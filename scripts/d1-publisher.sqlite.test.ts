@@ -1563,6 +1563,255 @@ describe('listing-categories-set and category-create in a row-level manifest (#3
   })
 })
 
+describe('listing-details-set in a row-level manifest (#340: a renamed product)', () => {
+  const live = { checksum: beforeChecksum, version: 4 }
+  const rows = (operations: Record<string, unknown>[]) =>
+    manifestSchema.parse({
+      version: 1,
+      id: 'renamed',
+      concurrency: 'rows',
+      provenance: { actor: 'test@example.com', workflow: 'test/sqlite' },
+      operations
+    })
+  const current = { name: 'Old', description: 'Description', website: 'https://example.com' }
+  const set = (details: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({
+    action: 'listing-details-set',
+    id: 'lst_sqlite_test',
+    slug: 'old-slug',
+    reason: 'Old is now New',
+    expected: current,
+    details,
+    ...extra
+  })
+  const websiteTaken =
+    'listing-details-set old-slug: the new website belongs to another listing or a submission in flight, or is blocked'
+  const renamed = {
+    name: 'New',
+    description: 'What New does.',
+    website: 'https://www.new.example/product/'
+  }
+  const details = (db: DatabaseSync) =>
+    db
+      .prepare(
+        "SELECT slug,name,description,website,status,is_active,checksum,updated_at FROM listings WHERE id='lst_sqlite_test'"
+      )
+      .get() as Record<string, unknown>
+  const publish = (db: DatabaseSync, operations: Record<string, unknown>[]) =>
+    executeInTestTransaction(db, buildPublicationPlan(rows(operations), 'renamed', now, live))
+  /** Asserts the batch was refused whole: the listing, the version, and the log as before. */
+  const expectRefused = (db: DatabaseSync, before: Record<string, unknown>) => {
+    expect(details(db)).toEqual(before)
+    expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
+      version: 4
+    })
+    expect(db.prepare('SELECT COUNT(*) AS count FROM listing_events').get()).toEqual({ count: 0 })
+  }
+
+  it('replaces the name, description, and website, and logs the edit', () => {
+    const db = database()
+    const before = details(db)
+    db.prepare('UPDATE publication_state SET version=9').run()
+    const publication = buildPublicationPlan(rows([set(renamed)]), 'renamed', now, {
+      ...live,
+      version: 9
+    })
+    expect(
+      publication.statements.flatMap(item => item.bindings).filter(b => typeof b === 'boolean')
+    ).toEqual([])
+    executeInTestTransaction(db, publication)
+    // Published as before, with a new checksum (a stale admin edit is refused) and lastmod.
+    const after = details(db)
+    expect(after).toMatchObject({
+      ...renamed,
+      slug: 'old-slug',
+      status: 'approved',
+      is_active: 1,
+      updated_at: now
+    })
+    expect(after.checksum).not.toBe(before.checksum)
+    expect(
+      db.prepare('SELECT listing_id,event_type,detail,actor FROM listing_events').all()
+    ).toEqual([
+      {
+        listing_id: 'lst_sqlite_test',
+        event_type: 'edited',
+        detail: JSON.stringify({
+          fields: ['name', 'description', 'website'],
+          manifest: 'renamed',
+          reason: 'Old is now New'
+        }),
+        actor: 'test@example.com'
+      }
+    ])
+    // The listing keeps its categories, and the catalog epoch turns over.
+    expect(
+      db
+        .prepare(
+          "SELECT COUNT(*) AS count FROM listing_categories WHERE listing_id='lst_sqlite_test'"
+        )
+        .get()
+    ).toEqual({ count: 1 })
+    expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
+      version: 10
+    })
+    expect(publication.affectedRoutes.split('\n')).toContain('/products/old-slug/')
+    // Applied once: the listing no longer has the expected details, so it is refused.
+    expect(() =>
+      executeInTestTransaction(
+        db,
+        buildPublicationPlan(rows([set(renamed)]), 'again', now, {
+          checksum: publication.afterChecksum,
+          version: 10
+        })
+      )
+    ).toThrow()
+    expect(details(db)).toEqual(after)
+  })
+
+  it('changes only the fields it names (#340: a one-line description fix)', () => {
+    const db = database()
+    publish(db, [set({ description: 'Fixed.' })])
+    expect(details(db)).toMatchObject({ ...current, description: 'Fixed.' })
+    expect(db.prepare('SELECT detail FROM listing_events').get()).toEqual({
+      detail: JSON.stringify({
+        fields: ['description'],
+        manifest: 'renamed',
+        reason: 'Old is now New'
+      })
+    })
+  })
+
+  it('refuses the whole batch when the listing changed since generation', () => {
+    for (const changed of [
+      { expected: { ...current, name: 'Older' } },
+      { expected: { ...current, description: 'Edited by an admin' } },
+      { expected: { ...current, website: 'https://example.com/' } },
+      { slug: 'new-slug' },
+      { id: 'lst_sqlite_missing' }
+    ]) {
+      const db = database()
+      const before = details(db)
+      // Each refusal names the operation and its reason in the error D1 reports (#338's guards).
+      expect(() => publish(db, [set(renamed, changed)]), JSON.stringify(changed)).toThrow(
+        `listing-details-set ${'slug' in changed ? changed.slug : 'old-slug'}: the listing is not approved, or its slug, name, description, or website changed since the manifest`
+      )
+      expectRefused(db, before)
+    }
+  })
+
+  it.each([
+    ["another listing's website", "'https://new.example/product?ref=x'", 'other.example'],
+    ['a listing whose slug is the new host', "'https://other.example'", 'new.example']
+  ])('refuses a website that is %s', (_name, website, slug) => {
+    const db = database()
+    db.exec(`INSERT INTO listings (id,slug,name,description,website,status,published_at,source_kind,source_identity,checksum)
+      VALUES ('lst_sqlite_other','${slug}','Other','Description',${website},'draft','${now}','test','fixture','${'d'.repeat(64)}');
+      INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary) VALUES ('lst_sqlite_other',1,0,1);`)
+    const before = details(db)
+    expect(() => publish(db, [set(renamed)])).toThrow(websiteTaken)
+    expectRefused(db, before)
+    // The name and description alone still change.
+    publish(db, [set({ name: 'New' })])
+    expect(details(db)).toMatchObject({ ...current, name: 'New' })
+  })
+
+  it('refuses a website a submission in flight or a block covers, and accepts it after', () => {
+    const db = database()
+    db.exec(`INSERT INTO listing_submissions (id,slug,name,description,website,content,category_slug,logo_url,status,plan)
+      VALUES ('sub_new','new.example','New','d','https://new.example/','c','seo','l','verified','free')`)
+    const before = details(db)
+    expect(() => publish(db, [set(renamed)])).toThrow(websiteTaken)
+    expectRefused(db, before)
+    db.exec(`UPDATE listing_submissions SET status='rejected', rejection_reason='No',
+        rejection_category='prohibited' WHERE id='sub_new';
+      INSERT INTO listing_submission_url_blocks (url_key,covers_subdomains,submission_id,reason,blocked_by,blocked_at)
+        VALUES ('new.example',1,'sub_new','No','admin','${now}')`)
+    expect(() => publish(db, [set(renamed)])).toThrow(websiteTaken)
+    expectRefused(db, before)
+    db.exec(`UPDATE listing_submission_url_blocks SET lifted_at='${now}', lifted_by='admin'`)
+    publish(db, [set(renamed)])
+    expect(details(db)).toMatchObject(renamed)
+  })
+
+  it.each(['paid_pending_review', 'changes_requested'])(
+    'refuses a listing whose own submission is %s',
+    status => {
+      const db = database()
+      db.exec(`INSERT INTO listing_submissions (id,slug,name,description,website,content,
+        category_slug,logo_url,status,plan,paid_at,listing_id,published_checksum)
+      VALUES ('sub','example.com','Old','d','https://example.com/','c','seo','l',
+        '${status}','paid','${now}','lst_sqlite_test',
+        (SELECT checksum FROM listings WHERE id='lst_sqlite_test'))`)
+      const before = details(db)
+      expect(() => publish(db, [set(renamed)])).toThrow(
+        'listing-details-set old-slug: its own submission is in review'
+      )
+      expectRefused(db, before)
+    }
+  )
+
+  it('refuses a listing whose own submission was rejected, which stays down and read-only', () => {
+    const db = database()
+    // A live rejection unpublishes the listing and leaves its row approved (submission-plans.ts).
+    db.exec(`UPDATE listings SET is_active=0 WHERE id='lst_sqlite_test';
+      INSERT INTO listing_submissions (id,slug,name,description,website,content,category_slug,
+        logo_url,status,plan,paid_at,listing_id,rejection_reason,rejection_category)
+      VALUES ('sub','example.com','Old','d','https://example.com/','c','seo','l','rejected',
+        'paid','${now}','lst_sqlite_test','No','prohibited')`)
+    const before = details(db)
+    for (const change of [renamed, { description: 'Fixed.' }]) {
+      expect(() => publish(db, [set(change)]), JSON.stringify(change)).toThrow(
+        'listing-details-set old-slug: its own submission was rejected'
+      )
+      expectRefused(db, before)
+    }
+  })
+
+  it.each(['draft', 'review', 'rejected'])('refuses a listing in %s', status => {
+    const db = database()
+    db.exec(`UPDATE listings SET status='${status}' WHERE id='lst_sqlite_test'`)
+    const before = details(db)
+    expect(() => publish(db, [set(renamed)])).toThrow(
+      /listing-details-set old-slug: the listing is not approved/u
+    )
+    expectRefused(db, before)
+  })
+
+  it('renames an unpublished listing and leaves it unpublished', () => {
+    const db = database()
+    db.exec("UPDATE listings SET is_active=0 WHERE id='lst_sqlite_test'")
+    publish(db, [set(renamed)])
+    expect(details(db)).toMatchObject({ ...renamed, status: 'approved', is_active: 0 })
+  })
+
+  it('stores the website trimmed, as the admin edit does, so exact website matches find it', () => {
+    const db = database()
+    const padded = { ...renamed, website: ` ${renamed.website}\n` }
+    expect(rows([set(padded)]).operations[0]).toMatchObject({ details: renamed })
+    publish(db, [set(padded)])
+    expect(details(db)).toMatchObject(renamed)
+  })
+
+  it('refuses details that change nothing, a non-public website, and over-long copy', () => {
+    expect(() => rows([set({})])).toThrow(/only the fields that change/u)
+    expect(() => rows([set({ name: 'Old' })])).toThrow(/only the fields that change/u)
+    expect(() => rows([set({ name: 'New', website: current.website })])).toThrow(
+      /only the fields that change/u
+    )
+    for (const website of ['http://localhost:3000/', 'http://10.0.0.1/', 'ftp://new.example/'])
+      expect(() => rows([set({ website })]), website).toThrow(/public HTTP\(S\) URL/u)
+    expect(() => rows([set({ name: 'N'.repeat(81) })])).toThrow()
+    expect(() => rows([set({ description: 'D'.repeat(161) })])).toThrow()
+    expect(() => rows([set({ name: '  ' })])).toThrow()
+    expect(() => rows([set(renamed, { reason: undefined })])).toThrow()
+    // Trimmed like the admin panel's edit; a listing is named once per manifest.
+    expect(rows([set({ name: '  New  ' })]).operations[0]).toMatchObject({
+      details: { name: 'New' }
+    })
+    expect(() => rows([set(renamed), set({ name: 'Newer' })])).toThrow(/Duplicate listing/u)
+  })
+})
+
 describe('listing-content-remove-suffix (#105: imported FAQ blocks move to the FAQs section)', () => {
   const body = 'Intro with an emoji 🚀 and more.'
   const suffix = '\n\n## FAQ\n\n### Is it free?\n\nYes.'
@@ -1766,6 +2015,42 @@ describe('listing-claim-hold-add and -clear (#67: holds for the owner’s review
     expect(() => executeInTestTransaction(db, rowsPlan([clear], 7))).toThrow()
     executeInTestTransaction(db, rowsPlan([add], 7))
     expect(holds(db)).toEqual([expect.objectContaining({ cleared_at: null, cleared_by: null })])
+  })
+
+  it('with expected.website, clears only once the listing has it (#340: after the renames)', () => {
+    const website = 'https://www.new.example/'
+    const ordered = { ...clear, expected: { website } }
+    const rename = {
+      action: 'listing-details-set',
+      id: 'lst_sqlite_test',
+      slug: 'old-slug',
+      reason: 'the product moved',
+      expected: { name: 'Old', description: 'Description', website: 'https://example.com' },
+      details: { website }
+    }
+    const db = database()
+    const sync = () => {
+      live = db
+        .prepare('SELECT version,checksum FROM publication_state WHERE id=1')
+        .get() as typeof live
+    }
+    live = { checksum: beforeChecksum, version: 4 }
+    executeInTestTransaction(db, rowsPlan([add]))
+    // Dispatched before the rename: refused whole, with the reason bound like every guard's.
+    sync()
+    expect(() => executeInTestTransaction(db, rowsPlan([ordered], 5))).toThrow(
+      `listing-claim-hold-clear old-slug: its website is not ${website} yet; publish the manifest that sets it first`
+    )
+    expect(holds(db)).toEqual([expect.objectContaining({ cleared_at: null, cleared_by: null })])
+    expect(db.prepare('SELECT version FROM publication_state').get()).toEqual({ version: 5 })
+    // After the rename sets the website, the same clear applies.
+    executeInTestTransaction(db, rowsPlan([rename], 5))
+    sync()
+    executeInTestTransaction(db, rowsPlan([ordered], 6))
+    expect(holds(db)).toEqual([expect.objectContaining({ cleared_at: now })])
+    // Without the field, the operation plans as it did before #340: no website guard.
+    expect(rowsPlan([clear]).statements.some(item => item.query.includes('website=?'))).toBe(false)
+    expect(rowsPlan([ordered]).statements.some(item => item.query.includes('website=?'))).toBe(true)
   })
 
   it('refuses a listing whose slug or website changed since the report', () => {
