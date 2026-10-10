@@ -44,7 +44,11 @@ From the edge inward:
 3. **Data cache** (Workers Cache API, `apps/web/src/db/cache.ts`). Shell counts,
    name order, name pages, featured/latest heads, details, search results (per normalized
    query and limit), and the full summary list (for sitemaps and the feed) are cached under
-   epoch-scoped keys for 24 hours, with live D1 fallback when the cache fails.
+   epoch-scoped keys for 24 hours, with live D1 fallback when the cache fails. So is each
+   listing body's parsed Markdown (`getDerivedValue`, `lib/markdown/listing-content.ts`, #334):
+   the page renders the cached tree instead of parsing the body on every uncached render. Its
+   key also names the tree's format (`LISTING_CONTENT_FORMAT`), which a change to the parser's
+   output must bump, because the data cache survives deployments.
 4. React `cache()` deduplicates reads within a request.
 
 Both Cache API layers are per data center and populate on demand. A deployment gets a new
