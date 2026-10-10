@@ -7,8 +7,8 @@ Each doc covers one topic. Open the one whose "read it when" matches the task.
 | [Architecture](./ARCHITECTURE.md) | Runtime boundaries and responsibilities | You change the Worker entry, a binding, an environment or host rule, or which layer owns what |
 | [URLs](./URLS.md) | Canonical URLs, redirects, pagination, sitemaps and structured data | You add a route, a redirect, a sitemap, or structured data |
 | [Caching](./CACHING.md) | The catalog epoch and the four cache layers | You change what a page caches, or a change isn't showing |
-| [Data model](./DATA_MODEL.md) | D1 schema, eligibility, caching, the initial import | You touch a table, a query, what a page may show, or the catalog caches |
-| [Development](./DEVELOPMENT.md) | Local catalog, Worker preview, schema changes | You set up a checkout, run the Worker locally, or change the schema |
+| [Data model](./DATA_MODEL.md) | D1 schema, eligibility, caching, where the catalog came from | You touch a table, a query, what a page may show, or the catalog caches |
+| [Development](./DEVELOPMENT.md) | Local data, Worker preview, schema changes | You set up a checkout, run the Worker locally, or change the schema |
 | [Submission flow](./SUBMISSION_FLOW.md) | Public intake, badge verification, review | You change `/submit` or how a submission reaches review |
 | [Claims](./CLAIMS.md) | Claiming an existing listing: domain-email code, badge or payment | You change the claim link, its checks, or ownership |
 | [Badge program](./BADGE_PROGRAM.md) | Weekly badge checks, rechecks, unpublishing, ownership removal | You change the badge crons or what a failed check does |
@@ -22,7 +22,6 @@ Each doc covers one topic. Open the one whose "read it when" matches the task.
 | [Admin panel](./ADMIN_PANEL.md) | `/admin` screens, decisions, the production-write exception | You change an `/admin` screen or a decision it writes |
 | [Deploy runbook](./DEPLOY_RUNBOOK.md) | Environments, workflows and their guards, production release, recovery, post-deploy checks | Before any Cloudflare operation or release, or when a deploy gate fails |
 | [Deploy credentials](./DEPLOY_CREDENTIALS.md) | The Cloudflare API token, the GitHub environments that hold it, what a leak reaches | You create, rotate or narrow the token or an environment's secrets |
-| [Production D1 bootstrap](./PRODUCTION_BOOTSTRAP.md) | Importing the reviewed catalog into an empty production D1, its rehearsal and read-only checks | You re-create production D1 from the reviewed import |
 | [Production cutover](./PRODUCTION_CUTOVER.md) | The finished move of best.serp.co from GitHub Pages to the Worker, and the canonical-host switch | Code or a gate mentions the cutover or the canonical-host switch |
 | [Telemetry](./TELEMETRY.md) | Sentry error reporting, GTM and Cloudflare Web Analytics | You add logging, error reporting, or analytics |
 | [D1 recovery](./D1_RECOVERY.md) | Undoing a production write with D1 Time Travel | A production write needs undoing |
@@ -39,6 +38,7 @@ Each doc covers one topic. Open the one whose "read it when" matches the task.
 | [Domain docs](./agents/domain.md) | Shared vocabulary configuration | You name a domain concept |
 
 Root navigation and non-negotiable rules live in [`AGENTS.md`](../AGENTS.md). Planning
-lives in GitHub Issues on `serpcompany/best.serp.co`. History, such as the first promotion plan
-and the #70 submission mockups with their approved copy, is in `.archive/`: it explains how a
-decision came about, but it doesn't override these docs or the code.
+lives in GitHub Issues on `serpcompany/best.serp.co`. History, such as the v1 catalog import and
+the production D1 bootstrap (#315), the first promotion plan, and the #70 submission mockups with
+their approved copy, is in [`.archive/`](../.archive/README.md): it explains how a decision came
+about, but it doesn't override these docs or the code.

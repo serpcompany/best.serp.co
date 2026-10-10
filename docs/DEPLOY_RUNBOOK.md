@@ -29,7 +29,7 @@ Cloudflare token and the GitHub environments that hold it are in
 [Release guards](./RELEASE_GUARDS.md) says which target each `db:*` command reaches, defines
 the `staging` → `main` promotion and the hotfix path, and explains the staging-before-production
 check (the released commit must carry a tree Deploy Staging verified) that gates production
-migrations, imports, and Worker deploys.
+migrations and Worker deploys.
 
 ## Workflows
 
@@ -37,7 +37,6 @@ migrations, imports, and Worker deploys.
 |---|---|---|---|---|
 | `web.yml` (`deploy-staging`) | push to `staging` after `check`, `e2e` and `tip`, manual from `staging` | `staging` | none | build → tip guard → D1 bookmark → migrations → deploy → HTTP gates → Playwright smoke |
 | `deploy-production.yml` | push to `main`, manual | `production` | dispatch: `deploy-best.serp.co-production` (or `hotfix-…`) | Staging verification → `pnpm harness:fast` → build → `plan-release` → (pending migrations: bookmark → migrate) → deploy → HTTP gates |
-| `bootstrap-production-d1.yml` | manual, `main` | `production` | `bootstrap-best.serp.co-production` | Staging verification → D1 bookmark → initial catalog import into an empty production D1 → parity verification ([bootstrap](./PRODUCTION_BOOTSTRAP.md)) |
 | `publish-d1.yml`, `publish-d1-staging.yml` | manual, `main` / `staging` | `production` / `staging` | `publish-best.serp.co-<env>` | D1 bookmark → apply one reviewed manifest, staging first |
 | `upload-media.yml`, `upload-media-staging.yml` | manual, `main` / `staging` | `production` / `staging` | `upload-media-best.serp.co-<env>` | Upload one reviewed `d1/media/` plan to R2, no D1 change ([media](./MEDIA.md)) |
 | `media-health.yml` | weekly | `production-media-health` | none | [Health](./MEDIA_HEALTH.md) |
@@ -46,12 +45,11 @@ Guards, in order:
 
 1. An `authorize` job with no secrets checks the workflow's branch and, on a dispatch, the typed
    confirmation (and the manifest or plan path), so a mistyped dispatch never
-   requests reviewer approval. Deploy Production and Bootstrap Production D1 also require
-   Deploy Staging to have verified the commit's tree (see
-   [Release guards](./RELEASE_GUARDS.md#staging-before-production)).
+   requests reviewer approval. Deploy Production also requires Deploy Staging to have verified
+   the commit's tree (see [Release guards](./RELEASE_GUARDS.md#staging-before-production)).
 2. The GitHub `production` environment requires reviewer approval, for pushes and dispatches.
-3. `scripts/cloudflare-release.ts` refuses every mutating command (`migrate`, `import`,
-   `deploy`) outside the workflow, branch, events, and environment that own it, at anything but
+3. `scripts/cloudflare-release.ts` refuses every mutating command (`migrate`, `deploy`) outside
+   the workflow, branch, events, and environment that own it, at anything but
    a clean `GITHUB_SHA`, or on a dispatch without the confirmation in `RELEASE_CONFIRM` (its
    header has the full rule). Production ones also require the verified Deploy Staging run (a
    hotfix dispatch of a merged `hotfix-*` pull request may only `deploy` without it) and a

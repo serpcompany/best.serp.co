@@ -15,6 +15,7 @@
       "!**/.wrangler",
       "!apps/web/cloudflare-env.d.ts",
       "!apps/web/drizzle",
+      // History, not live code (#315): kept as it was when archived, never linted or formatted.
       "!.archive"
     ]
   },

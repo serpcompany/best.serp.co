@@ -23,7 +23,8 @@ const REQUIRED_FILES = [
 
 /**
  * Whether the checks below hold a file to the documentation rules. `.archive/` keeps history
- * as it was (serp's docs README): it is read, not maintained, so its links and sizes go unchecked.
+ * as it was (serp's docs README, #315): it is read, not maintained, so its links and sizes go
+ * unchecked.
  */
 export function isMaintainedFile(file: string): boolean {
   return !file.startsWith('.archive/')
@@ -35,7 +36,7 @@ function repositoryFiles(root: string): string[] {
     encoding: 'utf8'
   })
     .split('\n')
-    .filter(Boolean)
+    .filter(file => file && isMaintainedFile(file))
 }
 
 function markdownLinkTargets(source: string): string[] {
@@ -164,9 +165,7 @@ export function validatePlanningDocumentation(
 
 export function checkDocumentation(root = resolve('.')): string[] {
   const violations: string[] = []
-  const files = repositoryFiles(root).filter(
-    file => isMaintainedFile(file) && existsSync(resolve(root, file))
-  )
+  const files = repositoryFiles(root).filter(file => existsSync(resolve(root, file)))
 
   for (const file of REQUIRED_FILES) {
     if (!existsSync(resolve(root, file)))
@@ -239,8 +238,7 @@ export function checkDocumentation(root = resolve('.')): string[] {
     'agent:ui:capture',
     'worktree:new',
     'worktree:doctor',
-    'worktree:destroy',
-    'migration:preflight'
+    'worktree:destroy'
   ]) {
     if (!rootManifest.scripts?.[script]) violations.push(`package.json: missing ${script} command`)
   }

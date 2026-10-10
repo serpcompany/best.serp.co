@@ -18,11 +18,13 @@ import {
   q,
   removeAdmin,
   removeLeftoverAdmins,
+  runStatements,
   seedAdminCatalog,
   signInAsNewAdmin,
   localD1 as suiteD1,
   unique
 } from './admin-fixture'
+import { insert, listingStatements, type SeedStatement } from './fixture-seed'
 import { escapeRegExp } from './site-fixture'
 import { type FixtureSite, startFixtureSite } from './submit-fixture'
 import { expectedResponse, test } from './test'
@@ -54,6 +56,59 @@ test.use({ baseURL: adminOrigin(accountServer) })
 /** SQL on this suite's own local D1 (`accountServer`). */
 function localD1<T = Record<string, unknown>>(sql: string): T[] {
   return suiteD1<T>(sql, accountServer)
+}
+
+/**
+ * A live listing an approved submission left on this suite's D1, with a logo source, owned by
+ * `ownerId` (an admin-verified owner) and FAQs before it goes live.
+ */
+function insertOwnedListing(listing: {
+  content: string
+  description: string
+  faqs?: SeedStatement[]
+  id: string
+  name: string
+  ownerId: string
+  slug: string
+}): void {
+  runStatements(
+    [
+      ...listingStatements({
+        beforeApproval: [
+          insert('listing_media', {
+            kind: 'logo',
+            listing_id: listing.id,
+            sort_order: 0,
+            url: `https://${listing.slug}/logo.png`
+          }),
+          ...(listing.faqs ?? [])
+        ],
+        category: activeCategory(),
+        row: {
+          checksum: `e2e-${listing.id}`,
+          content: listing.content,
+          description: listing.description,
+          id: listing.id,
+          link_rel: 'nofollow',
+          name: listing.name,
+          published_at: '2026-09-01',
+          slug: listing.slug,
+          source: 'submission',
+          source_identity: listing.id,
+          source_kind: 'verified-submission',
+          website: `https://${listing.slug}/`
+        }
+      }),
+      insert('listing_owners', {
+        listing_id: listing.id,
+        role: 'owner',
+        user_id: listing.ownerId,
+        verified_at: '2026-09-01T00:00:00.000Z',
+        verified_via: 'admin'
+      })
+    ],
+    accountServer
+  )
 }
 
 const screenshots = process.env.ACCOUNT_SCREENSHOT_DIRECTORY
@@ -497,20 +552,14 @@ test('shows and acts on the user’s own records only, never cached or indexed',
   const [ownerUser] = localD1<{ id: string }>(
     `SELECT id FROM users WHERE email = ${q(owner.email)}`
   )
-  localD1(`
-    INSERT INTO listings (id, slug, name, description, website, content, status, published_at,
-      source_kind, source_identity, checksum, source, link_rel)
-    VALUES (${q(listingId)}, ${q(listingSlug)}, 'Owned listing', 'Owned.', ${q(`https://${listingSlug}/`)},
-      '', 'draft', '2026-09-01', 'verified-submission', ${q(listingId)}, ${q(`e2e-${listingId}`)},
-      'submission', 'nofollow');
-    INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
-      SELECT ${q(listingId)}, id, 0, 1 FROM categories WHERE slug = ${q(activeCategory())};
-    INSERT INTO listing_media (listing_id, kind, url, sort_order)
-      VALUES (${q(listingId)}, 'logo', ${q(`https://${listingSlug}/logo.png`)}, 0);
-    UPDATE listings SET status = 'approved' WHERE id = ${q(listingId)};
-    INSERT INTO listing_owners (listing_id, user_id, role, verified_via, verified_at)
-      VALUES (${q(listingId)}, ${q(ownerUser?.id ?? '')}, 'owner', 'admin', '2026-09-01T00:00:00.000Z');
-  `)
+  insertOwnedListing({
+    content: '',
+    description: 'Owned.',
+    id: listingId,
+    name: 'Owned listing',
+    ownerId: ownerUser?.id ?? '',
+    slug: listingSlug
+  })
   await owner.page.goto(`/account/listings/${listingSlug}/edit/`)
   await expect(owner.page.getByRole('heading', { name: 'Edit Owned listing' })).toBeVisible()
 
@@ -616,27 +665,17 @@ function seedOwnedListing(
   const id = `e2e-faqs-${label}-${unique()}`
   const slug = `${id}.example`
   const [owner] = localD1<{ id: string }>(`SELECT id FROM users WHERE email = ${q(ownerEmail)}`)
-  localD1(`
-    INSERT INTO listings (id, slug, name, description, website, content, status, published_at,
-      source_kind, source_identity, checksum, source, link_rel)
-    VALUES (${q(id)}, ${q(slug)}, ${q(`FAQ ${label}`)}, 'A listing for the FAQ section.',
-      ${q(`https://${slug}/`)}, ${q(content)}, 'draft', '2026-09-01', 'verified-submission', ${q(id)},
-      ${q(`e2e-${id}`)}, 'submission', 'nofollow');
-    INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
-      SELECT ${q(id)}, id, 0, 1 FROM categories WHERE slug = ${q(activeCategory())};
-    INSERT INTO listing_media (listing_id, kind, url, sort_order)
-      VALUES (${q(id)}, 'logo', ${q(`https://${slug}/logo.png`)}, 0);
-    ${faqs
-      .map(
-        ([question, answer], index) =>
-          `INSERT INTO listing_faqs (listing_id, question, answer, sort_order)
-            VALUES (${q(id)}, ${q(question)}, ${q(answer)}, ${index});`
-      )
-      .join('\n')}
-    UPDATE listings SET status = 'approved' WHERE id = ${q(id)};
-    INSERT INTO listing_owners (listing_id, user_id, role, verified_via, verified_at)
-      VALUES (${q(id)}, ${q(owner?.id ?? '')}, 'owner', 'admin', '2026-09-01T00:00:00.000Z');
-  `)
+  insertOwnedListing({
+    content,
+    description: 'A listing for the FAQ section.',
+    faqs: faqs.map(([question, answer], index) =>
+      insert('listing_faqs', { answer, listing_id: id, question, sort_order: index })
+    ),
+    id,
+    name: `FAQ ${label}`,
+    ownerId: owner?.id ?? '',
+    slug
+  })
   return { id, slug }
 }
 

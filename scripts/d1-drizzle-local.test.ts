@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
@@ -14,10 +14,11 @@ import {
   requiredIndexNames
 } from './d1-drizzle-local'
 import { validateCanonicalLocalConfig } from './d1-local-config'
+import { localSqlitePath } from './d1-local-guard'
 import { canonicalPreviewCommand, localPreviewVarArgs } from './d1-local-preview'
 import { resolveFreshD1StateRoot } from './d1-local-state'
 import { parseManifest } from './d1-publisher'
-import { applicationColumnInventory, importOrder, parityTableNames } from './d1-table-inventory'
+import { applicationColumnInventory, importOrder, orderedRowsSql } from './d1-table-inventory'
 import { project } from './project'
 
 const temporaryDirectories: string[] = []
@@ -88,27 +89,6 @@ function executeLocal(stateDirectory: string, command: string): void {
       project.local.databaseName,
       '--command',
       command,
-      '--local',
-      '--persist-to',
-      resolve(stateDirectory, 'drizzle', 'best-serp-co'),
-      '--config',
-      project.wranglerConfigPath
-    ],
-    { stdio: 'ignore' }
-  )
-}
-
-function mutateCanonicalState(stateDirectory: string): void {
-  execFileSync(
-    'pnpm',
-    [
-      'exec',
-      'wrangler',
-      'd1',
-      'execute',
-      project.local.databaseName,
-      '--command',
-      "UPDATE listing_resource_links SET label=label || ' tampered' WHERE id=(SELECT id FROM listing_resource_links ORDER BY id LIMIT 1)",
       '--local',
       '--persist-to',
       resolve(stateDirectory, 'drizzle', 'best-serp-co'),
@@ -244,7 +224,7 @@ describe('fresh Drizzle D1 history', () => {
     const rows = database
       .prepare('SELECT email, created_at FROM admin_allowlist ORDER BY email')
       .all()
-    // A fixed created_at keeps the bootstrap snapshot (verify-import, db:verify:local) exact.
+    // A fixed created_at keeps every fresh database, and so the fixture seed, the same.
     expect(rows.map(row => [String(row.email), String(row.created_at)])).toEqual([
       ['devin@serp.co', '2026-10-06 00:00:00']
     ])
@@ -575,35 +555,36 @@ describe('fresh Drizzle D1 history', () => {
     expect(runLocal('migrate', stateDirectory)).toContain('No migrations to apply')
   }, 180_000)
 
-  it.runIf(
-    existsSync(resolve(project.artifact.batchDirectory, '0001.sql')) ||
-      existsSync(resolve(project.artifact.compressedSqlPath))
-  )(
-    'bootstraps the reviewed initial artifact with exact repeatable parity',
-    () => {
-      const stateDirectory = temporaryDirectory('best-serp-co-bootstrap-')
-      runLocal('migrate', stateDirectory)
-      runLocal('import', stateDirectory)
-      expect(runLocal('verify', stateDirectory)).toContain('Verified local D1 publication')
-      expect(runLocal('import', stateDirectory)).toContain('import is a no-op')
-      expect(runLocal('verify', stateDirectory)).toContain('Verified local D1 publication')
-      // Accounts created at runtime (sign-ins, code limits) are outside bootstrap parity.
-      executeLocal(
-        stateDirectory,
-        "INSERT INTO users (id, name, email, email_verified) VALUES ('u1', '', 'a@example.com', 1); INSERT INTO auth_rate_limit_hits (bucket, hit_at) VALUES ('b', 1)"
+  it('seeds fixtures (#312) with the same rows on every run, and verifies their facts', () => {
+    const stateDirectory = temporaryDirectory('best-serp-co-seed-')
+    const rows = () => {
+      const database = new DatabaseSync(
+        localSqlitePath(resolve(stateDirectory, 'drizzle', 'best-serp-co')),
+        { readOnly: true }
       )
-      // The count comes from the table inventory, so a migration that adds a table cannot
-      // leave a stale number here (#77).
-      const parityTables = `${parityTableNames.length}-table`
-      expect(runLocal('verify', stateDirectory)).toContain(`exact ${parityTables} snapshot`)
-      mutateCanonicalState(stateDirectory)
-      // The tampered table, and nothing else, must fail parity (not a crash or a missing report).
-      expect(failingLocalStderr('verify', stateDirectory)).toContain(
-        `Local D1 exact ${parityTables} bootstrap parity failed: listing_resource_links.`
-      )
-    },
-    240_000
-  )
+      try {
+        return Object.fromEntries(
+          applicationTableNames.map(table => [table, database.prepare(orderedRowsSql(table)).all()])
+        )
+      } finally {
+        database.close()
+      }
+    }
+    // A migrated D1 without the seed is not local data: verify sends it to the seed (#315).
+    runLocal('migrate', stateDirectory)
+    expect(failingLocalStderr('verify', stateDirectory)).toContain('pnpm db:seed:local')
+    expect(runLocal('seed', stateDirectory)).toContain('Seeded local D1 with fixtures')
+    const first = rows()
+    expect(runLocal('verify', stateDirectory)).toContain('fixture seed facts')
+    // The v1 import is retired: its command names the seed instead of loading the catalog.
+    expect(failingLocalStderr('import', stateDirectory)).toContain('v1 catalog import is retired')
+    // A re-run resets the state first, so local changes are gone and the rows are the same.
+    executeLocal(stateDirectory, "UPDATE listings SET name='Changed' WHERE slug='fixture-studio'")
+    expect(failingLocalStderr('verify', stateDirectory)).toContain('no longer matches')
+    runLocal('seed', stateDirectory)
+    expect(rows()).toEqual(first)
+    expect(runLocal('verify', stateDirectory)).toContain('fixture seed facts')
+  }, 240_000)
 
   it('rejects the retired --site argument with remediation', () => {
     expect(() =>
@@ -799,12 +780,17 @@ describe('fresh Drizzle D1 history', () => {
         expect(() => localPreviewVarArgs(refused), refused).toThrow(/LOCAL_PREVIEW_VARS/u)
       }
 
+      // Playwright's default server runs on the fixture seed, never the real catalog (#313).
       const playwright = readFileSync(resolve('apps/web/playwright.config.ts'), 'utf8')
-      expect(playwright).toContain('pnpm db:migrate:local')
-      expect(playwright).toContain('pnpm db:import:local')
-      expect(playwright).toContain('pnpm db:verify:local')
-      expect(playwright).toContain('pnpm preview')
+      expect(playwright).toMatch(
+        /pnpm db:seed:local && pnpm db:verify:local && PORT=\S+ pnpm preview/u
+      )
+      expect(playwright).not.toContain('db:import:local')
       expect(playwright).not.toContain('pornvideodownloaders')
+      const e2eSources = readdirSync(resolve('apps/web/e2e'))
+        .filter(name => name.endsWith('.ts'))
+        .map(name => readFileSync(resolve('apps/web/e2e', name), 'utf8'))
+      expect(e2eSources.filter(source => source.includes('db:import:local'))).toEqual([])
     } finally {
       if (previous === undefined) delete process.env.HARNESS_D1_STATE_DIRECTORY
       else process.env.HARNESS_D1_STATE_DIRECTORY = previous
@@ -820,9 +806,12 @@ describe('fresh Drizzle D1 history', () => {
     expect(scripts['db:generate']).toBe('cd apps/web && drizzle-kit generate')
     expect(Object.keys(scripts).filter(name => name.startsWith('d1:'))).toEqual([])
     expect(scripts['db:migrations:list:local']).toBe('pnpm tsx scripts/d1-local-guard.ts list')
-    for (const command of ['migrate', 'import', 'verify', 'publish']) {
+    for (const command of ['migrate', 'seed', 'verify', 'publish']) {
       expect(scripts[`db:${command}:local`]).toBe(`pnpm tsx scripts/d1-local-guard.ts ${command}`)
     }
+    // The v1 import and its one-time tooling are archived (#315).
+    expect(scripts['db:import:local']).toBeUndefined()
+    expect(Object.keys(scripts).filter(name => name.startsWith('migration:'))).toEqual([])
     expect(Object.values(scripts).join('\n')).not.toMatch(/--site\b/u)
   })
 })

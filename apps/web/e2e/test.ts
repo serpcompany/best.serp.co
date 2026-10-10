@@ -1,13 +1,14 @@
 import { type BrowserContext, test as base, type Page } from '@playwright/test'
 
 /**
- * Always allowed: images the committed D1 import still points at legacy media hosts that no
- * longer serve them. Local and CI runs load that import; production's listing media is migrated
- * and checked by `pnpm media:health`, so a miss here is data, not a code error. Only local and
- * CI runs (pages on 127.0.0.1) get it, and a miss on the site's own fallback tile never does.
+ * Always allowed: a site-relative legacy logo (`/listing-logos/<host>/…`) that a spec seeds the
+ * way the one-time import left listings (`seedImportedListing` in `admin-fixture.ts`), which the
+ * Worker doesn't serve. The fixture seed hosts its logos (#313), so nothing else may miss. Only
+ * local and CI runs (pages on 127.0.0.1) get it, and a miss on the site's own fallback tile never
+ * does.
  */
-const catalogMediaMiss =
-  /^console\.error on http:\/\/127\.0\.0\.1:\d+\/[^:]*: Failed to load resource: the server responded with a status of 404 \(Not Found\) \((?!.*favicon-fallback-512x512\.png)(?:http:\/\/127\.0\.0\.1:\d+\/listing-logos\/|https:\/\/imagedelivery\.net\/|https:\/\/raw\.githubusercontent\.com\/serpapps\/)/u
+const legacyLogoMiss =
+  /^console\.error on http:\/\/127\.0\.0\.1:\d+\/[^:]*: Failed to load resource: the server responded with a status of 404 \(Not Found\) \((?!.*favicon-fallback-512x512\.png)http:\/\/127\.0\.0\.1:\d+\/listing-logos\//u
 
 /**
  * Always allowed: listings the specs seed point their logos at reserved `.example` hosts
@@ -48,7 +49,7 @@ export const test = base.extend<ConsoleFixtures>({
     async ({ allowedConsoleErrors, browser, context }, use) => {
       const errors: string[] = []
       const record = (entry: string) => {
-        const allowed = [catalogMediaMiss, seededExampleHost, ...allowedConsoleErrors.patterns]
+        const allowed = [legacyLogoMiss, seededExampleHost, ...allowedConsoleErrors.patterns]
         if (!allowed.some(pattern => pattern.test(entry))) errors.push(entry)
       }
       const watchPage = (page: Page) => {

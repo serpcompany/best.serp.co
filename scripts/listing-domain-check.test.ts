@@ -1,35 +1,25 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
+import { DatabaseSync } from 'node:sqlite'
 import { describe, expect, it, vi } from 'vitest'
-import { parse } from 'yaml'
-import { LISTING_IN_RETIRED_CATEGORY_SQL } from '../apps/web/src/db/catalog-epoch'
-import { assertD1StatementLimits } from '../apps/web/src/db/sql-limits'
+import type { D1Row, ProcessRunner } from './cloudflare-release'
 import { freshMigrationNames, freshMigrationsDirectory } from './d1-drizzle-local'
-import { readParityReport, readReviewedImportSql } from './d1-import-artifact'
-import { buildPublicationPlan, parseManifest } from './d1-publisher'
+import { parseManifest } from './d1-publisher'
 import {
   type AdultDecisions,
-  adultDecisionsPathFor,
-  adultManifestIds,
-  applyManifest,
   buildAdultManifests,
   buildDeadDomainManifest,
   buildDecisionsManifest,
   buildReport,
   buildUnpublishManifest,
   type CatalogListing,
-  committedPublications,
-  type DomainReport,
+  catalogListings,
   deadDomainEntries,
-  decisionsPathFor,
-  liveListings,
+  environmentListings,
+  LIVE_LISTINGS_SQL,
   type OwnerListDecisions,
-  parseArguments,
-  recheckPathFor,
-  reviewedCatalogDatabase,
-  reviewedImportListings
+  parseArguments
 } from './listing-domain-check'
 import {
   type CheckedListing,
@@ -49,7 +39,6 @@ import {
   traceWebsite,
   vettedLookup
 } from './listing-domain-fetch'
-import { ADULT_TERMS } from './migration/legacy-media'
 
 const listing = (overrides: Partial<CheckedListing> = {}): CheckedListing => ({
   description: 'Writes marketing copy with AI.',
@@ -711,6 +700,122 @@ describe('listing domain fetch', () => {
   })
 })
 
+describe('listing domain check source (#315)', () => {
+  /** A migrated database with live, unpublished, and draft fixture listings. */
+  function fixtureCatalog(): DatabaseSync {
+    const database = new DatabaseSync(':memory:')
+    for (const migration of freshMigrationNames()) {
+      database.exec(readFileSync(resolve(freshMigrationsDirectory, migration), 'utf8'))
+    }
+    database.exec(`
+      INSERT INTO categories (id,slug,name) VALUES (1,'seo','SEO'),(2,'ai-writing','AI Writing');
+      INSERT INTO listings (id,slug,name,description,website,status,is_active,published_at,source_kind,source_identity,checksum) VALUES
+        ('lst_fixture00001','acme.ai','Acme','Writes copy.','https://serp.ly/acme','draft',1,'2026-01-01','fixture','acme','${'a'.repeat(64)}'),
+        ('lst_fixture00002','bravo.io','Bravo','Ranks pages.','https://serp.ly/bravo','draft',1,'2026-01-01','fixture','bravo','${'b'.repeat(64)}'),
+        ('lst_fixture00003','carta.app','Carta','Gone.','https://serp.ly/carta','draft',1,'2026-01-01','fixture','carta','${'c'.repeat(64)}'),
+        ('lst_fixture00004','delta.dev','Delta','Draft.','https://serp.ly/delta','draft',1,'2026-01-01','fixture','delta','${'d'.repeat(64)}');
+      INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary) VALUES
+        ('lst_fixture00001',2,0,1),
+        ('lst_fixture00002',2,1,0),('lst_fixture00002',1,0,1),
+        ('lst_fixture00003',1,0,1),
+        ('lst_fixture00004',1,0,1);
+      UPDATE listings SET status='approved' WHERE id IN ('lst_fixture00001','lst_fixture00002','lst_fixture00003');
+      UPDATE listings SET is_active=0 WHERE id='lst_fixture00003';
+    `)
+    return database
+  }
+
+  it('reads the live listings with their active categories in order, in one SELECT', () => {
+    const database = fixtureCatalog()
+    try {
+      const rows = database.prepare(LIVE_LISTINGS_SQL).all() as D1Row[]
+      expect(catalogListings(rows)).toEqual([
+        {
+          categories: ['ai-writing'],
+          description: 'Writes copy.',
+          id: 'lst_fixture00001',
+          name: 'Acme',
+          slug: 'acme.ai',
+          website: 'https://serp.ly/acme'
+        },
+        {
+          categories: ['seo', 'ai-writing'],
+          description: 'Ranks pages.',
+          id: 'lst_fixture00002',
+          name: 'Bravo',
+          slug: 'bravo.io',
+          website: 'https://serp.ly/bravo'
+        }
+      ])
+    } finally {
+      database.close()
+    }
+    expect(LIVE_LISTINGS_SQL).toMatch(/^SELECT\b/u)
+    expect(LIVE_LISTINGS_SQL).not.toMatch(
+      /;|\b(?:INSERT|UPDATE|DELETE|REPLACE|DROP|ALTER|CREATE|PRAGMA|ATTACH|VACUUM)\b/iu
+    )
+    // Reads only: that one SELECT through the release tooling's D1 target, never a write.
+    const source = readFileSync(resolve('scripts/listing-domain-check.ts'), 'utf8')
+    expect(source.match(/\.query\(/gu)).toHaveLength(1)
+    expect(source).not.toMatch(/applyMigrations|executeFile|d1-remote-publisher/u)
+  })
+
+  it('names --env in every documented catalog:domains command (#319 review)', () => {
+    // Every command reads the environment's listings, the manifest ones included, so a runbook
+    // line without --env would only print the usage error.
+    const sources = execFileSync('git', ['ls-files', '*.md', '*.mdx', 'scripts/*.ts'], {
+      encoding: 'utf8'
+    })
+      .split('\n')
+      .filter(file => file && !file.startsWith('.archive/'))
+    const commands = sources.flatMap(file =>
+      readFileSync(resolve(file), 'utf8')
+        .split('\n')
+        .filter(line => /pnpm catalog:domains --/u.test(line) && !/Generated by/u.test(line))
+        .map(line => `${file}: ${line.trim()}`)
+    )
+    expect(commands.length).toBeGreaterThan(10)
+    expect(commands.filter(line => !/--env (?:production|staging)\b/u.test(line))).toEqual([])
+  })
+
+  it('asks the named environment’s remote D1, read-only, through the release tooling', async () => {
+    const database = fixtureCatalog()
+    const calls: string[][] = []
+    const runner: ProcessRunner = {
+      run(command, args, { capture }) {
+        calls.push([command, ...args])
+        expect(capture).toBe(true)
+        const sql = args[args.indexOf('--command') + 1] ?? ''
+        return JSON.stringify([{ results: database.prepare(sql).all(), success: true }])
+      }
+    }
+    try {
+      const listings = await environmentListings('staging', runner)
+      expect(listings.map(item => item.slug)).toEqual(['acme.ai', 'bravo.io'])
+    } finally {
+      database.close()
+    }
+    expect(calls).toEqual([
+      [
+        'pnpm',
+        'exec',
+        'wrangler',
+        'd1',
+        'execute',
+        'best-serp-co-staging',
+        '--remote',
+        '--env',
+        'staging',
+        '--config',
+        'apps/web/wrangler.jsonc',
+        '--command',
+        LIVE_LISTINGS_SQL,
+        '--json'
+      ]
+    ])
+  })
+})
+
 describe('listing domain report and manifest', () => {
   const catalog: CatalogListing[] = [
     { ...listing(), categories: ['ai-writing'] },
@@ -788,19 +893,31 @@ describe('listing domain report and manifest', () => {
     ).toThrow('no longer matches')
   })
 
-  it('parses its arguments strictly', () => {
-    expect(parseArguments(['--', 'manifest', '--date', '2026-10-06'])).toMatchObject({
+  it('parses its arguments strictly, and always names the environment it reads (#315)', () => {
+    const env = ['--env', 'production']
+    expect(parseArguments(['--', 'manifest', '--date', '2026-10-06', ...env])).toMatchObject({
       command: 'manifest',
-      date: '2026-10-06'
+      date: '2026-10-06',
+      environment: 'production'
     })
-    expect(() => parseArguments(['--date', '6/10/2026'])).toThrow('YYYY-MM-DD')
-    expect(() => parseArguments(['--concurrency', '0'])).toThrow('1 to 32')
-    expect(() => parseArguments(['--site', 'x'])).toThrow('Unknown argument')
+    expect(parseArguments(['--env', 'staging'])).toMatchObject({
+      command: 'scan',
+      environment: 'staging'
+    })
+    for (const missing of [[], ['--env', 'local'], ['--env', 'preview'], ['--env']]) {
+      expect(() => parseArguments(missing), missing.join(' ')).toThrow(/--env|needs a value/u)
+    }
+    expect(() => parseArguments(['manifest'])).toThrow('--env staging|production is required')
+    expect(() => parseArguments(['--date', '6/10/2026', ...env])).toThrow('YYYY-MM-DD')
+    expect(() => parseArguments(['--concurrency', '0', ...env])).toThrow('1 to 32')
+    expect(() => parseArguments(['--site', 'x', ...env])).toThrow('Unknown argument')
     expect(
-      parseArguments(['dead-manifest', '--date', '2026-10-07', '--since', '2026-10-06'])
+      parseArguments(['dead-manifest', '--date', '2026-10-07', '--since', '2026-10-06', ...env])
     ).toMatchObject({ command: 'dead-manifest', date: '2026-10-07', since: '2026-10-06' })
-    expect(() => parseArguments(['dead-manifest', '--date', '2026-10-07'])).toThrow('--since')
-    expect(parseArguments(['adult-manifest', '--date', '2026-10-09'])).toMatchObject({
+    expect(() => parseArguments(['dead-manifest', '--date', '2026-10-07', ...env])).toThrow(
+      '--since'
+    )
+    expect(parseArguments(['adult-manifest', '--date', '2026-10-09', ...env])).toMatchObject({
       command: 'adult-manifest',
       date: '2026-10-09'
     })
@@ -856,117 +973,6 @@ describe('listing domain report and manifest', () => {
     ).toThrow('nothing to unpublish')
   })
 
-  it('keeps each committed dead-domain manifest identical to its two committed checks', () => {
-    const manifests = readdirSync(resolve('d1/publications')).filter(file =>
-      file.endsWith('-dead-domains.yaml')
-    )
-    const listings = reviewedImportListings()
-    for (const file of manifests) {
-      const source = readFileSync(resolve('d1/publications', file), 'utf8')
-      const manifest = parseManifest(source)
-      const [, earlierPath, recheckPath] = source.match(/^# Evidence: (\S+) and (\S+)\.$/mu) ?? []
-      expect(recheckPath, file).toBe(recheckPathFor(file.slice(0, 10)))
-      const read = (path: string) =>
-        parse(readFileSync(resolve(path as string), 'utf8')) as DomainReport
-      expect(source, file).toBe(
-        buildDeadDomainManifest(read(earlierPath), read(recheckPath), listings, {
-          earlierPath: earlierPath as string,
-          id: manifest.id,
-          recheckPath: recheckPath as string
-        })
-      )
-      // It applies, whole, to the reviewed catalog both environments started from.
-      const database = new DatabaseSync(':memory:')
-      for (const migration of freshMigrationNames())
-        database.exec(readFileSync(resolve(freshMigrationsDirectory, migration), 'utf8'))
-      database.exec(readReviewedImportSql(readParityReport()))
-      const live = database
-        .prepare('SELECT version, checksum FROM publication_state WHERE id = 1')
-        .get() as { checksum: string; version: number }
-      const plan = buildPublicationPlan(manifest, source, '2026-10-07T00:00:00.000Z', live)
-      database.exec('BEGIN')
-      for (const item of plan.statements) {
-        assertD1StatementLimits(item.query, item.bindings)
-        database
-          .prepare(item.query)
-          .run(
-            ...(item.bindings.map(value =>
-              typeof value === 'boolean' ? Number(value) : value
-            ) as SQLInputValue[])
-          )
-      }
-      database.exec('COMMIT')
-      expect(
-        database
-          .prepare(`SELECT COUNT(*) AS count FROM listings WHERE status='approved' AND is_active=0`)
-          .get()
-      ).toEqual({ count: manifest.operations.length })
-      database.close()
-    }
-  }, 60_000)
-
-  it('keeps the committed manifest identical to the committed report and the reviewed catalog', () => {
-    const reports = existsSync(resolve('d1/hygiene'))
-      ? readdirSync(resolve('d1/hygiene')).filter(file => file.endsWith('-listing-domains.yaml'))
-      : []
-    expect(reports.length).toBeGreaterThan(0)
-    const listings = reviewedImportListings()
-    for (const file of reports) {
-      const date = file.slice(0, 10)
-      const committed = parse(readFileSync(resolve('d1/hygiene', file), 'utf8')) as DomainReport
-      const manifestPath = resolve(`d1/publications/${date}-hijacked-domains.yaml`)
-      const source = readFileSync(manifestPath, 'utf8')
-      const manifest = parseManifest(source)
-      // The manifest is exactly what the generator writes from the report and the catalog.
-      expect(source, file).toBe(
-        buildUnpublishManifest(committed, listings, {
-          id: manifest.id,
-          reportPath: `d1/hygiene/${file}`
-        })
-      )
-      // It applies, whole, to the reviewed catalog both environments started from.
-      const database = new DatabaseSync(':memory:')
-      for (const migration of freshMigrationNames())
-        database.exec(readFileSync(resolve(freshMigrationsDirectory, migration), 'utf8'))
-      database.exec(readReviewedImportSql(readParityReport()))
-      // Row-level: planned at the environment's live state, here the import's.
-      const live = database
-        .prepare('SELECT version, checksum FROM publication_state WHERE id = 1')
-        .get() as { checksum: string; version: number }
-      const plan = buildPublicationPlan(manifest, source, '2026-10-06T00:00:00.000Z', live)
-      database.exec('BEGIN')
-      for (const item of plan.statements) {
-        assertD1StatementLimits(item.query, item.bindings)
-        const bindings = item.bindings.map(value =>
-          typeof value === 'boolean' ? Number(value) : value
-        ) as SQLInputValue[]
-        database.prepare(item.query).run(...bindings)
-      }
-      database.exec('COMMIT')
-      const ids = manifest.operations.map(operation => ('id' in operation ? operation.id : ''))
-      expect(
-        database
-          .prepare(
-            `SELECT COUNT(*) AS count FROM listings WHERE status='approved' AND is_active=0 AND id IN (${ids.map(() => '?').join(',')})`
-          )
-          .get(...ids)
-      ).toEqual({ count: committed.unpublish.length })
-      expect(database.prepare('SELECT COUNT(*) AS count FROM listing_events').get()).toEqual({
-        count: committed.unpublish.length
-      })
-      expect(database.prepare('SELECT version FROM publication_state').get()).toEqual({
-        version: live.version + 1
-      })
-      database.close()
-      expect(
-        committed.unpublish.every(entry => ['parking', 'gambling-spam'].includes(entry.class))
-      ).toBe(true)
-      expect(
-        committed.ownerReview.some(entry => ['parking', 'gambling-spam'].includes(entry.class))
-      ).toBe(false)
-    }
-  })
-
   it('unpublishes the owner’s decisions, each with its class and reason (#104)', () => {
     const decisions: OwnerListDecisions = {
       decidedAt: '2026-10-07',
@@ -1003,63 +1009,6 @@ describe('listing domain report and manifest', () => {
       buildDecisionsManifest(wrongClass, catalog, { decisionsPath: 'd', id: 'x' })
     ).toThrow('gone or trash')
   })
-
-  it('keeps each committed owner-list cleanup identical to its decisions, and disjoint from other unpublications', () => {
-    // Committed manifests only: d1-remote-publisher.test.ts writes temporary ones here.
-    const publications = execFileSync('git', ['ls-files', 'd1/publications'], { encoding: 'utf8' })
-      .split('\n')
-      .filter(path => path.endsWith('.yaml'))
-      .map(path => path.slice('d1/publications/'.length))
-    const unpublished = new Map<string, string>()
-    for (const file of publications) {
-      if (file.endsWith('-owner-list-cleanup.yaml')) continue
-      const manifest = parseManifest(readFileSync(resolve('d1/publications', file), 'utf8'))
-      for (const operation of manifest.operations)
-        if (operation.action === 'listing-unpublish') unpublished.set(operation.id, file)
-    }
-    const listings = reviewedImportListings()
-    for (const file of publications.filter(name => name.endsWith('-owner-list-cleanup.yaml'))) {
-      const source = readFileSync(resolve('d1/publications', file), 'utf8')
-      const manifest = parseManifest(source)
-      const decisionsPath = decisionsPathFor(file.slice(0, 10))
-      const decisions = parse(readFileSync(resolve(decisionsPath), 'utf8')) as OwnerListDecisions
-      expect(source, file).toBe(
-        buildDecisionsManifest(decisions, listings, { decisionsPath, id: manifest.id })
-      )
-      // Another manifest's unpublish would leave the listing not live, and this one refuses whole.
-      for (const operation of manifest.operations) {
-        if (operation.action !== 'listing-unpublish')
-          throw new Error(`${file}: ${operation.action}`)
-        expect(unpublished.get(operation.id), operation.slug).toBeUndefined()
-      }
-      const database = new DatabaseSync(':memory:')
-      for (const migration of freshMigrationNames())
-        database.exec(readFileSync(resolve(freshMigrationsDirectory, migration), 'utf8'))
-      database.exec(readReviewedImportSql(readParityReport()))
-      const live = database
-        .prepare('SELECT version, checksum FROM publication_state WHERE id = 1')
-        .get() as { checksum: string; version: number }
-      const plan = buildPublicationPlan(manifest, source, '2026-10-07T00:00:00.000Z', live)
-      database.exec('BEGIN')
-      for (const item of plan.statements) {
-        assertD1StatementLimits(item.query, item.bindings)
-        database
-          .prepare(item.query)
-          .run(
-            ...(item.bindings.map(value =>
-              typeof value === 'boolean' ? Number(value) : value
-            ) as SQLInputValue[])
-          )
-      }
-      database.exec('COMMIT')
-      expect(
-        database
-          .prepare(`SELECT COUNT(*) AS count FROM listings WHERE status='approved' AND is_active=0`)
-          .get()
-      ).toEqual({ count: manifest.operations.length })
-      database.close()
-    }
-  }, 60_000)
 })
 
 describe('adult listings and the Adult category (#260)', () => {
@@ -1193,127 +1142,4 @@ describe('adult listings and the Adult category (#260)', () => {
       buildAdultManifests({ ...decisions, retireCategories: [] }, fixture, options)
     ).toThrow('retireCategories names no category')
   })
-
-  it('keeps the committed manifests identical to the decisions; they apply to the reviewed catalog, disjoint from other unpublications, and leave nothing adult or gone', () => {
-    const decisionsFiles = readdirSync(resolve('d1/hygiene')).filter(file =>
-      file.endsWith('-adult-decisions.yaml')
-    )
-    expect(decisionsFiles.length).toBeGreaterThan(0)
-    for (const file of decisionsFiles) {
-      const date = file.slice(0, 10)
-      const decisionsPath = adultDecisionsPathFor(date)
-      const ids = adultManifestIds(date)
-      const decided = parse(readFileSync(resolve(decisionsPath), 'utf8')) as AdultDecisions
-      // The catalog this decision's manifests are published on: every committed manifest that
-      // sorts before them, never a later one (it may expect this decision's result).
-      const database = reviewedCatalogDatabase(ids.categoryId)
-      const inactive = () =>
-        database
-          .prepare('SELECT slug FROM categories WHERE is_active = 0')
-          .all()
-          .map(row => String(row.slug))
-      try {
-        const before = liveListings(database)
-        const inactiveBefore = new Set(inactive())
-        // Later manifests, this decision's own included, are not applied.
-        for (const slug of decided.retireCategories)
-          expect(inactiveBefore.has(slug), slug).toBe(false)
-        const generated = buildAdultManifests(decided, before, { decisionsPath, ...ids })
-        const committed = (id: string) => {
-          const path = resolve(`d1/publications/${id}.yaml`)
-          return existsSync(path) ? readFileSync(path, 'utf8') : null
-        }
-        expect(committed(ids.categoryId), ids.categoryId).toBe(generated.category)
-        expect(committed(ids.removalId), ids.removalId).toBe(generated.removal)
-
-        // Another manifest's unpublish, earlier or later, would leave a listing not live, and
-        // whichever publishes second refuses whole.
-        const elsewhere = new Map<string, string>()
-        for (const path of committedPublications()) {
-          const manifest = parseManifest(readFileSync(resolve(path), 'utf8'))
-          if (manifest.id === ids.removalId) continue
-          for (const operation of manifest.operations)
-            if (operation.action === 'listing-unpublish') elsewhere.set(operation.id, path)
-        }
-        const removal = parseManifest(generated.removal)
-        for (const operation of removal.operations)
-          if (operation.action === 'listing-unpublish')
-            expect(elsewhere.get(operation.id), operation.slug).toBeUndefined()
-
-        // Published in order, the two apply whole; the plans stay within D1's limits.
-        for (const source of [generated.category, generated.removal]) {
-          if (!source) continue
-          const live = database
-            .prepare('SELECT version, checksum FROM publication_state WHERE id = 1')
-            .get() as { checksum: string; version: number }
-          for (const item of buildPublicationPlan(
-            parseManifest(source),
-            source,
-            `${date}T00:00:00.000Z`,
-            live
-          ).statements)
-            assertD1StatementLimits(item.query, item.bindings)
-          applyManifest(database, source, `${date}T00:00:00.000Z`)
-        }
-        // Exactly the decided categories retire (Fansite Downloaders, which keeps listings, stays).
-        expect(
-          inactive()
-            .filter(slug => !inactiveBefore.has(slug))
-            .sort()
-        ).toEqual([...decided.retireCategories].sort())
-        const after = liveListings(database)
-        expect(before.length - after.length).toBe(decided.unpublish.length)
-        const live = new Map(after.map(item => [item.slug, item]))
-        for (const entry of decided.unpublish) expect(live.has(entry.slug), entry.slug).toBe(false)
-        // Kept listings stay live, off the retired categories.
-        for (const entry of decided.kept) {
-          expect(live.has(entry.slug), entry.slug).toBe(true)
-          expect(
-            database
-              .prepare(
-                `SELECT c.slug FROM listing_categories lc JOIN categories c ON c.id = lc.category_id
-                 JOIN listings l ON l.id = lc.listing_id WHERE l.slug = ? AND c.is_active = 0`
-              )
-              .all(entry.slug),
-            entry.slug
-          ).toEqual([])
-        }
-        // Nothing live is named for an adult platform any more (#98's list, and #260's find),
-        // except a listing the owner keeps (the fan-site downloaders).
-        const kept = new Set(decided.kept.map(entry => entry.slug))
-        expect(
-          after
-            .filter(
-              item =>
-                !kept.has(item.slug) &&
-                [item.slug, item.name, item.website].some(
-                  value =>
-                    ADULT_TERMS.test(value.toLowerCase()) || /shemale/u.test(value.toLowerCase())
-                )
-            )
-            .map(item => item.slug)
-        ).toEqual([])
-
-        // The Worker's 410 check: every removed listing answers 404, other unpublished ones 410.
-        const gone = (slug: string) =>
-          database
-            .prepare(
-              `SELECT 1 AS found FROM listings l WHERE l.slug = ? AND l.status = 'approved'
-                AND l.is_active = 0 AND l.published_at IS NOT NULL
-                AND NOT ${LISTING_IN_RETIRED_CATEGORY_SQL}`
-            )
-            .get(slug) !== undefined
-        for (const entry of decided.unpublish) expect(gone(entry.slug), entry.slug).toBe(false)
-        const earlier = [...elsewhere].find(
-          ([, path]) => path < `d1/publications/${ids.categoryId}.yaml`
-        )
-        const other = database
-          .prepare('SELECT slug FROM listings WHERE id = ?')
-          .get(earlier?.[0] ?? '')
-        expect(gone(String(other?.slug)), String(other?.slug)).toBe(true)
-      } finally {
-        database.close()
-      }
-    }
-  }, 120_000)
 })

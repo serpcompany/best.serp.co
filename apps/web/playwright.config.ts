@@ -16,8 +16,8 @@ import { mediaOrigin, mediaServerCommand, mediaServerEnabled } from './e2e/media
 
 const playwrightPort = Number(process.env.PLAYWRIGHT_PORT ?? 3100)
 const baseUrl = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${playwrightPort}`
-// Prepare the local best.serp.co D1 catalog, then serve the OpenNext Worker preview.
-const defaultWebServerCommand = `cd ../.. && pnpm db:migrate:local && pnpm db:import:local && pnpm db:verify:local && PORT=${playwrightPort} pnpm preview`
+// Reset local D1 to the fixture seed (#311, #313), check its facts, then build and serve the Worker.
+const defaultWebServerCommand = `cd ../.. && pnpm db:seed:local && pnpm db:verify:local && PORT=${playwrightPort} pnpm preview`
 const webServerCommand = process.env.PLAYWRIGHT_WEB_SERVER_COMMAND ?? defaultWebServerCommand
 const useExternalServer = process.env.PLAYWRIGHT_EXTERNAL_SERVER === '1'
 const workerCount = Number(process.env.E2E_WORKERS ?? 2)
@@ -100,7 +100,7 @@ export default defineConfig({
   ],
   // Web servers start in order: the first builds the Worker, the Access-lock servers
   // (e2e/access-lock-fixture.ts) then serve that build with CF_ACCESS_REQUIRED=on, and the
-  // media server (e2e/media-fixture.ts) serves it on a seeded local D1 and R2.
+  // media server (e2e/media-fixture.ts) serves it on its own seeded local D1 and R2.
   webServer: useExternalServer
     ? undefined
     : [
@@ -108,7 +108,7 @@ export default defineConfig({
           command: webServerCommand,
           url: baseUrl,
           reuseExistingServer: !process.env.CI,
-          timeout: 360000, // D1 initialization plus the OpenNext Worker build on CI runners
+          timeout: 360000, // The fixture seed plus the OpenNext Worker build on CI runners
           env: {
             // Sentry stays off in E2E: no DSN, so no events, and no token, so no upload (#48).
             NEXT_PUBLIC_SENTRY_DSN: '',

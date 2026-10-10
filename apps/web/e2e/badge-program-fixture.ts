@@ -1,6 +1,7 @@
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
-import { adminSuiteEnabled, localD1, type SuiteServer } from './admin-fixture'
+import { adminSuiteEnabled, localD1, runStatements, type SuiteServer } from './admin-fixture'
+import { listingStatements, type SeedValue, suiteCatalogStatements } from './fixture-seed'
 import { BILLING_PREVIEW_VARS } from './orders-worker'
 
 /**
@@ -48,4 +49,24 @@ export function badgeServerCommand(): string {
 /** Runs SQL on the badge suite Worker's local D1 (see `localD1` in `admin-fixture.ts`). */
 export function badgeD1<T = Record<string, unknown>>(sql: string): T[] {
   return localD1<T>(sql, badgeServer)
+}
+
+/** The category the badge program suite's listings are filed under. */
+export const badgeCategory = {
+  description: 'Tools for the badge program suite.',
+  name: 'E2E Badge Tools',
+  slug: 'e2e-badge-tools'
+} as const
+
+/** The badge D1's publication state and category. */
+export function seedBadgeCatalog(): void {
+  runStatements(
+    suiteCatalogStatements({ category: badgeCategory, checksum: 'e2e-badge' }),
+    badgeServer
+  )
+}
+
+/** A live listing on the badge D1, filed under `badgeCategory`. */
+export function seedBadgeListing(row: Record<string, SeedValue> & { id: string }): void {
+  runStatements(listingStatements({ category: badgeCategory.slug, row }), badgeServer)
 }

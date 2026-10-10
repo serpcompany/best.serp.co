@@ -31,9 +31,13 @@ Every listing image carries `data-listing-image="logo|image"`. Guards:
 - `apps/web/e2e/listing-image-fallback.spec.ts` answers every image request but the tile with
   404 and requires every listing image on the home and detail pages to end as the loaded tile;
   with JavaScript off, it requires the `::after` tile on each broken image.
-- `scripts/catalog-media.test.ts` requires every published logo and image to be its own listing's
-  hosted key (`listings/<slug>/<kind>/`), every manifest to name only such keys or no image, and
-  listing content to embed no image, so no other host is ever rendered.
+- `scripts/catalog-media.test.ts` requires every manifest to name only its own listing's hosted
+  keys (`listings/<slug>/<kind>/`), each in an upload plan with the same bytes, or no image, and
+  no listing content to embed an image, so no other host is ever rendered. On fixture rows, it
+  also requires a `listing-slug-change` to leave no media keyed to the old slug, and every
+  committed rename to be followed by a `listing-media-update` under the new slug. (Until #315 the
+  same checks also ran on every published logo and image of the v1 import; that test is archived
+  with the import.)
 
 ## Media health check
 
