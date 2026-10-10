@@ -132,6 +132,7 @@ export function toSummary(submission: OwnSubmission, now = new Date()): Submissi
     plan: submission.plan,
     slug: submission.slug,
     status: submission.status,
+    tagSlugs: submission.tagSlugs,
     verificationAttempts: submission.verificationAttempts,
     website: submission.website
   }

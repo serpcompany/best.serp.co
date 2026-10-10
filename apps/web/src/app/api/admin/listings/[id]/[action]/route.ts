@@ -4,6 +4,7 @@ import {
   removeListingOwner,
   republishListing,
   setListingLinkRel,
+  setListingTags,
   transferListingOwner,
   unpublishListing,
   updateListingDetails
@@ -14,6 +15,7 @@ import {
   decisionIdSchema,
   linkRelSchema,
   listingDetailsSchema,
+  listingTagsSchema,
   removeOwnerSchema,
   transferOwnerSchema,
   unpublishListingSchema
@@ -22,8 +24,8 @@ import { authorizationErrorResponse } from '@/lib/auth/guards'
 import { authorizeAdminRequest } from '@/lib/auth/server'
 
 /**
- * Listing actions (#64 screen 12): `details`, `unpublish`, `republish`, `link-rel`,
- * `transfer-owner`, `remove-owner`, and `allow-resubmission`.
+ * Listing actions (#64 screen 12): `details`, `tags` (#341), `unpublish`, `republish`,
+ * `link-rel`, `transfer-owner`, `remove-owner`, and `allow-resubmission`.
  */
 export const dynamic = 'force-dynamic'
 
@@ -45,6 +47,10 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
     case 'details':
       return runAdminDecision(request, actor, listingDetailsSchema, (context, body) =>
         updateListingDetails(context, { ...body, ...target })
+      )
+    case 'tags':
+      return runAdminDecision(request, actor, listingTagsSchema, (context, body) =>
+        setListingTags(context, { ...body, ...target })
       )
     case 'unpublish':
       return runAdminDecision(request, actor, unpublishListingSchema, (context, body) =>

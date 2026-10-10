@@ -219,7 +219,7 @@ describe('the route registry (#167)', () => {
   })
 
   it('the header links only registered pages', () => {
-    const hrefs = headerItems.flatMap(item =>
+    const hrefs = headerItems({ bestIndexListed: true }).flatMap(item =>
       item.kind === 'link' ? [item.link.href] : item.links.map(link => link.href)
     )
     expect(hrefs.length).toBeGreaterThan(0)

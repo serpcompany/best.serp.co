@@ -43,7 +43,10 @@ test.describe('listing structured data', () => {
 })
 
 // The visible breadcrumb writes no JSON-LD of its own (#273): the graph's BreadcrumbList is the one.
-test('the product page has one BreadcrumbList, from Home to the listing', async ({ page }) => {
+// It runs through the listing's hub, as the visible trail does (#347).
+test('the product page has one BreadcrumbList, from Home through its hub to the listing', async ({
+  page
+}) => {
   await page.goto(detailListing.path, { waitUntil: 'domcontentloaded' })
   const lists = (await jsonLdNodes(page)).filter(node => node['@type'] === 'BreadcrumbList')
   expect(lists).toHaveLength(1)
@@ -51,8 +54,15 @@ test('the product page has one BreadcrumbList, from Home to the listing', async 
   expect(items.map(item => item.item)).toEqual([
     'https://best.serp.co',
     'https://best.serp.co/products/',
+    `https://best.serp.co${categoryPath(sampleCategory.slug)}`,
     `https://best.serp.co${detailListing.path}`
   ])
+  expect(items[2]?.name).toBe(sampleCategory.name)
+  const breadcrumb = page.getByRole('navigation', { name: 'breadcrumb' })
+  await expect(breadcrumb.getByRole('link', { name: sampleCategory.name })).toHaveAttribute(
+    'href',
+    categoryPath(sampleCategory.slug)
+  )
 })
 
 const websiteId = 'https://best.serp.co/#website'

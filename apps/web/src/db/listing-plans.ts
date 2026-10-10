@@ -619,3 +619,68 @@ export function buildUpdateListingDetailsPlans(input: {
     ...finishCatalogPublicationPlans(input.publication)
   ]
 }
+
+/** The most tags an admin sets on one listing (#341): it bounds the batch's statements. */
+export const MAX_LISTING_TAGS = 20
+
+/**
+ * A listing's tags as the admin's tag edit compares them (#341): slugs ordered by sort order,
+ * then slug, retired tags included, as a JSON array; the publisher's `listing-tags-set` compares
+ * the same. `?` binds the listing id.
+ */
+const LISTING_TAGS_JSON = `(SELECT json_group_array(slug) FROM (SELECT t.slug
+  FROM listing_tags lt JOIN tags t ON t.id=lt.tag_id WHERE lt.listing_id=?
+  ORDER BY lt.sort_order,t.slug))`
+
+/**
+ * An admin replaces a listing's tags (#341, design 4.3), in order (the first is the most
+ * central): compared and swapped on the tags the admin saw (`expectedTags`, as
+ * `LISTING_TAGS_JSON` orders them), on an approved listing whose submission isn't rejected
+ * (a rejected listing stays read-only). Each tag must be active; a missing or retired one
+ * refuses the batch. It sets `updated_at` (the sitemap `lastmod`) and logs `edited` with
+ * `fields: ['tags']`, but leaves the checksum, which covers the content revisions and the
+ * details edit compare: so it is allowed while the listing's own submission is in review, and a
+ * paid submission's approval still matches its `published_checksum`.
+ */
+export function buildSetListingTagsPlans(input: {
+  expectedTags: readonly string[]
+  listingId: string
+  publication: CatalogPublication
+  tags: readonly string[]
+}): StatementPlan[] {
+  const { listingId, tags } = input
+  if (new Set(tags).size !== tags.length || tags.some(tag => !tag.trim())) {
+    throw new Error("A listing's tags are distinct, non-empty slugs.")
+  }
+  if (tags.length > MAX_LISTING_TAGS) {
+    throw new Error(`A listing has at most ${MAX_LISTING_TAGS} tags.`)
+  }
+  return [
+    ...beginCatalogPublicationPlans(input.publication, {
+      sql: `EXISTS (SELECT 1 FROM listings WHERE id=? AND status='approved')
+        AND NOT ${listingSubmissionRejected('?')} AND ${LISTING_TAGS_JSON}=?`,
+      params: [listingId, listingId, listingId, JSON.stringify(input.expectedTags)]
+    }),
+    { sql: 'DELETE FROM listing_tags WHERE listing_id=?', params: [listingId] },
+    // Plain inserts through active tags, never an upsert (docs/data-model.md).
+    ...tags.flatMap((tag, order) => [
+      {
+        sql: `INSERT INTO listing_tags (listing_id,tag_id,sort_order)
+          SELECT ?,id,? FROM tags WHERE slug=? AND is_active=1`,
+        params: [listingId, order, tag]
+      },
+      assertPreviousStatementChangedOne('listing_tag_active')
+    ]),
+    {
+      sql: `UPDATE listings SET updated_at=? WHERE id=? AND status='approved'`,
+      params: [input.publication.now, listingId]
+    },
+    assertPreviousStatementChangedOne('listing_tags_updated'),
+    listingEvent(listingId, 'edited', input.publication.actor, {
+      fields: ['tags'],
+      from: [...input.expectedTags],
+      to: [...tags]
+    }),
+    ...finishCatalogPublicationPlans(input.publication)
+  ]
+}

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { AdminCrumbs } from '@/components/admin/admin-shell'
 import { ListingDetail } from '@/components/admin/listing-detail'
+import { MAX_LISTING_TAGS } from '@/db/listing-plans'
 import { listingDetailView } from '@/lib/admin/listing-view'
 import { getAdminReads } from '@/lib/admin/runtime'
 import { requireAdmin } from '@/lib/auth/server'
@@ -22,9 +23,10 @@ export default async function AdminListingPage({ params }: Props) {
     .toLowerCase()
   if (!slug || slug.length > 253) notFound()
   const reads = await getAdminReads()
-  const [listing, categories] = await Promise.all([
+  const [listing, categories, tags] = await Promise.all([
     reads.getAdminListing(slug),
-    reads.listActiveCategories()
+    reads.listActiveCategories(),
+    reads.listActiveTags()
   ])
   if (!listing) notFound()
   return (
@@ -39,6 +41,8 @@ export default async function AdminListingPage({ params }: Props) {
 
       <ListingDetail
         categories={categories}
+        maxTags={MAX_LISTING_TAGS}
+        tags={tags.map(tag => ({ ...tag, label: tag.name }))}
         view={listingDetailView(listing, await mediaBaseUrl())}
       />
     </>

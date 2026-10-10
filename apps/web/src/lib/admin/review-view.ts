@@ -72,6 +72,7 @@ export function submissionView(review: SubmissionReview, mediaBaseUrl: string): 
           otherSubmissions: review.submitter.otherSubmissions
         }
       : null,
+    tagSlugs: review.tagSlugs,
     website: review.website
   }
 }
@@ -118,6 +119,7 @@ export function revisionView(review: RevisionReview, mediaBaseUrl: string): Revi
           otherSubmissions: review.submitter.otherSubmissions
         }
       : null,
+    tagSlugs: review.tagSlugs,
     website: review.website
   }
 }
@@ -224,5 +226,7 @@ export interface ReviewView {
   stale: boolean
   status: string
   submitter: { createdAt: string | null; email: string; otherSubmissions: number } | null
+  /** The Creator's suggested tags (#341), or null when none were given. */
+  tagSlugs: string[] | null
   website: string
 }

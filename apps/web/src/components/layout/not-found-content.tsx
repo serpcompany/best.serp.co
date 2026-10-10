@@ -26,8 +26,13 @@ const linkIcons: Record<string, typeof Layers3> = {
   [getRoute('brands')]: Layers3
 }
 
-/** The header's Products menu, less its first link: the homepage the button already offers. */
-const popularPages = productLinks.filter(link => link.href !== getRoute('home'))
+/**
+ * The header's Products menu, less its first link (the homepage the button already offers) and
+ * "Best" (#347), which the menu gained after this page's two-card grid was designed.
+ */
+const popularPages = productLinks({ bestIndexListed: false }).filter(
+  link => link.href !== getRoute('home')
+)
 
 /**
  * The 404 page's content (serp.co's `not-found.tsx`, #279): a large "404", the heading and its

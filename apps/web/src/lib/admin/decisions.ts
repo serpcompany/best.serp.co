@@ -35,6 +35,7 @@ import {
   buildRepublishListingPlans,
   buildRevokeListingOwnerPlans,
   buildSetListingLinkRelPlans,
+  buildSetListingTagsPlans,
   buildTransferListingOwnerPlans,
   buildUnpublishListingPlans,
   buildUpdateListingDetailsPlans,
@@ -412,6 +413,28 @@ export interface SubmissionEdits {
   description?: string
   logoUrl?: string
   name?: string
+  /** The Creator's suggested tags, as the reviewer leaves them (#341). */
+  tagSlugs?: string[]
+}
+
+const sameTags = (a: readonly string[], b: readonly string[]) =>
+  a.length === b.length && a.every((tag, index) => tag === b[index])
+
+/** Why `tags` can't be set: one isn't an active tag (422), or null. */
+async function invalidTags(
+  context: AdminContext,
+  tags: readonly string[]
+): Promise<DecisionFailure | null> {
+  if (tags.length === 0) return null
+  const active = new Set(
+    (await createAdminReadOperations({ client: context.client }).listActiveTags()).map(
+      tag => tag.slug
+    )
+  )
+  if (new Set(tags).size !== tags.length || tags.some(tag => !active.has(tag))) {
+    return failure(422, 'invalid_tags', 'Choose active tags, each once.')
+  }
+  return null
 }
 
 const EDIT_FIELDS = ['name', 'categorySlug', 'description', 'logoUrl', 'content'] as const
@@ -473,7 +496,18 @@ async function approveSubmissionOnce(
     }[field]
     return value.trim() !== current.trim()
   })
-  if (edited.length > 0) {
+  // Tags are a list: edited when the reviewer's differs from the Creator's (#341). A paid
+  // listing already live got its tags at payment and its approval leaves them, so its tags are
+  // edited on the listing page instead, and a tag edit here is not taken (the screen offers
+  // none for it).
+  const tagSlugs =
+    snapshot.status === 'verified' ? input.edits?.tagSlugs?.map(tag => tag.trim()) : undefined
+  const tagsEdited = tagSlugs !== undefined && !sameTags(tagSlugs, review.tagSlugs ?? [])
+  if (tagsEdited) {
+    const invalid = await invalidTags(context, tagSlugs)
+    if (invalid) return invalid
+  }
+  if (edited.length > 0 || tagsEdited) {
     const categories = await reads.listActiveCategories()
     const content = {
       categorySlug: input.edits?.categorySlug?.trim() ?? review.categorySlug,
@@ -483,15 +517,24 @@ async function approveSubmissionOnce(
       logoUrl: input.edits?.logoUrl?.trim() ?? review.logoUrl,
       name: input.edits?.name?.trim() ?? review.name,
       resourceLinks: review.resourceLinks,
+      ...(tagsEdited ? { tagSlugs } : {}),
       videoUrl: review.videoUrl
     }
-    const invalid = validateListingFields(content, categories, { logoUrl: review.logoUrl })
+    // The stored category stands unless the reviewer changed it: an in-flight submission may
+    // still name a retired narrow slug, which approval resolves (#341, design 4.4).
+    const invalid = validateListingFields(
+      content,
+      edited.includes('categorySlug')
+        ? categories
+        : [...categories, { name: '', slug: review.categorySlug }],
+      { logoUrl: review.logoUrl }
+    )
     if (invalid) return invalid
     plans.push(
       ...buildReplaceSubmissionContentPlans({
         actor: context.actor,
         content,
-        eventDetail: JSON.stringify({ fields: edited }),
+        eventDetail: JSON.stringify({ fields: [...edited, ...(tagsEdited ? ['tags'] : [])] }),
         expectedContentVersion: version,
         expectedStatuses: [snapshot.status as 'verified' | 'paid_pending_review'],
         now,
@@ -1261,6 +1304,71 @@ async function setListingLinkRelOnce(
     listingRead(context, snapshot)
   )
   log(context, 'set_link_rel', input.listingId, decision.ok ? input.linkRel : decision.error)
+  return decision
+}
+
+/**
+ * The Tags field on the listing page (#341, design 4.3): replaces the listing's tags, compared
+ * and swapped on the tags the admin saw (`expectedTags`, retired ones included). It leaves the
+ * listing's checksum, so it is allowed while the listing's own submission is in review; a
+ * rejected listing stays read-only.
+ */
+export function setListingTags(
+  context: AdminContext,
+  input: Parameters<typeof setListingTagsOnce>[1]
+): Promise<Decision<{ tags: string[] }>> {
+  return retryPublicationRace(() => setListingTagsOnce(context, input))
+}
+
+async function setListingTagsOnce(
+  context: AdminContext,
+  input: { expectedTags: string[]; listingId: string; tags: string[] }
+): Promise<Decision<{ tags: string[] }>> {
+  const tags = input.tags.map(tag => tag.trim())
+  const expectedTags = input.expectedTags.map(tag => tag.trim())
+  const snapshot = await listingSnapshot(context, input.listingId)
+  if (!snapshot) return notFound('listing')
+  const reads = createAdminReadOperations({ client: context.client })
+  const tagsNow = async () =>
+    (await reads.getAdminListing(snapshot.slug))?.tags.map(tag => tag.slug) ?? null
+  const listing = await reads.getAdminListing(snapshot.slug)
+  if (!listing) return notFound('listing')
+  const current = listing.tags.map(tag => tag.slug)
+  const result = { tags }
+  if (sameTags(current, tags)) return { ok: true, replayed: true, ...result }
+  if (!sameTags(current, expectedTags)) return changed
+  if (listing.adminStatus === 'blocked' || listing.adminStatus === 'rejected') {
+    return failure(409, 'listing_rejected', 'A rejected listing is read-only.')
+  }
+  if (snapshot.status !== 'approved') {
+    return failure(409, 'not_approved', 'Only a published listing can be tagged.')
+  }
+  const invalid = await invalidTags(context, tags)
+  if (invalid) return invalid
+  const decision = await commit(
+    context,
+    buildSetListingTagsPlans({
+      expectedTags,
+      listingId: input.listingId,
+      publication: await listingPublication(context, snapshot, 'listing-tags', nowIso(context)),
+      tags
+    }),
+    async () => {
+      const after = await tagsNow()
+      return after !== null && sameTags(after, tags)
+    },
+    result,
+    // The tags belong to the item: a concurrent tag edit is a conflict, not a publication race.
+    {
+      global: ['publication_checksum', 'version'],
+      read: async () => {
+        const fresh = await listingSnapshot(context, input.listingId)
+        return fresh && { ...fresh, tags: JSON.stringify(await tagsNow()) }
+      },
+      snapshot: { ...snapshot, tags: JSON.stringify(current) }
+    }
+  )
+  log(context, 'set_listing_tags', input.listingId, decision.ok ? tags.join(',') : decision.error)
   return decision
 }
 

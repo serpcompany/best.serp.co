@@ -37,7 +37,7 @@ test.use({
  * The admin panel (serpcompany/best.serp.co#64) against the local Worker and local D1: the
  * gate, approving (the listing page and the sitemap after the epoch bump), requesting changes,
  * rejecting, allowing resubmission, unpublishing (410, out of the sitemap and search) and
- * republishing, and the allowlist. Each decision (approve, request changes, reject, allow
+ * republishing, a listing's tags (#341), and the allowlist. Each decision (approve, request changes, reject, allow
  * resubmission, unpublish, republish, add and remove an admin) is replayed once to prove it is a
  * no-op. The gate is probed on every admin page and API action.
  *
@@ -115,6 +115,7 @@ const ADMIN_ACTIONS: Array<['DELETE' | 'POST', string]> = [
     'link-rel',
     'remove-owner',
     'republish',
+    'tags',
     'transfer-owner',
     'unpublish'
   ].map((action): ['POST', string] => ['POST', `/api/admin/listings/lst_missing/${action}`]),
@@ -655,6 +656,95 @@ test.describe('listings', () => {
         await expect(page.getByText(/^Waiting to be hosted after 1 failed attempt/u)).toBeVisible()
       }
     }
+  })
+
+  test('edits a listing’s tags grouped by hub, also while its submission is in review (#341)', async ({
+    baseURL,
+    page
+  }) => {
+    const admin = client(page.request, baseURL)
+    admins.push(await signInAsNewAdmin(admin, ADMIN_EMAIL_PREFIXES.adminPanel))
+    const key = unique()
+    const hub = { name: `E2E Hub ${key}`, slug: `e2e-hub-${key}` }
+    const tag = (label: string) => ({ name: `${label} ${key}`, slug: `e2e-${label}-${key}` })
+    const [alpha, beta, gamma, retired] = [tag('alpha'), tag('beta'), tag('gamma'), tag('gone')]
+    localD1(`
+      INSERT INTO categories (slug, name, description, sort_order)
+        VALUES (${q(hub.slug)}, ${q(hub.name)}, '', 9);
+      INSERT INTO tags (slug, name, category_id, sort_order)
+        SELECT ${q(alpha.slug)}, ${q(alpha.name)}, id, 0 FROM categories WHERE slug = ${q(activeCategory())};
+      INSERT INTO tags (slug, name, category_id, sort_order)
+        SELECT ${q(beta.slug)}, ${q(beta.name)}, id, 1 FROM categories WHERE slug = ${q(activeCategory())};
+      INSERT INTO tags (slug, name, category_id, sort_order)
+        SELECT ${q(gamma.slug)}, ${q(gamma.name)}, id, 0 FROM categories WHERE slug = ${q(hub.slug)};
+      INSERT INTO tags (slug, name, category_id, sort_order, is_active)
+        SELECT ${q(retired.slug)}, ${q(retired.name)}, id, 2, 0 FROM categories WHERE slug = ${q(activeCategory())};
+    `)
+    const tagsOf = (id: string) =>
+      localD1<{ slug: string }>(
+        `SELECT t.slug FROM listing_tags lt JOIN tags t ON t.id = lt.tag_id
+          WHERE lt.listing_id = ${q(id)} ORDER BY lt.sort_order, t.slug`
+      ).map(row => row.slug)
+    const listing = seedImportedListing('tags', activeCategory(), null)
+
+    await page.goto(`/admin/listings/${listing.slug}/`)
+    await expect(page.getByRole('heading', { name: listing.name, level: 1 })).toBeVisible()
+    await page.getByLabel('Tags', { exact: true }).click()
+    // Active tags only, grouped by hub: the listing's own hub first.
+    const listbox = page.getByRole('listbox')
+    await expect(listbox.getByRole('option', { name: retired.name })).toHaveCount(0)
+    await expect(listbox.getByRole('group', { name: hub.name })).toContainText(gamma.name)
+    await expect(listbox.getByRole('group').first()).toContainText(alpha.name)
+    await listbox.getByRole('option', { name: gamma.name }).click()
+    await listbox.getByRole('option', { name: alpha.name }).click()
+    await page.keyboard.press('Escape')
+    await capture(page, '12-listing-tags')
+    expect(publicationsFor(listing.slug)).toBe(0)
+    await page.getByRole('button', { name: 'Save tags' }).click()
+    await expect(page.getByText('Saved.')).toBeVisible()
+    expect(tagsOf(listing.id)).toEqual([gamma.slug, alpha.slug])
+    expect(publicationsFor(listing.slug)).toBe(1)
+    expect(
+      localD1<{ detail: string }>(
+        `SELECT detail FROM listing_events WHERE listing_id = ${q(listing.id)} AND event_type = 'edited'`
+      ).map(row => JSON.parse(row.detail))
+    ).toEqual([{ fields: ['tags'], from: [], to: [gamma.slug, alpha.slug] }])
+
+    // A replay is a no-op; a stale view, or a retired tag, changes nothing.
+    const post = (data: { expectedTags: string[]; tags: string[] }) =>
+      page.request.post(`/api/admin/listings/${listing.id}/tags`, { data, headers: admin.headers })
+    const replay = await post({ expectedTags: [], tags: [gamma.slug, alpha.slug] })
+    expect(await replay.json()).toMatchObject({ ok: true, replayed: true })
+    expect((await post({ expectedTags: [], tags: [beta.slug] })).status()).toBe(409)
+    const refused = await post({ expectedTags: [gamma.slug, alpha.slug], tags: [retired.slug] })
+    expect(refused.status()).toBe(422)
+    expect(tagsOf(listing.id)).toEqual([gamma.slug, alpha.slug])
+    expect(publicationsFor(listing.slug)).toBe(1)
+
+    // While its paid submission is in review the details are read-only, but the tags are not:
+    // they leave the checksum the approval compares (design 4.3).
+    const userId = `e2e-user-tags-${key}`
+    localD1(`
+      INSERT INTO users (id, name, email, email_verified)
+        VALUES (${q(userId)}, 'E2E submitter', ${q(`tags-${key}@example.com`)}, 1);
+      INSERT INTO listing_submissions (id, slug, name, description, website, content,
+        category_slug, logo_url, status, plan, paid_at, listing_id, published_checksum,
+        owner_user_id, block_key, block_covers_subdomains)
+      SELECT ${q(`e2e-tags-${key}`)}, ${q(`tags-${key}.example`)}, name, description,
+        ${q(`https://tags-${key}.example/`)}, content, ${q(activeCategory())},
+        ${q(`https://tags-${key}.example/logo.png`)}, 'paid_pending_review', 'paid',
+        ${q(new Date().toISOString())}, id, checksum, ${q(userId)}, ${q(`tags-${key}.example`)}, 1
+      FROM listings WHERE id = ${q(listing.id)};
+    `)
+    await page.reload()
+    await expect(page.getByText('Its submission is in review')).toBeVisible()
+    await expect(page.getByLabel('Name', { exact: true })).toBeDisabled()
+    await page.getByLabel('Tags', { exact: true }).click()
+    await page.getByRole('listbox').getByRole('option', { name: beta.name }).click()
+    await page.keyboard.press('Escape')
+    await page.getByRole('button', { name: 'Save tags' }).click()
+    await expect(page.getByText('Saved.')).toBeVisible()
+    expect(tagsOf(listing.id)).toEqual([gamma.slug, alpha.slug, beta.slug])
   })
 
   test('the allowlist adds an admin once and removes it', async ({ baseURL, page }) => {

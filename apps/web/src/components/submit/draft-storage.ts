@@ -34,6 +34,8 @@ export interface LocalSubmitDraft {
   savedAt: number
   siteIcon: string | null
   socialImage: string | null
+  /** The suggested tags (#341), at most three. */
+  tagSlugs: string[]
   website: string
 }
 
@@ -79,6 +81,12 @@ export function parseLocalDraft(raw: string | null, now = Date.now()): LocalSubm
     savedAt,
     siteIcon: nullableUrl(record.siteIcon),
     socialImage: nullableUrl(record.socialImage),
+    tagSlugs: Array.isArray(record.tagSlugs)
+      ? record.tagSlugs
+          .filter((slug): slug is string => typeof slug === 'string')
+          .slice(0, 3)
+          .map(slug => slug.slice(0, 100))
+      : [],
     website: text(record.website, 2048)
   }
   return draft.website || draft.name || draft.description || draft.content ? draft : null

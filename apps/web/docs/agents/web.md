@@ -120,10 +120,10 @@ search is `components/directory/empty-state.tsx`: the stock `Empty`, as serplist
 
 | Page | Route | Built from |
 |---|---|---|
-| Home, and `/products/` page by page | `/`, `/products/?page=N` | `components/home/home-page.tsx`: `PageHero` with the listing count and Submit, Featured and Recently added in `LLMGrid`, then the browse list with its filter and the page links |
-| Categories | `/products/categories/` | `PageHero`, then a `ListCard` per category in `CardGrid` |
-| Category | `/products/categories/<category>/` | `components/category-routes/category-page.tsx`: breadcrumb, `PageHero`, the sortable listings, the page links |
-| Product | `/products/<slug>/` | `components/website-routes/detail-page.tsx` on `DetailPageLayout`: the logo, name, description, badges, Visit Site and favorite in the header, the featured-on badge and claim link in the panel, then the content, links, FAQs, browse-more and related listings |
+| Home, and `/products/` page by page | `/`, `/products/?page=N` | `components/home/home-page.tsx`: `PageHero` with the listing count and Submit, Featured and Recently added in `LLMGrid`, the hubs as `CategoryCards` (once they hold tags, #347), then the browse list with its filter and the page links |
+| Categories | `/products/categories/` | `PageHero`, then a `ListCard` per category in `CardGrid` (`CategoryCards`) |
+| Category | `/products/categories/<category>/` | `components/category-routes/category-page.tsx`: breadcrumb, `PageHero` with the hub's tag chips, "Best {hub} lists" (`BestPagesSection`), the sortable listings, the page links |
+| Product | `/products/<slug>/` | `components/website-routes/detail-page.tsx` on `DetailPageLayout`: the breadcrumb through its hub, the logo, name, description, badges, hub and tag chips, Visit Site and favorite in the header, the featured-on badge and claim link in the panel, then the content, links, FAQs, "Featured in" best pages, browse-more and related listings |
 | Search | `/search/` | `components/search/index-page.tsx`: `PageHero` with the page's search field, then the results |
 | About | `/about/` | `components/static-pages/about-page.tsx`: `PageHero`, then `SectionHeader`s over `ListCard`s in `CardGrid` |
 | Brands | `/brands/` | `components/static-pages/brands-page.tsx`: `PageHero` over `ListCard`s in `CardGrid` |

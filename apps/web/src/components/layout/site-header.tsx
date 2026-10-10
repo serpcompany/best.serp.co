@@ -6,6 +6,7 @@ import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
 import { AccountMenu } from './account-menu'
 import { PageContainer } from './page-shell'
+import { headerItems, type SiteLinkOptions } from './site-links'
 import { SiteMobileNav } from './site-mobile-nav'
 import { SiteNavigationMenu } from './site-navigation-menu'
 
@@ -14,18 +15,25 @@ import { SiteNavigationMenu } from './site-navigation-menu'
  * name on the left, the navigation in the middle, and Submit with the account menu on the right,
  * as zenbujapanese.com's (#286). There is no search in the header (#253).
  */
-export function SiteHeader({ authState }: { authState: HeaderAuthState }) {
+export function SiteHeader({
+  authState,
+  links
+}: {
+  authState: HeaderAuthState
+  links: SiteLinkOptions
+}) {
+  const items = headerItems(links)
   return (
     <header className="sticky top-0 z-50 border-b bg-background">
       <PageContainer width="shell" className="flex h-14 items-center gap-4">
         <div className="flex flex-1 items-center gap-2">
-          <SiteMobileNav authState={authState} />
+          <SiteMobileNav authState={authState} items={items} />
           <Link href={getRoute('home')} className="text-sm font-semibold whitespace-nowrap">
             {siteConfig.name}
           </Link>
         </div>
 
-        <SiteNavigationMenu className="hidden md:flex" />
+        <SiteNavigationMenu className="hidden md:flex" items={items} />
 
         {/* zenbujapanese.com's right side (#286): the primary action, then the account menu. */}
         <div className="flex flex-1 items-center justify-end gap-2">

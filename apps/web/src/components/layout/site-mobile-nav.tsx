@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils'
 import { getRoute } from '../../lib/routing/routes'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
-import { headerItems, isCurrentPage, type SiteLink } from './site-links'
+import { type HeaderItem, isCurrentPage, type SiteLink } from './site-links'
 import { ThemeToggle } from './theme-toggle'
 
 type MenuLinkProps = { link: SiteLink; onNavigate: () => void; pathname: string }
@@ -69,7 +69,14 @@ function useOpenUntilPathnameChanges(pathname: string) {
  * The header's menu on phones (serplists' `PublicMobileNav`, #256): a Sheet from the left with
  * the header's links, the theme toggle, and the account and submit actions.
  */
-export function SiteMobileNav({ authState }: { authState: HeaderAuthState }) {
+export function SiteMobileNav({
+  authState,
+  items
+}: {
+  authState: HeaderAuthState
+  /** `headerItems()`, built on the server (#347). */
+  items: readonly HeaderItem[]
+}) {
   const pathname = usePathname()
   const [open, setOpen] = useOpenUntilPathnameChanges(pathname)
   const [signingOut, signOut] = useSignOut()
@@ -87,7 +94,7 @@ export function SiteMobileNav({ authState }: { authState: HeaderAuthState }) {
         </SheetHeader>
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">
           <nav aria-label="Site" className="flex flex-col gap-4">
-            {headerItems.map(item =>
+            {items.map(item =>
               item.kind === 'menu' ? (
                 <MobileMenuGroup
                   key={item.label}

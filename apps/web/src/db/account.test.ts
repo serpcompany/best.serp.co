@@ -433,6 +433,55 @@ describe('account operations', () => {
     ).rejects.toMatchObject({ code: 'no_open_revision' })
   })
 
+  it('stages tags with a revision only when they differ from the listing’s (#341)', async () => {
+    const slug = seedOwnedListing('lst_tags')
+    sqlite.database.exec(`
+      INSERT INTO tags (slug,name,category_id,sort_order,is_active) VALUES
+        ('note-taking','Note Taking',1,0,1),('whiteboards','Whiteboards',2,0,1),
+        ('gone','Gone',1,1,1);
+      INSERT INTO listing_tags (listing_id,tag_id,sort_order)
+        SELECT 'lst_tags',id,0 FROM tags WHERE slug='note-taking';
+      INSERT INTO listing_tags (listing_id,tag_id,sort_order)
+        SELECT 'lst_tags',id,1 FROM tags WHERE slug='gone';
+      UPDATE tags SET is_active=0 WHERE slug='gone';
+    `)
+    const listing = await operations().listing(OWNER, slug)
+    // Only active tags show: a retired one isn't the owner's to keep or drop.
+    expect(listing?.tags).toEqual(['note-taking'])
+    const edit = {
+      categorySlug: 'tools',
+      content: 'Live content',
+      description: 'Live description',
+      faqs: [],
+      logoUrl: listing?.logoUrl ?? '',
+      resourceLinks: []
+    }
+    const save = (tagSlugs: string[] | undefined, expectedRevisionVersion: number | null) =>
+      operations().saveRevision({
+        content: { ...edit, tagSlugs },
+        expectedRevisionVersion,
+        listingId: 'lst_tags',
+        newRevisionId: 'rev_tags',
+        userId: OWNER
+      })
+    const stored = () => row("SELECT tag_slugs FROM listing_revisions WHERE id='rev_tags'")
+    await save(['note-taking'], null)
+    expect(stored()).toEqual({ tag_slugs: null })
+    await save(['whiteboards', 'note-taking'], 1)
+    expect(stored()).toEqual({ tag_slugs: '["whiteboards","note-taking"]' })
+    expect((await operations().listing(OWNER, slug))?.revision?.tagSlugs).toEqual([
+      'whiteboards',
+      'note-taking'
+    ])
+    await save(undefined, 2)
+    expect(stored()).toEqual({ tag_slugs: null })
+    await save([], 3)
+    expect(stored()).toEqual({ tag_slugs: '[]' })
+    for (const tagSlugs of [['gone'], ['nope'], ['whiteboards', 'whiteboards']]) {
+      await expect(save(tagSlugs, 4)).rejects.toMatchObject({ code: 'invalid_tags' })
+    }
+  })
+
   it('checks a live free listing’s badge with its own cooldown and 24-hour budget', async () => {
     seedOwnedListing('lst_badge')
     seedOwnedListing('lst_paid', { paid: true })

@@ -11,6 +11,8 @@ import {
 import { createDatabase } from './client'
 import type { CatalogCacheEvent, CatalogDataCache, CatalogQueryEvent } from './contracts'
 import {
+  fixtureCategoryIds,
+  insertPublishedListing,
   MemoryCatalogCache,
   SqliteD1,
   seedContractFixture,
@@ -139,14 +141,15 @@ describe('shared catalog data operations', () => {
   it('ranks single-category related listings from the category members', async () => {
     const { events, operations: catalog } = operations()
     const detail = await catalog.getListingBySlug('bravo')
+    // Onward from its own name, wrapping round to the start (#331).
     expect(detail?.relatedWebsites.map(item => item.slug)).toEqual([
-      'alpha',
       'charlie',
       'delta',
-      'echo'
+      'echo',
+      'alpha'
     ])
     expect(detail?.relatedWebsites[0]?.media?.logo).toBe(
-      'https://assets.example/serp-alpha-logo.png'
+      'https://assets.example/serp-charlie-logo.png'
     )
     expect(
       events.some(
@@ -232,7 +235,7 @@ describe('shared catalog data operations', () => {
     expect(after.listingCount).toBe(6)
     expect(after.publicationVersion).toBe(before.publicationVersion)
     expect((await later.getListingNamePage()).items.map(item => item.slug)).toContain('future')
-    expect([...cache.values.keys()]).toContain('catalog-shell:v8:1.2027-01-01T00:00:00.000Z')
+    expect([...cache.values.keys()]).toContain('catalog-shell:v9:1.2027-01-01T00:00:00.000Z')
   })
 
   it('reads the catalog epoch for the Worker edge cache with query telemetry', async () => {
@@ -469,14 +472,14 @@ describe('shared catalog data operations', () => {
       )
     ).toHaveLength(1)
     expect([...cache.values.keys()].sort()).toEqual([
-      `catalog-shell:v8:${epoch(1)}`,
-      `catalog-shell:v8:${epoch(2)}`
+      `catalog-shell:v9:${epoch(1)}`,
+      `catalog-shell:v9:${epoch(2)}`
     ])
   })
 
   it('falls back to live D1 when cached shell data is corrupt or unavailable', async () => {
     const corrupt = new MemoryCatalogCache()
-    corrupt.values.set(`catalog-shell:v8:${epoch(1)}`, { featuredCount: 'wrong' })
+    corrupt.values.set(`catalog-shell:v9:${epoch(1)}`, { featuredCount: 'wrong' })
     const corruptCatalog = operations(corrupt)
     expect((await corruptCatalog.operations.getShellStats()).featuredCount).toBe(2)
     expect(corruptCatalog.events).toContainEqual({
@@ -582,8 +585,8 @@ describe('shared catalog data operations', () => {
     ).toHaveLength(2)
 
     const corrupt = new MemoryCatalogCache()
-    corrupt.values.set(`catalog-published:v8:${epoch(2)}`, { items: 'wrong' })
-    corrupt.values.set(`catalog-detail:v8:${epoch(2)}:charlie`, { detail: 'wrong' })
+    corrupt.values.set(`catalog-published:v9:${epoch(2)}`, { items: 'wrong' })
+    corrupt.values.set(`catalog-detail:v9:${epoch(2)}:charlie`, { detail: 'wrong' })
     const recovered = operations(corrupt)
     expect(await recovered.operations.getPublishedListings()).toHaveLength(5)
     expect((await recovered.operations.getListingBySlug('charlie'))?.slug).toBe('charlie')
@@ -620,11 +623,11 @@ describe('shared catalog data operations', () => {
     expect(
       cold.events.filter(event => event.event === 'd1_query').map(event => event.queryShape)
     ).toEqual(['publication-version'])
-    expect(cache.values.get(`catalog-listing-content:v8:${epoch(1)}:f1:charlie`)).toEqual({
+    expect(cache.values.get(`catalog-listing-content:v9:${epoch(1)}:f1:charlie`)).toEqual({
       publicationVersion: 1,
       value: { body: 'tree 1' }
     })
-    expect(cache.ttlSeconds.get(`catalog-listing-content:v8:${epoch(1)}:f1:charlie`)).toBe(86400)
+    expect(cache.ttlSeconds.get(`catalog-listing-content:v9:${epoch(1)}:f1:charlie`)).toBe(86400)
 
     const warm = operations(cache)
     expect(await warm.operations.getDerivedValue(derivation())).toEqual({ body: 'tree 1' })
@@ -643,7 +646,7 @@ describe('shared catalog data operations', () => {
     expect(await operations(cache).operations.getDerivedValue(derivation())).toEqual({
       body: 'tree 3'
     })
-    cache.values.set(`catalog-listing-content:v8:${epoch(2)}:f1:charlie`, {
+    cache.values.set(`catalog-listing-content:v9:${epoch(2)}:f1:charlie`, {
       publicationVersion: 2,
       value: { body: 7 }
     })
@@ -927,5 +930,71 @@ describe('when a public listing last changed (#218)', () => {
         .sort()
         .at(-1)
     )
+  })
+})
+
+describe('related listings of untagged listings in one category (#331)', () => {
+  /** `count` untagged listings named "<prefix> 000", "<prefix> 001", … in a category of their own. */
+  function seedCategory(sqlite: SqliteD1, slug: string, count: number) {
+    sqlite.database
+      .prepare('INSERT INTO categories(slug, name, description, sort_order) VALUES (?, ?, ?, 0)')
+      .run(slug, `${slug} category`, '')
+    const categoryId = fixtureCategoryIds(sqlite.database).get(slug)
+    if (categoryId === undefined) throw new Error(`Missing category ${slug}.`)
+    for (let index = 0; index < count; index++) {
+      const number = String(index).padStart(3, '0')
+      insertPublishedListing(sqlite.database, {
+        categoryIds: [categoryId],
+        content: null,
+        description: `${slug} ${number}`,
+        displayOrder: 0,
+        id: `${slug}-${number}`,
+        isFeatured: false,
+        name: `${slug} ${number}`,
+        publishedAt: '2026-07-01T00:00:00.000Z',
+        slug: `${slug}-${number}`,
+        website: `https://${slug}-${number}.example.com`
+      })
+    }
+  }
+
+  const related = (slug: string, numbers: number[]) =>
+    numbers.map(number => `${slug}-${String(number).padStart(3, '0')}`)
+
+  it('links two listings of the catch-all onward to different neighbours, wrapping at the end', async () => {
+    const sqlite = new SqliteD1()
+    sqlite.database
+      .prepare(
+        "INSERT INTO publication_state(id, version, checksum, published_at) VALUES (1, 1, 'fixture', '2026-07-01T00:00:00.000Z')"
+      )
+      .run()
+    // Over `RELATED_MEMBER_SCAN_LIMIT` (128): the walk of the public name index.
+    seedCategory(sqlite, 'other', 140)
+    // At most 128: read through the category's members.
+    seedCategory(sqlite, 'small', 6)
+    const events: Array<CatalogCacheEvent | CatalogQueryEvent> = []
+    const catalog = createCatalogOperations({
+      cache: new MemoryCatalogCache(),
+      client: createDatabase(sqlite.asD1Database()),
+      clock: now,
+      observe: event => events.push(event)
+    })
+    const relatedOf = async (slug: string) =>
+      (await catalog.getListingBySlug(slug))?.relatedWebsites.map(item => item.slug)
+
+    // Before #331 every listing in `other` linked the category's first four names.
+    expect(await relatedOf('other-010')).toEqual(related('other', [11, 12, 13, 14]))
+    expect(await relatedOf('other-070')).toEqual(related('other', [71, 72, 73, 74]))
+    // The last names wrap round to the start, for only as many as the walk lacked.
+    expect(await relatedOf('other-138')).toEqual(related('other', [139, 0, 1, 2]))
+    expect(await relatedOf('other-139')).toEqual(related('other', [0, 1, 2, 3]))
+    expect(await relatedOf('small-001')).toEqual(related('small', [2, 3, 4, 5]))
+    expect(await relatedOf('small-004')).toEqual(related('small', [5, 0, 1, 2]))
+
+    const shapes = new Set(
+      events.flatMap(event => (event.event === 'd1_query' ? [event.queryShape] : []))
+    )
+    expect(shapes).toContain('related-single-category-seek')
+    expect(shapes).toContain('related-single-category-members')
   })
 })

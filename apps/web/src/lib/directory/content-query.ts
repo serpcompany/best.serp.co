@@ -146,7 +146,20 @@ export interface LegalEntry {
   _meta?: ContentMeta
 }
 
+/** A tag's or category's slug and its name from D1 (#341). */
+export interface TaxonomyName {
+  name: string
+  slug: string
+}
+
 export interface WebsiteDetailMetadata extends WebsiteMetadata {
+  /**
+   * The active best pages that pin it (`position`) or exclude it (null), by page slug (#347);
+   * absent when none do. With the best index they give its "Featured in".
+   */
+  bestPageMarks?: Array<{ page: string; position: number | null }>
+  /** Its active tags, the most central first (#341); absent when it has none. */
+  tags?: TaxonomyName[]
   /**
    * The body (`content`) as the tree the page renders, from the epoch-keyed data cache
    * (`lib/markdown/listing-content.ts`, #334); absent without a body.
