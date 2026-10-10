@@ -21,7 +21,7 @@ the row), and every listing the user owns, except one whose own submission is st
 requested, or a revision with changes requested), Live, Closed (rejected, withdrawn, unlisted).
 A draft or a pending-badge submission continues in the submit flow (`/submit/<id>/…`); its
 `/account/submissions/<id>/` redirects there. Messages (#73) and Settings show "Soon"; the
-user menu holds the email and sign-out.
+account menu at the foot of the sidebar holds the email and sign-out.
 
 ## Ownership and requests
 

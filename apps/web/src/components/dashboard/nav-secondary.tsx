@@ -10,7 +10,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem
 } from '@/components/ui/sidebar'
-import { useCloseMobileSidebar } from './nav-main'
+import { FULL_SIZE_TARGET_CLASS, useCloseMobileSidebar } from './nav-main'
 
 export interface DashboardLink {
   title: string
@@ -18,7 +18,10 @@ export interface DashboardLink {
   icon: LucideIcon
 }
 
-/** dashboard-01's NavSecondary: small utility links, usually pinned with `className="mt-auto"`. */
+/**
+ * serplists' secondary `AppSidebar` group: utility rows, usually pinned with
+ * `className="mt-auto"`.
+ */
 export function NavSecondary({
   items,
   ...props
@@ -31,6 +34,7 @@ export function NavSecondary({
           {items.map(item => (
             <SidebarMenuItem key={item.title}>
               <SidebarMenuButton
+                className={FULL_SIZE_TARGET_CLASS}
                 tooltip={item.title}
                 render={<Link href={item.href} onClick={close} />}
               >
