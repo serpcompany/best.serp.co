@@ -83,7 +83,9 @@ always rendered). Later pages use a `?page=N` query parameter on the existing UR
 links into `/products/?page=N`. `/products/` itself renders the homepage's content, so its
 canonical is `/`. Page 1 is the bare URL; pages 2+ are linked with plain `<a href>` anchors,
 canonicalize to themselves, carry `noindex, follow` and a "- Page N" title, and a page
-past the end is a 404. Category JSON-LD describes the whole category on every page.
+past the end is a 404. The bar links the first and last pages, the current page's neighbours,
+and the pages 10 either side (#331), so no page of the 57-page directory is more than 6 links
+from page 1; below `sm` it hides the ±10 links (they stay in the HTML) to fit one row. Category JSON-LD describes the whole category on every page.
 `apps/web/src/components/directory/listing-pagination.tsx` owns the parameter, links, and metadata;
 `getListingNamePage` in `apps/web/src/db` reads one page (ids in name order are cached
 per epoch, then only that page's summaries are read). Routes never load the full catalog
