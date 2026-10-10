@@ -38,7 +38,7 @@ export interface CatalogSample {
   }
   /** Live listings: the homepage badge, the directory pages, the feed and the sitemap. */
   listingCount: number
-  /** A category with a second directory page. */
+  /** An indexable category with a second directory page. */
   paginatedCategory: { slug: string }
   /** A query `/search/` answers with `listing` among its results. */
   search: { listing: SampleListing; query: string }
@@ -96,7 +96,8 @@ async function readLiveSample(request: APIRequestContext): Promise<CatalogSample
 
   const categoriesSitemap = await request.get('/sitemap-categories.xml')
   expect(categoriesSitemap.status(), '/sitemap-categories.xml').toBe(200)
-  const categoryCount = sitemapLocations(await categoriesSitemap.text()).length
+  const listedCategories = sitemapLocations(await categoriesSitemap.text())
+  const categoryCount = listedCategories.length
   expect(categoryCount, 'listed categories').toBeGreaterThanOrEqual(
     deployedCatalog.minimumCategoryCount
   )
@@ -127,10 +128,16 @@ async function readLiveSample(request: APIRequestContext): Promise<CatalogSample
   const domain = items.find(item => item.id.includes('.'))
   if (!domain) throw new Error('No live listing has a domain-name slug.')
 
+  // The largest category the sitemap lists: an indexable one, so not the transitional `other`
+  // (noindex, #346), whose page 1 the pagination check expects to be `index`.
+  const indexable = new Set(
+    listedCategories.map(location => new URL(location).pathname.split('/').at(-2) ?? '')
+  )
   const perCategory = new Map<string, number>()
   for (const item of items) {
     const category = item.categories[1]
-    if (category) perCategory.set(category, (perCategory.get(category) ?? 0) + 1)
+    if (category && indexable.has(category))
+      perCategory.set(category, (perCategory.get(category) ?? 0) + 1)
   }
   const [paginated, paginatedCount] = [...perCategory].sort((a, b) => b[1] - a[1])[0] ?? []
   expect(paginatedCount ?? 0, 'the largest category').toBeGreaterThan(DIRECTORY_PAGE_SIZE)
