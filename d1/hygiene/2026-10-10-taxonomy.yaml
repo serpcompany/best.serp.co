@@ -1074,8 +1074,10 @@ bestPages:
   - {slug: missiveapp.com, id: lst_6d660b16d76aa800f4cc971f, evidence: "DR 74, 87,328 organic visits/mo"}
   - {slug: superhuman.com, id: lst_692085f232c9ba8f1cea086f, evidence: "DR 81, 74,395 organic visits/mo"}
   - {slug: craft.do, id: lst_fd938555facec2c12ac49ba1, evidence: "DR 76, 54,496 organic visits/mo"}
-  - {slug: shift.com, id: lst_fa5f8e8c11dc0d0351675958, evidence: "DR 73, 53,837 organic visits/mo"}
   - {slug: usemotion.com, id: lst_014a1e0f4f0cdea41c0c3224, evidence: "DR 82, 45,957 organic visits/mo"}
+  - {slug: taskade.com, id: lst_5a38a0d086bf9fddf4a807aa, evidence: "DR 76, 35,223 organic visits/mo"}
+  passedOver:
+  - {slug: shift.com, reason: "a web browser; this page ranks no browser (Microsoft Edge and Opera are passed over too)"}
 - slug: video-downloader
   keyword: video downloader
   volume: 192000
@@ -1158,10 +1160,12 @@ bestPages:
   - {slug: socialbu.com, id: lst_b819f25be12ec3c8e4d5ee04, evidence: "DR 65, 90,834 organic visits/mo"}
   - {slug: youscan.io, id: lst_b8840864975df45d3cda30fd, evidence: "DR 72, 77,322 organic visits/mo"}
   - {slug: taplio.com, id: lst_a7bf6f40afb0f965ea1b204e, evidence: "DR 72, 71,200 organic visits/mo"}
-  - {slug: portaly.cc, id: lst_7cdc3ca8ab9e8dde21cb5fc4, evidence: "DR 76, 44,855 organic visits/mo"}
   - {slug: tweethunter.io, id: lst_b2c18d0ef61e56de326a3f40, evidence: "DR 71, 41,680 organic visits/mo"}
   - {slug: predis.ai, id: lst_5da6c0322740c0039977eec3, evidence: "DR 78, 26,712 organic visits/mo"}
   - {slug: taggbox.com, id: lst_7311f297caf5e804cbc6af7f, evidence: "DR 78, 15,868 organic visits/mo"}
+  - {slug: contentin.io, id: lst_837845d43a835bc6bf319c2d, evidence: "DR 43, 6,981 organic visits/mo"}
+  passedOver:
+  - {slug: portaly.cc, reason: "a link-in-bio site builder for creators, not a social media tool"}
 - slug: ai-coding-assistant
   keyword: ai coding assistant
   volume: 1800
@@ -1181,7 +1185,9 @@ bestPages:
   - {slug: qodo.ai, id: lst_83776aab9fb5d8dea8e83e95, evidence: "DR 76, 8,389 organic visits/mo"}
   - {slug: pseudoeditor.com, id: lst_856d5d558b67c4cac9f63790, evidence: "DR 8, 5,275 organic visits/mo"}
   - {slug: docuwriter.ai, id: lst_8ef1e02224ce390886eaf2a8, evidence: "DR 51, 2,269 organic visits/mo"}
-  - {slug: codiga.io, id: lst_a93dfdd172209a3786fd6d64, evidence: "DR 57, 1,619 organic visits/mo"}
+  - {slug: cosine.sh, id: lst_f8bf4271ce883bf4c804d63b, evidence: "DR 65, 1,496 organic visits/mo"}
+  passedOver:
+  - {slug: codiga.io, reason: "its site leads with \"Codiga has joined Datadog!\", and it is a static-analysis tool, not a coding assistant"}
 - slug: ai-seo-tools
   keyword: ai seo tools
   volume: 2900
@@ -1406,18 +1412,20 @@ bestPages:
   - {slug: rackspace.com, id: lst_f3fe329066251301efb7dab6, evidence: "DR 86, 143,533 organic visits/mo; HIPAA offering: https://www.rackspace.com/industry/healthcare"}
   - {slug: tierpoint.com, id: lst_3ea5780c5f90d731adf503fe, evidence: "DR 71, 25,365 organic visits/mo; HIPAA offering: https://www.tierpoint.com/industry-it-solutions/healthcare/"}
   - {slug: hipaavault.com, id: lst_e7ec160437237670f8d55f33, evidence: "DR 57, 19,701 organic visits/mo; HIPAA offering: https://hipaavault.com/"}
-  - {slug: sherweb.com, id: lst_663a07bb996dd0ccf9a7cda5, evidence: "DR 69, 4,716 organic visits/mo; HIPAA offering: https://www.sherweb.com/about/newsroom/sherweb-making-hipaa-compliance-easier-for-businesses"}
   - {slug: luxsci.com, id: lst_7db2b41213a0fa3aa0e732ae, evidence: "DR 71, 2,762 organic visits/mo; HIPAA offering: https://luxsci.com/"}
-  - {slug: lightedge.com, id: lst_993b1205a26a9890ce3c76be, evidence: "DR 56, 2,484 organic visits/mo; HIPAA offering: https://lightedge.com/hipaa-cloud/"}
+  - {slug: lightedge.com, id: lst_993b1205a26a9890ce3c76be, evidence: "DR 56, 2,484 organic visits/mo; HIPAA offering: https://lightedge.com/healthcare-life-sciences/"}
   - {slug: medstack.co, id: lst_5feb6ba9a5a2f56731e83c1d, evidence: "DR 41, 519 organic visits/mo; HIPAA offering: https://medstack.co/"}
   - {slug: connectria.com, id: lst_f3bd853de9d630e280f11c06, evidence: "DR 52, 302 organic visits/mo; HIPAA offering: https://www.connectria.com/"}
   - {slug: bytegrid.com, id: lst_a7e78106154177ad79236c5d, evidence: "DR 22, 73 organic visits/mo; HIPAA offering: https://www.bytegrid.com/"}
+  - {slug: healthcareblocks.com, id: lst_05e0a382416b1cd854e2f88b, evidence: "DR 46, 11 organic visits/mo; HIPAA offering: https://www.healthcareblocks.com/solutions/healthcare-blocks-aws"}
   exclude:
   - {slug: aws.amazon.com, id: lst_31a93dfdd1a9daea71399d95, reason: "its listing is Amazon Polly, a text-to-speech service"}
+  - {slug: cyracom.com, id: lst_c7d69228a72038141831e437, reason: "language services, not hosting"}
   - {slug: greengeeks.com, id: lst_550deeba4d8724905250b26e, reason: "no HIPAA offering on greengeeks.com: its home, web, VPS and dedicated hosting pages don't mention HIPAA (GET, 2026-10-11)"}
   - {slug: leaseweb.com, id: lst_752764c40458318859bca9b3, reason: "no HIPAA offering found on leaseweb.com's home, compliance and certification pages (GET, 2026-10-11)"}
   - {slug: linqto.com, id: lst_aa82a29b27b0eced74916ebc, reason: "an investment platform, not hosting"}
   - {slug: servermania.com, id: lst_64d01bfeda69a4db37249b02, reason: "servermania.com lists its data centers' SOC 2-HIPAA reports, but no HIPAA hosting offering (GET, 2026-10-11)"}
+  - {slug: sherweb.com, id: lst_663a07bb996dd0ccf9a7cda5, reason: "no current HIPAA hosting offering on sherweb.com: only a 2013 newsroom post and blog articles about Microsoft 365 (GET, 2026-10-11)"}
   - {slug: truevault.com, id: lst_8d0d625095e3c610cb08dd25, reason: "privacy-compliance software, not hosting"}
 featureListings:
 - {slug: aws.amazon.com, id: lst_31a93dfdd1a9daea71399d95, name: "Amazon Polly", reason: "names one feature of a larger site; aws.amazon.com's traffic measures all of AWS"}

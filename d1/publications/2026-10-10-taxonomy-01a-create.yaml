@@ -1581,10 +1581,10 @@ operations:
         slug: superhuman.com
       - id: lst_fd938555facec2c12ac49ba1
         slug: craft.do
-      - id: lst_fa5f8e8c11dc0d0351675958
-        slug: shift.com
       - id: lst_014a1e0f4f0cdea41c0c3224
         slug: usemotion.com
+      - id: lst_5a38a0d086bf9fddf4a807aa
+        slug: taskade.com
     exclude: []
   - action: best-page-create
     page:
@@ -1737,14 +1737,14 @@ operations:
         slug: youscan.io
       - id: lst_a7bf6f40afb0f965ea1b204e
         slug: taplio.com
-      - id: lst_7cdc3ca8ab9e8dde21cb5fc4
-        slug: portaly.cc
       - id: lst_b2c18d0ef61e56de326a3f40
         slug: tweethunter.io
       - id: lst_5da6c0322740c0039977eec3
         slug: predis.ai
       - id: lst_7311f297caf5e804cbc6af7f
         slug: taggbox.com
+      - id: lst_837845d43a835bc6bf319c2d
+        slug: contentin.io
     exclude: []
   - action: best-page-create
     page:
@@ -1783,8 +1783,8 @@ operations:
         slug: pseudoeditor.com
       - id: lst_8ef1e02224ce390886eaf2a8
         slug: docuwriter.ai
-      - id: lst_a93dfdd172209a3786fd6d64
-        slug: codiga.io
+      - id: lst_f8bf4271ce883bf4c804d63b
+        slug: cosine.sh
     exclude: []
   - action: best-page-create
     page:
@@ -2213,8 +2213,6 @@ operations:
         slug: tierpoint.com
       - id: lst_e7ec160437237670f8d55f33
         slug: hipaavault.com
-      - id: lst_663a07bb996dd0ccf9a7cda5
-        slug: sherweb.com
       - id: lst_7db2b41213a0fa3aa0e732ae
         slug: luxsci.com
       - id: lst_993b1205a26a9890ce3c76be
@@ -2225,9 +2223,13 @@ operations:
         slug: connectria.com
       - id: lst_a7e78106154177ad79236c5d
         slug: bytegrid.com
+      - id: lst_05e0a382416b1cd854e2f88b
+        slug: healthcareblocks.com
     exclude:
       - id: lst_31a93dfdd1a9daea71399d95
         slug: aws.amazon.com
+      - id: lst_c7d69228a72038141831e437
+        slug: cyracom.com
       - id: lst_550deeba4d8724905250b26e
         slug: greengeeks.com
       - id: lst_752764c40458318859bca9b3
@@ -2236,5 +2238,7 @@ operations:
         slug: linqto.com
       - id: lst_64d01bfeda69a4db37249b02
         slug: servermania.com
+      - id: lst_663a07bb996dd0ccf9a7cda5
+        slug: sherweb.com
       - id: lst_8d0d625095e3c610cb08dd25
         slug: truevault.com
