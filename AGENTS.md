@@ -59,7 +59,8 @@ Closer `AGENTS.md` files add local rules without replacing this contract.
 
 Stage: ship
 
-GitHub Issues on `serpcompany/best.serp.co` are the source of truth for planning.
+GitHub Issues on `serpcompany/best.serp.co` are the source of truth for planning. To resume
+work, start from the open issue labelled `handoff` (`gh issue list --label handoff`).
 `staging` is the base branch: branch from `origin/staging` as `issue-<n>-<slug>` and open
 pull requests into `staging` (`gh pr create --base staging`); each merge deploys staging.
 `main` is production and changes only by a fast-forward promotion (`pnpm release:promote`,
