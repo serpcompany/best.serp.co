@@ -255,7 +255,8 @@ const operation = z.discriminatedUnion('action', [
    * categories like `listing-categories-add` (#333: listings filed only under Other move to real
    * categories, which `-add` and `-remove` can't do, as they never touch the primary). The listing
    * is a draft inside the batch while its memberships are replaced, as the admin panel's edit does,
-   * so the primary-category triggers hold; every category must be active.
+   * so the primary-category triggers hold; every category must be active, and the listing's own
+   * submission must not be in review.
    */
   z
     .object({
@@ -938,6 +939,13 @@ export function buildPublicationPlan(
     if (op.action === 'listing-categories-set') {
       statements.push(
         categoriesGuard(op.id, op.slug, op.expected),
+        // As in the admin panel (#64): never while the listing's own submission is in review. Its
+        // approval needs the checksum the listing was paid at (`published_checksum`), and the new
+        // checksum below would leave that paid submission impossible to approve.
+        statement(
+          `SELECT CASE WHEN ${listingHasQueuedSubmission('?')} THEN ${GUARD_FAILURE} ELSE 1 END`,
+          op.id
+        ),
         // A draft while its memberships are replaced, as the admin panel's edit does: the
         // primary-category triggers refuse removing a published listing's primary.
         statement(
@@ -948,12 +956,14 @@ export function buildPublicationPlan(
         statement(CHANGED_ONE_GUARD),
         statement('DELETE FROM listing_categories WHERE listing_id=?', op.id),
         // The first is the primary. A missing or retired category inserts nothing: refused.
+        // `is_primary` binds as 1 or 0, never a boolean, so D1's REST API binds it as the
+        // Worker binding does (`d1-remote-publisher.ts` sends bindings as JSON).
         ...op.categories.flatMap((categorySlugToSet, order) => [
           statement(
             'INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary) SELECT ?,id,?,? FROM categories WHERE slug=? AND is_active=1',
             op.id,
             order,
-            order === 0,
+            order === 0 ? 1 : 0,
             categorySlugToSet
           ),
           statement(CHANGED_ONE_GUARD)

@@ -1091,6 +1091,10 @@ describe('listing-categories-set and category-create in a row-level manifest (#3
       now,
       { ...live, version: 9 }
     )
+    // `is_primary` binds as 1 or 0: D1's REST API gets the same values as the Worker binding.
+    expect(
+      publication.statements.flatMap(item => item.bindings).filter(b => typeof b === 'boolean')
+    ).toEqual([])
     executeInTestTransaction(db, publication)
     expect(memberships(db)).toEqual([
       { is_primary: 1, slug: 'ai-chatbots', sort_order: 0 },
@@ -1240,6 +1244,67 @@ describe('listing-categories-set and category-create in a row-level manifest (#3
     }
   })
 
+  it.each(['paid_pending_review', 'changes_requested'])(
+    'refuses a listing whose own submission is %s, so that paid submission can still be approved',
+    status => {
+      const db = inOther()
+      // A paid submission's approval requires the listing's checksum to equal `published_checksum`,
+      // written once at payment (`submission-plans.ts`).
+      db.exec(`INSERT INTO listing_submissions (id,slug,name,description,website,content,
+        category_slug,logo_url,status,plan,paid_at,listing_id,published_checksum)
+      VALUES ('sub','example.com','Old','d','https://example.com/','c','other','l',
+        '${status}','paid','${now}','lst_sqlite_test',
+        (SELECT checksum FROM listings WHERE id='lst_sqlite_test'))`)
+      const before = listingState(db)
+      expect(() =>
+        executeInTestTransaction(
+          db,
+          buildPublicationPlan(rows([set(['other'], ['ai-chatbots'])]), 'm', now, live)
+        )
+      ).toThrow()
+      expectRefused(db, before)
+      expect(
+        db
+          .prepare(
+            "SELECT COUNT(*) AS count FROM listings l JOIN listing_submissions s ON s.listing_id=l.id WHERE s.id='sub' AND l.checksum=s.published_checksum"
+          )
+          .get()
+      ).toEqual({ count: 1 })
+      // Once that submission is decided, the listing moves.
+      db.exec("UPDATE listing_submissions SET status='approved' WHERE id='sub'")
+      executeInTestTransaction(
+        db,
+        buildPublicationPlan(rows([set(['other'], ['ai-chatbots'])]), 'm', now, live)
+      )
+      expect(memberships(db)).toEqual([{ is_primary: 1, slug: 'ai-chatbots', sort_order: 0 }])
+    }
+  )
+
+  it.each(['review', 'rejected'])(
+    'refuses a listing in %s, which never comes back approved or live',
+    status => {
+      const db = inOther()
+      // Still active with a `published_at`: approving it again would publish it.
+      db.exec(`UPDATE listings SET status='${status}' WHERE id='lst_sqlite_test'`)
+      const before = listingState(db)
+      expect(() =>
+        executeInTestTransaction(
+          db,
+          buildPublicationPlan(rows([set(['other'], ['ai-chatbots'])]), 'm', now, live)
+        )
+      ).toThrow()
+      expectRefused(db, before)
+      expect(listingState(db)).toMatchObject({ status, is_active: 1 })
+      expect(
+        db
+          .prepare(
+            "SELECT COUNT(*) AS count FROM listings WHERE id='lst_sqlite_test' AND status='approved' AND is_active=1 AND published_at IS NOT NULL"
+          )
+          .get()
+      ).toEqual({ count: 0 })
+    }
+  )
+
   it('replaces an unpublished listing’s categories and leaves it unpublished', () => {
     const db = inOther()
     db.exec("UPDATE listings SET is_active=0 WHERE id='lst_sqlite_test'")
@@ -1279,6 +1344,9 @@ describe('listing-categories-set and category-create in a row-level manifest (#3
       now,
       { ...live, version: 12 }
     )
+    expect(
+      publication.statements.flatMap(item => item.bindings).filter(b => typeof b === 'boolean')
+    ).toEqual([])
     executeInTestTransaction(db, publication)
     expect(
       db

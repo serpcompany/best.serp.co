@@ -49,19 +49,21 @@ row-level, so one manifest fits staging and production. Each listing operation n
 | Operation | What it does | Refused, with nothing written, when |
 |---|---|---|
 | `listing-categories-add` | Adds `add` as secondary categories, after the listing's last one | The slug or categories aren't exactly `expected`, or a category is missing or retired |
-| `listing-categories-remove` | Removes `remove`, which must be secondary categories | As for `-add`, or one of them is the primary |
-| `listing-categories-set` | Replaces the listing's categories with `categories`, the first as primary (#333) | As for `-add`, or the listing isn't approved |
+| `listing-categories-remove` | Removes `remove`, which must be secondary categories | The slug or categories aren't exactly `expected`, or one of them is the primary |
+| `listing-categories-set` | Replaces the listing's categories with `categories`, the first as primary (#333) | As for `-add`, the listing isn't approved, or its own submission is in review (`paid_pending_review` or `changes_requested`) |
 | `category-create` | Adds an active category: `slug`, `name`, `description`, `order` | The slug exists, active or retired |
-| `category-unpublish` | Retires a category ([Catalog hygiene](./catalog-hygiene.md#adult-products-260)) | A live listing is still filed under it |
+| `category-unpublish` | Retires a category ([Catalog hygiene](./catalog-hygiene.md#adult-products-260)) | The slug doesn't exist, or a live listing is still filed under it |
 
-`listing-categories-set` is the only way a manifest changes a listing's primary category: `-add`
-and `-remove` never touch it. Within the batch, it moves the listing to a draft, replaces its
+`listing-categories-set` is the only row-level operation that changes a listing's primary category:
+`-add` and `-remove` never touch it. Within the batch, it moves the listing to a draft, replaces its
 memberships, and approves it again, as the admin panel's edit does, so the primary-category
 triggers still hold. An unpublished listing stays unpublished. The operation also does three things:
 
 - It sets `updated_at`, the page's sitemap `lastmod`.
 - It gives the listing a new checksum. An admin edit or owner revision read before the change is
-  then refused as stale, instead of putting the old primary back.
+  then refused as stale, instead of putting the old primary back. A paid submission's approval
+  needs the checksum the listing had at payment, which is why the operation refuses a listing
+  whose own submission is in review, as `listing-unpublish` and `listing-content-remove-suffix` do.
 - It logs an `edited` event, which `/admin` shows as "Details edited: categories".
 
 Publish a manifest's `category-create` before the operations that file listings under the new
