@@ -327,6 +327,28 @@ describe('taxonomy reads (#345)', () => {
     expect(await catalog.getTaxonomyRedirect('category', 'missing')).toBeNull()
   })
 
+  // #346 review: a 308 to a page that answers 404 would be a broken moved URL.
+  it('follows a moved URL only to a target whose page renders', async () => {
+    const { events, operations: catalog } = operations()
+    // Active, but with nothing to show: a category and a tag with no public listing, and a best
+    // page with no entry.
+    expect(await catalog.getCategoryBySlug('empty')).toMatchObject({ count: 0 })
+    expect(await catalog.getTagBySlug('idle')).toMatchObject({ count: 0 })
+    expect(await catalog.getBestPageBySlug('best-idle')).toMatchObject({ poolSize: 0 })
+    for (const slug of ['old-empty-hub', 'old-idle-tag', 'old-idle-best']) {
+      expect(await catalog.getTaxonomyRedirect('category', slug), slug).toBeNull()
+    }
+    // An empty category's own URL follows its redirect when the target renders.
+    expect(await catalog.getTaxonomyRedirect('category', 'empty')).toEqual({
+      kind: 'tag',
+      slug: 'writers'
+    })
+    // The check reads the cached shell stats, tag stats and best index: one seek per lookup.
+    const start = events.length
+    await catalog.getTaxonomyRedirect('category', 'old-idle-best')
+    expect(queries(events.slice(start))).toEqual(['taxonomy-redirect'])
+  })
+
   it('carries active tags on the detail and ranks related listings by shared tags', async () => {
     const { events, operations: catalog } = operations()
     const start = sqlite.statements.length

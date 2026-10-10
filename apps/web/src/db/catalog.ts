@@ -2055,7 +2055,32 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
       )
     )
     const row = rows[0]
-    return row ? parseTaxonomyTarget(row.kind, row.slug) : null
+    const target = row ? parseTaxonomyTarget(row.kind, row.slug) : null
+    return target && (await taxonomyTargetRenders(target)) ? target : null
+  }
+
+  /**
+   * Whether a moved URL's target page renders (#346 review), by that page's own rule, so a moved
+   * URL never answers 308 to a 404: a category or tag with a public listing, a best page with an
+   * entry, or the directory. Read from the cached shell stats, tag stats and best index the pages
+   * read anyway, so it adds no statement on a warm cache. `legacyRootTarget` applies the same rule
+   * in SQL for the Worker's root-level redirect.
+   */
+  async function taxonomyTargetRenders(target: TaxonomyTarget): Promise<boolean> {
+    switch (target.kind) {
+      case 'directory':
+        return true
+      case 'category':
+        return (await getShellStats()).categories.some(
+          category => category.slug === target.slug && category.count > 0
+        )
+      case 'tag':
+        return (await getTagStats()).some(tag => tag.slug === target.slug && tag.count > 0)
+      case 'best':
+        return (await getBestIndex()).some(
+          page => page.slug === target.slug && Math.min(page.listSize, page.poolSize) > 0
+        )
+    }
   }
 
   /** First `limit` public listings in publication order, optionally featured only. */

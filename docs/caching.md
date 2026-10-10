@@ -56,7 +56,8 @@ From the edge inward:
    featured/latest heads, details, search results (per normalized query and limit), and the
    full summary list (for sitemaps and the feed) are cached under epoch-scoped keys for
    24 hours, with live D1 fallback when the cache fails. The redirect lookups (renamed listing
-   slugs, moved taxonomy URLs, root-level URLs) are single seeks and stay uncached. Each
+   slugs, moved taxonomy URLs, root-level URLs) are single seeks and stay uncached; whether a
+   moved URL's target renders comes from the cached shell stats, tag stats and best index. Each
    listing body's parsed Markdown is cached too (`getDerivedValue`, built by
    `lib/markdown/listing-content-tree.ts`, #334): the page renders the cached tree instead of
    parsing the body on every uncached render. A tree's JSON is about twice its body for prose

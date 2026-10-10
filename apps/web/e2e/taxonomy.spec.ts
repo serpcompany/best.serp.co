@@ -266,13 +266,24 @@ test.describe('taxonomy routes on the fixture seed (#346)', () => {
             : '/products/'
     const sourcePath = ({ kind, slug }: { kind: string; slug: string }) =>
       kind === 'category' ? categoryPath(slug) : kind === 'tag' ? tagPath(slug) : bestPath(slug)
-    for (const { from, to } of seedTaxonomyRedirects) {
+    // A target with nothing to show (the empty category or tag) is no redirect at all.
+    const emptyTargets = new Set<string>([seedCategories.empty.slug, seedTags.empty.slug])
+    const moved = seedTaxonomyRedirects.filter(({ to }) => !emptyTargets.has(to.slug ?? ''))
+    for (const { from, to } of moved) {
       await expectOneHop(request, sourcePath(from), targetPath(to))
     }
     // An old category URL at the root (#168) answers the same one hop, in both slash forms.
-    for (const { from, to } of seedTaxonomyRedirects.filter(r => r.from.kind === 'category')) {
+    for (const { from, to } of moved.filter(r => r.from.kind === 'category')) {
       await expectOneHop(request, `/${from.slug}/`, targetPath(to))
       await expectOneHop(request, `/${from.slug}`, targetPath(to))
+    }
+    // #346 review: never a 308 to a page that answers 404, at the root or on the page.
+    const toEmpty = seedTaxonomyRedirects.filter(({ to }) => emptyTargets.has(to.slug ?? ''))
+    expect(toEmpty).toHaveLength(2)
+    for (const { from } of toEmpty) {
+      for (const path of [sourcePath(from), `/${from.slug}/`]) {
+        expect((await request.get(path, { maxRedirects: 0 })).status(), path).toBe(404)
+      }
     }
     // The query string survives without `page` (design 2.2, rule 4).
     await expectOneHop(

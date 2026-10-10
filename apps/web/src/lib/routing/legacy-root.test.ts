@@ -233,4 +233,14 @@ describe('root-level URLs on the Worker path, against D1 (#356)', () => {
     expect(response?.status).toBe(308)
     expect(response?.headers.get('location')).toBe('/best/best-writers/?utm_source=news')
   })
+
+  it('answers 404, not a 308, when the target has nothing to show (#346 review)', async () => {
+    const { lookup } = workerLookup()
+    for (const path of ['/old-empty-hub', '/old-idle-tag', '/old-idle-best/']) {
+      expect(
+        await legacyRootRedirect(new Request(`https://best.serp.co${path}`), slugFor, lookup),
+        path
+      ).toBeNull()
+    }
+  })
 })

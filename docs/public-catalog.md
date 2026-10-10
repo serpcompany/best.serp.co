@@ -74,7 +74,8 @@ and public listings:
   in the same name order, in the same statement. A listing without tags is ranked by shared
   categories, as before.
 - **Moved taxonomy URLs** follow `taxonomy_redirects` to the target's current URL, when it is
-  public: a best page whose tag or category is retired is not followed.
+  public and its page renders: a best page whose tag or category is retired is not followed, and
+  neither is a category or tag with no public listing or a best page with no entry (#346).
 
 Every shape has a rows-read budget on a generated catalog of production's size
 (`ROWS_READ_BUDGET` in `scripts/d1-workerd-queries.test.ts`, #314), so a lost index or a full

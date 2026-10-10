@@ -181,9 +181,74 @@ export function parseTaxonomyTarget(kind: unknown, slug: unknown): TaxonomyTarge
   return { kind, slug }
 }
 
+/** `alias` is a public listing as of `asOf`: the catalog's public eligibility. */
+function publicListing(alias: string, asOf: string): SQL {
+  const l = sql.raw(alias)
+  return sql`${l}.status = 'approved' AND ${l}.is_active = 1 AND ${l}.published_at IS NOT NULL
+    AND ${l}.published_at <= ${asOf}`
+}
+
+/** The category with id `categoryId` has a public listing: its page renders (#341, #346). */
+function categoryRenders(categoryId: string, asOf: string): SQL {
+  return sql`EXISTS (
+    SELECT 1 FROM listing_categories render_lc INDEXED BY listing_categories_category_idx
+    CROSS JOIN listings render_l ON render_l.id = render_lc.listing_id
+    WHERE render_lc.category_id = ${sql.raw(categoryId)} AND ${publicListing('render_l', asOf)})`
+}
+
 /**
- * Where `/<slug>` moved: a public listing or an active category with that slug, or (`moved`) the
- * target of the retired category URL it names.
+ * The target of a `taxonomy_redirects` row `r` (joined with `TAXONOMY_TARGET_JOINS`) renders,
+ * by its own page's rule (#346 review), so a moved URL never answers 308 to a 404: a category or
+ * tag with a public listing (a tag under an active hub, as the tag stats count it), a best page
+ * with an entry (a public pin, or a public listing of its pool that it does not exclude), or the
+ * directory. The catalog's `getTaxonomyRedirect` applies the same rule from its cached reads.
+ */
+function taxonomyTargetRenders(asOf: string): SQL {
+  return sql`CASE r.target_kind
+    WHEN 'directory' THEN 1
+    WHEN 'category' THEN ${categoryRenders('target_c.id', asOf)}
+    WHEN 'tag' THEN EXISTS (
+        SELECT 1 FROM categories render_hub
+        WHERE render_hub.id = target_t.category_id AND render_hub.is_active = 1
+      ) AND EXISTS (
+        SELECT 1 FROM listing_tags render_lt INDEXED BY listing_tags_tag_idx
+        CROSS JOIN listings render_l ON render_l.id = render_lt.listing_id
+        WHERE render_lt.tag_id = target_t.id AND ${publicListing('render_l', asOf)})
+    WHEN 'best' THEN EXISTS (
+        SELECT 1 FROM best_page_listings render_pin
+        CROSS JOIN listings render_l ON render_l.id = render_pin.listing_id
+        WHERE render_pin.best_page_id = target_b.id AND render_pin.excluded = 0
+          AND ${publicListing('render_l', asOf)}
+      ) OR EXISTS (
+        SELECT 1 FROM listing_tags render_lt INDEXED BY listing_tags_tag_idx
+        CROSS JOIN listings render_l ON render_l.id = render_lt.listing_id
+        WHERE render_lt.tag_id = target_b.tag_id AND ${publicListing('render_l', asOf)}
+          AND (target_b.category_id IS NULL OR EXISTS (
+            SELECT 1 FROM listing_categories render_in
+            WHERE render_in.listing_id = render_l.id AND render_in.category_id = target_b.category_id
+          ))
+          AND NOT EXISTS (
+            SELECT 1 FROM best_page_listings render_out
+            WHERE render_out.best_page_id = target_b.id AND render_out.listing_id = render_l.id
+              AND render_out.excluded = 1
+          )
+      ) OR (target_b.tag_id IS NULL AND EXISTS (
+        SELECT 1 FROM listing_categories render_lc INDEXED BY listing_categories_category_idx
+        CROSS JOIN listings render_l ON render_l.id = render_lc.listing_id
+        WHERE render_lc.category_id = target_b.category_id AND ${publicListing('render_l', asOf)}
+          AND NOT EXISTS (
+            SELECT 1 FROM best_page_listings render_out
+            WHERE render_out.best_page_id = target_b.id AND render_out.listing_id = render_l.id
+              AND render_out.excluded = 1
+          )
+      ))
+    ELSE 0
+  END`
+}
+
+/**
+ * Where `/<slug>` moved: a public listing or a category with a public listing with that slug, or
+ * (`moved`) the target of the retired category URL it names.
  */
 export type LegacyRootTarget =
   | { kind: 'category' | 'listing'; slug: string }
@@ -199,14 +264,17 @@ interface LegacyRootRow {
  * Where an old root-level URL `/<slug>` moved (#168), in one hop, or null:
  *
  * 1. a public listing with that slug;
- * 2. an active category with that slug;
+ * 2. an active category with that slug and a public listing (its page renders);
  * 3. a retired listing slug (`listing_slug_redirects`: a rename, or an unpublished duplicate,
  *    #338) followed to its public listing's current slug (#356);
- * 4. a retired category URL (`taxonomy_redirects`, #341 design 2.2) followed to its active target.
+ * 4. a retired category URL, or one with no public listing left (`taxonomy_redirects`, #341
+ *    design 2.2), followed to its active target when that target renders (#346 review).
  *
- * Each branch is one seek on a unique key (plus one for its target), and the four are one
- * compound SELECT within D1's limit of five terms, so the Worker entry answers the one 308 itself
- * instead of letting Next.js redirect after the trailing-slash rule (two hops).
+ * Each branch is one seek on a unique key (plus one for its target, and an `EXISTS` that stops at
+ * the first public listing that shows the page renders), and the four are one compound SELECT
+ * within D1's limit of five terms, so the Worker entry answers the one 308 itself instead of
+ * letting Next.js redirect after the trailing-slash rule (two hops). Rendering wins, as on the
+ * hub route: a category with a public listing renders even when a redirect row names it.
  */
 export async function legacyRootTarget(input: {
   asOf: string
@@ -228,8 +296,9 @@ export async function legacyRootTarget(input: {
             WHERE slug = ${input.slug} AND status = 'approved' AND is_active = 1
               AND published_at IS NOT NULL AND published_at <= ${input.asOf}
           UNION ALL
-          SELECT 'category' AS kind, slug, 1 AS rank FROM categories
-            WHERE slug = ${input.slug} AND is_active = 1
+          SELECT 'category' AS kind, c.slug, 1 AS rank FROM categories c
+            WHERE c.slug = ${input.slug} AND c.is_active = 1
+              AND ${categoryRenders('c.id', input.asOf)}
           UNION ALL
           SELECT 'listing' AS kind, l.slug, 2 AS rank FROM listing_slug_redirects old
             JOIN listings l ON l.id = old.listing_id
@@ -241,6 +310,7 @@ export async function legacyRootTarget(input: {
             ${sql.raw(TAXONOMY_TARGET_JOINS)}
             WHERE r.source_kind = 'category' AND r.source_slug = ${input.slug}
               AND (r.target_kind = 'directory' OR ${sql.raw(TAXONOMY_TARGET_SLUG)} IS NOT NULL)
+              AND ${taxonomyTargetRenders(input.asOf)}
         )
         ORDER BY rank
         LIMIT 1`

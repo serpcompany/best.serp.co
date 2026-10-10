@@ -364,6 +364,10 @@ export function seedTaxonomyFixture(sqlite: SqliteD1): void {
         UNION ALL SELECT 'category', 'old-retired-tag', 'tag', 'retired-tag'
         UNION ALL SELECT 'category', 'old-best-retired-tag', 'best', 'best-retired-tag'
         UNION ALL SELECT 'category', 'primary', 'category', 'secondary'
+        UNION ALL SELECT 'category', 'old-empty-hub', 'category', 'empty'
+        UNION ALL SELECT 'category', 'old-idle-tag', 'tag', 'idle'
+        UNION ALL SELECT 'category', 'old-idle-best', 'best', 'best-idle'
+        UNION ALL SELECT 'category', 'empty', 'tag', 'writers'
         UNION ALL SELECT 'tag', 'old-writers', 'tag', 'writers'
         UNION ALL SELECT 'best', 'old-best-writers', 'best', 'best-writers'
       ) r

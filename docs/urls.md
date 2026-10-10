@@ -46,9 +46,9 @@ one of these extensions (`chart.js`), and a test checks the committed import.
   category, tag or best page with nothing to show, #346) or in the Worker (the old
   root-level `/<slug>`, before the slash rule, `apps/web/src/lib/routing/legacy-root.ts`) and
   write a canonical destination (`getRoute`). The root-level lookup answers in one hop: a live
-  listing, an active category, a retired listing slug followed through `listing_slug_redirects`
-  to its listing's current URL (#356), or a retired category URL followed through
-  `taxonomy_redirects` to its target (#341). A moved taxonomy URL keeps its query string except
+  listing, a category with a public listing, a retired listing slug followed through
+  `listing_slug_redirects` to its listing's current URL (#356), or a retired or emptied category
+  URL followed through `taxonomy_redirects` to its target (#341). A moved taxonomy URL keeps its query string except
   `page`, which would not match the target's pagination (`withoutPageQuery`), so a campaign's
   `utm_source` survives the redirect; the listing and category redirects keep the whole query.
   A taxonomy page rebuilds the query from its decoded search parameters, so it keeps every
@@ -110,6 +110,11 @@ publisher's affected routes) build their URLs from it.
   indexable still renders `noindex, follow`, so its links are crawled.
 - **Rendering wins over a redirect.** A page answers its 308 only when it has nothing to show, so
   a redirect row published before its listings move takes over the moment the old page empties.
+- **A redirect never leads to a 404.** A moved URL is followed only to a target whose own page
+  renders (a category or tag with a public listing, a best page with an entry, or the
+  directory); otherwise it answers 404 itself. Pages check this against the cached shell stats,
+  tag stats and best index (`getTaxonomyRedirect`), and the Worker's root-level lookup in the same
+  statement (`legacyRootTarget`).
 - **Best pages** take their title and H1 from D1 and list their entries in rank order: position,
   logo, name, the owner's blurb or the description, hub and tag chips, and "Visit Site" with the
   listing's `link_rel`. Their JSON-LD is a `CollectionPage` with an ordered `ItemList` and a
