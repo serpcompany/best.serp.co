@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
@@ -140,6 +141,25 @@ describe('the Other categorization manifests (#333)', () => {
       expect(batched.has(removal.id), removal.slug).toBe(false)
       expect(committed.find(proposal => proposal.id === removal.id)?.primary).toBe('other')
     }
+  })
+
+  it('moves no listing that any committed manifest unpublishes (#332: its expected [other])', () => {
+    // Committed manifests only: d1-remote-publisher.test.ts writes temporary ones there.
+    const committedFiles = execFileSync('git', ['ls-files', 'd1/publications'], {
+      encoding: 'utf8'
+    })
+      .split('\n')
+      .filter(path => /\.ya?ml$/u.test(path))
+    const unpublished = new Map<string, string>()
+    for (const path of committedFiles)
+      for (const operation of parseManifest(readFileSync(resolve(path), 'utf8')).operations)
+        if (operation.action === 'listing-unpublish') unpublished.set(operation.id, path)
+    expect(unpublished.size).toBeGreaterThan(0)
+    for (const name of committedOtherCategoryManifests())
+      for (const operation of parseManifest(readFileSync(resolve('d1/publications', name), 'utf8'))
+        .operations)
+        if (operation.action === 'listing-categories-set')
+          expect(unpublished.get(operation.id), `${name}: ${operation.slug}`).toBeUndefined()
   })
 
   it('keeps the committed manifests identical to what the committed proposal generates', () => {
