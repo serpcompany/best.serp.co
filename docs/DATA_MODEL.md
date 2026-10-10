@@ -277,7 +277,7 @@ each after recording a D1 Time Travel bookmark (no export). A row-level manifest
 (`concurrency: rows`: `listing-media-update`, `listing-categories-add`/`-remove`,
 `listing-content-remove-suffix`, `listing-unpublish` with `expected.website`,
 `listing-claim-hold-add`/`-clear` for [claim](./CLAIMS.md) holds, and `category-unpublish`)
-checks each row it changes, not a base version ([media](./MEDIA.md)). Verification, rejection, and approval
+checks each row it changes, not a base version ([media](./MEDIA_PUBLISHING.md)). Verification, rejection, and approval
 batches assert `changes() = 1` after every compare-and-swap step, so stale decisions roll back.
 
 ## Where the catalog came from

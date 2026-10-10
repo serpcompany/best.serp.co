@@ -3,8 +3,9 @@ import { test } from './test'
 
 /**
  * The #95 acceptance check, run by hand against a deployed Worker after its catalog was
- * migrated (docs/MEDIA.md): no page, `og:image`, or JSON-LD names a listing image outside the
- * environment's media host or the fallback tile, and every listing image there answers 200.
+ * migrated (docs/MEDIA_PUBLISHING.md): no page, `og:image`, or JSON-LD names a listing image
+ * outside the environment's media host or the fallback tile, and every listing image there
+ * answers 200.
  *
  *   MEDIA_ACCEPTANCE=1 PLAYWRIGHT_BASE_URL=https://best-serp-co-staging.serpcompany.workers.dev \
  *     PLAYWRIGHT_EXTERNAL_SERVER=1 pnpm --filter web exec playwright test \

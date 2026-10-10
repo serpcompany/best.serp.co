@@ -90,7 +90,7 @@ boundary.
 - **No human gate on staging data:** the `staging` environment has no reviewers, so anything
   that can dispatch workflows can run the staging publication or upload. Agents never do
   (AGENTS.md); a `staging-data` environment would enforce it
-  ([Listing media](./MEDIA.md#optional-owner-actions)).
+  ([Media publishing](./MEDIA_PUBLISHING.md#a-human-gate-on-staging-data)).
 
 The per-environment token split closes that path: decision b of serpcompany/best.serp.co#42,
 which the owner approved for right after cutover and the runbook still lists as planned.

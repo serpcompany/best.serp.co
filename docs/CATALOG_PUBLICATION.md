@@ -4,7 +4,7 @@ Every reviewed catalog change reaches staging before production (owner decision)
 under `d1/publications/` and a listing media plan under `d1/media/` are applied to staging,
 checked there, and applied to production only after the `staging` → `main` promotion. Code and
 schema follow [Release guards](./RELEASE_GUARDS.md); this covers data. The step-by-step media
-procedure is in [Listing media](./MEDIA.md#uploading-and-publishing).
+procedure is in [Media publishing](./MEDIA_PUBLISHING.md#uploading-and-publishing).
 
 ## Order
 
@@ -37,5 +37,5 @@ production upload copies the objects staging verified.
   `scripts/d1-publisher.ts` allows) check each row they change instead of a base version. Each
   fits both environments whatever else each published, and a listing that changed since
   generation refuses it with nothing written
-  ([recovery](./MEDIA.md#recovering-a-refused-media-manifest)). Any other manifest names the
+  ([recovery](./MEDIA_PUBLISHING.md#recovering-a-refused-media-manifest)). Any other manifest names the
   base version both environments must share.

@@ -51,8 +51,8 @@ D1. `pnpm dev` runs `next dev` for UI work, but only the Worker preview exercise
 binding.
 
 Listing media (#95) uses a local R2 bucket in the same state; the Worker serves it at
-`/_media/<key>`, and `curl localhost:8787/cdn-cgi/handler/scheduled` runs the media cron once
-([Listing media](./MEDIA.md#local-development-and-tests)).
+`/_media/<key>`, and `curl 'localhost:8787/cdn-cgi/handler/scheduled?cron=*/15+*+*+*+*'` runs the
+media cron once ([Listing media](./MEDIA.md#local-development-and-tests)).
 
 ## Accounts locally
 
