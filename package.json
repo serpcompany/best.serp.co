@@ -16,6 +16,7 @@
     "catalog:domains": "pnpm tsx scripts/listing-domain-check.ts",
     "catalog:mismatch": "pnpm tsx scripts/mismatch-manifests.ts",
     "catalog:other-categories": "pnpm tsx scripts/other-categories-manifest.ts",
+    "catalog:taxonomy": "pnpm tsx scripts/taxonomy-manifest.ts",
     "cf-typegen": "pnpm --filter web cf-typegen",
     "check": "pnpm tsx scripts/harness/runner.ts full",
     "check:links": "lychee --config ./lychee.toml --verbose .",
