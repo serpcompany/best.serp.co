@@ -2,7 +2,7 @@ import { getCategoryDisplayName } from '../directory/category-display'
 import { shouldUseProvidedListingLogo } from '../directory/listing-logo-presentation'
 import { getCanonicalListingListRoute, getRoute } from '../routing/routes'
 import { siteCopy } from '../site/site-copy'
-import { SITE_LOGO_URL, SITE_NAME, SITE_PUBLIC_URL, SITE_URL, SITE_WEBSITE_ID } from './seo-config'
+import { SITE_NAME, siteLogoUrl, siteOrigin, siteWebsiteId } from './seo-config'
 
 export interface SchemaOrg {
   '@context': 'https://schema.org'
@@ -122,7 +122,8 @@ export function generateArticleSchema(website: WebsiteMetadataLike): ArticleSche
 }
 
 export function generateWebsiteDetailSchema(website: WebsiteMetadataLike) {
-  const pageUrl = `${SITE_URL}${getRoute('listing.detail', {
+  const origin = siteOrigin()
+  const pageUrl = `${origin}${getRoute('listing.detail', {
     slug: website.slug
   })}`
   const categoryFormatted = website.category
@@ -143,7 +144,7 @@ export function generateWebsiteDetailSchema(website: WebsiteMetadataLike) {
         name: `${website.name} ${listingLabelTitle}`,
         description: website.description,
         isPartOf: {
-          '@id': SITE_WEBSITE_ID
+          '@id': siteWebsiteId()
         },
         ...(primaryImageUrl
           ? { primaryImageOfPage: { '@type': 'ImageObject', url: primaryImageUrl } }
@@ -162,13 +163,13 @@ export function generateWebsiteDetailSchema(website: WebsiteMetadataLike) {
             '@type': 'ListItem',
             position: 1,
             name: 'Home',
-            item: SITE_URL
+            item: origin
           },
           {
             '@type': 'ListItem',
             position: 2,
             name: siteCopy.allLabel,
-            item: `${SITE_URL}${getCanonicalListingListRoute()}`
+            item: `${origin}${getCanonicalListingListRoute()}`
           },
           {
             '@type': 'ListItem',
@@ -203,15 +204,15 @@ export function generateWebsiteDetailSchema(website: WebsiteMetadataLike) {
         author: {
           '@type': 'Organization',
           name: SITE_NAME,
-          url: SITE_PUBLIC_URL
+          url: origin
         },
         publisher: {
           '@type': 'Organization',
           name: SITE_NAME,
-          url: SITE_PUBLIC_URL,
+          url: origin,
           logo: {
             '@type': 'ImageObject',
-            url: SITE_LOGO_URL
+            url: siteLogoUrl()
           }
         },
         mainEntityOfPage: {
@@ -241,7 +242,7 @@ function resolveSchemaImageUrl(website: WebsiteMetadataLike): string | undefined
   const logo = website.media?.logo
 
   if (!shouldUseProvidedListingLogo(logo) || !logo) return undefined
-  if (logo.startsWith('/')) return `${SITE_PUBLIC_URL}${logo}`
+  if (logo.startsWith('/')) return `${siteOrigin()}${logo}`
   return logo
 }
 

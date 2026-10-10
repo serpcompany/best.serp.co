@@ -19,6 +19,7 @@
     "test:e2e:fast": "playwright test --project=chromium",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:smoke": "playwright test e2e/smoke.spec.ts e2e/public-parity.spec.ts --project=chromium",
+    "test:e2e:staging-access": "playwright test --config playwright.staging-access.config.ts",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:visual": "E2E_VISUAL=1 playwright test e2e/visual.spec.ts --project=chromium",
     "test:install": "playwright install chromium",

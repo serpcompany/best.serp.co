@@ -6,12 +6,14 @@ import { requireAccountUser } from '@/lib/account/pages'
 import { getRoute } from '@/lib/routing/routes'
 import { generateBaseMetadata } from '@/lib/seo/seo-config'
 
-export const metadata: Metadata = generateBaseMetadata({
-  title: 'Account',
-  description: 'Your SERP account.',
-  path: '/account/',
-  noindex: true
-})
+export function generateMetadata(): Metadata {
+  return generateBaseMetadata({
+    title: 'Account',
+    description: 'Your SERP account.',
+    path: '/account/',
+    noindex: true
+  })
+}
 
 /**
  * `/account` (#60, #65; #70 screen 5): the section cards and the table of the user's

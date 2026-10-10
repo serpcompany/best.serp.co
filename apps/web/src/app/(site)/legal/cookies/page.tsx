@@ -6,7 +6,9 @@ import { legalPageFor } from '@/lib/site/legal-pages'
 
 const path = getRoute('cookies')
 
-export const metadata: Metadata = generateLegalPageMetadata(path)
+export function generateMetadata(): Metadata {
+  return generateLegalPageMetadata(path)
+}
 
 export default async function CookiePolicyPage() {
   return (

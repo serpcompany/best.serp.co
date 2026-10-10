@@ -106,6 +106,35 @@ page answers 308 instead of 410. It names `from` and `to`, each a listing's `id`
 - **Order.** Publish it after the manifest that unpublishes `from`, on each environment. As with
   every publication, the catalog epoch advances, so the cached 410 turns over.
 
+## Listing details
+
+`listing-details-set` (#340) replaces a listing's name, short description, or website, the fields
+the admin panel's edit changes, for a listing whose product was renamed or whose one-line
+description describes something else. It is row-level. It names the listing's `id` and `slug`, a
+`reason` for the activity log, `expected` (its current `name`, `description`, and `website`, all
+three), and `details` (only the fields that change, at least one).
+
+The batch is refused, with nothing written, when:
+
+- the slug or any of the three fields isn't exactly `expected`, or the listing isn't approved;
+- its own submission is in review (`paid_pending_review` or `changes_requested`), or stands
+  rejected: the listing stays down and read-only, as in the admin panel;
+- a new website is another listing's, the host of a submission in flight, or under a block
+  (`listingWebsiteConflicts`, which the admin edit checks too).
+
+Each refusal names the operation and its reason in the error D1 reports, as the slug redirect's
+guards do, for example `bad JSON path: 'listing-details-set ca.la: the listing is not approved, or
+its slug, name, description, or website changed since the manifest'`.
+
+The manifest itself is refused when a field in `details` equals `expected`, the name is over 80
+characters or the description over 160 (the admin panel's limits), or the website isn't a public
+HTTP(S) URL. All three are trimmed first, as the admin edit stores them.
+
+Like `listing-categories-set`, it sets `updated_at` (the sitemap `lastmod`), gives the listing a
+new checksum, so an admin edit or owner revision read before it is refused as stale, and logs an
+`edited` event, which `/admin` shows as "Details edited: name, description". An unpublished
+listing stays unpublished, its categories stay, and the long description is left as it is.
+
 ## Taxonomy operations
 
 These operations write #341's taxonomy: tags, best pages, and redirects of old taxonomy URLs

@@ -61,6 +61,7 @@
         "EMAIL_STAGING_ALLOWLIST": "devin@serp.co",
         "MEDIA_BASE_URL": "https://cdn-staging.serp.co",
         "SITE_ENVIRONMENT": "staging",
+        "STAGING_BASIC_AUTH_PASSWORD": "stagingpassword",
         "USESEND_BASE_URL": "https://app.usesend.com"
       },
       "version_metadata": {

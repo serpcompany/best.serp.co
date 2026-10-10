@@ -14,12 +14,14 @@ import { features } from '@/lib/features'
 import { getRoute } from '@/lib/routing/routes'
 import { generateBaseMetadata } from '@/lib/seo/seo-config'
 
-export const metadata: Metadata = generateBaseMetadata({
-  title: 'Submission',
-  description: 'Your submission to SERP.',
-  path: '/account/submissions/',
-  noindex: true
-})
+export function generateMetadata(): Metadata {
+  return generateBaseMetadata({
+    title: 'Submission',
+    description: 'Your submission to SERP.',
+    path: '/account/submissions/',
+    noindex: true
+  })
+}
 
 type SubmissionPageProps = { params: Promise<{ id: string }> }
 

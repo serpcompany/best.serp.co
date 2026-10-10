@@ -51,6 +51,24 @@ vi.mock('@/lib/environment/request-environment', () => ({
 }))
 vi.mock('@/actions/get-home-page-data', () => ({ getHomePageData: async () => null }))
 
+/**
+ * Runs `read` as if inside a Worker request with these vars: OpenNext's request context, which
+ * `lib/environment/site-origin.ts` reads synchronously.
+ */
+async function withWorkerEnv<T>(
+  env: Record<string, string>,
+  read: () => Promise<T> | T
+): Promise<T> {
+  const key = Symbol.for('__cloudflare-context__')
+  const global = globalThis as Record<symbol, unknown>
+  global[key] = { env }
+  try {
+    return await read()
+  } finally {
+    delete global[key]
+  }
+}
+
 interface CompiledHeaderRule {
   has?: Array<{ key?: string; type: string; value?: string }>
   headers: Array<{ key: string; value: string }>
@@ -149,13 +167,13 @@ describe('next.config.ts headers()', () => {
 })
 
 describe('exported page metadata', () => {
-  it('the root layout exports the shared root metadata, with no robots directive', () => {
-    expect(rootLayout.metadata).toBe(rootLayoutMetadata)
-    expect(resolveRobots(rootLayout.metadata.robots)).toBeNull()
+  it('the root layout builds the shared root metadata, with no robots directive', () => {
+    expect(rootLayout.generateMetadata()).toEqual(rootLayoutMetadata())
+    expect(resolveRobots(rootLayout.generateMetadata().robots)).toBeNull()
   })
 
   it('the homepage and the first directory page are indexable', async () => {
-    expect(noindexIn(resolveRobots(homePage.metadata.robots))).toBe(false)
+    expect(noindexIn(resolveRobots(homePage.generateMetadata().robots))).toBe(false)
     const firstPage = await productsPage.generateMetadata({ searchParams: Promise.resolve({}) })
     expect(noindexIn(resolveRobots(firstPage.robots))).toBe(false)
   })
@@ -204,15 +222,29 @@ describe('the route registry and the pages (#167)', () => {
     )
   })
 
-  it.each(siteRoutes.filter(route => !route.path.includes('[')).map(route => [route.path, route]))(
-    '%s renders the robots directive and canonical the registry gives it',
-    async (path, route) => {
+  // #359: staging writes its own origin; best.serp.co (and local) write best.serp.co.
+  it.each(
+    siteRoutes
+      .filter(route => !route.path.includes('['))
+      .flatMap(route =>
+        (['production', 'staging'] as const).map(environment => [route.path, environment, route])
+      )
+  )(
+    '%s renders the robots directive and canonical the registry gives it (%s)',
+    async (path, environment, route) => {
+      const origin =
+        environment === 'staging' ? 'https://staging.best.serp.co' : 'https://best.serp.co'
       const page = await registryPageModules[path]?.()
-      const metadata = (
+      const metadata = (await withWorkerEnv({ SITE_ENVIRONMENT: environment }, async () =>
         typeof page?.generateMetadata === 'function'
           ? await page.generateMetadata({ searchParams: Promise.resolve({}) })
           : page?.metadata
-      ) as { alternates?: { canonical?: unknown }; robots?: Parameters<typeof resolveRobots>[0] }
+      )) as {
+        alternates?: { canonical?: unknown }
+        metadataBase?: unknown
+        openGraph?: { url?: unknown }
+        robots?: Parameters<typeof resolveRobots>[0]
+      }
       expect(noindexIn(resolveRobots(metadata.robots)), 'noindex').toBe(!route.indexable)
       const canonical = 'canonicalPath' in route ? route.canonicalPath : path
       // A page canonical to `/` writes its tag itself (HomePageCanonicalTags): Next.js would add
@@ -221,9 +253,11 @@ describe('the route registry and the pages (#167)', () => {
         expect(metadata.alternates?.canonical, 'canonical').toBeUndefined()
         return
       }
-      expect(String(metadata.alternates?.canonical), 'canonical').toBe(
-        `https://best.serp.co${canonical}`
-      )
+      expect(String(metadata.alternates?.canonical), 'canonical').toBe(`${origin}${canonical}`)
+      if (metadata.openGraph?.url)
+        expect(String(metadata.openGraph.url), 'og:url').toBe(`${origin}${canonical}`)
+      if (metadata.metadataBase)
+        expect(String(metadata.metadataBase), 'metadataBase').toBe(`${origin}/`)
     }
   )
 })

@@ -1,8 +1,8 @@
 /**
- * Worker entry: canonical-host, old root-level URL, and trailing-slash redirects, the
- * environment's crawl policy, then the OpenNext-generated handler behind a catalog-epoch-keyed
- * edge cache. Its cron hosts queued listing media, and locally it serves the media bucket at
- * `/_media` (#95).
+ * Worker entry: the canonical-host redirect, staging's password (#359), old root-level URL and
+ * trailing-slash redirects, the environment's crawl policy, then the OpenNext-generated handler
+ * behind a catalog-epoch-keyed edge cache. Its cron hosts queued listing media, and locally it
+ * serves the media bucket at `/_media` (#95).
  *
  * Admin paths pass the Cloudflare Access and session-cookie gate first
  * (`src/lib/auth/admin-gate.ts`).
@@ -64,8 +64,10 @@ interface WorkerEnv {
   CF_VERSION_METADATA?: { id?: string }
   D1_RUNTIME_ENV?: string
   DB?: D1Database
+  LOCAL_STAGING_ACCESS?: string
   MEDIA?: R2Bucket
   SITE_ENVIRONMENT?: string
+  STAGING_BASIC_AUTH_PASSWORD?: string
 }
 
 function fromRoutesManifest<T>(read: () => T): T {
@@ -112,11 +114,12 @@ export default {
       configRedirects,
       legacyRoot: incoming =>
         legacyRootRedirect(incoming, legacyRootSlug, catalogLegacyRootLookup(env, log)),
-      // Redirects and the non-production robots.txt are answered before this, so they are
-      // never rendered or stored. A cacheable request reaches OpenNext with allowlisted
-      // headers only (`renderRequestFor` in src/lib/edge-cache/html-cache.ts). The crawl
-      // policy's X-Robots-Tag is added after this, per request (handle-request.ts), so no
-      // stored response carries it or its absence.
+      // Staging's 401, redirects and the non-production robots.txt are answered before this,
+      // so they are never rendered or stored, and a request without staging's password never
+      // reaches a stored page. A cacheable request reaches OpenNext with allowlisted headers
+      // only (`renderRequestFor` in src/lib/edge-cache/html-cache.ts). The crawl policy's
+      // X-Robots-Tag is added after this, per request (handle-request.ts), so no stored
+      // response carries it or its absence.
       serve: async served => {
         const cache = await caches.open(EDGE_CACHE_NAME)
         return withEdgeCache(

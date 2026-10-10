@@ -3,7 +3,9 @@ import { notFound } from 'next/navigation'
 import { getHomePageData } from '@/actions/get-home-page-data'
 import { HomePageCanonicalTags, HomePageRoute, homePageMetadata } from '@/components/home/home-page'
 
-export const metadata: Metadata = homePageMetadata
+export function generateMetadata(): Metadata {
+  return homePageMetadata()
+}
 
 /** The homepage shows page 1 of the directory; later pages live at `/products/?page=N`. */
 export default async function Home() {

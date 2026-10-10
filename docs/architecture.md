@@ -90,6 +90,7 @@ host alone. A test (`apps/web/src/lib/environment/site-environment.test.ts`) pin
 | --- | --- | --- | --- |
 | `SITE_ENVIRONMENT` | `local` | `staging` | `production` |
 | `CANONICAL_HOST_REDIRECT` | unset | `on` since #323 | `on` since the cutover (`off` before it) |
+| `STAGING_BASIC_AUTH_PASSWORD` | unset | `stagingpassword` since #359 | unset |
 
 - **Public production** is `SITE_ENVIRONMENT=production` on the canonical host
   `best.serp.co`: indexable, `robots.txt` lists the sitemap index, and analytics load. Everything
@@ -97,20 +98,50 @@ host alone. A test (`apps/web/src/lib/environment/site-environment.test.ts`) pin
   `*.workers.dev` host, and a missing or misspelled var. There the Worker entry sends
   `X-Robots-Tag: noindex, nofollow` on every response it answers and answers `/robots.txt`
   with `Disallow: /` for every crawler, and the root layout leaves analytics out
-  (`apps/web/src/lib/environment/`). Static files are served before the Worker runs, so
+  (`apps/web/src/lib/environment/`). The one exception is a staging request that passed
+  staging's password (below). Static files are served before the Worker runs, so
   `apps/web/public/_headers` keeps them `noindex` on every `*.workers.dev` host and on
   `staging.best.serp.co`, and `next.config.ts` keeps its `*.workers.dev` `noindex` rule as
   defense in depth.
-- **Ahrefs' Site Audit on staging** (#323). Staging's canonical host `staging.best.serp.co`
-  may be audited in Ahrefs: there, and only there, `/robots.txt` adds a
-  `User-agent: AhrefsSiteAudit` / `Allow: /` group ahead of the disallow-all one, and a request
-  whose `User-Agent` contains `AhrefsSiteAudit` gets no environment `X-Robots-Tag` (a page's
-  own noindex stays, as on best.serp.co). Every other request there is `noindex, nofollow`,
-  analytics stay off, and staging's workers.dev host, production and local are unchanged. The
-  header is added per request after the edge cache, which keys on neither the `User-Agent` nor
-  the exemption, so nothing an Ahrefs request was served can reach another client
-  ([Caching](./caching.md)). Canonical tags still name best.serp.co
-  ([URLs](./urls.md#written-urls)).
+- **Staging's password** (#359; serp's `docs/engineering/standards/staging-access.md`, proposed
+  in serpcompany/serp#1458). Staging sits behind HTTP Basic auth, so it can describe itself
+  exactly as production will and SEO auditors (Ahrefs project 10510472) crawl it as search
+  engines will crawl best.serp.co.
+  - **Credentials:** username `staging`, password `stagingpassword`. The password is
+    `STAGING_BASIC_AUTH_PASSWORD` in `env.staging.vars` of `apps/web/wrangler.jsonc`, a plain
+    var, not a secret: the owner's decision, because every SERP site shares it, serp's standard
+    states it, and staging's content is the public site's. The gate checks only the password
+    and ignores the username (Ahrefs needs one; use `staging`).
+  - **The gate** (`apps/web/src/lib/environment/staging-access.ts`) runs in the Worker entry right
+    after the canonical-host redirect (so staging's workers.dev host still sends a request without
+    the smoke-test header to staging.best.serp.co first), on every host of a Worker that serves as
+    staging (`servesAsStaging`: `SITE_ENVIRONMENT=staging`). Without the password a request gets 401
+    with `WWW-Authenticate: Basic realm="best.serp.co staging"` and `Cache-Control: no-store`. It
+    fails closed: without the var, every request is refused but the exemptions. The comparison
+    hashes both values with SHA-256 and compares the digests in constant time. Production and local
+    have no gate.
+  - **Exemptions**, served without the password and kept `noindex`: requests with the
+    `x-best-serp-co-smoke-test` header (CI's gates and smoke), `GET`/`HEAD /robots.txt`, and
+    the billing provider's test-mode webhook (`POST /api/billing/webhook/`), which proves
+    itself with its signature ([Billing](./billing.md)).
+  - **Static files are not gated either:** everything in `apps/web/public` (`/og.png`,
+    `/badge/*.svg`, `/ads.txt`) and `/_next/static` answers 200 without the password, because
+    Workers static assets serve them before `worker.ts` runs. Their content is the public
+    site's, `apps/web/public/_headers` keeps them `noindex`, and robots.txt disallows them to
+    every crawler but the auditor.
+    Gating them would take `assets.run_worker_first` in `env.staging`, which runs the Worker
+    for every staging asset request and makes it hand each one to `env.ASSETS` after the gate;
+    that cost buys nothing the threat model needs.
+  - **With the password**, a request goes on without its `Authorization` header (so the edge
+    cache stores it like an anonymous one) and gets no environment `X-Robots-Tag`; a page's own
+    noindex stays, as on best.serp.co. Analytics stay off. Every absolute URL staging writes
+    names `https://staging.best.serp.co` ([URLs](./urls.md#written-urls)).
+  - **robots.txt** on staging disallows every crawler except `AhrefsSiteAudit`, which gets
+    best.serp.co's rules (`crawlRules` in `apps/web/src/lib/site/site-routes.ts`) and staging's
+    sitemap index.
+  - **Locally**, the e2e suite runs one Worker with `LOCAL_STAGING_ACCESS=on` and a test
+    password (`apps/web/e2e/staging-access-fixture.ts`); the switch is ignored anywhere but
+    local.
 - **Canonical host.** With `CANONICAL_HOST_REDIRECT=on`, a deployed Worker answers every
   `*.workers.dev` request (the workers.dev URL and preview URLs) with one 308 to its own
   canonical host, in canonical form and with the query kept byte for byte: production to

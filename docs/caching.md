@@ -31,9 +31,14 @@ From the edge inward:
    Better Auth (`better-auth.*`) or preview cookie, so a signed-in request is never served from
    or stored in the cache. Responses carry `x-edge-cache: HIT | MISS | BYPASS`. The Worker
    adds the environment headers (`X-Robots-Tag`, `x-site-environment`, `x-worker-version`)
-   after this layer, from each request, so a stored response carries none of them: that is
-   why staging's Ahrefs Site Audit exemption (no `X-Robots-Tag` for an `AhrefsSiteAudit`
-   request, #323) can never be served to another client, whichever request filled the entry.
+   after this layer, from each request, so a stored response carries none of them.
+   **Staging's password** (#359, [Architecture](./architecture.md#environments-and-hosts)) is
+   checked before this layer: a request without it gets a 401 that is never stored and never
+   reaches a stored page, and a request with it continues without its `Authorization` header,
+   so it is cached like an anonymous one. A staging page renders the same on both sides of the
+   password (its URLs come from the environment, not the request), and only the header added
+   afterwards differs: no `X-Robots-Tag` with the password, `noindex` for a smoke-test request
+   served the same entry. `handle-request.test.ts` checks every order of these visitors.
 2. **Epoch memo.** Each isolate reuses its epoch for 30 seconds and revalidates it in the
    background for up to 5 minutes; isolates in one data center share it through the Cache
    API for 30 seconds. D1 therefore sees about one one-row epoch read per data center per

@@ -9,7 +9,7 @@ import {
   PaginationItem
 } from '@/components/ui/pagination'
 import { cn } from '@/lib/utils'
-import { SITE_PUBLIC_URL } from '../../lib/seo/seo-config'
+import { siteOrigin } from '../../lib/seo/seo-config'
 
 /**
  * Directory and category listings are paginated with a `?page=N` query parameter on the
@@ -42,7 +42,7 @@ export function paginatedMetadata(
   { basePath, page }: { basePath: string; page: number }
 ): Metadata {
   if (page <= 1) return metadata
-  const canonical = `${SITE_PUBLIC_URL}${listingPageHref(basePath, page)}`
+  const canonical = `${siteOrigin()}${listingPageHref(basePath, page)}`
   const title = typeof metadata.title === 'string' ? `${metadata.title} - Page ${page}` : undefined
   return {
     ...metadata,
@@ -55,13 +55,45 @@ export function paginatedMetadata(
   }
 }
 
-/** First, last, and the pages around the current one, with gaps in between. */
+/**
+ * How far the jump links reach from the current page. Linking only the neighbours chains the pages,
+ * so a crawler reached /products/ pages 2–17 and 42–57 and never 18–41 (#331); jumps of 10 put
+ * every page of a 57-page list within 6 links of page 1.
+ */
+export const PAGINATION_JUMP = 10
+
+/** First, last, the pages around the current one and `PAGINATION_JUMP` either side, with gaps. */
 export function paginationWindow(page: number, pageCount: number): Array<number | 'gap'> {
-  const pages = new Set([1, pageCount, page - 1, page, page + 1])
+  const jump = PAGINATION_JUMP
+  const pages = new Set([1, pageCount, page - jump, page - 1, page, page + 1, page + jump])
   const visible = [...pages].filter(value => value >= 1 && value <= pageCount).sort((a, b) => a - b)
   return visible.flatMap((value, index) => {
     const previous = visible[index - 1]
     return previous !== undefined && value - previous > 1 ? ['gap' as const, value] : [value]
+  })
+}
+
+/**
+ * The window with each entry marked `compact` when it stays on small screens: first, last, and the
+ * pages around the current one, with one gap between them where the window has any. The jumps
+ * and their extra gaps are hidden below `sm`, as stock shadcn hides its data table's first and last
+ * page buttons, so the bar fits one row at phone width; they stay in the HTML for crawlers.
+ */
+export function paginationEntries(
+  page: number,
+  pageCount: number
+): Array<{ compact: boolean; entry: number | 'gap' }> {
+  const neighbours = new Set([1, pageCount, page - 1, page, page + 1])
+  let gapShown = false
+  return paginationWindow(page, pageCount).map(entry => {
+    if (entry !== 'gap') {
+      const compact = neighbours.has(entry)
+      if (compact) gapShown = false
+      return { compact, entry }
+    }
+    const compact = !gapShown
+    gapShown = true
+    return { compact, entry }
   })
 }
 
@@ -121,21 +153,22 @@ export function ListingPagination({
             </PageLink>
           </PaginationItem>
         ) : null}
-        {paginationWindow(page, pageCount).map((entry, index) =>
-          entry === 'gap' ? (
-            // The window has at most a leading and a trailing gap, so position is the identity.
+        {paginationEntries(page, pageCount).map(({ compact, entry }, index) => {
+          const className = compact ? undefined : 'hidden sm:block'
+          return entry === 'gap' ? (
+            // A gap has no page of its own, so its position in the window is its identity.
             // biome-ignore lint/suspicious/noArrayIndexKey: see above
-            <PaginationItem key={`gap-${index}`}>
+            <PaginationItem className={className} key={`gap-${index}`}>
               <PaginationEllipsis />
             </PaginationItem>
           ) : (
-            <PaginationItem key={entry}>
+            <PaginationItem className={className} key={entry}>
               <PageLink active={entry === page} aria-label={`Page ${entry}`} href={href(entry)}>
                 {entry}
               </PageLink>
             </PaginationItem>
           )
-        )}
+        })}
         {page < pageCount ? (
           <PaginationItem>
             <PageLink

@@ -810,8 +810,9 @@ async function expectHostRedirectPolicy(target: GateTarget, redirectTo: URL | nu
  * best.serp.co's public policy (#44, E-4), requested on best.serp.co itself without the
  * smoke-test header, as visitors and crawlers see it: answered by the production Worker
  * (`x-site-environment: production`); no noindex on `/`, robots.txt or the sitemap index;
- * robots.txt lets Google and `*` crawl and lists the sitemap index; Google Tag Manager loads.
- * A noindex reaching best.serp.co would deindex the site.
+ * robots.txt lets Google and `*` crawl and lists the sitemap index; Google Tag Manager loads;
+ * and no answer asks for a password (`WWW-Authenticate`: only staging has one, #359). A noindex
+ * reaching best.serp.co would deindex the site.
  *
  * Every answer from the Worker is enforced. With `skipNonWorker` (production gates), zone
  * protection and GitHub Pages (`notAnsweredByWorker`) are skipped with a `::warning::`, so
@@ -837,6 +838,10 @@ async function expectPublicPolicy(
           throw new Error(
             `best.serp.co route ${path} was not answered by the production Worker (x-site-environment ${environment ?? '(none)'}, status ${response.status}, server ${response.headers.get('server') ?? '(none)'}${mitigated ? `, cf-mitigated ${mitigated}` : ''}).`
           )
+        }
+        if (response.headers.has('www-authenticate')) {
+          await response.body?.cancel().catch(() => undefined)
+          throw new Error(`best.serp.co route ${path} asked for a password (WWW-Authenticate).`)
         }
         await inspect(response)
       },

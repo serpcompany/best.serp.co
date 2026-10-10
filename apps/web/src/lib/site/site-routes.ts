@@ -72,3 +72,11 @@ export function disallowedPaths(): string[] {
     .filter(route => 'disallow' in route && route.disallow)
     .map(route => route.path.replace(/\/$/u, ''))
 }
+
+/**
+ * The robots.txt rules best.serp.co gives every crawler. Staging's robots.txt gives its auditor
+ * the same rules (#359), so an audit of staging catches a rule that would block real pages.
+ */
+export function crawlRules(): { allow: string[]; disallow: string[] } {
+  return { allow: ['/'], disallow: disallowedPaths() }
+}

@@ -4,6 +4,10 @@ import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
 import { z } from 'zod'
+import {
+  listingSubmissionRejected,
+  listingWebsiteConflicts
+} from '../apps/web/src/db/listing-plans'
 import { IMAGE_CONTENT_TYPES, MAX_IMAGE_SIDE } from '../apps/web/src/db/media-format'
 import {
   contentTypeForKey,
@@ -15,6 +19,7 @@ import {
   listingHasQueuedSubmission,
   listingInRetiredCategory
 } from '../apps/web/src/db/plan-support'
+import { validatePublicHttpUrl } from '../apps/web/src/db/public-url'
 import { BEST_PAGE_LIST_SIZE, taxonomyRedirectSourceKinds } from '../apps/web/src/db/schema'
 import { hasFileExtension } from '../apps/web/src/lib/seo/canonical-url'
 import { assertD1Compatible } from './d1-compat'
@@ -284,6 +289,11 @@ const listing = z
       .optional()
   })
   .strict()
+/** The admin panel's limits for a listing's name and short description (`lib/admin/decisions.ts`). */
+const LISTING_NAME_MAX = 80
+const LISTING_DESCRIPTION_MAX = 160
+/** The listing fields `listing-details-set` compares and replaces, in the order it logs them. */
+const listingDetailFields = ['name', 'description', 'website'] as const
 const operation = z.discriminatedUnion('action', [
   z.object({ action: z.literal('listing-create'), listing }).strict(),
   z
@@ -437,6 +447,37 @@ const operation = z.discriminatedUnion('action', [
     })
     .strict(),
   /**
+   * Replaces a listing's name, short description, or website (#340: the product behind a listing
+   * was renamed, or its copy describes something else), compared and swapped on its slug and all
+   * three current values (`expected`), so it is row-level like `listing-categories-set`. `details`
+   * names only what changes. As the admin panel's edit does (#64), it refuses a listing that isn't
+   * approved or whose own submission is in review or was rejected, and a new website that another
+   * listing, a submission in flight, or a block already covers (`listingWebsiteConflicts`).
+   */
+  z
+    .object({
+      action: z.literal('listing-details-set'),
+      id: listingId,
+      slug: existingSlug,
+      reason: z.string().trim().min(1).max(200),
+      expected: z
+        .object({
+          name: z.string().min(1),
+          description: z.string().min(1),
+          website: z.string().url()
+        })
+        .strict(),
+      details: z
+        .object({
+          name: z.string().trim().min(1).max(LISTING_NAME_MAX).optional(),
+          description: z.string().trim().min(1).max(LISTING_DESCRIPTION_MAX).optional(),
+          // Trimmed as the admin edit stores it, so the exact website match still finds it.
+          website: z.string().trim().url().optional()
+        })
+        .strict()
+    })
+    .strict(),
+  /**
    * Holds a listing's instant claim for the owner's review (#67, #108 review round 3): #100's
    * owner-review sets, or one an admin names. Row-level guarded: the listing must still have this
    * slug and, with `expected`, this website. An active hold is left as it is; a cleared one is
@@ -452,13 +493,18 @@ const operation = z.discriminatedUnion('action', [
       expected: z.object({ website: z.string().url() }).strict().optional()
     })
     .strict(),
-  /** Clears a listing's active claim hold (#67): the owner decided it can be claimed. */
+  /**
+   * Clears a listing's active claim hold (#67): the owner decided it can be claimed. With
+   * `expected.website` (#340), only once the listing has that website: a hold cleared because a
+   * rename fixed the link waits for the manifest that sets it, and is refused before it.
+   */
   z
     .object({
       action: z.literal('listing-claim-hold-clear'),
       id: listingId,
       slug: existingSlug,
-      note: z.string().trim().min(1).max(200)
+      note: z.string().trim().min(1).max(200),
+      expected: z.object({ website: z.string().url() }).strict().optional()
     })
     .strict(),
   z.object({ action: z.literal('category-create'), category }).strict(),
@@ -743,14 +789,16 @@ export const manifestConcurrency = ['publication', 'rows'] as const
  * category retirement (#260: no live listing and no slug redirect's source left in it, #338), a new
  * category (#333: its insert refuses the batch when the slug exists, retired or not), a slug
  * redirect (#338: an unpublished source, a live target, no redirect for the slug, no chain or
- * loop, all still true at the end of the batch), and every taxonomy operation (#344: each
- * compares the tag, best page, listing, or redirect it changes).
+ * loop, all still true at the end of the batch), a listing's name, short description, and website
+ * (#340: `expected`), and every taxonomy operation (#344: each compares the tag, best page,
+ * listing, or redirect it changes).
  */
 const rowLevelActions = new Set<string>([
   'listing-media-update',
   'listing-categories-add',
   'listing-categories-remove',
   'listing-categories-set',
+  'listing-details-set',
   'listing-content-remove-suffix',
   'listing-unpublish',
   'listing-claim-hold-add',
@@ -788,7 +836,7 @@ export const manifestSchema = z
           context.addIssue({
             code: z.ZodIssueCode.custom,
             message:
-              'A row-level manifest holds only listing-media-update, listing-categories-add/-remove/-set, listing-content-remove-suffix, listing-unpublish, listing-claim-hold-add/-clear, listing-slug-redirect, category-create/-unpublish, and taxonomy (tag-*, listing-tags-set, best-page-*, taxonomy-redirect-set) operations.',
+              'A row-level manifest holds only listing-media-update, listing-categories-add/-remove/-set, listing-details-set, listing-content-remove-suffix, listing-unpublish, listing-claim-hold-add/-clear, listing-slug-redirect, category-create/-unpublish, and taxonomy (tag-*, listing-tags-set, best-page-*, taxonomy-redirect-set) operations.',
             path: ['operations', index, 'action']
           })
         }
@@ -870,6 +918,24 @@ export const manifestSchema = z
           message: 'The listing already has exactly these categories.',
           path: ['operations', index, 'categories']
         })
+      }
+      if (op.action === 'listing-details-set') {
+        const changed = listingDetailFields.filter(
+          field => op.details[field] !== undefined && op.details[field] !== op.expected[field]
+        )
+        if (changed.length === 0 || changed.length !== Object.keys(op.details).length)
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Name in details only the fields that change, and at least one.',
+            path: ['operations', index, 'details']
+          })
+        // The submission intake's and the admin edit's URL rule (#64 review).
+        if (op.details.website !== undefined && !validatePublicHttpUrl(op.details.website).ok)
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'A listing website must be a public HTTP(S) URL.',
+            path: ['operations', index, 'details', 'website']
+          })
       }
       if (op.action === 'listing-media-update') {
         const keyed = [
@@ -1859,6 +1925,16 @@ export function buildPublicationPlan(
       routes.add(listingRoute(op.slug))
     }
     if (op.action === 'listing-claim-hold-clear') {
+      if (op.expected)
+        statements.push(
+          statement(
+            `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=? AND website=?) THEN 1 ELSE ${REASONED_GUARD_FAILURE} END`,
+            op.id,
+            op.slug,
+            op.expected.website,
+            `listing-claim-hold-clear ${op.slug}: its website is not ${op.expected.website} yet; publish the manifest that sets it first`
+          )
+        )
       statements.push(
         statement(
           'UPDATE listing_claim_holds SET cleared_at=?,cleared_by=? WHERE listing_id=? AND cleared_at IS NULL AND EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=?)',
@@ -1967,6 +2043,71 @@ export function buildPublicationPlan(
       )
       routes.add(listingRoute(op.slug))
       addCategories([...op.expected, ...op.categories])
+    }
+    if (op.action === 'listing-details-set') {
+      const next = { ...op.expected, ...op.details }
+      const website = op.details.website
+      const label = `listing-details-set ${op.slug}`
+      // A new website must not be another listing's, a submission's in flight, or blocked.
+      const conflicts = website
+        ? Object.values(listingWebsiteConflicts({ listingId: op.id, website }))
+        : []
+      statements.push(
+        // As in the admin panel (#64): never while the listing's own submission is in review, whose
+        // approval needs the checksum the listing was paid at.
+        statement(
+          `SELECT CASE WHEN ${listingHasQueuedSubmission('?')} THEN ${REASONED_GUARD_FAILURE} ELSE 1 END`,
+          op.id,
+          `${label}: its own submission is in review`
+        ),
+        // As in the admin panel: a listing whose own submission stands rejected stays down and
+        // read-only (`docs/admin-panel.md`). Its row is still `approved`, with `is_active=0`.
+        statement(
+          `SELECT CASE WHEN ${listingSubmissionRejected('?')} THEN ${REASONED_GUARD_FAILURE} ELSE 1 END`,
+          op.id,
+          `${label}: its own submission was rejected`
+        ),
+        ...(conflicts.length > 0
+          ? [
+              statement(
+                `SELECT CASE WHEN ${conflicts.map(conflict => conflict.sql).join(' OR ')} THEN ${REASONED_GUARD_FAILURE} ELSE 1 END`,
+                ...conflicts.flatMap(conflict => conflict.params),
+                `${label}: the new website belongs to another listing or a submission in flight, or is blocked`
+              )
+            ]
+          : []),
+        // Compared and swapped on all three fields. The page changed, so `updated_at` (sitemap
+        // lastmod, #218) moves, and a new checksum refuses an admin edit or revision read before it.
+        statement(
+          "UPDATE listings SET name=?,description=?,website=?,checksum=?,updated_at=? WHERE id=? AND slug=? AND status='approved' AND name=? AND description=? AND website=?",
+          next.name,
+          next.description,
+          next.website,
+          hash(`${manifest.id}\0${op.id}\0details`),
+          now,
+          op.id,
+          op.slug,
+          op.expected.name,
+          op.expected.description,
+          op.expected.website
+        ),
+        statement(
+          `SELECT CASE WHEN changes()=1 THEN 1 ELSE ${REASONED_GUARD_FAILURE} END`,
+          `${label}: the listing is not approved, or its slug, name, description, or website changed since the manifest`
+        ),
+        // The admin panel's activity record for an edit (#64): "Details edited: name, ...".
+        statement(
+          "INSERT INTO listing_events (listing_id,event_type,detail,actor) VALUES (?,'edited',?,?)",
+          op.id,
+          JSON.stringify({
+            fields: listingDetailFields.filter(field => op.details[field] !== undefined),
+            manifest: manifest.id,
+            reason: op.reason
+          }),
+          manifest.provenance.actor
+        )
+      )
+      routes.add(listingRoute(op.slug))
     }
     if (op.action === 'listing-media-update') {
       const expected = expectedMediaJson(op.expected)
