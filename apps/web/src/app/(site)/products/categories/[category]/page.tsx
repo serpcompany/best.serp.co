@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import {
   CategoryRoutePage,
@@ -9,7 +10,11 @@ import {
   paginatedMetadata,
   parseListingPageParam
 } from '@/components/directory/listing-pagination'
+import { BestPagesSection } from '@/components/taxonomy/best-page'
+import { Badge } from '@/components/ui/badge'
 import {
+  getActiveTags,
+  getBestPages,
   getCategoryBySlug,
   getListingNamePage,
   type PublishedCategory
@@ -17,7 +22,7 @@ import {
 import { getCategoryIcon } from '@/lib/directory/categories'
 import { getRoute } from '@/lib/routing/routes'
 import { type PageSearchParams, redirectMovedTaxonomyPage } from '@/lib/routing/taxonomy-redirect'
-import { isCategoryIndexable } from '@/lib/seo/taxonomy-indexing'
+import { isCategoryIndexable, linkedTags, listedBestPages } from '@/lib/seo/taxonomy-indexing'
 
 interface CategoryPageProps {
   params: Promise<{ category: string }>
@@ -67,8 +72,11 @@ export async function generateMetadata({
 }
 
 /**
- * A category (a hub, #341) with a public listing renders. Otherwise its URL answers one 308 to
- * where `taxonomy_redirects` moved it (an old narrow category's tag or best page), else 404.
+ * A category (a hub, #341) with a public listing renders: its tags with 3 or more listings as
+ * chips (most listings first), its best pages under "Best {hub} lists", then its listings (design
+ * 5.3, #347), all from the cached tag stats and best index. Without tags or best pages it renders
+ * as before. Otherwise its URL answers one 308 to where `taxonomy_redirects` moved it (an old
+ * narrow category's tag or best page), else 404.
  */
 export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {
   const [resolvedParams, resolvedSearchParams] = await Promise.all([params, searchParams])
@@ -80,10 +88,12 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   }
 
   const page = parseListingPageParam(resolvedSearchParams.page)
-  const [listingPage, firstPage] = await Promise.all([
+  const [listingPage, firstPage, tags, bestPages] = await Promise.all([
     getListingNamePage({ category: storedCategory.slug, page }),
     // Structured data describes the whole category, so every page repeats page 1's list.
-    getListingNamePage({ category: storedCategory.slug, page: 1 })
+    getListingNamePage({ category: storedCategory.slug, page: 1 }),
+    getActiveTags(),
+    getBestPages()
   ])
   if (page > listingPage.pageCount) {
     notFound()
@@ -91,8 +101,31 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
 
   const category = presentCategory(storedCategory)
   const categoryPath = getRoute('category.page', { category: category.slug })
+  const hubTags = linkedTags(tags.filter(tag => tag.category === category.slug)).sort(
+    (left, right) => right.count - left.count || left.name.localeCompare(right.name)
+  )
+  const hubBestPages = listedBestPages(bestPages.filter(bestPage => bestPage.hub === category.slug))
   const route = CategoryRoutePage({
+    beforeListings: hubBestPages.length ? (
+      <BestPagesSection
+        className="border-b"
+        hub={category}
+        id="hub-best-pages"
+        pages={hubBestPages}
+      />
+    ) : undefined,
     category,
+    chips: hubTags.length
+      ? hubTags.map(tag => (
+          <Badge
+            key={tag.slug}
+            variant="outline"
+            render={<Link href={getRoute('tag.page', { tag: tag.slug })} />}
+          >
+            {tag.name}
+          </Badge>
+        ))
+      : undefined,
     collection: {
       count: listingPage.total,
       firstPublishedAt: listingPage.firstPublishedAt,

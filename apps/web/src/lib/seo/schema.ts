@@ -121,7 +121,14 @@ export function generateArticleSchema(website: WebsiteMetadataLike): ArticleSche
   }
 }
 
-export function generateWebsiteDetailSchema(website: WebsiteMetadataLike) {
+/**
+ * A listing page's JSON-LD graph. Its `BreadcrumbList` follows the visible trail: Home, the
+ * directory, the listing's hub when it has one (#347), then the listing.
+ */
+export function generateWebsiteDetailSchema(
+  website: WebsiteMetadataLike,
+  hub?: { name: string; slug: string }
+) {
   const origin = siteOrigin()
   const pageUrl = `${origin}${getRoute('listing.detail', {
     slug: website.slug
@@ -171,9 +178,19 @@ export function generateWebsiteDetailSchema(website: WebsiteMetadataLike) {
             name: siteCopy.allLabel,
             item: `${origin}${getCanonicalListingListRoute()}`
           },
+          ...(hub
+            ? [
+                {
+                  '@type': 'ListItem',
+                  position: 3,
+                  name: hub.name,
+                  item: `${origin}${getRoute('category.page', { category: hub.slug })}`
+                }
+              ]
+            : []),
           {
             '@type': 'ListItem',
-            position: 3,
+            position: hub ? 4 : 3,
             name: website.name,
             item: pageUrl
           }

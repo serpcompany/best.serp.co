@@ -22,11 +22,12 @@ import { getRoute } from '@/lib/routing/routes'
 
 /**
  * The page an unpublished listing's URL shows, with status 410 Gone (#64; screen 9's
- * "Unpublished (410)" state): the listing is gone, a link to its category, and "Relist it".
+ * "Unpublished (410)" state): the listing is gone, a link to its hub (its category's page, #347;
+ * the directory without one), and "Relist it".
  */
 export function GoneListing({ listing }: { listing: UnpublishedListing }) {
   const categoryHref = listing.category
-    ? getRoute('listing.withCategory', { category: listing.category })
+    ? getRoute('category.page', { category: listing.category })
     : getRoute('listing.list')
   const categoryName = listing.categoryName ?? 'the directory'
   return (

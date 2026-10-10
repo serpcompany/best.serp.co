@@ -62,7 +62,8 @@ const ROWS_READ_BUDGET: Record<CatalogQueryShape, number> = {
   'legacy-root-target': 10, // a retired category URL, its target, and whether it renders (#346): 8
   'featured-summaries': 2_500, // 100 featured: 1,887 (walks the publication index)
   'latest-summaries': 1_500, // 100 latest: 829
-  'listing-detail': 100, // the most FAQs, links and images, and its tags: 44
+  // the most FAQs, links and images, its tags and its best pages' pins and exclusions (#347): 45
+  'listing-detail': 100,
   'listing-name-order': 12_000, // `other`: 8,854 (3 rows per member)
   'listing-name-page-items': 1_200, // 100 ids: ~900
   'navigation-next': 20, // 5 at worst, at every boundary (3,425 on the oldest before #314)
@@ -76,8 +77,10 @@ const ROWS_READ_BUDGET: Record<CatalogQueryShape, number> = {
   // more, 2,442 (2,757 on all nine of one listing's tags before the cap). Filling from the hub:
   // 196 when it walks the name index, 119 through a small hub's members.
   'related-shared-tags': 3_000,
-  'related-single-category-members': 500, // 78
-  'related-single-category-seek': 200, // the sparsest category over 128: 79
+  // Onward from the listing's own name, wrapping round to the start (#331): 77 and 52 at worst
+  // over every 25th untagged listing and the last names (78 and 79 from the start before).
+  'related-single-category-members': 500,
+  'related-single-category-seek': 200, // the sparsest category over 128
   // worst: a term in the catch-all's name (`other`, `the`): 10,826; 15,520 before #345's
   // uncorrelated category and tag subqueries. The widest searches have their own budget below.
   'search-summaries': 17_000,
@@ -907,6 +910,31 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
         ),
         db.prepare("DELETE FROM tags WHERE slug = 'workerd-solo'")
       ])
+    }
+    // An untagged listing in one category (#331, design 3.2) takes the members after its own
+    // name, then from the start: the hub fill's contract with no tags. The catch-all's and the
+    // sparse category's last names wrap; every 25th such listing checks the rest.
+    const singleUntagged = untagged.filter(listing => listing.categories.length === 1)
+    const lastIn = (slug: string) =>
+      first(
+        singleUntagged
+          .filter(listing => listing.categories[0] === slug)
+          .sort((left, right) => binary(right.name, left.name) || binary(right.slug, left.slug)),
+        `last listing in ${slug}`
+      )
+    for (const listing of [
+      dense,
+      sparse.listing,
+      small.listing,
+      lastIn(CATCH_ALL_CATEGORY),
+      lastIn(sparse.slug),
+      ...singleUntagged.filter((_, index) => index % 25 === 0)
+    ]) {
+      const related = (await catalog().getListingBySlug(listing.slug))?.relatedWebsites
+      expect(
+        related?.map(item => item.slug),
+        listing.slug
+      ).toEqual(expectedRelatedByTags(listing))
     }
   }, 120_000)
 

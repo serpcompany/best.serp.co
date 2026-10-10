@@ -1,7 +1,14 @@
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { HomePageCanonicalTags, homePageMetadata } from './home-page'
+import type { PublishedCategory } from '@/db/contracts'
+import {
+  buildHomePageData,
+  HomePageCanonicalTags,
+  HomePageRoute,
+  homePageMetadata,
+  homepageHubs
+} from './home-page'
 
 describe('homepage canonical URL', () => {
   beforeEach(() => {
@@ -41,5 +48,56 @@ describe('homepage canonical URL', () => {
     } finally {
       delete global[key]
     }
+  })
+})
+
+describe('the homepage hub grid (#347)', () => {
+  beforeEach(() => {
+    vi.stubGlobal('React', React)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  const category = (slug: string, name: string, count: number): PublishedCategory => ({
+    count,
+    description: '',
+    name,
+    order: 0,
+    slug
+  })
+  const categories = [
+    category('writing', 'Writing', 12),
+    category('audio', 'Audio', 0),
+    category('design', 'Design', 3),
+    category('notebooks', 'Notebooks', 40)
+  ]
+  const browse = { items: [], page: 1, pageCount: 1, pageSize: 48 }
+
+  it('lists the categories with a public listing that hold a tag, by name', () => {
+    const tags = [{ category: 'writing' }, { category: 'design' }, { category: 'audio' }]
+    expect(homepageHubs(categories, tags).map(hub => hub.slug)).toEqual(['design', 'writing'])
+  })
+
+  it('renders the grid only with hubs, so the homepage looks as before without tags', () => {
+    const page = (tags: Array<{ category: string }>) =>
+      renderToStaticMarkup(
+        <HomePageRoute
+          data={buildHomePageData({
+            browse,
+            categories,
+            featured: [],
+            latest: [],
+            tags,
+            totalCount: 0
+          })}
+        />
+      )
+    const withHubs = page([{ category: 'writing' }])
+    expect(withHubs).toContain('id="categories"')
+    expect(withHubs).toMatch(/href="\/products\/categories\/writing\/?"/u)
+    expect(withHubs).not.toMatch(/href="\/products\/categories\/notebooks\/?"/u)
+    expect(page([])).not.toContain('id="categories"')
   })
 })

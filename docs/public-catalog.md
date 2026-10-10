@@ -47,7 +47,7 @@ check, for example) never touches it.
 ## Reads
 
 List and card operations return summary projections; only detail operations hydrate content,
-media, resource links, and tags. List pages read one page at a time (`getListingNamePage`): the
+media, resource links, tags, and the active best pages that pin or exclude the listing. List pages read one page at a time (`getListingNamePage`): the
 public ids of the directory, of one category, or of one tag in name order are cached per epoch,
 and only the requested page's summaries are then read by id.
 
@@ -71,8 +71,15 @@ and public listings:
 - **Related listings** of a listing with tags are ranked by how many of its three most central
   tags they share, with ties broken from the listing's own name onward, so listings that share
   tags link to different neighbours. When its tags give fewer than four, its hub fills the rest
-  in the same name order, in the same statement. A listing without tags is ranked by shared
-  categories, as before.
+  in the same name order, in the same statement. A listing without tags in one category takes
+  the members after its own name, wrapping round to the start, so two listings of one large
+  category (the catch-all `other`) link to different neighbours (#331, #347); one in several
+  categories is ranked by shared categories, as before.
+- **"Featured in"** on a listing page names up to three best pages that show the listing
+  (`featuredInBestPages`, #347), from the cached best index and the detail's pins and exclusions,
+  so it adds no statement: a page that pins it within the entries it shows, or one whose rule
+  selects it, doesn't exclude it and shows its whole pool. An unpinned listing in a larger pool
+  may rank below the cut, which only the page's entries tell, so it isn't named.
 - **Moved taxonomy URLs** follow `taxonomy_redirects` to the target's current URL, when it is
   public and its page renders: a best page whose tag or category is retired is not followed, and
   neither is a category or tag with no public listing or a best page with no entry (#346).

@@ -342,3 +342,175 @@ test.describe('taxonomy routes on the fixture seed (#346)', () => {
     }
   })
 })
+
+/** A listing page's "Featured in" band (#347). */
+const featuredIn = (page: Page) => page.getByRole('region', { name: 'Featured in' })
+/** The slugs of a listing's related listings as its page shows them (the first three), in order. */
+async function relatedSlugs(page: Page, slug: string): Promise<string[]> {
+  await page.goto(listingPath(slug))
+  return page
+    .getByRole('region', { name: 'Related Entries' })
+    .locator('[data-website-slug]')
+    .evaluateAll(links => links.map(link => link.getAttribute('data-website-slug') ?? ''))
+}
+const writer = (number: number) => `fixture-writer-${String(number).padStart(2, '0')}`
+
+test.describe('the taxonomy on listing, hub and home pages (#347)', () => {
+  test('a listing page: the hub in its breadcrumb, hub and tag chips, and "Featured in"', async ({
+    page
+  }) => {
+    const canvas = seedListings.claimable
+    await page.goto(listingPath(canvas.slug))
+    const breadcrumb = page.getByRole('navigation', { name: 'breadcrumb' })
+    await expect(breadcrumb.getByRole('link')).toHaveText([
+      'Home',
+      'Products',
+      seedCategories.design.name,
+      canvas.name
+    ])
+    await expect(
+      breadcrumb.getByRole('link', { name: seedCategories.design.name })
+    ).toHaveAttribute('href', categoryPath(seedCategories.design.slug))
+    const graph = (await structuredData(page)).flatMap(entry =>
+      Array.isArray(entry['@graph']) ? (entry['@graph'] as Array<Record<string, unknown>>) : [entry]
+    )
+    const trail = graph.find(node => node['@type'] === 'BreadcrumbList') as {
+      itemListElement: Array<{ name: string }>
+    }
+    expect(trail.itemListElement.map(item => item.name)).toEqual([
+      'Home',
+      'All Products',
+      seedCategories.design.name,
+      canvas.name
+    ])
+
+    // The hub, then its tags, most central first, named from D1.
+    const header = page.locator('[data-slot="detail-page-header"]')
+    for (const [name, href] of [
+      [seedCategories.design.name, categoryPath(seedCategories.design.slug)],
+      [seedTags.whiteboards.name, tagPath(seedTags.whiteboards.slug)],
+      [seedTags.mockups.name, tagPath(seedTags.mockups.slug)]
+    ]) {
+      await expect(header.getByRole('link', { name, exact: true })).toHaveAttribute('href', href)
+    }
+
+    // Both its best pages show their whole pools (2 and 3 entries): the tag page first.
+    await expect(featuredIn(page).getByRole('link')).toHaveCount(2)
+    await expect(featuredIn(page).getByRole('link').nth(0)).toHaveAttribute(
+      'href',
+      bestPath(whiteboardApp.slug)
+    )
+    await expect(featuredIn(page).getByRole('link').nth(1)).toHaveAttribute(
+      'href',
+      bestPath(designApp.slug)
+    )
+  })
+
+  test('"Featured in" names only best pages that show the listing', async ({ page }) => {
+    // Pinned first on the note-taking page.
+    await page.goto(listingPath(seedListings.submitted.slug))
+    await expect(
+      featuredIn(page).getByRole('link', { name: /Best Note Taking Apps/u })
+    ).toHaveAttribute('href', bestPath(noteTakingApp.slug))
+    // Excluded from it.
+    await page.goto(listingPath(noteTakingApp.excluded[0].slug))
+    await expect(featuredIn(page)).toHaveCount(0)
+    // In its tag but not pinned, in a pool of 11 for 10 entries: it may be cut, so not named.
+    await page.goto(listingPath(writer(5)))
+    await expect(featuredIn(page)).toHaveCount(0)
+  })
+
+  test('a listing without taxonomy data shows its hub only, and no "Featured in"', async ({
+    page
+  }) => {
+    await page.goto(listingPath(writer(20)))
+    const header = page.locator('[data-slot="detail-page-header"]')
+    await expect(header.locator('[data-slot="badge"]')).toHaveText([seedCategories.writing.name])
+    await expect(featuredIn(page)).toHaveCount(0)
+  })
+
+  test('two untagged listings of one category link onward to different neighbours (#331)', async ({
+    page
+  }) => {
+    // Before #331 every listing of a category linked its first names (Fixture Inkwell, …).
+    expect(await relatedSlugs(page, writer(20))).toEqual([21, 22, 23].map(writer))
+    expect(await relatedSlugs(page, writer(30))).toEqual([31, 32, 33].map(writer))
+    // The last name wraps round to the start of the category.
+    expect(await relatedSlugs(page, writer(47))).toEqual([
+      seedListings.submitted.slug,
+      seedListings.paid.slug,
+      writer(1)
+    ])
+  })
+
+  test('a hub page: its tags of 3 or more as chips, most listings first, and its best pages', async ({
+    page
+  }) => {
+    await page.goto(categoryPath(seedCategories.writing.slug))
+    const hero = page.locator('[data-slot="page-hero"]')
+    await expect(hero.getByRole('link')).toHaveText([
+      seedTags.noteTaking.name,
+      seedTags.documentEditors.name
+    ])
+    await expect(hero.getByRole('link', { name: seedTags.noteTaking.name })).toHaveAttribute(
+      'href',
+      tagPath(seedTags.noteTaking.slug)
+    )
+    const lists = page.getByRole('region', { name: `Best ${seedCategories.writing.name} lists` })
+    await expect(lists.getByRole('link')).toHaveCount(1)
+    await expect(
+      lists.getByRole('link', { name: new RegExp(noteTakingApp.heading, 'u') })
+    ).toHaveAttribute('href', bestPath(noteTakingApp.slug))
+
+    // Two-listing tags make no chips; its two best pages are listed.
+    await page.goto(categoryPath(seedCategories.design.slug))
+    await expect(page.locator('[data-slot="page-hero"]').getByRole('link')).toHaveCount(0)
+    await expect(
+      page
+        .getByRole('region', { name: `Best ${seedCategories.design.name} lists` })
+        .getByRole('link')
+    ).toHaveCount(2)
+
+    // A tag chip, and no best pages: no "Best … lists" band.
+    await page.goto(categoryPath(seedCategories.developer.slug))
+    await expect(page.locator('[data-slot="page-hero"]').getByRole('link')).toHaveText([
+      seedTags.apis.name
+    ])
+    await expect(
+      page.getByRole('region', { name: `Best ${seedCategories.developer.name} lists` })
+    ).toHaveCount(0)
+  })
+
+  test('the 410 page links the listing’s hub', async ({ request }) => {
+    const response = await request.get(listingPath(seedListings.unlisted.slug))
+    expect(response.status()).toBe(410)
+    const html = await response.text()
+    expect(html).toContain(`href="${categoryPath(seedCategories.writing.slug)}"`)
+    expect(html).not.toContain('?category=')
+  })
+
+  test('the homepage lists the hubs, and the Products menu links Best', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/')
+    const hubs = page.getByRole('region', { name: 'Categories' })
+    // The categories that hold a tag and a public listing, by name; not the empty Audio Tools.
+    await expect(hubs.getByRole('listitem')).toHaveText([
+      new RegExp(seedCategories.design.name, 'u'),
+      new RegExp(seedCategories.developer.name, 'u'),
+      new RegExp(seedCategories.writing.name, 'u')
+    ])
+    await expect(hubs.getByRole('link', { name: 'View all' })).toHaveAttribute(
+      'href',
+      '/products/categories/'
+    )
+
+    await page
+      .getByRole('navigation', { name: 'Site' })
+      .getByRole('button', { name: 'Products' })
+      .click()
+    await expect(page.getByRole('link', { name: 'Best', exact: true })).toHaveAttribute(
+      'href',
+      '/best/'
+    )
+  })
+})

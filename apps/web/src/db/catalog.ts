@@ -22,6 +22,7 @@ import type {
   CatalogQueryEvent,
   CatalogQueryShape,
   CatalogShellStats,
+  ListingBestPageMark,
   ListingDetail,
   ListingFaq,
   ListingLinkRel,
@@ -43,14 +44,15 @@ import { latestInstant } from './instants'
 import { listingSlugRedirects, listings } from './schema'
 
 /**
- * v8: listing details carry `tags`, name pages `tag`, and name-order and name-page keys name
- * their scope (`*`, `c:<category>`, `t:<tag>`), so a tag and a category with one slug never
- * share an entry (#345); v7: listing summaries carry `modifiedAt`, and directory pages
- * `lastModifiedAt` (#218); v6: listing details carry `faqs` (#105); v5: a hosted logo or image is
- * its media key (#95), which the web adapter turns into a URL on the environment's media host; v4
- * added `linkRel` and `verifiedOwner` (#62).
+ * v9: listing details carry `bestPageMarks`, and an untagged listing in one category takes its
+ * related listings onward from its own name (#347, #331); v8: listing details carry `tags`, name
+ * pages `tag`, and name-order and name-page keys name their scope (`*`, `c:<category>`,
+ * `t:<tag>`), so a tag and a category with one slug never share an entry (#345); v7: listing
+ * summaries carry `modifiedAt`, and directory pages `lastModifiedAt` (#218); v6: listing details
+ * carry `faqs` (#105); v5: a hosted logo or image is its media key (#95), which the web adapter
+ * turns into a URL on the environment's media host; v4 added `linkRel` and `verifiedOwner` (#62).
  */
-const CACHE_SCHEMA = 'v8'
+const CACHE_SCHEMA = 'v9'
 /**
  * Keys include the catalog epoch (publication version plus the latest public
  * `published_at`), so an entry can never outlive the content it was built from; the TTL
@@ -138,6 +140,7 @@ interface SummaryRow {
 }
 
 interface DetailRow extends SummaryRow {
+  best_page_marks: string
   content: string | null
   entity_type: string | null
   images: string
@@ -358,6 +361,21 @@ function mapListingTags(value: string): ListingTag[] {
   })
 }
 
+function mapBestPageMarks(value: string): ListingBestPageMark[] {
+  return parseJsonArray(value, 'listing best page marks').map((mark, index) => {
+    if (!mark || typeof mark !== 'object')
+      throw new Error(`Invalid D1 best page mark ${index + 1}.`)
+    const candidate = mark as Record<string, unknown>
+    return {
+      page: requireString(candidate.page, `best page mark ${index + 1} page`),
+      position:
+        candidate.position === null
+          ? null
+          : requireNonNegativeInteger(candidate.position, `best page mark ${index + 1} position`)
+    }
+  })
+}
+
 function mapDetail(
   row: DetailRow
 ): Omit<ListingDetail, 'nextWebsite' | 'previousWebsite' | 'relatedWebsites'> {
@@ -390,11 +408,13 @@ function mapDetail(
   const logo = summary.media?.logo
   const video = row.video || undefined
   const tags = mapListingTags(row.tags)
+  const bestPageMarks = mapBestPageMarks(row.best_page_marks)
   if (!runtimeLinkRels.has(row.link_rel))
     throw new Error(`Invalid D1 listing ${row.slug} link rel.`)
 
   return {
     ...summary,
+    bestPageMarks: bestPageMarks.length ? bestPageMarks : undefined,
     content: row.content || undefined,
     entityType: row.entity_type || undefined,
     faqs: faqs.length ? faqs : undefined,
@@ -574,6 +594,15 @@ function isListingDetail(value: unknown): value is ListingDetail {
             tag.name.length > 0 &&
             typeof tag.slug === 'string' &&
             tag.slug.length > 0
+        ))) &&
+    (candidate.bestPageMarks === undefined ||
+      (Array.isArray(candidate.bestPageMarks) &&
+        candidate.bestPageMarks.length > 0 &&
+        candidate.bestPageMarks.every(
+          mark =>
+            mark &&
+            isNonEmptyString(mark.page) &&
+            (mark.position === null || isNonNegativeInteger(mark.position))
         )))
   )
 }
@@ -1281,7 +1310,16 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
             WHERE lt.listing_id = l.id AND t.is_active = 1
             ORDER BY lt.sort_order ASC, t.slug ASC
           ) ordered
-        ), '[]') AS tags
+        ), '[]') AS tags,
+        COALESCE((
+          SELECT json_group_array(json_object('page', ordered.slug, 'position', ordered.position))
+          FROM (
+            SELECT b.slug, e.position FROM best_page_listings e
+            JOIN best_pages b ON b.id = e.best_page_id
+            WHERE e.listing_id = l.id AND b.is_active = 1
+            ORDER BY b.slug ASC
+          ) ordered
+        ), '[]') AS best_page_marks
       FROM listings l
       WHERE ${publicEligibilitySql()} AND l.slug = ?
       LIMIT 1`,
@@ -1319,8 +1357,12 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
    * - No tags: ranked by shared categories (most first), then name and slug.
    *   - Several categories: count shared memberships from the listing's own categories
    *     (bounded by the size of those categories).
-   *   - One category: read that category's members when it is small, otherwise walk the
-   *     public name index, where a dense category yields four members almost immediately.
+   *   - One category (design 3.2, #331): the members after it in name order, wrapping round to
+   *     the start, so two listings in one large category (the catch-all `other`) link onward to
+   *     different neighbours instead of all to its first names. Read from the category's members
+   *     when it is small, otherwise by walking the public name index from its own name, where a
+   *     dense category yields four members almost immediately, then from the start only for
+   *     as many as that walk lacked.
    */
   async function relatedListings(
     row: DetailRow,
@@ -1365,25 +1407,30 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
                WHERE current.listing_id = ?
                LIMIT 1
              )`
+      tieBreak = 'related.wrap ASC, '
       if (categorySize !== undefined && categorySize <= RELATED_MEMBER_SCAN_LIMIT) {
         queryShape = 'related-single-category-members'
         candidates = `SELECT l.id, l.slug, l.name, l.description, l.website, l.is_unofficial,
-             1 AS score
+             1 AS score,
+             CASE WHEN (l.name, l.slug) > (?, ?) THEN 0 ELSE 1 END AS wrap
            FROM listing_categories shared INDEXED BY listing_categories_category_idx
            CROSS JOIN listings l ON l.id = shared.listing_id
            WHERE shared.category_id = ${currentCategory}
              AND ${publicEligibilitySql()}
              AND l.id != ?
-           ORDER BY l.name ASC, l.slug ASC
+           ORDER BY wrap ASC, l.name ASC, l.slug ASC
            LIMIT 4`
-        bindings = [row.id, asOf, row.id]
+        bindings = [row.name, row.slug, row.id, asOf, row.id]
       } else {
         queryShape = 'related-single-category-seek'
-        candidates = `SELECT l.id, l.slug, l.name, l.description, l.website, l.is_unofficial,
-             1 AS score
+        // The walk after its own name, then one from the start for only as many as it lacked
+        // (`LIMIT 0`, which SQLite checks before reading a row, when it found four).
+        const walk = (comparison: '<' | '>', wrap: 0 | 1, limit: string) => `SELECT
+             l.id, l.slug, l.name, l.description, l.website, l.is_unofficial,
+             1 AS score, ${wrap} AS wrap
            FROM listings l INDEXED BY listings_related_name_idx
            WHERE ${publicEligibilitySql()}
-             AND l.id != ?
+             AND (l.name, l.slug) ${comparison} (?, ?)
              AND EXISTS (
                SELECT 1
                FROM listing_categories shared
@@ -1391,8 +1438,12 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
                  AND shared.category_id = ${currentCategory}
              )
            ORDER BY l.name ASC, l.slug ASC
-           LIMIT 4`
-        bindings = [asOf, row.id, row.id]
+           LIMIT ${limit}`
+        candidates = `WITH onward AS (${walk('>', 0, '4')})
+           SELECT * FROM onward
+           UNION ALL
+           SELECT * FROM (${walk('<', 1, '4 - (SELECT COUNT(*) FROM onward)')})`
+        bindings = [asOf, row.name, row.slug, row.id, asOf, row.name, row.slug, row.id]
       }
     }
     const relatedRows = await queryAll<RelatedRow>(

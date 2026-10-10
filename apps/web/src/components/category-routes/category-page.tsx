@@ -87,12 +87,18 @@ export async function generateCategoryRouteMetadata({
  * and size, then its listings in the shared card grid and the page links.
  */
 export function CategoryRoutePage({
+  beforeListings,
   category,
+  chips,
   collection,
   pageProjects,
   pagination
 }: {
+  /** A hub's "Best {hub} lists", between its hero and its listings (#347). */
+  beforeListings?: ReactNode
   category: Category
+  /** A hub's tag chips under its hero (#347). */
+  chips?: ReactNode
   collection: CategoryCollection
   /** The listings on the requested page, in directory (name) order. */
   pageProjects: WebsiteMetadata[]
@@ -101,10 +107,12 @@ export function CategoryRoutePage({
   const seoContent = getCategorySEO(category.slug, category)
   const categoryPath = getRoute('category.page', { category: category.slug })
   return CollectionRoutePage({
+    beforeListings,
     breadcrumb: [
       { name: 'Categories', href: getRoute('category.index') },
       { name: category.name, href: categoryPath }
     ],
+    chips,
     collection,
     description: category.description,
     faqQuestions: seoContent.faqQuestions,
@@ -124,6 +132,7 @@ export function CategoryRoutePage({
  */
 export function CollectionRoutePage({
   analyticsSource,
+  beforeListings,
   breadcrumb,
   chips,
   collection,
@@ -138,9 +147,11 @@ export function CollectionRoutePage({
 }: {
   /** The listing cards' `data-source` (`category` when unset). */
   analyticsSource?: string
+  /** A band between the hero and the listings (a hub's best pages). */
+  beforeListings?: ReactNode
   /** The trail below Home, ending with this page. */
   breadcrumb: BreadcrumbItemData[]
-  /** Links under the hero (a tag page's best pages). */
+  /** Links under the hero (a tag page's best pages, a hub's tags). */
   chips?: ReactNode
   collection: CategoryCollection
   /** The collection's description, for its JSON-LD. */
@@ -265,6 +276,7 @@ export function CollectionRoutePage({
             description={intro}
           />
         </PageSection>
+        {beforeListings}
         <PageContainer className="flex flex-col gap-8 py-12">
           <CategoryWebsitesList
             analyticsSource={analyticsSource}

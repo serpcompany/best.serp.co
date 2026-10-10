@@ -1,9 +1,14 @@
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
+import type { PublishedBestPage } from '@/db/contracts'
 import { getCategoryDisplayName } from '../../lib/directory/category-display'
-import type { WebsiteDetailMetadata, WebsiteMetadata } from '../../lib/directory/content-query'
+import type {
+  TaxonomyName,
+  WebsiteDetailMetadata,
+  WebsiteMetadata
+} from '../../lib/directory/content-query'
 import { resolveListingDetailTemplate } from '../../lib/directory/listing-detail-template'
-import { getCanonicalListingListRoute } from '../../lib/routing/routes'
+import { getCanonicalListingListRoute, getRoute } from '../../lib/routing/routes'
 import { generateWebsiteDetailSchema } from '../../lib/seo/schema'
 import { composeMetaDescription, generateDynamicMetadata } from '../../lib/seo/seo-config'
 import { siteConfig } from '../../lib/site/site-config'
@@ -13,6 +18,7 @@ import { DetailPageLayout } from '../layout/detail-page-layout'
 import { SectionHeader } from '../layout/section-header'
 import { ListingImage } from '../listing/listing-image'
 import { JsonLd } from '../seo/json-ld'
+import { BestPageCards } from '../taxonomy/best-page'
 import { WebsiteContentSection } from '../website/website-content-section'
 import {
   WebsiteDetailActions,
@@ -76,14 +82,35 @@ export function generateWebsiteDetailRouteStaticParams(
     }))
 }
 
+/**
+ * A listing's categories, its hub (the primary) first, named from D1 (#347): `categoryNames` is
+ * the shell stats' names by slug. A slug they lack keeps its checked-in name.
+ */
+export function listingCategoryNames(
+  project: Pick<WebsiteDetailMetadata, 'categories' | 'category'>,
+  categoryNames: ReadonlyMap<string, string>
+): TaxonomyName[] {
+  return [...(project.category ? [project.category] : []), ...(project.categories ?? [])]
+    .filter((slug, index, slugs) => Boolean(slug) && slugs.indexOf(slug) === index)
+    .map(slug => ({ name: categoryNames.get(slug) ?? getCategoryDisplayName(slug), slug }))
+}
+
 export function WebsiteDetailRoutePage({
+  categoryNames = new Map(),
   claim,
+  featuredIn = [],
   project
 }: {
+  /** Category names from D1 by slug (the shell stats): the hub's crumb and badge (#347). */
+  categoryNames?: ReadonlyMap<string, string>
   /** The claim link of a listing without an owner, while claims are on (#67). */
   claim?: ReactNode
+  /** The best pages that show the listing (`featuredInBestPages`, #347): "Featured in". */
+  featuredIn?: readonly PublishedBestPage[]
   project: WebsiteDetailMetadata
 }) {
+  const categories = listingCategoryNames(project, categoryNames)
+  const hub = categories[0]
   const detailTemplate = resolveListingDetailTemplate(project.entityType)
   const resourcesWebsite: WebsiteResourcesSectionWebsite = {
     ...(project.resourceLinks ? { resourceLinks: project.resourceLinks } : {})
@@ -92,12 +119,15 @@ export function WebsiteDetailRoutePage({
 
   return (
     <div data-entity-type={project.entityType || 'listing'} data-listing-template={detailTemplate}>
-      <JsonLd data={generateWebsiteDetailSchema(project)} />
+      <JsonLd data={generateWebsiteDetailSchema(project, hub)} />
 
       {/* serplists' detail page (#273); the JSON-LD graph above carries the breadcrumb. */}
       <DetailPageLayout
         breadcrumbs={[
           { href: getCanonicalListingListRoute(), label: siteCopy.listingName.pluralTitle },
+          ...(hub
+            ? [{ href: getRoute('category.page', { category: hub.slug }), label: hub.name }]
+            : []),
           { label: project.name }
         ]}
         media={
@@ -111,9 +141,9 @@ export function WebsiteDetailRoutePage({
         title={project.name}
         description={project.description}
         meta={websiteDetailMeta({
-          category: project.category,
-          ...(project.categories?.length ? { categories: project.categories } : {}),
+          categories,
           ...(project.isUnofficial ? { isUnofficial: true } : {}),
+          ...(project.tags?.length ? { tags: project.tags } : {}),
           ...verifiedOwner
         })}
         actions={
@@ -139,6 +169,13 @@ export function WebsiteDetailRoutePage({
 
             <WebsiteFaqsSection website={{ faqs: faqsToShow(project.faqs, project.content) }} />
           </div>
+
+          {featuredIn.length > 0 ? (
+            <section aria-labelledby="featured-in-heading">
+              <SectionHeader id="featured-in-heading" title="Featured in" />
+              <BestPageCards pages={featuredIn} />
+            </section>
+          ) : null}
 
           <section aria-labelledby="browse-more-heading">
             <SectionHeader id="browse-more-heading" title="Browse more" />

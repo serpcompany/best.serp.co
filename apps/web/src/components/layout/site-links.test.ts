@@ -18,6 +18,8 @@ describe('header link states (#259)', () => {
       '/products/vimeo-downloader/',
       '/products/categories/',
       '/products/categories/ai-agents/',
+      '/best/',
+      '/best/ai-photo-editor/',
       '/brands/'
     ]) {
       expect(isMenuActive(path, products), path).toBe(true)
@@ -25,5 +27,15 @@ describe('header link states (#259)', () => {
     for (const path of ['/', '/pricing/', '/about/', '/submit/']) {
       expect(isMenuActive(path, products), path).toBe(false)
     }
+  })
+})
+
+describe('the Products menu (#347)', () => {
+  it('links the best-page index beside Categories', () => {
+    expect(products.links.map(link => [link.label, link.href]).slice(0, 3)).toEqual([
+      ['All products', '/'],
+      ['Categories', '/products/categories/'],
+      ['Best', '/best/']
+    ])
   })
 })

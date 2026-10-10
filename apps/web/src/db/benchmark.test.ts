@@ -285,7 +285,8 @@ describe('representative D1 query benchmark', () => {
       ).total
     )
 
-    // Single-category detail in a dense category: the public name index seek.
+    // Single-category detail in a dense category: the public name index seek, onward from its own
+    // name (#331): the four names after it, not the category's first four.
     const singleCategoryStart = sqlite.statements.length
     const single = await catalog.getListingBySlug('bench-161')
     const singleCategoryStatements = sqlite.statements
@@ -298,8 +299,9 @@ describe('representative D1 query benchmark', () => {
         .prepare(
           `SELECT l.slug FROM listings l
            JOIN listing_categories lc ON lc.listing_id = l.id
-           WHERE lc.category_id = ? AND l.slug != 'bench-161' AND l.status = 'approved'
+           WHERE lc.category_id = ? AND l.status = 'approved'
              AND l.published_at <= '2026-07-30T00:00:00.000Z'
+             AND (l.name, l.slug) > (SELECT name, slug FROM listings WHERE slug = 'bench-161')
            ORDER BY l.name, l.slug LIMIT 4`
         )
         .all(fixtureCategoryIds(sqlite.database).get('primary') ?? -1) as Array<{ slug: string }>

@@ -10,8 +10,11 @@ export const TAG_INDEX_MIN_LISTINGS = 10
 /** A best page is indexed (and in `sitemap-best.xml`) from this many entries; 1 to 4 are noindex. */
 export const BEST_PAGE_INDEX_MIN_ENTRIES = 5
 
-/** The tag index links a tag from this many public listings. */
+/** The tag index and a hub's tag chips link a tag from this many public listings. */
 export const TAG_LINK_MIN_LISTINGS = 3
+
+/** A listing page names at most this many best pages under "Featured in" (design 5.3). */
+export const FEATURED_IN_MAX_PAGES = 3
 
 /**
  * Categories that stay as transitional catch-all hubs (design 1.5): noindex, follow, and left out

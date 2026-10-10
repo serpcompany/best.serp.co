@@ -9,8 +9,7 @@ import {
   getFeaturedOnBadgePublicUrlFromKey
 } from '@/lib/directory/featured-on-badge-url'
 import { withDubVia } from '../../lib/analytics/dub-via'
-import { getCategoryDisplayName } from '../../lib/directory/category-display'
-import type { WebsiteLinkRel } from '../../lib/directory/content-query'
+import type { TaxonomyName, WebsiteLinkRel } from '../../lib/directory/content-query'
 import { getRoute } from '../../lib/routing/routes'
 import { siteConfig } from '../../lib/site/site-config'
 import { FavoriteButton } from '../favorites/favorite-button'
@@ -54,23 +53,24 @@ export function WebsiteDetailActions({ website }: WebsiteDetailActionsProps) {
 }
 
 export type WebsiteDetailMetaWebsite = {
-  categories?: string[]
-  category?: string
+  /** Its categories with their names from D1, its hub (the primary) first (#347). */
+  categories?: readonly TaxonomyName[]
   isUnofficial?: boolean
+  /** Its active tags with their names from D1, the most central first (#341, #347). */
+  tags?: readonly TaxonomyName[]
   /** The public "Verified owner" badge (#70 screen 9b). */
   verifiedOwner?: true
 }
 
 /**
- * The product page header's meta row (#273): the Unofficial and Verified owner badges, then the
- * listing's categories as links. Nothing when the listing has none of them.
+ * The product page header's meta row (#273): the Unofficial and Verified owner badges, then its
+ * hub badge, its other categories and its tag chips as links (#347), named from D1. Nothing when
+ * the listing has none of them.
  */
 export function websiteDetailMeta(website: WebsiteDetailMetaWebsite): ReactNode {
-  const categorySlugs = [
-    ...(website.category ? [website.category] : []),
-    ...(website.categories || [])
-  ].filter((value, index, values) => Boolean(value) && values.indexOf(value) === index)
-  if (!website.isUnofficial && !website.verifiedOwner && categorySlugs.length === 0) {
+  const [hub, ...otherCategories] = website.categories ?? []
+  const tags = website.tags ?? []
+  if (!website.isUnofficial && !website.verifiedOwner && !hub && tags.length === 0) {
     return undefined
   }
 
@@ -82,15 +82,33 @@ export function websiteDetailMeta(website: WebsiteDetailMetaWebsite): ReactNode 
         </Badge>
       ) : null}
       {website.verifiedOwner ? <VerifiedOwnerBadge /> : null}
-      {categorySlugs.length > 0 ? (
+      {hub || tags.length > 0 ? (
         <div className="flex flex-wrap gap-1.5">
-          {categorySlugs.map(categorySlug => (
+          {/* The hub as on a best page's entries (#346): secondary, its tags outline. */}
+          {hub ? (
             <Badge
-              key={categorySlug}
-              variant="outline"
-              render={<Link href={getRoute('category.page', { category: categorySlug })} />}
+              variant="secondary"
+              render={<Link href={getRoute('category.page', { category: hub.slug })} />}
             >
-              {getCategoryDisplayName(categorySlug)}
+              {hub.name}
+            </Badge>
+          ) : null}
+          {otherCategories.map(category => (
+            <Badge
+              key={category.slug}
+              variant="outline"
+              render={<Link href={getRoute('category.page', { category: category.slug })} />}
+            >
+              {category.name}
+            </Badge>
+          ))}
+          {tags.map(tag => (
+            <Badge
+              key={tag.slug}
+              variant="outline"
+              render={<Link href={getRoute('tag.page', { tag: tag.slug })} />}
+            >
+              {tag.name}
             </Badge>
           ))}
         </div>
