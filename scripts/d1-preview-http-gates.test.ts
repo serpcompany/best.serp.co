@@ -203,18 +203,69 @@ describe('environment-specific HTTP gates', () => {
     expect(committed.length).toBeGreaterThan(0)
     const retired = new Set<string>()
     const gone = new Set<string>()
+    /** Categories a committed manifest takes off the sample listing. */
+    const removedFromListing = new Set<string>()
     for (const path of committed) {
       const manifest = parse(readFileSync(resolve(path), 'utf8')) as {
-        operations?: Array<{ action?: string; from?: string; slug?: string }>
+        operations?: Array<{ action?: string; from?: string; remove?: string[]; slug?: string }>
       }
       for (const operation of manifest.operations ?? []) {
         if (operation.action === 'category-unpublish' && operation.slug) retired.add(operation.slug)
         if (operation.action === 'listing-unpublish' && operation.slug) gone.add(operation.slug)
         if (operation.action === 'listing-slug-change' && operation.from) gone.add(operation.from)
+        if (
+          operation.action === 'listing-categories-remove' &&
+          operation.slug === httpGateSamples.listing
+        )
+          for (const category of operation.remove ?? []) removedFromListing.add(category)
       }
     }
     expect(gone.has(httpGateSamples.listing), httpGateSamples.listing).toBe(false)
-    expect(httpGateSamples.categories.filter(slug => !retired.has(slug))).not.toEqual([])
+    const [sampled] = httpGateSamples.categories.filter(slug => !retired.has(slug))
+    expect(sampled).toBeDefined()
+    // #320: the sampled category is the sample listing's own, so it can't be empty while the
+    // listing the gates already require is live and filed under it.
+    expect(removedFromListing.has(String(sampled)), String(sampled)).toBe(false)
+  })
+
+  it('requests the pinned samples, and only with GETs apart from the empty sign-in (#320)', async () => {
+    const requests: Array<{ method: string; url: URL }> = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = new URL(String(input))
+        requests.push({ method: init?.method ?? 'GET', url })
+        // The checked-in samples' legacy listing URL redirects like the fixture's.
+        if (url.pathname === `/${httpGateSamples.listing}/`)
+          return withCrawlPolicy(
+            url,
+            new Response(null, {
+              status: 308,
+              headers: { location: `/products/${httpGateSamples.listing}/` }
+            })
+          )
+        return withCrawlPolicy(url, successfulResponse(url))
+      })
+    )
+    await expect(
+      runHttpGates('production', origin, {
+        publicationsDirectory: noPublications,
+        wranglerConfigPath: switchOffConfigPath
+      })
+    ).resolves.toBeUndefined()
+    const paths = requests.map(request => request.url.pathname)
+    expect(paths).toEqual(
+      expect.arrayContaining([
+        `/products/categories/${httpGateSamples.categories[0]}/`,
+        `/products/${httpGateSamples.listing}/`
+      ])
+    )
+    expect(paths.filter(path => path.startsWith('/products/categories/'))).toHaveLength(1)
+    expect(
+      requests
+        .filter(request => request.method !== 'GET')
+        .map(request => `${request.method} ${request.url.pathname}`)
+    ).toEqual([`POST ${badSignInPath}`])
   })
 
   it('keeps Staging isolated from the Production hostname', async () => {
