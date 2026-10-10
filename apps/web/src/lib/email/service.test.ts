@@ -110,9 +110,7 @@ describe('email delivery', () => {
     await settle()
     expect(sender.sent).toHaveLength(1)
     expect(sender.sent[0]?.subject).toBe('[staging] Fixture: Secret body text')
-    expect(sender.sent[0]?.text).toContain(
-      'https://best-serp-co-staging.serpcompany.workers.dev/products/autoenhance.ai/'
-    )
+    expect(sender.sent[0]?.text).toContain('https://staging.best.serp.co/products/autoenhance.ai/')
     expect(sender.sent[0]?.to).toBe('owner@serp.co')
     expect(sender.sent[0]?.from).toEqual({ email: 'noreply@mail.serp.co', name: 'SERP Directory' })
     expect(logs.find(entry => entry.event === 'email_skipped')).toMatchObject({

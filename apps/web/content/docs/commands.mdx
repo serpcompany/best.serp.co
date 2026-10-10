@@ -7,13 +7,14 @@ published: true
 
 # Common Commands
 
-Initialize and verify the isolated local D1 database:
+Reset the isolated local D1 database, seed it with fixtures, and check them:
 
 ```bash
-pnpm db:migrate:local
-pnpm db:import:local
+pnpm db:seed:local
 pnpm db:verify:local
 ```
+
+`pnpm db:migrate:local` applies new migrations without touching the data.
 
 Build and run the local OpenNext Worker:
 

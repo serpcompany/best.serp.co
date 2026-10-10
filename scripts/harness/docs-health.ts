@@ -21,13 +21,22 @@ const REQUIRED_FILES = [
   '.github/workflows/harness-gardening.yml'
 ] as const
 
+/**
+ * Whether the checks below hold a file to the documentation rules. `.archive/` keeps history
+ * as it was (serp's docs README, #315): it is read, not maintained, so its links and sizes go
+ * unchecked.
+ */
+export function isMaintainedFile(file: string): boolean {
+  return !file.startsWith('.archive/')
+}
+
 function repositoryFiles(root: string): string[] {
   return execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], {
     cwd: root,
     encoding: 'utf8'
   })
     .split('\n')
-    .filter(Boolean)
+    .filter(file => file && isMaintainedFile(file))
 }
 
 function markdownLinkTargets(source: string, { anchors = false } = {}): string[] {
@@ -315,8 +324,7 @@ export function checkDocumentation(root = resolve('.')): string[] {
     'agent:ui:capture',
     'worktree:new',
     'worktree:doctor',
-    'worktree:destroy',
-    'migration:preflight'
+    'worktree:destroy'
   ]) {
     if (!rootManifest.scripts?.[script]) violations.push(`package.json: missing ${script} command`)
   }

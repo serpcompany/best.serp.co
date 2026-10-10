@@ -2,7 +2,13 @@ import { mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { type BrowserContext, expect, type Page } from '@playwright/test'
 import { client, q, signIn, unique } from './admin-fixture'
-import { claimsD1, claimsOrigin, claimsSuiteEnabled } from './claims-fixture'
+import {
+  claimsD1,
+  claimsOrigin,
+  claimsSuiteEnabled,
+  seedClaimsCatalog,
+  seedClaimsListing
+} from './claims-fixture'
 import { escapeRegExp } from './site-fixture'
 import { type FixtureSite, startFixtureSite } from './submit-fixture'
 import { expectedResponse, test } from './test'
@@ -63,16 +69,14 @@ function seed(
   fixture.set(label, { badge, description: `${name}, a fixture.`, name })
   const slug = slugOverride ?? fixture.slug(label)
   const id = `e2e-dialog-${label}`
-  claimsD1(`
-    INSERT INTO listings (id, slug, name, description, website, content, status, published_at,
-      source_kind, source_identity, checksum)
-    VALUES (${q(id)}, ${q(slug)}, ${q(name)}, ${q(`${name} helps teams ship.`)},
-      ${q(fixture.website(label))}, 'A listing for the claim dialog suite.', 'draft',
-      '2026-05-16', 'legacy-json-migration-v1', ${q(id)}, ${q(`e2e-${label}`)});
-    INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
-      SELECT ${q(id)}, id, 0, 1 FROM categories WHERE slug = 'e2e-claim-tools';
-    UPDATE listings SET status = 'approved' WHERE id = ${q(id)};
-  `)
+  seedClaimsListing({
+    content: 'A listing for the claim dialog suite.',
+    description: `${name} helps teams ship.`,
+    id,
+    name,
+    slug,
+    website: fixture.website(label)
+  })
   return { id, label, name, slug }
 }
 
@@ -102,11 +106,7 @@ async function enterCode(page: Page, code: string): Promise<void> {
 
 test.beforeAll(async () => {
   fixture = await startFixtureSite()
-  claimsD1(`
-    INSERT OR IGNORE INTO publication_state (id, version, checksum) VALUES (1, 0, 'e2e-claims');
-    INSERT OR IGNORE INTO categories (slug, name, description, sort_order)
-      VALUES ('e2e-claim-tools', 'E2E Claim Tools', 'Tools for the claims suite.', 0);
-  `)
+  seedClaimsCatalog()
 })
 
 test.afterAll(async () => {

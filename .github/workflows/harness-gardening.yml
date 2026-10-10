@@ -29,8 +29,8 @@ jobs:
       - name: Audit documentation and D1 architecture
         run: pnpm docs:garden
 
-      - name: Exercise migration and worktree harness contracts
-        run: pnpm exec vitest run scripts/migration-preflight.test.ts scripts/worktree-harness.test.ts
+      - name: Exercise worktree harness contracts
+        run: pnpm exec vitest run scripts/worktree-harness.test.ts
 
       - name: Run fast feedback loop
         run: pnpm harness:fast

@@ -10,11 +10,12 @@ Production gated the Worker there while best.serp.co still answered with `server
 
 ## Checklist
 
-1. Staging passes `pnpm migration:compare -- <staging-origin> --sample 60` with zero
-   differences, a full sitemap crawl with zero non-200s, and the smoke suite.
+1. Staging passes `pnpm migration:compare -- <staging-origin> --sample 60` (archived since #315)
+   with zero differences, a full sitemap crawl with zero non-200s, and the smoke suite.
 2. Stop `json-directory-template` from deploying serp.co (its deploy would overwrite
    this repository's `main`). Done.
-3. Bootstrap production D1 ([Production D1 bootstrap](./PRODUCTION_BOOTSTRAP.md)), then run
+3. Bootstrap production D1 (the one-time import, archived since #315:
+   [Production D1 bootstrap](../.archive/docs/PRODUCTION_BOOTSTRAP.md)), then run
    Deploy Production, which gates the Worker on the review URL while GitHub Pages still serves
    best.serp.co.
 4. Attach the Custom Domain `best.serp.co` to the production Worker (it replaces the GitHub

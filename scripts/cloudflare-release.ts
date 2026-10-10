@@ -1,6 +1,7 @@
 /**
  * Protected Cloudflare release operations for best.serp.co: D1 Time Travel bookmarks, migrations,
- * the one-time catalog bootstrap and its verification, database readiness, and Worker deploy.
+ * database readiness, and Worker deploy. (The one-time catalog bootstrap, `import` and
+ * `verify-import`, is archived with the v1 import in `.archive/`, #315.)
  *
  *   pnpm tsx scripts/cloudflare-release.ts <command> <staging|production> [options]
  *
@@ -10,12 +11,9 @@
  *   plan-release    read-only: `database-and-worker` when migrations are pending, otherwise
  *                   `worker-only`; refuses a database with migrations this commit lacks
  *   check-database  read-only: every apps/web/drizzle migration is applied and a publication exists
- *   verify-import   read-only: exact catalog-table parity with the reviewed import and parity report
  *   bookmark        read-only: the current D1 Time Travel bookmark and its restore command, also
  *                   written to the GitHub step summary; fails when no bookmark can be read
  *   migrate         `wrangler d1 migrations apply` (`pnpm db:migrate:<env>`)
- *   import          one-time bootstrap of an empty D1: refuse existing data, migrate, then
- *                   import the checksum-verified reviewed SQL
  *   deploy          check-database, then `opennextjs-cloudflare deploy` of the built Worker
  *
  * Mutating commands run only inside the protected workflow that owns them
@@ -23,7 +21,7 @@
  * `main` for production), for one of its events, from a clean checkout at GITHUB_SHA, and, on
  * a manual dispatch, with its typed confirmation in RELEASE_CONFIRM. A push carries no
  * confirmation; the production environment's required reviewers approve it. Production
- * migrations, the bootstrap import, and Worker deploys also require Deploy Staging to have
+ * migrations and Worker deploys also require Deploy Staging to have
  * verified the same source tree on `staging` (`staging-verification.ts`, GITHUB_TOKEN with
  * actions: read and contents: read), except for an owner-approved hotfix dispatch of a merged
  * `hotfix-*` pull request, which may deploy the Worker but never migrate. They, and
@@ -41,29 +39,10 @@
  * because Wrangler's list first runs `CREATE TABLE IF NOT EXISTS` on the ledger table.
  */
 import { execFileSync } from 'node:child_process'
-import {
-  appendFileSync,
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync
-} from 'node:fs'
-import { tmpdir } from 'node:os'
-import { dirname, isAbsolute, join, resolve } from 'node:path'
+import { appendFileSync, existsSync, readFileSync } from 'node:fs'
+import { dirname, isAbsolute, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { captureApplicationSnapshot, type SnapshotTransport } from './d1-application-snapshot'
 import { freshMigrationNames } from './d1-drizzle-local'
-import {
-  expectedBootstrapSnapshot,
-  type ImportArtifactPaths,
-  type ParityReport,
-  readParityReport,
-  readReviewedImportSql,
-  reviewedArtifactPaths,
-  sha256
-} from './d1-import-artifact'
-import { parityTableNames, runtimeTableNames } from './d1-table-inventory'
 import { project, type RemoteEnvironment } from './project'
 import {
   assertCurrentRelease,
@@ -77,11 +56,9 @@ export const releaseCommands = [
   'bookmark',
   'check-database',
   'deploy',
-  'import',
   'list-migrations',
   'migrate',
-  'plan-release',
-  'verify-import'
+  'plan-release'
 ] as const
 export type ReleaseCommand = (typeof releaseCommands)[number]
 
@@ -89,8 +66,7 @@ export const readOnlyCommands: ReadonlySet<ReleaseCommand> = new Set([
   'bookmark',
   'check-database',
   'list-migrations',
-  'plan-release',
-  'verify-import'
+  'plan-release'
 ])
 
 /** Workflow events that may run remote release commands. */
@@ -139,16 +115,6 @@ export const releaseAuthorizations: Readonly<Record<string, ReleaseAuthorization
     events: ['push', 'workflow_dispatch'],
     hotfixConfirmation: project.confirmation.hotfix,
     requireVerifiedStaging: ['migrate', 'deploy']
-  },
-  'bootstrap-production-d1.yml': {
-    // `import` applies migrations itself, and only after proving the database is empty. It
-    // applies every migration at this commit, so it needs the same staging proof as `migrate`.
-    branch: 'main',
-    commands: ['import'],
-    confirmation: project.confirmation.bootstrap,
-    environment: 'production',
-    events: ['workflow_dispatch'],
-    requireVerifiedStaging: ['import']
   }
 }
 
@@ -164,7 +130,6 @@ export type D1Row = Record<string, unknown>
 /** The D1 operations release commands need; Wrangler-backed in production, SQLite in tests. */
 export interface D1Target {
   applyMigrations(): void
-  executeFile(path: string): void
   query(sql: string): Promise<D1Row[]>
 }
 
@@ -185,6 +150,7 @@ interface WranglerEnvironmentConfig {
   }>
   name?: string
   r2_buckets?: Array<{ binding?: string; bucket_name?: string }>
+  routes?: Array<string | { custom_domain?: boolean; pattern?: string }>
   vars?: Record<string, string | undefined>
   workers_dev?: boolean
 }
@@ -202,8 +168,10 @@ function parseCommand(value: string | undefined): ReleaseCommand {
 
 /**
  * Refuses a Wrangler config whose `env.<environment>` block no longer matches the reviewed
- * remote identity in `project.ts` (Worker name, workers.dev exposure, D1 binding, migration
- * history and ledger table, runtime env, media bucket and host).
+ * remote identity in `project.ts` (Worker name, workers.dev exposure, routes, D1 binding,
+ * migration history and ledger table, runtime env, media bucket and host). A route may only
+ * attach the environment's own canonical host as a Custom Domain, so a deploy can never move
+ * another environment's host (best.serp.co onto the staging Worker, say) to this Worker.
  */
 export function validateRemoteConfig(
   environment: RemoteEnvironment,
@@ -220,6 +188,14 @@ export function validateRemoteConfig(
   if (block?.name !== expected.workerName) problems.push(`name must be ${expected.workerName}`)
   if (block?.workers_dev !== expected.workersDev)
     problems.push(`workers_dev must be ${expected.workersDev}`)
+  const canonicalHost = new URL(expected.origin).host
+  if (
+    (block?.routes ?? []).some(
+      route =>
+        typeof route === 'string' || route.custom_domain !== true || route.pattern !== canonicalHost
+    )
+  )
+    problems.push(`routes may only attach ${canonicalHost} as a Custom Domain`)
   if (block?.vars?.D1_RUNTIME_ENV !== environment)
     problems.push(`vars.D1_RUNTIME_ENV must be ${environment}`)
   if (
@@ -429,28 +405,8 @@ export function wranglerD1(
     )
   return {
     applyMigrations: () => void d1(['migrations', 'apply'], [], false),
-    executeFile: path => void d1(['execute'], ['--file', path, '--yes'], false),
     query: async sql => parseWranglerRows(d1(['execute'], ['--command', sql, '--json'], true))
   }
-}
-
-/** Inlines the integer LIMIT/OFFSET parameters snapshot pages use; Wrangler cannot bind them. */
-export function inlineIntegerParameters(sql: string, params: readonly unknown[]): string {
-  let index = 0
-  const inlined = sql.replace(/\?/gu, () => {
-    const value = params[index]
-    index += 1
-    if (typeof value !== 'number' || !Number.isSafeInteger(value)) {
-      throw new Error('Remote snapshot queries accept only integer parameters.')
-    }
-    return String(value)
-  })
-  if (index !== params.length) throw new Error('Remote snapshot parameter count mismatch.')
-  return inlined
-}
-
-function snapshotTransport(d1: D1Target): SnapshotTransport {
-  return { query: statement => d1.query(inlineIntegerParameters(statement.sql, statement.params)) }
 }
 
 async function tableNames(d1: D1Target): Promise<Set<string>> {
@@ -509,7 +465,7 @@ export async function checkDatabase(d1: D1Target): Promise<DatabaseReadiness> {
   }
 }
 
-/** The Worker at this commit may serve only a fully migrated, bootstrapped database. */
+/** The Worker at this commit may serve only a fully migrated database with a catalog publication. */
 export function assertDatabaseReady(
   readiness: DatabaseReadiness,
   environment: RemoteEnvironment
@@ -530,11 +486,7 @@ export function assertDatabaseReady(
   }
   if (readiness.publication.rows !== 1) {
     throw new Error(
-      `${environment} D1 has no catalog publication. ${
-        environment === 'production'
-          ? 'Run the bootstrap-production-d1.yml workflow first.'
-          : 'Import the reviewed catalog first.'
-      }`
+      `${environment} D1 has no catalog publication. Restore it with D1 Time Travel (docs/D1_RECOVERY.md).`
     )
   }
 }
@@ -685,181 +637,6 @@ export function recordTimeTravelBookmark(
     appendFileSync(env.GITHUB_STEP_SUMMARY, bookmarkSummary(record))
   }
   return record
-}
-
-function requireReviewedChecksum(report: ParityReport): string {
-  const checksum = report.artifact?.sqlChecksum
-  if (!checksum || !/^[a-f0-9]{64}$/u.test(checksum)) {
-    throw new Error('The parity report has no artifact.sqlChecksum; refusing an unverified import.')
-  }
-  return checksum
-}
-
-/** Publication and catalog rows present, tolerating a database whose tables do not exist yet. */
-export async function catalogOccupancy(
-  d1: D1Target
-): Promise<{ catalogRows: number; checksum: string | null; publicationRows: number }> {
-  const tables = await tableNames(d1)
-  const count = async (table: string) =>
-    tables.has(table)
-      ? (integer((await d1.query(`SELECT COUNT(*) AS row_count FROM ${table}`))[0]?.row_count) ?? 0)
-      : 0
-  const checksum = tables.has('publication_state')
-    ? (await d1.query('SELECT checksum FROM publication_state WHERE id=1'))[0]?.checksum
-    : null
-  return {
-    catalogRows:
-      (await count('categories')) + (await count('listings')) + (await count('migration_runs')),
-    checksum: typeof checksum === 'string' ? checksum : null,
-    publicationRows: await count('publication_state')
-  }
-}
-
-/**
- * Imports the reviewed initial catalog into an empty D1: refuses any existing publication or
- * catalog rows before changing anything, applies the apps/web/drizzle migrations, re-checks, then
- * executes the checksum-verified SQL. A database that already carries the reviewed publication
- * checksum is a no-op.
- */
-export async function importReviewedCatalog(
-  d1: D1Target,
-  environment: RemoteEnvironment,
-  options: { paths?: ImportArtifactPaths; report?: ParityReport } = {}
-): Promise<{ sqlChecksum: string; status: 'already-imported' | 'imported' }> {
-  const report = options.report ?? readParityReport(options.paths?.parityReportPath)
-  const sqlChecksum = requireReviewedChecksum(report)
-  const sql = readReviewedImportSql(report, options.paths ?? reviewedArtifactPaths)
-  if (sha256(sql) !== sqlChecksum) {
-    throw new Error('Import SQL does not reproduce the reviewed artifact checksum.')
-  }
-  const refuseOccupied = (occupancy: Awaited<ReturnType<typeof catalogOccupancy>>) => {
-    if (occupancy.publicationRows !== 0 || occupancy.catalogRows !== 0) {
-      throw new Error(
-        `Refusing to import into ${environment} D1: it already holds a publication or catalog rows. The initial import runs only into an empty database.`
-      )
-    }
-  }
-  const before = await catalogOccupancy(d1)
-  if (before.checksum === report.target.checksum) {
-    return { sqlChecksum, status: 'already-imported' }
-  }
-  refuseOccupied(before)
-  d1.applyMigrations()
-  const readiness = await checkDatabase(d1)
-  if (readiness.missingMigrations.length > 0 || readiness.unknownMigrations.length > 0) {
-    throw new Error(
-      `${environment} D1 must have exactly the apps/web/drizzle migrations applied before the import.`
-    )
-  }
-  refuseOccupied(await catalogOccupancy(d1))
-  const directory = mkdtempSync(join(tmpdir(), 'best-serp-co-d1-bootstrap-'))
-  try {
-    const importPath = join(directory, `${project.artifact.name}.sql`)
-    writeFileSync(importPath, sql)
-    d1.executeFile(importPath)
-  } finally {
-    rmSync(directory, { force: true, recursive: true })
-  }
-  return { sqlChecksum, status: 'imported' }
-}
-
-const parityCountsQuery = `SELECT
-  (SELECT COUNT(*) FROM publication_state) AS publication_rows,
-  (SELECT version FROM publication_state WHERE id=1) AS version,
-  (SELECT checksum FROM publication_state WHERE id=1) AS checksum,
-  (SELECT COUNT(*) FROM listings WHERE status='approved' AND is_active=1) AS listing_count,
-  (SELECT COUNT(*) FROM categories WHERE is_active=1) AS category_count,
-  (SELECT COUNT(*) FROM listing_categories) AS membership_count,
-  (SELECT COUNT(*) FROM listing_categories WHERE is_primary=1) AS primary_category_count,
-  (SELECT COUNT(*) FROM listing_faqs) AS faq_count,
-  (SELECT COUNT(*) FROM listing_media) AS media_count,
-  (SELECT COUNT(*) FROM listing_resource_links) AS resource_link_count,
-  (SELECT COUNT(*) FROM listings WHERE is_featured=1) AS featured_count`
-
-/** Compares the observed counts with every count the parity report declares. */
-export function parityCountMismatches(row: D1Row | undefined, report: ParityReport): string[] {
-  const expectations: Array<[string, unknown]> = [
-    ['publication_rows', 1],
-    ['checksum', report.target.checksum],
-    ['version', report.target.publicationVersion],
-    ['listing_count', report.target.listingCount],
-    ['category_count', report.target.categoryCount],
-    ['membership_count', report.parity.categoryMembershipCount],
-    ['primary_category_count', report.parity.primaryCategoryCount],
-    ['faq_count', report.parity.faqCount],
-    ['media_count', report.parity.mediaCount],
-    ['resource_link_count', report.parity.resourceLinkCount],
-    ['featured_count', report.parity.featuredCount]
-  ]
-  return expectations
-    .filter(([, expected]) => expected !== undefined)
-    .filter(([key, expected]) => row?.[key] !== expected)
-    .map(([key, expected]) => `${key} is ${String(row?.[key])}, expected ${String(expected)}`)
-}
-
-/** One row with the row count of every runtime table (identifiers are constants). */
-const runtimeRowsQuery = `SELECT ${runtimeTableNames
-  .map(table => `(SELECT count(*) FROM "${table}") AS "${table}"`)
-  .join(', ')}`
-
-/**
- * Proves the database holds exactly the reviewed initial catalog: every application table
- * matches the in-memory bootstrap of the checksum-verified SQL, and the publication checksum
- * and counts match the parity report.
- */
-export async function verifyImportedCatalog(
-  d1: D1Target,
-  environment: RemoteEnvironment,
-  options: { pageSize?: number; paths?: ImportArtifactPaths; report?: ParityReport } = {}
-): Promise<Record<string, unknown>> {
-  const report = options.report ?? readParityReport(options.paths?.parityReportPath)
-  const sql = readReviewedImportSql(report, options.paths ?? reviewedArtifactPaths)
-  if (sha256(sql) !== requireReviewedChecksum(report)) {
-    throw new Error('Import SQL does not reproduce the reviewed artifact checksum.')
-  }
-  const [counts] = await d1.query(parityCountsQuery)
-  const countMismatches = parityCountMismatches(counts, report)
-  // Bootstrap parity skips the rows of the runtime tables, but at bootstrap they must hold
-  // none: an import that planted a user, session, code, or delivery would otherwise go unnoticed.
-  const [runtimeRows] = await d1.query(runtimeRowsQuery)
-  const nonEmptyRuntimeTables = runtimeTableNames.filter(
-    table => Number(runtimeRows?.[table]) !== 0
-  )
-  const expected = await expectedBootstrapSnapshot(sql)
-  const actual = await captureApplicationSnapshot(snapshotTransport(d1), {
-    pageSize: options.pageSize ?? 250
-  })
-  const tableMismatches = parityTableNames.filter(
-    table =>
-      actual.tables[table].count !== expected.tables[table].count ||
-      actual.tables[table].checksum !== expected.tables[table].checksum
-  )
-  if (
-    countMismatches.length > 0 ||
-    tableMismatches.length > 0 ||
-    nonEmptyRuntimeTables.length > 0 ||
-    actual.checksum !== expected.checksum
-  ) {
-    throw new Error(
-      `${environment} D1 does not match the reviewed ${project.artifact.name} import.${
-        countMismatches.length > 0 ? ` Parity report: ${countMismatches.join('; ')}.` : ''
-      }${tableMismatches.length > 0 ? ` Tables: ${tableMismatches.join(', ')}.` : ''}${
-        nonEmptyRuntimeTables.length > 0
-          ? ` Runtime tables must be empty at bootstrap: ${nonEmptyRuntimeTables.join(', ')}.`
-          : ''
-      }`
-    )
-  }
-  return {
-    checksum: counts?.checksum,
-    environment,
-    listings: counts?.listing_count,
-    categories: counts?.category_count,
-    snapshot: actual.checksum,
-    tables: parityTableNames.length,
-    totalRows: actual.totalRows,
-    version: counts?.version
-  }
 }
 
 export async function deployWorker(
@@ -1028,18 +805,11 @@ export async function runRelease(
       assertDatabaseReady(readiness, args.environment)
       return { environment: args.environment, ...readiness }
     }
-    case 'verify-import':
-      return verifyImportedCatalog(d1, args.environment)
     case 'bookmark':
       return recordTimeTravelBookmark(args.environment, runner, env)
     case 'migrate':
       d1.applyMigrations()
       return { environment: args.environment, ...(await checkDatabase(d1)) }
-    case 'import':
-      return {
-        environment: args.environment,
-        ...(await importReviewedCatalog(d1, args.environment))
-      }
     case 'deploy':
       await deployWorker(d1, args.environment, runner, dependencies.workerEntrypoint)
       return {

@@ -12,15 +12,13 @@ Use Node 24 and pnpm 10.
 ```bash
 nvm use
 pnpm install
-pnpm db:migrate:local
-pnpm db:import:local
-pnpm db:verify:local
+pnpm db:seed:local
 pnpm preview
 ```
 
 The local preview is the same OpenNext Worker architecture used in production, with
-an isolated local D1 identity. Listings, categories, search, RSS, and sitemaps all
-query D1.
+an isolated local D1 identity seeded with fixtures (fake listings, users, and
+submissions). Listings, categories, search, RSS, and sitemaps all query D1.
 
 Site presentation configuration lives in `sites/serp.software/site-config.ts`.
 Schema changes live in `d1/migrations/`, while approved catalog changes use

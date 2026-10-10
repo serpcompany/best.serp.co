@@ -1,4 +1,5 @@
 import { type APIRequestContext, type BrowserContext, expect, type Page } from '@playwright/test'
+import { seedCategories, seedListings, seedWebsite } from './seed-facts'
 import { escapeRegExp, listingPath, site } from './site-fixture'
 import { executeLocalD1, type FixtureSite, startFixtureSite } from './submit-fixture'
 import { expectedResponse, test } from './test'
@@ -23,7 +24,8 @@ test.use({
  */
 
 const ADMIN_RECIPIENT = 'devin@serp.co'
-const CATEGORY = 'Video Downloaders'
+/** A seeded category submissions file under. */
+const CATEGORY = seedCategories.writing
 
 function unique(): string {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`
@@ -85,7 +87,7 @@ async function emailsTo(request: APIRequestContext, to: string): Promise<OutboxM
 async function chooseCategory(page: Page, name: string) {
   await page.getByRole('combobox', { name: 'Primary category' }).click()
   // The list opens below its trigger (alignItemWithTrigger off), and its popup, which scrolls
-  // the 140-odd categories, is capped at max-h-80 (320 px) (#241, #186).
+  // a long category list, is capped at max-h-80 (320 px) (#241, #186).
   await expect(page.getByRole('listbox')).toBeVisible()
   const popup = page.locator('[data-slot="select-content"]')
   const box = await popup.boundingBox()
@@ -141,7 +143,7 @@ test.describe('submit v2', () => {
     const description = 'Drafts landing pages and emails from product notes, in your voice.'
     await page.getByLabel('Short description').fill(description)
     await expect(page.getByText('From meta description')).toHaveCount(0)
-    await chooseCategory(page, CATEGORY)
+    await chooseCategory(page, CATEGORY.name)
 
     // Continue signed out: the draft stays in this browser through the email-code sign-in.
     await page.getByRole('button', { name: 'Sign in and continue' }).click()
@@ -161,7 +163,9 @@ test.describe('submit v2', () => {
     await expect(page.getByLabel('Website URL')).toHaveValue(fixture.website(label))
     await expect(page.getByLabel('Name')).toHaveValue(productName)
     await expect(page.getByLabel('Short description')).toHaveValue(description)
-    await expect(page.getByRole('combobox', { name: 'Primary category' })).toContainText(CATEGORY)
+    await expect(page.getByRole('combobox', { name: 'Primary category' })).toContainText(
+      CATEGORY.name
+    )
     await expect(page.getByText('Sign in when you’re ready')).toHaveCount(0)
     await page.getByRole('button', { name: 'Continue' }).click()
 
@@ -275,7 +279,7 @@ test.describe('submit v2', () => {
     const pendingWebsite = `https://pending-${id}.example/`
     const created = await owner.request.post('/api/submissions', {
       data: {
-        categorySlug: 'video-downloaders',
+        categorySlug: CATEGORY.slug,
         content: '',
         description: 'A pending product.',
         logoUrl: `${fixture.website(iconLabel)}icon.png`,
@@ -291,7 +295,7 @@ test.describe('submit v2', () => {
     // The same domain again (another path, www.) is a duplicate, even over the API.
     const again = await owner.request.post('/api/submissions', {
       data: {
-        categorySlug: 'video-downloaders',
+        categorySlug: CATEGORY.slug,
         content: '',
         description: 'Again.',
         logoUrl: `${fixture.website(iconLabel)}icon.png`,
@@ -325,30 +329,34 @@ test.describe('submit v2', () => {
     await expect(page.getByText(`pending-${id}.example is already in review`)).toBeVisible()
     await expect(page.getByRole('button', { name: 'Sign in and continue' })).toBeDisabled()
 
-    // An imported listing: matched on the domain, with a link to claim it (#67).
-    await typeWebsite(page, 'https://www.frase.io/pricing')
-    await expect(page.getByText(/is already listed on SERP$/u)).toBeVisible()
+    // A listed site, whose slug is its domain: matched on the domain, with a link to claim it
+    // (#67).
+    const listed = seedListings.submitted
+    const listedHost = new URL(seedWebsite(listed.slug)).host
+    expect(listedHost).toBe(listed.slug)
+    await typeWebsite(page, `https://www.${listedHost}/pricing`)
+    await expect(page.getByText(`${listed.name} is already listed on SERP`)).toBeVisible()
     await expect(
-      page.getByText('We match on the domain, so frase.io/pricing counts as frase.io.')
+      page.getByText(`We match on the domain, so ${listedHost}/pricing counts as ${listedHost}.`)
     ).toBeVisible()
     await expect(page.getByRole('link', { name: 'Claim this listing' })).toHaveAttribute(
       'href',
-      '/products/frase.io/#claim'
+      `${listingPath(listed.slug)}#claim`
     )
     await expect(page.getByRole('button', { name: 'Sign in and continue' })).toBeDisabled()
-    const listed = await owner.request.post('/api/submissions', {
+    const listedSubmission = await owner.request.post('/api/submissions', {
       data: {
-        categorySlug: 'video-downloaders',
+        categorySlug: CATEGORY.slug,
         content: '',
         description: 'Listed.',
         logoUrl: `${fixture.website(iconLabel)}icon.png`,
         name: 'Listed',
-        website: 'https://frase.io/pricing'
+        website: `https://${listedHost}/pricing`
       },
       headers: { origin }
     })
-    expect(listed.status()).toBe(409)
-    expect(await listed.json()).toMatchObject({
+    expect(listedSubmission.status()).toBe(409)
+    expect(await listedSubmission.json()).toMatchObject({
       availability: { kind: 'listed' },
       code: 'listing_exists'
     })
@@ -364,7 +372,7 @@ test.describe('submit v2', () => {
     ).toBeVisible()
     const blocked = await owner.request.post('/api/submissions', {
       data: {
-        categorySlug: 'video-downloaders',
+        categorySlug: CATEGORY.slug,
         content: '',
         description: 'Blocked.',
         logoUrl: `${fixture.website(iconLabel)}icon.png`,
@@ -394,7 +402,7 @@ test.describe('submit v2', () => {
       fixture.set(label, product)
       const created = await owner.request.post('/api/submissions', {
         data: {
-          categorySlug: 'video-downloaders',
+          categorySlug: CATEGORY.slug,
           content: '',
           description: product.description,
           logoUrl: `${fixture.website(label)}icon.png`,
@@ -551,7 +559,7 @@ test.describe('submit v2', () => {
     fixture.set(label, { badge: 'missing', description: 'Stale page.', name: 'Stale' })
     const created = await owner.request.post('/api/submissions', {
       data: {
-        categorySlug: 'video-downloaders',
+        categorySlug: CATEGORY.slug,
         content: '',
         description: 'Stale page.',
         logoUrl: `${fixture.website(label)}icon.png`,
@@ -648,7 +656,7 @@ test.describe('submit v2', () => {
 
   test('refuses writes without a session or from another origin', async ({ baseURL, request }) => {
     const body = {
-      categorySlug: 'video-downloaders',
+      categorySlug: CATEGORY.slug,
       content: '',
       description: 'x',
       logoUrl: 'https://example.com/logo.png',

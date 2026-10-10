@@ -2,7 +2,6 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { brotliCompressSync } from 'node:zlib'
 import { afterAll, describe, expect, it } from 'vitest'
 import {
   assertDatabaseReady,
@@ -12,8 +11,6 @@ import {
   type D1Row,
   type D1Target,
   deployWorker,
-  importReviewedCatalog,
-  inlineIntegerParameters,
   type ProcessRunner,
   parseReleaseArguments,
   parseTimeTravelBookmark,
@@ -28,12 +25,9 @@ import {
   runRelease,
   timeTravelRestoreCommand,
   validateRemoteConfig,
-  verifyImportedCatalog,
   wranglerD1
 } from './cloudflare-release'
 import { freshMigrationNames } from './d1-drizzle-local'
-import type { ImportArtifactPaths, ParityReport } from './d1-import-artifact'
-import { sha256 } from './d1-import-artifact'
 import { project } from './project'
 import { type FetchLike, stagingWorkflow } from './staging-verification'
 
@@ -41,46 +35,13 @@ const fixtureDirectory = mkdtempSync(join(tmpdir(), 'best-serp-co-release-'))
 afterAll(() => rmSync(fixtureDirectory, { force: true, recursive: true }))
 
 const at = '2026-01-01T00:00:00.000Z'
-const targetChecksum = 'b'.repeat(64)
-const fixtureSql = [
-  'PRAGMA foreign_keys = ON;',
-  `INSERT INTO migration_runs (id, schema_version, manifest_identity, input_checksum, target_checksum, affected_records, outcome, started_at, completed_at) VALUES ('migration-fixture', 1, 'fixture-v1', '${'a'.repeat(64)}', '${targetChecksum}', 1, 'started', '${at}', NULL);`,
-  `INSERT INTO categories (slug, name, description, sort_order, is_active, created_at, updated_at) VALUES ('video-downloaders', 'Video Downloaders', 'Fixture category.', 0, 1, '${at}', '${at}');`,
-  `INSERT INTO listings (id, slug, name, description, website, content, entity_type, priority, is_unofficial, is_featured, is_active, status, published_at, display_order, source_kind, source_identity, source_updated_at, checksum, created_at, updated_at) VALUES ('lst_fixture0001', 'fixture-tool', 'Fixture Tool', 'A fixture listing.', 'https://example.com/', NULL, NULL, NULL, 0, 1, 1, 'draft', '${at}', 0, 'fixture', 'fixture-tool', NULL, '${'c'.repeat(64)}', '${at}', '${at}');`,
-  `INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary) SELECT 'lst_fixture0001', id, 0, 1 FROM categories WHERE slug = 'video-downloaders';`,
-  `INSERT INTO listing_media (listing_id, kind, url, sort_order) VALUES ('lst_fixture0001', 'logo', '/logo.png', 0);`,
-  `UPDATE listings SET status = 'approved' WHERE id = 'lst_fixture0001';`,
-  `INSERT INTO publication_state (id, version, manifest_id, checksum, published_at) VALUES (1, 1, 'fixture-v1', '${targetChecksum}', '${at}');`,
-  `UPDATE migration_runs SET outcome = 'succeeded', completed_at = '${at}' WHERE id = 'migration-fixture';`
-].join('\n')
+const publicationChecksum = 'b'.repeat(64)
 
-const paths: ImportArtifactPaths = {
-  batchDirectory: join(fixtureDirectory, 'no-batches'),
-  compressedSqlPath: join(fixtureDirectory, 'fixture.sql.br'),
-  parityReportPath: join(fixtureDirectory, 'parity.yaml')
-}
-writeFileSync(paths.compressedSqlPath, brotliCompressSync(Buffer.from(fixtureSql)))
-
-function fixtureReport(overrides: Partial<ParityReport['target']> = {}): ParityReport {
-  return {
-    artifact: { sqlChecksum: sha256(fixtureSql) },
-    parity: {
-      categoryMembershipCount: 1,
-      faqCount: 0,
-      featuredCount: 1,
-      importBatches: 1,
-      mediaCount: 1,
-      primaryCategoryCount: 1,
-      resourceLinkCount: 0
-    },
-    target: {
-      categoryCount: 1,
-      checksum: targetChecksum,
-      listingCount: 1,
-      publicationVersion: 1,
-      ...overrides
-    }
-  }
+/** The singleton catalog publication a deployed environment carries. */
+function publish(database: DatabaseSync): void {
+  database.exec(
+    `INSERT INTO publication_state (id, version, manifest_id, checksum, published_at) VALUES (1, 1, 'fixture-v1', '${publicationChecksum}', '${at}')`
+  )
 }
 
 /** A D1 target backed by in-memory SQLite that records the operations Wrangler would run. */
@@ -101,9 +62,6 @@ function sqliteD1(database = new DatabaseSync(':memory:')) {
         database.exec(readFileSync(resolve('apps/web/drizzle', name), 'utf8'))
         database.prepare('INSERT INTO d1_migrations (name) VALUES (?)').run(name)
       }
-    },
-    executeFile(path) {
-      database.exec(readFileSync(path, 'utf8'))
     },
     async query(sql) {
       return database.prepare(sql).all() as D1Row[]
@@ -218,8 +176,7 @@ describe('release authorization', () => {
       'bookmark',
       'check-database',
       'list-migrations',
-      'plan-release',
-      'verify-import'
+      'plan-release'
     ])
     for (const command of readOnlyCommands) {
       expect(() => authorizeRelease(command, 'production', {}, git)).not.toThrow()
@@ -262,14 +219,15 @@ describe('release authorization', () => {
     }
   })
 
-  it('keeps production behind typed confirmations and the import behind the bootstrap', () => {
+  it('keeps production behind typed confirmations, with no catalog import (#315)', () => {
     const production = Object.entries(releaseAuthorizations).filter(
       ([, authorization]) => authorization.environment === 'production'
     )
-    expect(production.map(([workflow]) => workflow).sort()).toEqual([
-      'bootstrap-production-d1.yml',
-      'deploy-production.yml'
-    ])
+    // The one-time bootstrap (bootstrap-production-d1.yml, `import`) is archived with the v1
+    // import: production recovers with D1 Time Travel, never a re-import.
+    expect(production.map(([workflow]) => workflow).sort()).toEqual(['deploy-production.yml'])
+    expect(releaseCommands).not.toContain('import')
+    expect(releaseCommands).not.toContain('verify-import')
     for (const [, authorization] of production) {
       expect(authorization.confirmation).toMatch(/-production$/u)
       // main is production: every production mutation runs from main.
@@ -294,12 +252,6 @@ describe('release authorization', () => {
         .filter(([, authorization]) => authorization.hotfixConfirmation)
         .map(([workflow, authorization]) => [workflow, authorization.hotfixConfirmation])
     ).toEqual([['deploy-production.yml', project.confirmation.hotfix]])
-    expect(
-      Object.entries(releaseAuthorizations)
-        .filter(([, authorization]) => authorization.commands.includes('import'))
-        .map(([workflow]) => workflow)
-    ).toEqual(['bootstrap-production-d1.yml'])
-    expect(releaseAuthorizations['bootstrap-production-d1.yml']?.commands).toEqual(['import'])
     expect(releaseAuthorizations['deploy-production.yml']?.commands).toEqual(['migrate', 'deploy'])
     // Publication mutates D1 through its own guarded script; it needs no release command,
     // because the bookmark it records first is read-only.
@@ -407,19 +359,12 @@ describe('release authorization', () => {
     for (const command of ['migrate', 'deploy'] as const) {
       expect(() => authorizeRelease(command, 'production', hotfix, cleanGit)).not.toThrow()
     }
-    for (const workflow of ['bootstrap-production-d1.yml']) {
-      const authorization = releaseAuthorizations[workflow]
-      expect(
-        () =>
-          authorizeRelease(
-            authorization?.commands[0] ?? 'import',
-            'production',
-            workflowEnv(workflow, project.confirmation.hotfix),
-            cleanGit
-          ),
-        workflow
-      ).toThrow(authorization?.confirmation ?? '')
-    }
+    // No other workflow takes it: deploy-production.yml is the only production release workflow.
+    expect(
+      Object.entries(releaseAuthorizations)
+        .filter(([, authorization]) => authorization.hotfixConfirmation !== undefined)
+        .map(([workflow]) => workflow)
+    ).toEqual(['deploy-production.yml'])
   })
 })
 
@@ -428,16 +373,12 @@ describe('staging before production', () => {
   const stagingSha = '1'.repeat(40)
   const withToken = (env: Partial<NodeJS.ProcessEnv>) => ({ ...env, GITHUB_TOKEN: 'ghs_test' })
 
-  it('requires a verified staging run for every production migration, import, and deploy', async () => {
+  it('requires a verified staging run for every production migration and deploy', async () => {
     expect(
       Object.entries(releaseAuthorizations).flatMap(([workflow, authorization]) =>
         authorization.requireVerifiedStaging.map(command => `${workflow} ${command}`)
       )
-    ).toEqual([
-      'deploy-production.yml migrate',
-      'deploy-production.yml deploy',
-      'bootstrap-production-d1.yml import'
-    ])
+    ).toEqual(['deploy-production.yml migrate', 'deploy-production.yml deploy'])
     for (const [workflow, authorization] of Object.entries(releaseAuthorizations)) {
       expect(
         authorization.requireVerifiedStaging.every(command =>
@@ -445,10 +386,10 @@ describe('staging before production', () => {
         ),
         workflow
       ).toBe(true)
-      // Any workflow that may apply migrations to production (migrate, or import, which migrates
-      // first) or deploy its Worker must prove staging first.
+      // Any workflow that may apply migrations to production or deploy its Worker must prove
+      // staging first.
       if (authorization.environment === 'production') {
-        for (const command of ['migrate', 'import', 'deploy'] as const) {
+        for (const command of ['migrate', 'deploy'] as const) {
           if (authorization.commands.includes(command)) {
             expect(authorization.requireVerifiedStaging, `${workflow} ${command}`).toContain(
               command
@@ -492,13 +433,6 @@ describe('staging before production', () => {
     }
     await expect(
       requireVerifiedStaging(
-        'import',
-        withToken(workflowEnv('bootstrap-production-d1.yml', project.confirmation.bootstrap)),
-        stagingApi(true, { stagingSha }).fetch
-      )
-    ).resolves.toMatchObject({ match: 'tree', runId: 1, sha })
-    await expect(
-      requireVerifiedStaging(
         'deploy',
         workflowEnv('deploy-production.yml', null, 'push'),
         stagingApi(true).fetch
@@ -537,14 +471,6 @@ describe('staging before production', () => {
         api.fetch
       )
     ).rejects.toThrow('has no run on staging')
-    // The bootstrap offers no hotfix: its import always needs staging.
-    await expect(
-      requireVerifiedStaging(
-        'import',
-        withToken(workflowEnv('bootstrap-production-d1.yml', project.confirmation.hotfix)),
-        stagingApi(false, { pulls: [mergedPull('hotfix-12-search')] }).fetch
-      )
-    ).rejects.toThrow('has no run on staging')
   })
 
   it('refuses a stale release once main has moved on to different source', async () => {
@@ -555,11 +481,6 @@ describe('staging before production', () => {
         'hotfix deploy',
         withToken(workflowEnv('deploy-production.yml', project.confirmation.hotfix)),
         'deploy'
-      ],
-      [
-        'bootstrap import',
-        withToken(workflowEnv('bootstrap-production-d1.yml', project.confirmation.bootstrap)),
-        'import'
       ]
     ]
     const pulls = [mergedPull('hotfix-12-search')]
@@ -655,8 +576,7 @@ describe('release entry point', () => {
   })
   const productionReleases: Array<[string, string, string]> = [
     ['migrate', 'deploy-production.yml', project.confirmation.deploy],
-    ['deploy', 'deploy-production.yml', project.confirmation.deploy],
-    ['import', 'bootstrap-production-d1.yml', project.confirmation.bootstrap]
+    ['deploy', 'deploy-production.yml', project.confirmation.deploy]
   ]
 
   it('refuses every remote mutation outside its protected workflow before any runner call', async () => {
@@ -670,15 +590,15 @@ describe('release entry point', () => {
         expect(run.events, `${command} ${environment}`).toEqual([])
       }
     }
-    // The bootstrap workflow itself, without its typed confirmation.
+    // The production workflow itself, dispatched without its typed confirmation.
     const unconfirmed = harness(true)
     await expect(
       runRelease(
-        ['import', 'production'],
-        productionEnv('bootstrap-production-d1.yml', null),
+        ['deploy', 'production'],
+        productionEnv('deploy-production.yml', null),
         dependencies(unconfirmed)
       )
-    ).rejects.toThrow(project.confirmation.bootstrap)
+    ).rejects.toThrow(project.confirmation.deploy)
     expect(unconfirmed.events).toEqual([])
     // An unprotected workflow on main, and a production workflow dispatched from staging.
     for (const env of [
@@ -698,13 +618,7 @@ describe('release entry point', () => {
   })
 
   it('rehearses locally without contacting GitHub or Cloudflare', async () => {
-    for (const command of [
-      'migrate',
-      'import',
-      'list-migrations',
-      'plan-release',
-      'check-database'
-    ]) {
+    for (const command of ['migrate', 'list-migrations', 'plan-release', 'check-database']) {
       const run = harness(false)
       await runRelease([command, 'production', '--rehearse', rehearsal], {}, dependencies(run))
       expect(run.runs.length, command).toBeGreaterThan(0)
@@ -754,7 +668,7 @@ describe('release entry point', () => {
   })
 
   it('checks staging first, then migrates or deploys a verified or promoted commit', async () => {
-    for (const [command] of productionReleases.filter(([name]) => name !== 'import')) {
+    for (const [command] of productionReleases) {
       for (const stagingSha of [sha, '1'.repeat(40)]) {
         for (const event of ['push', 'workflow_dispatch']) {
           const label = `${command} ${event} ${stagingSha.slice(0, 4)}`
@@ -968,6 +882,17 @@ describe('remote Wrangler identity', () => {
       expect(bindings[0].migrations_table).toBe(project.migrationsTable)
     }
     expect(project.remote.production.origin).toBe(project.publicUrl)
+    // Staging's branded canonical host (#323) is its Custom Domain; CI goes through workers.dev.
+    expect(project.remote.staging.origin).toBe('https://staging.best.serp.co')
+    expect(config.env.staging.routes).toEqual([
+      { custom_domain: true, pattern: 'staging.best.serp.co' }
+    ])
+    expect(project.remote.staging.reviewOrigin).toBe(
+      `https://${project.remote.staging.workerName}.serpcompany.workers.dev`
+    )
+    expect(project.remote.production.reviewOrigin).toBe(
+      `https://${project.remote.production.workerName}.serpcompany.workers.dev`
+    )
     // Staging and production media live in different buckets on different hosts (#95).
     expect(project.remote.staging.media.bucket).not.toBe(project.remote.production.media.bucket)
     expect(project.remote.staging.media.baseUrl).not.toBe(project.remote.production.media.baseUrl)
@@ -1053,6 +978,38 @@ describe('remote Wrangler identity', () => {
       expect(() => validateRemoteConfig('production', path)).toThrow(message)
     }
   })
+
+  it("refuses a route to anything but the environment's own canonical host (#323)", () => {
+    const base = JSON.parse(readFileSync(resolve(project.wranglerConfigPath), 'utf8'))
+    for (const environment of ['staging', 'production'] as const) {
+      base.env[environment].d1_databases[0].migrations_dir = resolve('apps/web/drizzle')
+    }
+    const check = (
+      environment: 'production' | 'staging',
+      routes: Array<string | { custom_domain?: boolean; pattern?: string }>
+    ) => {
+      const config = JSON.parse(JSON.stringify(base))
+      config.env[environment].routes = routes
+      const path = join(fixtureDirectory, 'wrangler.routes.jsonc')
+      writeFileSync(path, JSON.stringify(config))
+      return () => validateRemoteConfig(environment, path)
+    }
+    // The reviewed shapes: staging's Custom Domain, and production's once #192 declares it.
+    expect(
+      check('staging', [{ custom_domain: true, pattern: 'staging.best.serp.co' }])
+    ).not.toThrow()
+    expect(check('production', [{ custom_domain: true, pattern: 'best.serp.co' }])).not.toThrow()
+    expect(check('production', [])).not.toThrow()
+    for (const [environment, routes, host] of [
+      ['staging', [{ custom_domain: true, pattern: 'best.serp.co' }], 'staging.best.serp.co'],
+      ['production', [{ custom_domain: true, pattern: 'staging.best.serp.co' }], 'best.serp.co'],
+      ['staging', [{ pattern: 'staging.best.serp.co/*' }], 'staging.best.serp.co'],
+      ['staging', ['staging.best.serp.co/*'], 'staging.best.serp.co']
+    ] as const)
+      expect(check(environment, [...routes]), JSON.stringify(routes)).toThrow(
+        `routes may only attach ${host} as a Custom Domain`
+      )
+  })
 })
 
 describe('Wrangler invocation', () => {
@@ -1072,7 +1029,6 @@ describe('Wrangler invocation', () => {
     const d1 = wranglerD1('production', { kind: 'remote' }, runner)
     await expect(d1.query('SELECT 1')).resolves.toEqual([{ name: 'x' }])
     d1.applyMigrations()
-    d1.executeFile('/tmp/import.sql')
     const pinned = [
       'best-serp-co-production',
       '--remote',
@@ -1083,8 +1039,7 @@ describe('Wrangler invocation', () => {
     ]
     expect(calls.map(call => [call.command, ...call.args])).toEqual([
       ['pnpm', 'exec', 'wrangler', 'd1', 'execute', ...pinned, '--command', 'SELECT 1', '--json'],
-      ['pnpm', 'exec', 'wrangler', 'd1', 'migrations', 'apply', ...pinned],
-      ['pnpm', 'exec', 'wrangler', 'd1', 'execute', ...pinned, '--file', '/tmp/import.sql', '--yes']
+      ['pnpm', 'exec', 'wrangler', 'd1', 'migrations', 'apply', ...pinned]
     ])
   })
 
@@ -1112,144 +1067,31 @@ describe('Wrangler invocation', () => {
     ])
   })
 
-  it('parses only successful D1 results and inlines only integer parameters', () => {
+  it('parses only successful D1 results', () => {
     expect(parseWranglerRows('[{"results":[{"a":1}],"success":true}]')).toEqual([{ a: 1 }])
     expect(() => parseWranglerRows('[{"results":[],"success":false}]')).toThrow('unsuccessful')
     expect(() => parseWranglerRows('{}')).toThrow('malformed')
-    expect(inlineIntegerParameters('SELECT 1 LIMIT ? OFFSET ?', [250, 500])).toBe(
-      'SELECT 1 LIMIT 250 OFFSET 500'
-    )
-    expect(() => inlineIntegerParameters('SELECT ?', ["1'; DROP TABLE x"])).toThrow('integer')
-    expect(() => inlineIntegerParameters('SELECT ?', [1, 2])).toThrow('count')
   })
 })
 
-describe('one-time catalog bootstrap', () => {
-  it('migrates, imports, and verifies an empty database exactly once', async () => {
-    const { target } = sqliteD1()
-    const report = fixtureReport()
+describe('database readiness', () => {
+  it('serves only a fully migrated database with a catalog publication', async () => {
+    const { database, target } = sqliteD1()
 
     const empty = await checkDatabase(target)
     expect(empty.missingMigrations).toEqual(freshMigrationNames())
     expect(() => assertDatabaseReady(empty, 'production')).toThrow('database-and-worker')
 
     target.applyMigrations()
+    // No re-import exists (#315): a database without a publication is restored from Time Travel.
     await expect(
       checkDatabase(target).then(readiness => assertDatabaseReady(readiness, 'production'))
-    ).rejects.toThrow('bootstrap-production-d1.yml')
+    ).rejects.toThrow('Restore it with D1 Time Travel (docs/D1_RECOVERY.md)')
 
-    await expect(importReviewedCatalog(target, 'production', { paths, report })).resolves.toEqual({
-      sqlChecksum: sha256(fixtureSql),
-      status: 'imported'
-    })
-    await expect(
-      verifyImportedCatalog(target, 'production', { pageSize: 1, paths, report })
-    ).resolves.toMatchObject({ checksum: targetChecksum, listings: 1, version: 1 })
+    publish(database)
     const ready = await checkDatabase(target)
     expect(() => assertDatabaseReady(ready, 'production')).not.toThrow()
-    expect(ready.publication).toEqual({ checksum: targetChecksum, rows: 1, version: 1 })
-
-    await expect(importReviewedCatalog(target, 'production', { paths, report })).resolves.toEqual({
-      sqlChecksum: sha256(fixtureSql),
-      status: 'already-imported'
-    })
-  })
-
-  it('applies the migrations itself when bootstrapping a database with no tables', async () => {
-    const { target } = sqliteD1()
-    await expect(
-      importReviewedCatalog(target, 'production', { paths, report: fixtureReport() })
-    ).resolves.toMatchObject({ status: 'imported' })
-    const readiness = await checkDatabase(target)
-    expect(readiness.appliedMigrations).toEqual(freshMigrationNames())
-    expect(() => assertDatabaseReady(readiness, 'production')).not.toThrow()
-  })
-
-  it('refuses a populated database before applying any migration', async () => {
-    const { database, target } = sqliteD1()
-    database.exec(
-      "CREATE TABLE publication_state (id INTEGER PRIMARY KEY, version INTEGER, checksum TEXT); INSERT INTO publication_state VALUES (1, 7, 'live')"
-    )
-    let migrations = 0
-    const spy: D1Target = {
-      ...target,
-      applyMigrations: () => {
-        migrations += 1
-      }
-    }
-    await expect(
-      importReviewedCatalog(spy, 'production', { paths, report: fixtureReport() })
-    ).rejects.toThrow('only into an empty database')
-    expect(migrations).toBe(0)
-  })
-
-  it('refuses a database that already holds other or partial catalog data', async () => {
-    for (const statement of [
-      `INSERT INTO categories (slug, name) VALUES ('other', 'Other')`,
-      `INSERT INTO migration_runs (id, schema_version, manifest_identity, input_checksum, target_checksum, affected_records, outcome) VALUES ('partial', 1, 'partial', 'x', 'y', 0, 'started')`,
-      `INSERT INTO publication_state (id, version, checksum) VALUES (1, 3, '${'d'.repeat(64)}')`
-    ]) {
-      const { database, target } = sqliteD1()
-      target.applyMigrations()
-      database.exec(statement)
-      await expect(
-        importReviewedCatalog(target, 'production', { paths, report: fixtureReport() })
-      ).rejects.toThrow('only into an empty database')
-    }
-  })
-
-  it('refuses an unverifiable or tampered artifact before touching D1', async () => {
-    const { target } = sqliteD1()
-    target.applyMigrations()
-    const unverified = fixtureReport()
-    unverified.artifact = {}
-    await expect(
-      importReviewedCatalog(target, 'production', { paths, report: unverified })
-    ).rejects.toThrow('no artifact.sqlChecksum')
-    const tampered = fixtureReport()
-    tampered.artifact = { sqlChecksum: 'e'.repeat(64) }
-    await expect(
-      importReviewedCatalog(target, 'production', { paths, report: tampered })
-    ).rejects.toThrow('reviewed artifact checksum')
-    expect((await checkDatabase(target)).publication.rows).toBe(0)
-  })
-
-  it('names every table and parity count that differs from the reviewed import', async () => {
-    const { database, target } = sqliteD1()
-    target.applyMigrations()
-    await importReviewedCatalog(target, 'production', { paths, report: fixtureReport() })
-
-    await expect(
-      verifyImportedCatalog(target, 'production', {
-        paths,
-        report: fixtureReport({ listingCount: 2 })
-      })
-    ).rejects.toThrow('listing_count is 1, expected 2')
-
-    database.exec("UPDATE listings SET name = 'Tampered' WHERE id = 'lst_fixture0001'")
-    await expect(
-      verifyImportedCatalog(target, 'production', { paths, report: fixtureReport() })
-    ).rejects.toThrow('Tables: listings.')
-  })
-
-  it('requires the runtime tables to be empty at bootstrap', async () => {
-    const { database, target } = sqliteD1()
-    target.applyMigrations()
-    await importReviewedCatalog(target, 'production', { paths, report: fixtureReport() })
-    database.exec(
-      "INSERT INTO users (id, name, email, email_verified) VALUES ('planted', '', 'x@example.com', 1)"
-    )
-    database.exec(
-      "INSERT INTO sessions (id, expires_at, token, user_id) VALUES ('s', 1, 't', 'planted')"
-    )
-    database.exec(
-      "INSERT INTO email_deliveries (template_id, event_key, provider, status) VALUES ('t', 'evt', 'p', 'sent')"
-    )
-    await expect(
-      verifyImportedCatalog(target, 'production', { paths, report: fixtureReport() })
-    ).rejects.toThrow(
-      'Runtime tables must be empty at bootstrap: users, sessions, email_deliveries.'
-    )
+    expect(ready.publication).toEqual({ checksum: publicationChecksum, rows: 1, version: 1 })
   })
 
   it('lists applied, pending, and unknown migrations with SELECTs only', async () => {
@@ -1280,7 +1122,7 @@ describe('one-time catalog bootstrap', () => {
   it('refuses to deploy older code over a database with unknown migrations', async () => {
     const { database, target } = sqliteD1()
     target.applyMigrations()
-    await importReviewedCatalog(target, 'production', { paths, report: fixtureReport() })
+    publish(database)
     database.exec("INSERT INTO d1_migrations (name) VALUES ('9999_future.sql')")
     await expect(
       checkDatabase(target).then(readiness => assertDatabaseReady(readiness, 'staging'))
@@ -1454,7 +1296,7 @@ describe('deploy', () => {
         return ''
       }
     }
-    const { target } = sqliteD1()
+    const { database, target } = sqliteD1()
     await expect(
       deployWorker(target, 'production', runner, join(fixtureDirectory, 'missing.js'))
     ).rejects.toThrow('pnpm worker:build')
@@ -1464,7 +1306,7 @@ describe('deploy', () => {
       'no catalog publication'
     )
     expect(calls).toEqual([])
-    await importReviewedCatalog(target, 'production', { paths, report: fixtureReport() })
+    publish(database)
     await deployWorker(target, 'production', runner, entrypoint)
     expect(calls).toEqual([
       ['pnpm', '--filter', 'web', 'exec', 'opennextjs-cloudflare', 'deploy', '--env', 'production']
@@ -1482,9 +1324,13 @@ describe('release arguments', () => {
       command: 'bookmark',
       environment: 'production'
     })
-    expect(parseReleaseArguments(['import', 'production', '--rehearse', '/tmp/r'])).toMatchObject({
+    expect(parseReleaseArguments(['migrate', 'production', '--rehearse', '/tmp/r'])).toMatchObject({
       rehearse: '/tmp/r'
     })
+    // The one-time bootstrap commands are archived with the v1 import (#315).
+    for (const command of ['import', 'verify-import']) {
+      expect(() => parseReleaseArguments([command, 'production'])).toThrow('command must be')
+    }
     expect(parseReleaseArguments(['list-migrations', 'production'])).toEqual({
       command: 'list-migrations',
       environment: 'production'
@@ -1497,7 +1343,7 @@ describe('release arguments', () => {
       parseReleaseArguments(['migrate', 'production', '--output', '/tmp/b.sql'])
     ).toThrow('Usage')
     expect(() => parseReleaseArguments(['migrate', 'staging', '--site', 'x'])).toThrow('Usage')
-    expect(() => parseReleaseArguments(['import', 'production', '--rehearse', 'rel'])).toThrow(
+    expect(() => parseReleaseArguments(['migrate', 'production', '--rehearse', 'rel'])).toThrow(
       'absolute'
     )
     for (const command of ['deploy', 'bookmark']) {

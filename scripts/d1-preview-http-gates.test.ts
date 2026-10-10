@@ -1,8 +1,9 @@
+import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { stringify } from 'yaml'
+import { parse, stringify } from 'yaml'
 import type { AccessEnv } from '../apps/web/src/lib/auth/cloudflare-access'
 import { accessConfig } from '../apps/web/src/lib/auth/cloudflare-access'
 import {
@@ -18,11 +19,13 @@ import {
 import {
   adminLockStatusesFromConfig,
   allowedAdminLockStatuses,
+  canonicalHostRedirectConfigured,
   deployedWorkerVersion,
   expectedAdminLockStatus,
   expectedWorkerVersionFromEnvironment,
   type GateClock,
   type HttpGateOptions,
+  httpGateSamples,
   retiredCategorySlugs,
   runHttpGates,
   waitForWorkerVersion
@@ -34,23 +37,25 @@ const origin = 'https://best.serp.co'
 /** Production gates go through the production Worker's platform host, never best.serp.co. */
 const platformOrigin = 'https://best-serp-co-production.serpcompany.workers.dev'
 const stagingOrigin = 'https://best-serp-co-staging.example.test'
+/** Staging's canonical host (#323) and the platform host its gates go through. */
+const stagingCanonicalOrigin = 'https://staging.best.serp.co'
+const stagingPlatformOrigin = 'https://best-serp-co-staging.serpcompany.workers.dev'
 const slug = 'example-product'
 const category = 'seo-tools'
+const samples = { categories: [category], listing: slug }
 const fixtureDirectory = mkdtempSync(join(tmpdir(), 'best-serp-co-http-gates-'))
-const parityReportPath = join(fixtureDirectory, 'parity.yaml')
-writeFileSync(
-  parityReportPath,
-  stringify({
-    parity: { categories: [{ slug: category }], exactSlugSet: [slug] },
-    target: { checksum: 'a'.repeat(64) }
-  })
-)
-// Production gates read CANONICAL_HOST_REDIRECT from wrangler.jsonc. These tests pin it to `off`
-// unless they pass their own config, so they don't depend on the checked-in value.
+// Production gates, and staging gates on staging's platform host, read CANONICAL_HOST_REDIRECT
+// from wrangler.jsonc. These tests pin both to `off` unless they pass their own config, so they
+// don't depend on the checked-in values.
 const switchOffConfigPath = join(fixtureDirectory, 'wrangler-switch-off.jsonc')
 writeFileSync(
   switchOffConfigPath,
-  JSON.stringify({ env: { production: { vars: { CANONICAL_HOST_REDIRECT: 'off' } } } })
+  JSON.stringify({
+    env: {
+      production: { vars: { CANONICAL_HOST_REDIRECT: 'off' } },
+      staging: { vars: { CANONICAL_HOST_REDIRECT: 'off' } }
+    }
+  })
 )
 
 // The reviewed manifests the gates read for retired categories (#260): none by default, so the
@@ -67,8 +72,8 @@ function gates(
   options: HttpGateOptions = {}
 ): Promise<void> {
   return runHttpGates(mode, baseUrl, {
-    parityReportPath,
     publicationsDirectory: noPublications,
+    samples,
     timeoutMs,
     wranglerConfigPath: switchOffConfigPath,
     ...options
@@ -173,22 +178,43 @@ describe('environment-specific HTTP gates', () => {
       join(publications, 'retire.yaml'),
       stringify({ operations: [{ action: 'category-unpublish', slug: 'adult' }] })
     )
-    const report = join(fixtureDirectory, 'parity-retired.yaml')
-    writeFileSync(
-      report,
-      stringify({
-        parity: { categories: [{ slug: 'adult' }, { slug: category }], exactSlugSet: [slug] }
-      })
-    )
     const urls = installSuccessfulFetch()
     await gates('staging', stagingOrigin, undefined, {
-      parityReportPath: report,
-      publicationsDirectory: publications
+      publicationsDirectory: publications,
+      samples: { categories: ['adult', category], listing: slug }
     })
     const paths = urls.map(url => url.pathname)
     expect(paths).toContain(`/products/categories/${category}/`)
     expect(paths).not.toContain('/products/categories/adult/')
     expect(retiredCategorySlugs(publications)).toEqual(new Set(['adult']))
+    await expect(
+      gates('staging', stagingOrigin, undefined, {
+        publicationsDirectory: publications,
+        samples: { categories: ['adult'], listing: slug }
+      })
+    ).rejects.toThrow('add a live one to httpGateSamples')
+  })
+
+  it('samples a listing and a category no committed manifest takes off the site (#315)', () => {
+    // Committed manifests only: d1-remote-publisher.test.ts writes temporary ones here.
+    const committed = execFileSync('git', ['ls-files', 'd1/publications'], { encoding: 'utf8' })
+      .split('\n')
+      .filter(path => /\.ya?ml$/u.test(path))
+    expect(committed.length).toBeGreaterThan(0)
+    const retired = new Set<string>()
+    const gone = new Set<string>()
+    for (const path of committed) {
+      const manifest = parse(readFileSync(resolve(path), 'utf8')) as {
+        operations?: Array<{ action?: string; from?: string; slug?: string }>
+      }
+      for (const operation of manifest.operations ?? []) {
+        if (operation.action === 'category-unpublish' && operation.slug) retired.add(operation.slug)
+        if (operation.action === 'listing-unpublish' && operation.slug) gone.add(operation.slug)
+        if (operation.action === 'listing-slug-change' && operation.from) gone.add(operation.from)
+      }
+    }
+    expect(gone.has(httpGateSamples.listing), httpGateSamples.listing).toBe(false)
+    expect(httpGateSamples.categories.filter(slug => !retired.has(slug))).not.toEqual([])
   })
 
   it('keeps Staging isolated from the Production hostname', async () => {
@@ -337,7 +363,10 @@ const googleTagManager =
  */
 function withCrawlPolicy(url: URL, response: Response): Response {
   const headers = new Headers(response.headers)
-  headers.set(SITE_ENVIRONMENT_HEADER, url.origin === stagingOrigin ? 'staging' : 'production')
+  headers.set(
+    SITE_ENVIRONMENT_HEADER,
+    url.origin === stagingOrigin || url.origin === stagingPlatformOrigin ? 'staging' : 'production'
+  )
   if (url.origin !== origin) headers.set('x-robots-tag', 'noindex, nofollow')
   if (url.pathname === '/robots.txt')
     return new Response(correctRobotsTxt(url.origin), { status: 200, headers })
@@ -509,7 +538,8 @@ describe('environment-specific crawl policy gates', () => {
   it.each([
     ['production', origin, 'staging', 'production'],
     ['production', origin, null, 'production'],
-    ['staging', 'https://best-serp-co-staging.serpcompany.workers.dev', 'production', 'staging'],
+    ['staging', stagingPlatformOrigin, 'production', 'staging'],
+    ['staging', stagingCanonicalOrigin, 'production', 'staging'],
     ['staging', platformOrigin, 'staging', 'production']
   ])(
     'requires %s gates on %s to see the Worker report SITE_ENVIRONMENT %s',
@@ -922,6 +952,157 @@ describe('production canonical-host redirect gate', () => {
   })
 })
 
+// #323: staging mirrors production's host setup on staging.best.serp.co.
+describe('staging canonical-host redirect gate', () => {
+  function wranglerConfig(staging: string, production = 'off'): string {
+    const path = join(fixtureDirectory, `wrangler-staging-${staging}-${production}.jsonc`)
+    writeFileSync(
+      path,
+      JSON.stringify({
+        env: {
+          production: { vars: { CANONICAL_HOST_REDIRECT: production } },
+          staging: { vars: { CANONICAL_HOST_REDIRECT: staging } }
+        }
+      })
+    )
+    return path
+  }
+
+  const withSwitch = (staging: string, production?: string) => ({
+    wranglerConfigPath: wranglerConfig(staging, production)
+  })
+
+  /**
+   * The staging Worker on its platform host. With `redirecting`, a request without the smoke
+   * header gets a 308 to `location(url)`, as with staging's CANONICAL_HOST_REDIRECT=on.
+   */
+  function stubStagingPlatform(
+    redirecting: boolean,
+    location = (url: URL) => `${stagingCanonicalOrigin}${url.pathname}/${url.search}`
+  ) {
+    const requests: Array<{ smoke: boolean; url: URL }> = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = new URL(String(input))
+        const smoke = new Headers(init?.headers).has(SMOKE_TEST_HEADER)
+        requests.push({ smoke, url })
+        if (redirecting && !smoke && url.origin === stagingPlatformOrigin)
+          return new Response(null, { status: 308, headers: { location: location(url) } })
+        return withCrawlPolicy(url, successfulResponse(url))
+      })
+    )
+    return requests
+  }
+
+  it.each([stagingCanonicalOrigin, stagingPlatformOrigin])(
+    'gates staging given %s through its platform host, and checks the 308 to staging.best.serp.co',
+    async given => {
+      const requests = stubStagingPlatform(true)
+      await expect(gates('staging', given, undefined, withSwitch('on'))).resolves.toBeUndefined()
+      expect(requests.every(request => request.url.origin === stagingPlatformOrigin)).toBe(true)
+      expect(requests.filter(request => !request.smoke).map(request => request.url.href)).toEqual([
+        `${stagingPlatformOrigin}/about?gate=canonical-host`
+      ])
+    }
+  )
+
+  it('requires one 308 to the same URL on staging.best.serp.co, not best.serp.co', async () => {
+    stubStagingPlatform(true, url => `${origin}${url.pathname}/${url.search}`)
+    await expect(
+      gates('staging', stagingCanonicalOrigin, undefined, withSwitch('on'))
+    ).rejects.toThrow(
+      `staging platform host best-serp-co-staging.serpcompany.workers.dev/about without the smoke-test header returned 308 ${origin}/about/?gate=canonical-host, not a 308 to ${stagingCanonicalOrigin}/about/?gate=canonical-host`
+    )
+    // The switch on in the config but not in the deployed Worker: only the slash rule answers.
+    stubStagingPlatform(false)
+    await expect(
+      gates('staging', stagingCanonicalOrigin, undefined, withSwitch('on'))
+    ).rejects.toThrow(`returned 308 /about/, not a 308 to ${stagingCanonicalOrigin}/about/`)
+  })
+
+  it('requires the staging platform host to serve requests while its switch is off', async () => {
+    const off = stubStagingPlatform(false)
+    await expect(
+      gates('staging', stagingCanonicalOrigin, undefined, withSwitch('off'))
+    ).resolves.toBeUndefined()
+    expect(off.filter(request => !request.smoke).map(request => request.url.href)).toEqual([
+      `${stagingPlatformOrigin}/`
+    ])
+    stubStagingPlatform(true)
+    await expect(
+      gates('staging', stagingCanonicalOrigin, undefined, withSwitch('off'))
+    ).rejects.toThrow('this origin must not redirect')
+  })
+
+  it("reads staging's switch only for staging's platform host, never production's", async () => {
+    expect(canonicalHostRedirectConfigured(wranglerConfig('on', 'off'), 'staging')).toBe(true)
+    expect(canonicalHostRedirectConfigured(wranglerConfig('on', 'off'))).toBe(false)
+    expect(() => canonicalHostRedirectConfigured(wranglerConfig('yes'), 'staging')).toThrowError(
+      /env\.staging\.vars\.CANONICAL_HOST_REDIRECT must be on or off/u
+    )
+    // Deploy Production's pre-cutover run (staging gates on the production platform host) and
+    // any other staging origin still require `/` to be served, whatever staging's switch says.
+    for (const given of [platformOrigin, stagingOrigin]) {
+      const requests = stubStagingPlatform(true)
+      await expect(gates('staging', given, undefined, withSwitch('yes'))).resolves.toBeUndefined()
+      expect(requests.filter(request => !request.smoke).map(request => request.url.href)).toEqual([
+        `${given}/`
+      ])
+    }
+    // Production's gates never read staging's switch.
+    stubCrawlPolicy((_url, response) => response)
+    await expect(
+      gates('production', origin, undefined, withSwitch('yes', 'off'))
+    ).resolves.toBeUndefined()
+  })
+
+  it('retries a 308 check answered by the previous Worker version, like production', async () => {
+    const deployed = '0a1b2c3d-0000-4000-8000-00000000d0d0'
+    const previous = '0a1b2c3d-0000-4000-8000-0000000000aa'
+    let hostChecks = 0
+    let now = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = new URL(String(input))
+        const smoke = new Headers(init?.headers).has(SMOKE_TEST_HEADER)
+        if (smoke)
+          return withHeader(
+            withCrawlPolicy(url, successfulResponse(url)),
+            WORKER_VERSION_HEADER,
+            deployed
+          )
+        hostChecks += 1
+        // The previous deployment, without the switch, still answers the first check.
+        if (hostChecks === 1) return withHeader(new Response('ok'), WORKER_VERSION_HEADER, previous)
+        return withHeader(
+          new Response(null, {
+            headers: { location: `${stagingCanonicalOrigin}/about/?gate=canonical-host` },
+            status: 308
+          }),
+          WORKER_VERSION_HEADER,
+          deployed
+        )
+      })
+    )
+    await expect(
+      gates('staging', stagingCanonicalOrigin, undefined, {
+        ...withSwitch('on'),
+        clock: {
+          now: () => now,
+          sleep: async ms => {
+            now += ms
+          }
+        },
+        expectedVersion: deployed,
+        versionPollIntervalMs: 1_000
+      })
+    ).resolves.toBeUndefined()
+    expect(hostChecks).toBe(2)
+  })
+})
+
 describe('best.serp.co public policy in the production gates', () => {
   const warnings = () =>
     vi
@@ -1119,7 +1300,7 @@ describe('admin lock gate', () => {
             CF_ACCESS_TEAM_DOMAIN: 'example-team.cloudflareaccess.com'
           }
         },
-        staging: { vars: { CF_ACCESS_REQUIRED: 'on' } }
+        staging: { vars: { CANONICAL_HOST_REDIRECT: 'off', CF_ACCESS_REQUIRED: 'on' } }
       }
     })
   )
@@ -1181,7 +1362,7 @@ describe('admin lock gate', () => {
   })
 
   it('follows CF_ACCESS_REQUIRED on staging', async () => {
-    const staging = 'https://best-serp-co-staging.serpcompany.workers.dev'
+    const staging = stagingPlatformOrigin
     stubCrawlPolicy(adminAnswer(404))
     await expect(gates('staging', staging)).rejects.toThrow(
       'staging admin route /admin/ returned 404, not 401'
@@ -1220,19 +1401,28 @@ describe('Better Auth smoke gates', () => {
 
   it.each([
     ['production', origin, 'https://best.serp.co'],
-    ['staging', stagingOrigin, stagingOrigin]
-  ])('sends %s an empty-email sign-in from its trusted origin', async (mode, baseUrl, expected) => {
-    const requests = installAuthFetch({})
-    await expect(gates(mode, baseUrl)).resolves.toBeUndefined()
-    const signIn = requests.find(request => request.url.pathname === badSignInPath)
-    expect(signIn?.init?.method).toBe('POST')
-    expect(JSON.parse(String(signIn?.init?.body))).toEqual({ email: '', type: 'sign-in' })
-    expect(signIn?.init?.headers).toMatchObject({
-      'content-type': 'application/json',
-      origin: expected
-    })
-    expect(signIn?.init?.redirect).toBe('manual')
-  })
+    ['production', platformOrigin, 'https://best.serp.co'],
+    ['staging', stagingOrigin, stagingOrigin],
+    // #323: through its platform host, staging's trusted origin is staging.best.serp.co.
+    ['staging', stagingCanonicalOrigin, stagingCanonicalOrigin],
+    ['staging', stagingPlatformOrigin, stagingCanonicalOrigin],
+    // Deploy Production's pre-cutover run keeps its own origin.
+    ['staging', platformOrigin, platformOrigin]
+  ])(
+    'sends %s on %s an empty-email sign-in from its trusted origin',
+    async (mode, baseUrl, expected) => {
+      const requests = installAuthFetch({})
+      await expect(gates(mode, baseUrl)).resolves.toBeUndefined()
+      const signIn = requests.find(request => request.url.pathname === badSignInPath)
+      expect(signIn?.init?.method).toBe('POST')
+      expect(JSON.parse(String(signIn?.init?.body))).toEqual({ email: '', type: 'sign-in' })
+      expect(signIn?.init?.headers).toMatchObject({
+        'content-type': 'application/json',
+        origin: expected
+      })
+      expect(signIn?.init?.redirect).toBe('manual')
+    }
+  )
 
   it.each([
     [

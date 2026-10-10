@@ -29,7 +29,7 @@ import { ProductLogo, ToneAlert } from './submit-ui'
 
 /**
  * The paid checkout screens (#68; #70 screen 4, approved copy in
- * docs/mockups/submissions/COPY.md, with the payment provider never named: owner decision on
+ * .archive/mockups/submissions/COPY.md, with the payment provider never named: owner decision on
  * #70): the handoff to checkout (4a), and the return states:
  * confirming (4c), live and in review (4d), checks failed (4e), cancelled (4f), and failed (4g).
  * The checkout itself opens from `startHref`, a route that opens (or reuses) the provider's

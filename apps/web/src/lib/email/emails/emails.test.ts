@@ -231,9 +231,7 @@ You're getting this because this address was entered at best.serp.co/login.`)
       'You’re getting this because this address was entered at best.serp.co/login.'
     )
     const staging = render('sign-in-code', 0, 'staging')
-    expect(staging.text).toContain(
-      'Enter this code on best-serp-co-staging.serpcompany.workers.dev to sign in'
-    )
+    expect(staging.text).toContain('Enter this code on staging.best.serp.co to sign in')
   })
 
   it('states the lifetime Better Auth gives it, and refuses codes of another length', () => {
@@ -384,7 +382,7 @@ You're getting this because you have an account on best.serp.co.`)
     expect(email.html).toContain('<b>https://best.serp.co/products/quillmate.app/</b>')
     expect(linksTo(email.html, 'https://best.serp.co/products/quillmate.app/')).toBe(true)
     expect(render('listing-approved', 0, 'staging').html).toContain(
-      'Your listing is published at best-serp-co-staging.serpcompany.workers.dev/products/quillmate.app/'
+      'Your listing is published at staging.best.serp.co/products/quillmate.app/'
     )
   })
 

@@ -43,7 +43,7 @@ from `apps/web/src/lib/site` (`email.from`, `email.dashboardPath`, `email.adminD
 | From | (logged as `noreply@mail.serp.co`) | `noreply@mail.serp.co` | `noreply@mail.serp.co` |
 | Recipients | anyone (logged only) | only `EMAIL_STAGING_ALLOWLIST` | anyone |
 | Subject | as rendered | `[staging] ` + subject | as rendered |
-| Link origin | `http://localhost:8787` | `https://best-serp-co-staging.serpcompany.workers.dev` | `https://best.serp.co` |
+| Link origin | `http://localhost:8787` | `https://staging.best.serp.co` | `https://best.serp.co` |
 
 Configuration, per deployed environment:
 

@@ -79,7 +79,7 @@ async function sha256Hex(value: string): Promise<string> {
  * A single-category listing's related candidates are read from its category's members
  * when the category is at most this large; larger (dense) categories walk the name index
  * instead, which finds four members after a handful of rows. Both plans return the same
- * rows; this only picks the cheaper one (see DATA_MODEL.md).
+ * rows; this only picks the cheaper one (see `relatedListings`).
  */
 const RELATED_MEMBER_SCAN_LIMIT = 128
 const runtimePriorities = new Set(['high', 'medium', 'low'])
@@ -183,8 +183,13 @@ function finiteMetric(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
+/** Published and active, at any publication time (no `asOf` binding). */
+function publishedSql(alias = 'l'): string {
+  return `${alias}.status = 'approved' AND ${alias}.is_active = 1 AND ${alias}.published_at IS NOT NULL`
+}
+
 function publicEligibilitySql(alias = 'l'): string {
-  return `${alias}.status = 'approved' AND ${alias}.is_active = 1 AND ${alias}.published_at IS NOT NULL AND ${alias}.published_at <= ?`
+  return `${publishedSql(alias)} AND ${alias}.published_at <= ?`
 }
 
 const summaryColumns = `
@@ -810,16 +815,19 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
     const branches = isPrevious
       ? [
           {
+            asOfBound: true,
             bindings: [current.published_at, current.display_order, current.slug],
             order: 'l.slug DESC',
             predicate: 'l.published_at = ? AND l.display_order = ? AND l.slug < ?'
           },
           {
+            asOfBound: true,
             bindings: [current.published_at, current.display_order],
             order: 'l.display_order DESC, l.slug DESC',
             predicate: 'l.published_at = ? AND l.display_order < ?'
           },
           {
+            asOfBound: true,
             bindings: [current.published_at],
             order: 'l.published_at ASC, l.display_order DESC, l.slug DESC',
             predicate: 'l.published_at > ?'
@@ -827,16 +835,22 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
         ]
       : [
           {
+            asOfBound: true,
             bindings: [current.published_at, current.display_order, current.slug],
             order: 'l.slug ASC',
             predicate: 'l.published_at = ? AND l.display_order = ? AND l.slug > ?'
           },
           {
+            asOfBound: true,
             bindings: [current.published_at, current.display_order],
             order: 'l.display_order ASC, l.slug ASC',
             predicate: 'l.published_at = ? AND l.display_order > ?'
           },
           {
+            // Published before the current listing, which is public at `asOf`, so already
+            // public too. A second upper bound (`<= asOf`) would let SQLite seek on that one
+            // and walk every newer listing first: 3,425 rows for the oldest listing (#314).
+            asOfBound: false,
             bindings: [current.published_at],
             order: PUBLICATION_ORDER,
             predicate: 'l.published_at < ?'
@@ -863,7 +877,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
             branch => `(
           SELECT l.id
           FROM listings l
-          WHERE ${publicEligibilitySql()} AND ${branch.predicate}
+          WHERE ${branch.asOfBound ? publicEligibilitySql() : publishedSql()} AND ${branch.predicate}
           ORDER BY ${branch.order}
           LIMIT 1
         )`
@@ -871,7 +885,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
           .join(',\n        ')}
       )
       LIMIT 1`,
-        branches.flatMap(branch => [asOf, ...branch.bindings])
+        branches.flatMap(branch => [...(branch.asOfBound ? [asOf] : []), ...branch.bindings])
       )
     )
     return mapNavigation(rows[0])

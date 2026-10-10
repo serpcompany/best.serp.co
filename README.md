@@ -13,27 +13,33 @@ The catalog was imported once from the JSON `serp.co` site in
 `serpcompany/json-directory-template@25e2a8d` (serpcompany/best.serp.co#34). D1 is now
 the source of truth.
 
+## Picking up work
+
+Planning lives in GitHub Issues. To resume where the last person or agent stopped, open the
+[current handoff](https://github.com/serpcompany/best.serp.co/issues?q=is%3Aissue%20is%3Aopen%20label%3Ahandoff),
+the one open issue labelled `handoff`, which is also pinned on the Issues tab. It holds the
+status of the work in flight, the rules for continuing it, and a prompt to start an agent on it.
+
 ## Local development
 
-Use Node 24 and pnpm. Local D1 is seeded from the committed initial import:
+Use Node 24 and pnpm. Local D1 is seeded with fixtures (fake listings, users, and
+submissions), never real data:
 
 ```bash
 pnpm install
-pnpm db:migrate:local
-pnpm db:import:local
-pnpm db:verify:local
+pnpm db:seed:local
 pnpm preview
 ```
 
 `pnpm preview` builds the Worker and serves it on http://localhost:8787 against the local
-D1 database. It cannot reach staging or production resources.
+D1 database. It cannot reach staging or production resources. See
+[Development](./docs/DEVELOPMENT.md#local-data) for what the seed holds.
 
 ## Verification
 
 ```bash
 pnpm harness:fast
 pnpm test:e2e
-pnpm migration:compare -- http://localhost:8787
 ```
 
 Pull requests target `staging`, which deploys the staging Worker. `main` is production: the

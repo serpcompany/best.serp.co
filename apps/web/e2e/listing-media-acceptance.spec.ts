@@ -3,15 +3,16 @@ import { test } from './test'
 
 /**
  * The #95 acceptance check, run by hand against a deployed Worker after its catalog was
- * migrated (docs/MEDIA.md): no page, `og:image`, or JSON-LD names a listing image outside the
- * environment's media host or the fallback tile, and every listing image there answers 200.
+ * migrated (docs/MEDIA_PUBLISHING.md): no page, `og:image`, or JSON-LD names a listing image
+ * outside the environment's media host or the fallback tile, and every listing image there
+ * answers 200.
  *
- *   MEDIA_ACCEPTANCE=1 PLAYWRIGHT_BASE_URL=https://best-serp-co-staging.serpcompany.workers.dev \
+ *   MEDIA_ACCEPTANCE=1 PLAYWRIGHT_BASE_URL=https://staging.best.serp.co \
  *     PLAYWRIGHT_EXTERNAL_SERVER=1 pnpm --filter web exec playwright test \
  *     e2e/listing-media-acceptance.spec.ts --project=chromium
  *
  * The media host follows the base URL (`MEDIA_HOST` overrides it). It never runs in CI or
- * locally, where the catalog is the unmigrated import.
+ * locally, where the catalog is the fixture seed, not the migrated catalog it checks.
  */
 const enabled = process.env.MEDIA_ACCEPTANCE === '1' && Boolean(process.env.PLAYWRIGHT_BASE_URL)
 const fallbackTile = '/listing-logos/favicon-fallback-512x512.png'

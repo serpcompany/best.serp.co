@@ -97,11 +97,7 @@ function requiredScriptEnvironment(script: string): string[] {
 const expression = (value: string) => `\${{ ${value} }}`
 const secret = (name: string) => expression(`secrets.${name}`)
 const credentialsGate = "steps.credentials.outputs.configured == 'true'"
-const productionDispatchWorkflows = [
-  'bootstrap-production-d1.yml',
-  'deploy-production.yml',
-  'publish-d1.yml'
-]
+const productionDispatchWorkflows = ['deploy-production.yml', 'publish-d1.yml']
 /** Media uploads (#95) guard themselves in scripts/media-upload.ts, not cloudflare-release.ts. */
 const mediaUploadWorkflows = {
   'upload-media-staging.yml': 'staging',
@@ -145,8 +141,13 @@ describe('staging deploy job', () => {
     expect(job.if).toBe(
       "github.ref == 'refs/heads/staging' && github.event_name != 'pull_request' && needs.tip.outputs.deploy == 'true'"
     )
+    // The branded canonical host (#323); CI reaches the Worker on its workers.dev host.
     expect(job.environment).toEqual({ name: 'staging', url: project.remote.staging.origin })
-    expect(job.env).toEqual({ STAGING_ORIGIN: project.remote.staging.origin })
+    expect(project.remote.staging.origin).toBe('https://staging.best.serp.co')
+    expect(job.env).toEqual({
+      STAGING_ORIGIN: project.remote.staging.origin,
+      STAGING_REVIEW_ORIGIN: project.remote.staging.reviewOrigin
+    })
     expect(JSON.stringify(job)).not.toMatch(/production/u)
   })
 
@@ -176,8 +177,9 @@ describe('staging deploy job', () => {
     expect(names.indexOf('Record staging D1 Time Travel bookmark')).toBe(
       names.indexOf('Deploy only the staging tip') + 1
     )
+    // The smoke runs on the workers.dev host with the smoke-test header (playwright.config.ts).
     expect(stepRunning(job, 'test:e2e:smoke').env).toEqual({
-      PLAYWRIGHT_BASE_URL: expression('env.STAGING_ORIGIN'),
+      PLAYWRIGHT_BASE_URL: expression('env.STAGING_REVIEW_ORIGIN'),
       PLAYWRIGHT_EXTERNAL_SERVER: '1'
     })
     const evidence = job.steps?.find(step => step.uses === 'actions/upload-artifact@v7')
@@ -332,23 +334,10 @@ describe('production deploy workflow', () => {
 })
 
 describe('production D1 bootstrap workflow', () => {
-  const workflow = loadWorkflow('bootstrap-production-d1.yml')
-  const bootstrap = workflow.jobs.bootstrap as WorkflowJob
-
-  it('imports into empty production D1 and verifies it against the parity report', () => {
-    expect(Object.keys(workflow.on)).toEqual(['workflow_dispatch'])
-    expect(Object.keys(workflow.on.workflow_dispatch?.inputs ?? {})).toEqual(['confirmation'])
-    expect(runs(workflow.jobs.authorize as WorkflowJob).join('\n')).toContain(
-      `"$CONFIRMATION" != "${project.confirmation.bootstrap}"`
-    )
-    expect(environmentName(bootstrap)).toBe('production')
-    expect(runs(bootstrap).slice(1)).toEqual([
-      'pnpm test:d1',
-      'pnpm tsx scripts/cloudflare-release.ts bookmark production',
-      'pnpm tsx scripts/cloudflare-release.ts import production',
-      'pnpm tsx scripts/cloudflare-release.ts verify-import production'
-    ])
-    expect(JSON.stringify(workflow)).not.toMatch(/deploy production|opennextjs-cloudflare/u)
+  it('is archived with the v1 import (#315): production recovers with D1 Time Travel', () => {
+    expect(existsSync(resolve('.github/workflows/bootstrap-production-d1.yml'))).toBe(false)
+    expect(existsSync(resolve('.archive/.github/workflows/bootstrap-production-d1.yml'))).toBe(true)
+    expect(Object.keys(releaseAuthorizations)).not.toContain('bootstrap-production-d1.yml')
   })
 })
 
@@ -357,11 +346,8 @@ describe('staging before production in the workflows', () => {
     ([, authorization]) => authorization.requireVerifiedStaging.length > 0
   )
 
-  it('gates the production deploy and the bootstrap, which both apply migrations', () => {
-    expect(gated.map(([file]) => file)).toEqual([
-      'deploy-production.yml',
-      'bootstrap-production-d1.yml'
-    ])
+  it('gates the production deploy, which applies migrations', () => {
+    expect(gated.map(([file]) => file)).toEqual(['deploy-production.yml'])
   })
 
   it('verifies staging before reviewer approval and again in every gated release step', () => {
@@ -489,9 +475,11 @@ describe('D1 data stays in Cloudflare', () => {
   // This repository is public: any signed-in GitHub user can download a workflow artifact, and
   // fork pull requests can restore caches. A D1 export holds sessions, OAuth tokens, and emails,
   // so no workflow exports D1; recovery is a Time Travel bookmark (#99, docs/D1_RECOVERY.md).
-  // These checks read workflow and script text, not data; RELEASE_GUARDS lists what they miss.
+  // These checks read workflow and script text, not data; docs/CREDENTIAL_GUARDS.md lists what
+  // they miss.
   //
-  // Adding a job that gets CLOUDFLARE_API_TOKEN (RELEASE_GUARDS, "Adding a credentialed job"):
+  // Adding a job that gets CLOUDFLARE_API_TOKEN (docs/CREDENTIAL_GUARDS.md, "Adding a
+  // credentialed job"):
   // 1. add `<file>:<job>` to `credentialedJobs`;
   // 2. put `cloudflare-release.ts bookmark <env>` right before each step that can change D1 and
   //    add `<file>:<job>:<env>` to `bookmarkedChanges` (once per change step);
@@ -502,7 +490,6 @@ describe('D1 data stays in Cloudflare', () => {
 
   /** Every job where some step gets the Cloudflare token: the upload checks cover each one. */
   const credentialedJobs = [
-    'bootstrap-production-d1.yml:bootstrap',
     'deploy-production.yml:release',
     'web.yml:deploy-staging',
     'media-health.yml:check',
@@ -513,7 +500,6 @@ describe('D1 data stays in Cloudflare', () => {
   ]
   /** Every step that can change D1, as `<file>:<job>:<environment>`; each follows a bookmark. */
   const bookmarkedChanges = [
-    'bootstrap-production-d1.yml:bootstrap:production',
     'deploy-production.yml:release:production',
     'web.yml:deploy-staging:staging',
     'publish-d1-staging.yml:publish:staging',
@@ -587,7 +573,7 @@ describe('D1 data stays in Cloudflare', () => {
     },
     {
       id: 'read-only release command',
-      run: /^pnpm tsx scripts\/cloudflare-release\.ts (?:bookmark|plan-release|list-migrations|check-database|verify-import|deploy) (?:staging|production)\n?$/u
+      run: /^pnpm tsx scripts\/cloudflare-release\.ts (?:bookmark|plan-release|list-migrations|check-database|deploy) (?:staging|production)\n?$/u
     },
     {
       // The listing media uploads (#95): `scripts/media-upload.ts` reads and writes R2 objects
@@ -644,6 +630,7 @@ describe('D1 data stays in Cloudflare', () => {
     RELEASE_CONFIRM: expression('inputs.confirmation'),
     // Deploy Staging's job env, and where the Worker deploy records its version.
     STAGING_ORIGIN: project.remote.staging.origin,
+    STAGING_REVIEW_ORIGIN: project.remote.staging.reviewOrigin,
     WRANGLER_OUTPUT_FILE_PATH: `${expression('runner.temp')}/wrangler-output.ndjson`
   }
   const onlyExemptEnvironment = (env: unknown) =>
@@ -1082,7 +1069,7 @@ describe('D1 data stays in Cloudflare', () => {
             env: token,
             run: 'if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then\n  echo "::error::Missing secrets."\n  exit 1\nfi\n'
           },
-          { env: token, run: 'pnpm tsx scripts/cloudflare-release.ts verify-import production' },
+          { env: token, run: 'pnpm tsx scripts/cloudflare-release.ts check-database production' },
           { env: token, run: 'pnpm tsx scripts/cloudflare-release.ts deploy production' }
         ])
       ]
@@ -1635,7 +1622,6 @@ describe('protected deployment boundaries', () => {
     // the whole workflow let a mistyped dispatch replace a valid queued run before `authorize`
     // refused it. A job skipped by a failed `needs` or a false `if` never joins its group.
     const expected: Record<string, Record<string, unknown>> = {
-      'bootstrap-production-d1.yml': { bootstrap: productionGroup },
       'deploy-production.yml': { release: productionGroup },
       'web.yml': {
         'deploy-staging': {

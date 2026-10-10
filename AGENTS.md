@@ -28,10 +28,9 @@ Cloudflare backed by one D1 database per environment. D1 is the only catalog sto
 - `apps/web/drizzle/`: forward-only migration history applied by Wrangler.
 - `d1/publications/`: reviewed catalog mutation manifests (staging first, then production).
 - `d1/media/`: reviewed listing media upload plans (keys and sources; no image files).
-- `d1/artifacts/`: one-time JSON import; the parity report and the brotli-compressed
-  SQL are committed, the uncompressed SQL and batches are generated.
-- `scripts/project.ts`: the single deployment target (app, local D1, artifacts).
-- `scripts/migration/`: the one-time json-directory-template → D1 import and page parity.
+- `scripts/project.ts`: the single deployment target (app, local D1, remote identities).
+- `.archive/`: history, never built or run: the retired v1 catalog import, its tooling, and the
+  production D1 bootstrap (#315).
 - `scripts/harness/`: deterministic agent feedback and runtime tooling.
 - `docs/`: operating procedures.
 
@@ -40,8 +39,8 @@ Closer `AGENTS.md` files add local rules without replacing this contract.
 ## Primary commands
 
 - `pnpm preview`: build and serve the Worker against local D1 (`pnpm dev` is `next dev`).
-- `pnpm db:migrate:local`, `pnpm db:import:local`, `pnpm db:verify:local`: prepare
-  local D1 from the committed import (see [Development](./docs/DEVELOPMENT.md)).
+- `pnpm db:seed:local`: reset local D1 and seed fixtures (fake listings, users, submissions);
+  `pnpm db:verify:local` checks them ([Development](./docs/DEVELOPMENT.md#local-data)).
 - `pnpm db:generate`: generate a reviewed migration from the Drizzle schema.
 - `pnpm db:migrations:list:{local,staging,production}`: read-only migration status.
   `pnpm db:migrate:{staging,production}` runs only inside the protected deploy workflows,
@@ -51,7 +50,6 @@ Closer `AGENTS.md` files add local rules without replacing this contract.
 - `pnpm cf-typegen`: regenerate `apps/web/cloudflare-env.d.ts` after a Wrangler change.
 - `pnpm test` (all Vitest projects), `pnpm test:e2e` (Playwright on a local Worker); while
   editing, `pnpm exec vitest related --run <files>`.
-- `pnpm migration:compare -- <origin>`: structural page parity against best.serp.co.
 - `pnpm agent:manifest`, `pnpm agent:doctor`, `pnpm agent:dev`: machine-readable
   runtime identity, prerequisite diagnostics, and a logged isolated Worker preview.
 - `pnpm worktree:new -- <name>` / `pnpm worktree:destroy -- <name>`: isolated
@@ -61,7 +59,8 @@ Closer `AGENTS.md` files add local rules without replacing this contract.
 
 Stage: ship
 
-GitHub Issues on `serpcompany/best.serp.co` are the source of truth for planning.
+GitHub Issues on `serpcompany/best.serp.co` are the source of truth for planning. To resume
+work, start from the open issue labelled `handoff` (`gh issue list --label handoff`).
 `staging` is the base branch: branch from `origin/staging` as `issue-<n>-<slug>` and open
 pull requests into `staging` (`gh pr create --base staging`); each merge deploys staging.
 `main` is production and changes only by a fast-forward promotion (`pnpm release:promote`,
@@ -85,8 +84,8 @@ Issues and labels never grant production, database, or deployment authority.
   with `pnpm db:generate`; `drizzle-kit push` is forbidden. Triggers, FTS5 and `STRICT` tables
   go through `drizzle-kit generate --custom`, never hand edits to a generated migration.
 - No catalog JSON/YAML/CSV runtime, generated browser search index, filesystem fallback,
-  static export, or GitHub Pages deploy path. The legacy `products.json` is an import input
-  read from an external checkout, never an application input.
+  static export, or GitHub Pages deploy path. The legacy `products.json` was the one-time
+  import's input (archived), never an application input.
 - Keep search, taxonomy, RSS, sitemap, and submission options derived from D1.
 - Public URLs are part of the SEO contract: `/products/<slug>/`,
   `/products/categories/<category>/`. Changing a route requires permanent redirects.

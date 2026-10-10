@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
   checkDocumentation,
   DOC_LINE_ALLOWANCES,
+  isMaintainedFile,
   markdownAnchors,
   validateDocumentationBudgets,
   validateDocumentNames,
@@ -15,6 +16,12 @@ import { stepsForProfile } from './harness/runner.ts'
 describe('repository harness contract', () => {
   it('keeps documentation, indexes, skills, links, and commands healthy', () => {
     expect(checkDocumentation(resolve('.'))).toEqual([])
+  })
+
+  it('leaves .archive/ out of the documentation checks: it keeps history as it was', () => {
+    expect(isMaintainedFile('.archive/releases/2026-10-06-promotion-plan.md')).toBe(false)
+    expect(isMaintainedFile('docs/HARNESS.md')).toBe(true)
+    expect(isMaintainedFile('apps/web/docs/agents/web.md')).toBe(true)
   })
 
   it('names every doc and folder under docs/ in kebab-case (#190)', () => {

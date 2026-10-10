@@ -50,7 +50,7 @@ import { ProductLogo } from './product-cell'
 import { PlanBadge, StatusBadge } from './status-badge'
 
 /**
- * Orders (#68; #70 screen 13, approved copy in docs/mockups/submissions/COPY.md): tabs with
+ * Orders (#68; #70 screen 13, approved copy in .archive/mockups/submissions/COPY.md): tabs with
  * counts, a filter, the table (order, date, customer, kind, item, amount, status with its
  * note, the payment reference), the row menu, and the refund dialogs. Opening "Refund…" checks
  * the listing's badge at refund first, so the dialog says what the refund will do: a passing

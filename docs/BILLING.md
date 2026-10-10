@@ -59,7 +59,7 @@ asked of Stripe, then finalized (`refunded`), so a racing fulfilment can never a
 payment nor a refund undo an applied one. Provider calls carry idempotency keys
 (`checkout:<order>`, `refund:<order>`).
 
-- **Screens** (#70 screen 4, copy from `docs/mockups/submissions/COPY.md`): the handoff
+- **Screens** (#70 screen 4, copy from `.archive/mockups/submissions/COPY.md`): the handoff
   `/submit/<id>/checkout/` (4a; the choose and badge steps' "$49" links and the draft reminder's
   "Complete checkout" open it, and it moves on to the checkout by itself); the return
   `/submit/<id>/checkout/return/?order=<id>` (4c confirming, refreshing until settled; 4d live
@@ -153,7 +153,8 @@ key needs write access to Checkout Sessions and Refunds, and read access to Prod
 included; Stripe does not follow redirects):
 
 - `https://best.serp.co/api/billing/webhook/` (live mode)
-- the staging Worker's origin + `/api/billing/webhook/` (test mode)
+- `https://staging.best.serp.co/api/billing/webhook/` (test mode; staging's canonical host
+  since #323, whose workers.dev host 308s there)
 
 ### Prices and promotion codes
 

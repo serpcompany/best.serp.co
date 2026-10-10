@@ -2,9 +2,9 @@
 
 Promote `staging` at `81aa4a49c7` (#107) or newer to production (best.serp.co). Claims (#67, PR
 #108) and payments (#68) are not merged and ship later. Read-only analysis: nothing here was run
-against Cloudflare. Procedures: [Release guards](../RELEASE_GUARDS.md),
-[Deploy runbook](../DEPLOY_RUNBOOK.md), [Listing media](../MEDIA.md),
-[Catalog hygiene](../CATALOG_HYGIENE.md), [D1 recovery](../D1_RECOVERY.md).
+against Cloudflare. Procedures: [Release guards](../../docs/RELEASE_GUARDS.md),
+[Deploy runbook](../../docs/DEPLOY_RUNBOOK.md), [Listing media](../../docs/MEDIA.md),
+[Catalog hygiene](../../docs/CATALOG_HYGIENE.md), [D1 recovery](../../docs/D1_RECOVERY.md).
 
 **Status: done.** Promotion #121 (`main` `a91842a375`) went live on 2026-10-07 with every
 catalog step in section 6 published on production (publication v11); see the
@@ -95,9 +95,9 @@ media part; hijacked-domains, FAQs, and Adult do not depend on the upload and go
 |---|---|---|
 | `accountDashboard` | `true` (code constant) | `/login`, `/account` (submissions, listings, edit, revisions), submit v2 drafts; emails link there |
 | `listingFaqs` | `true` (#107) | FAQ section on listing pages; account says "Shown on your listing page." |
-| `badgeProgram` | `false`; **`true` since #130** | At promotion: crons ran but returned `{enabled:false}`, and no page or email promised weekly checks. Since #130: the crons check badges ([Badge program](../BADGE_PROGRAM.md)), and the weekly-check copy shows |
-| `claims` | `false`; **`true` since #130** | At promotion: no claim link, and no claim offers in emails. Since #130: "Claim this listing" on every listing without an owner, by the badge (and a payment since #133) ([Claims](../CLAIMS.md)) |
-| `orders` | `false`; **`true` since #133** | At promotion: `/admin/orders/` 404, no paid plan, upgrade, Relist, paid claim, or claim-again offers. Since #133: the $49 paid plan at submit, Upgrade and Relist in the account, paid claims, claim-again and paid offers in emails, admin Orders, and the hourly billing sweep, which needs production's live secrets ([Billing](../BILLING.md#configuration-owner)) |
+| `badgeProgram` | `false`; **`true` since #130** | At promotion: crons ran but returned `{enabled:false}`, and no page or email promised weekly checks. Since #130: the crons check badges ([Badge program](../../docs/BADGE_PROGRAM.md)), and the weekly-check copy shows |
+| `claims` | `false`; **`true` since #130** | At promotion: no claim link, and no claim offers in emails. Since #130: "Claim this listing" on every listing without an owner, by the badge (and a payment since #133) ([Claims](../../docs/CLAIMS.md)) |
+| `orders` | `false`; **`true` since #133** | At promotion: `/admin/orders/` 404, no paid plan, upgrade, Relist, paid claim, or claim-again offers. Since #133: the $49 paid plan at submit, Upgrade and Relist in the account, paid claims, claim-again and paid offers in emails, admin Orders, and the hourly billing sweep, which needs production's live secrets ([Billing](../../docs/BILLING.md#configuration-owner)) |
 | `messages` | `false` | Emails and the claim dialog point to `/contact/` (200) |
 
 #130 turns `badgeProgram` and `claims` on after this promotion, and #133 `orders` (owner
@@ -107,7 +107,7 @@ one shipped and say what changed.
 `site.features.showPaidListings` is `false` (`packages/site-config/src/site.ts:54`), so submit
 offers only the free plan (since #68 the paid plan follows `features.orders` instead). Nothing promises an unbuilt feature (`feature-copy.test.ts`,
 `links.test.ts`). Note: sign-in and submissions open to the public, and `/admin` writes
-production D1 from the Worker ([Admin panel](../ADMIN_PANEL.md)).
+production D1 from the Worker ([Admin panel](../../docs/ADMIN_PANEL.md)).
 
 **FAQs before the #105 manifest:** `faqsToShow()` hides an FAQ whose `### <question>` heading
 the description still holds after its last `## FAQ` line
@@ -127,7 +127,7 @@ never show FAQs twice. The manifest removes those blocks; the net is then a no-o
 | Item | Code requires | Status |
 |---|---|---|
 | `BETTER_AUTH_SECRET` | Worker secret, ≥ 32 chars, else `/api/auth/*` 503 | Owner set it on both Workers (issue #60 comment, 2026-10-05). **Owner check:** `pnpm exec wrangler secret list --env production --config apps/web/wrangler.jsonc` |
-| `USESEND_API_KEY` | Worker secret, else email disabled and logged | Done per [Email](../EMAIL.md#owner-prerequisites) step 1. **Owner check:** the production key is restricted to `mail.serp.co` (only staging's is confirmed) |
+| `USESEND_API_KEY` | Worker secret, else email disabled and logged | Done per [Email](../../docs/EMAIL.md#owner-prerequisites) step 1. **Owner check:** the production key is restricted to `mail.serp.co` (only staging's is confirmed) |
 | Sending domain | `noreply@mail.serp.co` | **Owner check:** EMAIL.md steps 3–4 (domain verified, DKIM and DMARC pass) are not marked done |
 | Access on `/admin` | `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD` vars | Verified: best.serp.co/admin/ answers 302 to `serpcompany.cloudflareaccess.com` with the AUD in `wrangler.jsonc:90` |
 | `MEDIA` → `cdn` | binding, `MEDIA_BASE_URL=https://cdn.serp.co` | In `wrangler.jsonc:112-117`; cdn.serp.co answers 404 for an absent key; code writes only `best.serp.co/` keys |
@@ -160,15 +160,15 @@ pnpm exec wrangler d1 execute best-serp-co-staging --env staging --remote --json
 `hosted_rows` above 0 means admin logo edits: those listings will refuse their media part. A
 row-level manifest needs regeneration only if staging refuses it (it writes nothing):
 media via `--current <dir> --manifest-id 2026-10-07-legacy-media`
-([recovery](../MEDIA.md#recovering-a-refused-media-manifest)); FAQs via
+([recovery](../../docs/MEDIA_PUBLISHING.md#recovering-a-refused-media-manifest)); FAQs via
 `pnpm catalog:faqs -- manifest --skip <slug> --manifest-id 2026-10-07-listing-faqs-staging`.
 Production then publishes exactly the manifests staging published.
 
 ## 7. Runbook
 
 Agents prepare PRs and run read-only checks; the owner dispatches every workflow, staging
-included ([Release guards](../RELEASE_GUARDS.md#security-boundary), MEDIA.md). Each publish
-writes its Time Travel bookmark and restore command to the run summary: record it.
+included ([Credential guards](../../docs/CREDENTIAL_GUARDS.md#security-boundary), MEDIA_PUBLISHING.md). Each
+publish writes its Time Travel bookmark and restore command to the run summary: record it.
 
 ### a. Staging
 
@@ -217,8 +217,8 @@ writes its Time Travel bookmark and restore command to the run summary: record i
 | Step | Rollback (owner) |
 |---|---|
 | S1, P3 upload | Nothing to undo: objects are unreferenced until a manifest names them |
-| S2, P4, P5 publish | Fix forward in `/admin` (Republish) or `wrangler d1 time-travel restore <db> --env <env> --config apps/web/wrangler.jsonc --bookmark <run bookmark>` ([restore](../D1_RECOVERY.md#restore)); a restore loses every later write |
-| P2 deploy | Worker first: `pnpm exec wrangler rollback 59ce19ef-d561-4e0f-b654-52bbb55e5e12 --env production --config apps/web/wrangler.jsonc`, then D1 to the deploy run's first-attempt bookmark, and do not re-release `main` until a fix is promoted ([bad migration](../D1_RECOVERY.md#undo-a-bad-migration)) |
+| S2, P4, P5 publish | Fix forward in `/admin` (Republish) or `wrangler d1 time-travel restore <db> --env <env> --config apps/web/wrangler.jsonc --bookmark <run bookmark>` ([restore](../../docs/D1_RECOVERY.md#restore)); a restore loses every later write |
+| P2 deploy | Worker first: `pnpm exec wrangler rollback 59ce19ef-d561-4e0f-b654-52bbb55e5e12 --env production --config apps/web/wrangler.jsonc`, then D1 to the deploy run's first-attempt bookmark, and do not re-release `main` until a fix is promoted ([bad migration](../../docs/D1_RECOVERY.md#undo-a-bad-migration)) |
 
 The old Worker reads `listing_media.url`, so after media publishes it hotlinks the recorded
 sources as today; it shows unpublished listings as 404 instead of 410, and after the FAQ trim it
@@ -235,4 +235,4 @@ shows no FAQs (it has no FAQ section).
   queries and dry runs, the S3 and P6 acceptance checks, and the post-publish cleanup PR
   (#124: deleted `apps/web/public/listing-logos/serpdownloaders.com/`, `listing-media-seed/`, and
   `media/products/launchbuzz.io/` after read-only queries found every production and staging
-  row hosted; MEDIA.md [Legacy migration](../MEDIA.md#legacy-migration)).
+  row hosted; MEDIA_PUBLISHING.md [Legacy migration](../../docs/MEDIA_PUBLISHING.md#legacy-migration)).

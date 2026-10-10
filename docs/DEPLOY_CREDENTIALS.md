@@ -15,14 +15,15 @@ account permissions:
 
 | Account permission | Used by |
 |---|---|
-| D1 → Edit | `wrangler d1 migrations apply`, `d1 execute` (bootstrap import, read-only checks), `d1 time-travel info` bookmarks, and the D1 query API used by the publisher |
+| D1 → Edit | `wrangler d1 migrations apply`, `d1 execute` (read-only checks), `d1 time-travel info` bookmarks, and the D1 query API used by the publisher |
 | Workers Scripts → Edit | `opennextjs-cloudflare deploy`: Worker upload, static assets, the workers.dev setting, observability |
 | Account Settings → Read | Wrangler account lookups during deploy |
 | Workers R2 Storage → Edit | the `MEDIA` bucket binding and listing media uploads |
 
-No zone permission is needed while the Custom Domain is attached in the dashboard. Add Zone →
-Workers Routes → Edit (zone `serp.co`) only if routes or the Custom Domain move to
-`wrangler.jsonc` (proposed in #192).
+Plus one zone permission, Zone → Workers Routes → Edit on `serp.co` (granted 2026-10-09):
+Deploy Staging attaches `staging.best.serp.co`, declared in `env.staging.routes` of
+`wrangler.jsonc` (#323), as the staging Worker's Custom Domain, and production's best.serp.co
+moves there with #192 (until then it is attached in the dashboard).
 
 Cloudflare's current Workers roles map Workers Scripts → Edit to Workers **Editor**, which
 cannot create a Worker. The first production deploy created `best-serp-co-production` with
@@ -41,7 +42,7 @@ Each holds two environment secrets:
 - `CLOUDFLARE_API_TOKEN`: today, **both environments hold the same account-wide token**, with
   Edit on every Worker, D1 database, and R2 bucket (serp.co's `cdn` too). A leak from either
   environment therefore reaches staging and production alike
-  ([Security boundary](./RELEASE_GUARDS.md#security-boundary)).
+  ([Security boundary](./CREDENTIAL_GUARDS.md#security-boundary)).
 
 The planned fix, an owner decision (decision b in #42) due now that the cutover is complete
 (#310), gives each environment its own token, scoped to its Worker, D1 database, and R2 bucket (production's
@@ -52,7 +53,7 @@ The weekly media check uses a third environment, `production-media-health`, whos
 reads D1 and R2 ([Media health](./MEDIA_HEALTH.md#weekly-workflow)).
 
 Without the `staging` secrets, `web.yml`'s `deploy-staging` finishes green with a "Staging
-deploy skipped" notice, and that run verifies nothing for production. The release, bootstrap,
+deploy skipped" notice, and that run verifies nothing for production. The release,
 publication, and upload workflows fail at their credentials step instead. The
 `BETTER_AUTH_SECRET` secret and the `/admin` Access
 app: [Accounts](./ACCOUNTS.md). Error reporting (Sentry) and analytics (GTM, Cloudflare Web
