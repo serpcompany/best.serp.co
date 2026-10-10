@@ -53,8 +53,7 @@ Closer `AGENTS.md` files add local rules without replacing this contract.
   editing, `pnpm exec vitest related --run <files>`.
 - `pnpm agent:manifest`, `pnpm agent:doctor`, `pnpm agent:dev`: machine-readable
   runtime identity, prerequisite diagnostics, and a logged isolated Worker preview.
-- `pnpm worktree:new -- <name>` / `pnpm worktree:destroy -- <name>`: isolated
-  worktrees with their own D1 state and port.
+- `pnpm worktree:new -- <name>` / `pnpm worktree:destroy -- <name>`: isolated worktree, D1 and port.
 
 ## Planning and implementation
 
@@ -107,6 +106,7 @@ Deliberate differences from serp's `web-stack/` standard; change one only throug
   (`apps/web/src/lib/environment/request-environment.ts`), so nothing per-environment is
   prerendered. Staging's password skips smoke tests, robots.txt, the webhook and static files.
 - `orders.currency` keeps its `GLOB` CHECK: replacing it rebuilds a referenced table.
+- Worker Sentry runs only on signed-in and operational surfaces; public pages log errors (#355).
 - The Stripe webhook is `/api/billing/webhook/` behind a provider-neutral `BillingProvider`
   with no Stripe SDK, until the payments audit (#156) decides. Brand icons use
   `@icons-pack/react-simple-icons` because lucide has no brand icons.
