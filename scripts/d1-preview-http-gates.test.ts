@@ -80,6 +80,41 @@ function gates(
   })
 }
 
+interface SampleOperation {
+  action?: string
+  from?: string
+  listing?: { categories?: string[]; slug?: string }
+  remove?: string[]
+  slug?: string
+  to?: string
+}
+type SampleManifest = { operations?: SampleOperation[] } | null
+
+/**
+ * What manifests do to the gates' samples: the categories they retire, the listing slugs they
+ * take off the site, and the sample categories they detach from the sample listing, with a
+ * `listing-categories-remove` or a `listing-update` whose categories leave one out (#320).
+ */
+function sampleChanges(
+  manifests: readonly SampleManifest[],
+  { categories, listing }: { categories: readonly string[]; listing: string }
+): { detached: Set<string>; gone: Set<string>; retired: Set<string> } {
+  const detached = new Set<string>()
+  const gone = new Set<string>()
+  const retired = new Set<string>()
+  for (const operation of manifests.flatMap(manifest => manifest?.operations ?? [])) {
+    if (operation.action === 'category-unpublish' && operation.slug) retired.add(operation.slug)
+    if (operation.action === 'listing-unpublish' && operation.slug) gone.add(operation.slug)
+    if (operation.action === 'listing-slug-change' && operation.from) gone.add(operation.from)
+    if (operation.action === 'listing-categories-remove' && operation.slug === listing)
+      for (const removed of operation.remove ?? []) detached.add(removed)
+    if (operation.action === 'listing-update' && operation.listing?.slug === listing)
+      for (const sampled of categories)
+        if (!operation.listing.categories?.includes(sampled)) detached.add(sampled)
+  }
+  return { detached, gone, retired }
+}
+
 /** Requests the trailing-slash gates make, and the canonical redirects they require. */
 const trailingSlashGatePaths = ['/about', '/robots.txt/', '/api/search/']
 const canonicalRedirects: Record<string, string> = {
@@ -201,31 +236,47 @@ describe('environment-specific HTTP gates', () => {
       .split('\n')
       .filter(path => /\.ya?ml$/u.test(path))
     expect(committed.length).toBeGreaterThan(0)
-    const retired = new Set<string>()
-    const gone = new Set<string>()
-    /** Categories a committed manifest takes off the sample listing. */
-    const removedFromListing = new Set<string>()
-    for (const path of committed) {
-      const manifest = parse(readFileSync(resolve(path), 'utf8')) as {
-        operations?: Array<{ action?: string; from?: string; remove?: string[]; slug?: string }>
-      }
-      for (const operation of manifest.operations ?? []) {
-        if (operation.action === 'category-unpublish' && operation.slug) retired.add(operation.slug)
-        if (operation.action === 'listing-unpublish' && operation.slug) gone.add(operation.slug)
-        if (operation.action === 'listing-slug-change' && operation.from) gone.add(operation.from)
-        if (
-          operation.action === 'listing-categories-remove' &&
-          operation.slug === httpGateSamples.listing
-        )
-          for (const category of operation.remove ?? []) removedFromListing.add(category)
-      }
-    }
+    const { detached, gone, retired } = sampleChanges(
+      committed.map(path => parse(readFileSync(resolve(path), 'utf8')) as SampleManifest),
+      httpGateSamples
+    )
     expect(gone.has(httpGateSamples.listing), httpGateSamples.listing).toBe(false)
     const [sampled] = httpGateSamples.categories.filter(slug => !retired.has(slug))
     expect(sampled).toBeDefined()
     // #320: the sampled category is the sample listing's own, so it can't be empty while the
     // listing the gates already require is live and filed under it.
-    expect(removedFromListing.has(String(sampled)), String(sampled)).toBe(false)
+    expect(detached.has(String(sampled)), String(sampled)).toBe(false)
+  })
+
+  it('counts every manifest operation that takes a sample off the site (#320)', () => {
+    const changes = (...operations: SampleOperation[]) => sampleChanges([{ operations }], samples)
+    expect(
+      changes(
+        { action: 'category-unpublish', slug: category },
+        { action: 'listing-unpublish', slug },
+        { action: 'listing-slug-change', from: 'renamed-product', to: 'other-product' }
+      )
+    ).toEqual({
+      detached: new Set(),
+      gone: new Set([slug, 'renamed-product']),
+      retired: new Set([category])
+    })
+    // Either way the sample listing leaves the sampled category: removed, or left out of the
+    // categories a listing-update replaces its memberships with.
+    expect(
+      changes({ action: 'listing-categories-remove', slug, remove: [category] }).detached
+    ).toEqual(new Set([category]))
+    expect(
+      changes({ action: 'listing-update', listing: { slug, categories: ['other'] } }).detached
+    ).toEqual(new Set([category]))
+    // An update that keeps it, and changes to other listings, leave it attached.
+    expect(
+      changes(
+        { action: 'listing-update', listing: { slug, categories: ['other', category] } },
+        { action: 'listing-update', listing: { slug: 'other-product', categories: ['other'] } },
+        { action: 'listing-categories-remove', slug: 'other-product', remove: [category] }
+      ).detached
+    ).toEqual(new Set())
   })
 
   it('requests the pinned samples, and only with GETs apart from the empty sign-in (#320)', async () => {

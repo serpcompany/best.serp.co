@@ -126,15 +126,21 @@ function trackedFiles(): string[] {
     .filter(file => file && !file.startsWith('.archive/'))
 }
 
-/** Code, configs, and workflows; tests may name what they assert is gone or archived. */
-function liveCodeFiles(files: readonly string[]): string[] {
-  return files.filter(
-    file =>
-      (file === 'package.json' || /^(?:scripts|apps\/web|\.github)\//u.test(file)) &&
-      /\.(?:m?[jt]sx?|jsonc?|ya?ml)$/u.test(file) &&
-      !/\.(?:test|spec)\.tsx?$/u.test(file) &&
-      existsSync(resolve(file))
+/**
+ * Code, configs, and workflows: under `scripts/`, `apps/web/` and `.github/`, and at the root,
+ * where `package.json`, `vitest.config.ts` and the other configs run in the harness or the build
+ * (#320). Tests may name what they assert is gone or archived.
+ */
+function isLiveCode(file: string): boolean {
+  return (
+    (/^[^/]+$/u.test(file) || /^(?:scripts|apps\/web|\.github)\//u.test(file)) &&
+    /\.(?:[cm]?[jt]sx?|jsonc?|ya?ml)$/u.test(file) &&
+    !/\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(file)
   )
+}
+
+function liveCodeFiles(files: readonly string[]): string[] {
+  return files.filter(file => isLiveCode(file) && existsSync(resolve(file)))
 }
 
 /** The modules #315 split out of `scripts/` into `.archive/scripts/`, by name. */
@@ -869,6 +875,27 @@ describe('single-site D1-only repository architecture', () => {
     }
     for (const [name, source] of Object.entries(reaches))
       expect(archiveReferences(source, modules), name).not.toEqual([])
+    // Every file that runs in the harness or the build is read, root configs included.
+    for (const file of [
+      'vitest.config.ts',
+      'eslint.config.mjs',
+      'package.json',
+      'tsconfig.json',
+      'biome.jsonc',
+      'pnpm-workspace.yaml',
+      'scripts/listing-domain-check.ts',
+      'apps/web/next.config.ts',
+      'apps/web/wrangler.jsonc',
+      '.github/workflows/web.yml'
+    ])
+      expect(isLiveCode(file), file).toBe(true)
+    for (const file of [
+      'scripts/architecture-guard.test.ts',
+      'apps/web/e2e/home.spec.ts',
+      'docs/HARNESS.md',
+      'd1/publications/2026-10-09-adult-removal.yaml'
+    ])
+      expect(isLiveCode(file), file).toBe(false)
     for (const prose of [
       // Excluding the archive names only its prefix, never a path into it.
       `return !file.startsWith('.archive/')`,
