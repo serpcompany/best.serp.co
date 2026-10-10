@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { parse, stringify } from 'yaml'
 import { fixtureSeedStatements } from '../apps/web/e2e/fixture-seed'
 import { assertD1StatementLimits } from '../apps/web/src/db/sql-limits'
@@ -33,6 +33,13 @@ import {
 const NOW = '2026-10-10T00:00:00.000Z'
 const options = { date: taxonomyDefaults.date, keywordsCheckedAt: '2026-10-10T13:10:00.000Z' }
 const ids = taxonomyIds(options.date)
+/**
+ * Time limits for the tests that generate or replay whole catalogs: a few seconds locally, but CI
+ * runners are slower and share the d1 project with the workerd suites, so each has headroom over
+ * vitest's 5-second default (which stays as it is for the rest).
+ */
+const GENERATE_TIMEOUT = 60_000
+const REPLAY_TIMEOUT = 120_000
 const intro = Array.from({ length: 70 }, (_, index) => `word${index}`).join(' ')
 
 // ---------------------------------------------------------------------------------------------
@@ -313,54 +320,61 @@ describe('the taxonomy generator (#349)', () => {
       expect(parseManifest(manifest.source).concurrency).toBe('rows')
   })
 
-  it('keeps every listing in its batch when the manifests are regenerated (#342 review)', () => {
-    const many: TaxonomyCatalog = {
-      categories: small.categories,
-      listings: Array.from({ length: 300 }, (_, index) =>
-        listing(`n${String(index).padStart(3, '0')}.ai`, ['ai-seo'])
+  it(
+    'keeps every listing in its batch when the manifests are regenerated (#342 review)',
+    () => {
+      const many: TaxonomyCatalog = {
+        categories: small.categories,
+        listings: Array.from({ length: 300 }, (_, index) =>
+          listing(`n${String(index).padStart(3, '0')}.ai`, ['ai-seo'])
+        )
+      }
+      const mapping = smallMapping()
+      mapping.hubs = [
+        { slug: 'chat', name: 'Chat', order: 1 },
+        { slug: 'marketing', name: 'Marketing', order: 2 },
+        { slug: 'downloaders', existing: true }
+      ]
+      mapping.tags = mapping.tags.map(({ listings: _, ...tag }) => tag)
+      mapping.bestPages = []
+      mapping.other = {}
+      mapping.redirects = [
+        { from: { kind: 'category', slug: 'ai-chat' }, to: { kind: 'category', slug: 'chat' } },
+        {
+          from: { kind: 'category', slug: 'ai-chat-free' },
+          to: { kind: 'category', slug: 'chat' }
+        },
+        { from: { kind: 'category', slug: 'ai-seo' }, to: { kind: 'tag', slug: 'ai-seo' } }
+      ]
+      // A hub with nothing filed under it is refused; give each one a listing.
+      many.listings.push(listing('chat.ai', ['ai-chat']), listing('dl', ['downloaders']))
+      const inputs = { mapping, catalog: many }
+      const first = buildTaxonomyManifests(planTaxonomy(inputs), options)
+      const batches = first.filter(({ id: manifestId }) => manifestId.includes('-02-move-'))
+      expect(batches.length).toBeGreaterThan(2)
+      const assignments = new Map<string, number>()
+      batches.forEach(({ source }, index) => {
+        for (const operation of parseManifest(source).operations)
+          if ('id' in operation) assignments.set(operation.id, index + 1)
+      })
+      // A listing no batch holds goes to a new batch; the others stay as they were.
+      const added = {
+        ...inputs,
+        catalog: { ...many, listings: [...many.listings, listing('m.ai', ['ai-seo'])] }
+      }
+      const again = buildTaxonomyManifests(planTaxonomy(added), options, assignments)
+      const againBatches = again.filter(({ id: manifestId }) => manifestId.includes('-02-move-'))
+      expect(againBatches.slice(0, batches.length).map(({ source }) => source)).toEqual(
+        batches.map(({ source }) => source)
       )
-    }
-    const mapping = smallMapping()
-    mapping.hubs = [
-      { slug: 'chat', name: 'Chat', order: 1 },
-      { slug: 'marketing', name: 'Marketing', order: 2 },
-      { slug: 'downloaders', existing: true }
-    ]
-    mapping.tags = mapping.tags.map(({ listings: _, ...tag }) => tag)
-    mapping.bestPages = []
-    mapping.other = {}
-    mapping.redirects = [
-      { from: { kind: 'category', slug: 'ai-chat' }, to: { kind: 'category', slug: 'chat' } },
-      { from: { kind: 'category', slug: 'ai-chat-free' }, to: { kind: 'category', slug: 'chat' } },
-      { from: { kind: 'category', slug: 'ai-seo' }, to: { kind: 'tag', slug: 'ai-seo' } }
-    ]
-    // A hub with nothing filed under it is refused; give each one a listing.
-    many.listings.push(listing('chat.ai', ['ai-chat']), listing('dl', ['downloaders']))
-    const inputs = { mapping, catalog: many }
-    const first = buildTaxonomyManifests(planTaxonomy(inputs), options)
-    const batches = first.filter(({ id: manifestId }) => manifestId.includes('-02-move-'))
-    expect(batches.length).toBeGreaterThan(2)
-    const assignments = new Map<string, number>()
-    batches.forEach(({ source }, index) => {
-      for (const operation of parseManifest(source).operations)
-        if ('id' in operation) assignments.set(operation.id, index + 1)
-    })
-    // A listing no batch holds goes to a new batch; the others stay as they were.
-    const added = {
-      ...inputs,
-      catalog: { ...many, listings: [...many.listings, listing('m.ai', ['ai-seo'])] }
-    }
-    const again = buildTaxonomyManifests(planTaxonomy(added), options, assignments)
-    const againBatches = again.filter(({ id: manifestId }) => manifestId.includes('-02-move-'))
-    expect(againBatches.slice(0, batches.length).map(({ source }) => source)).toEqual(
-      batches.map(({ source }) => source)
-    )
-    expect(
-      parseManifest(againBatches.at(-1)?.source ?? '').operations.map(operation =>
-        'slug' in operation ? operation.slug : ''
-      )
-    ).toEqual(['m.ai', 'm.ai'])
-  })
+      expect(
+        parseManifest(againBatches.at(-1)?.source ?? '').operations.map(operation =>
+          'slug' in operation ? operation.slug : ''
+        )
+      ).toEqual(['m.ai', 'm.ai'])
+    },
+    GENERATE_TIMEOUT
+  )
 })
 
 // ---------------------------------------------------------------------------------------------
@@ -721,36 +735,44 @@ function withoutTaxonomy(db: DatabaseSync): void {
 }
 
 describe('the taxonomy manifests replayed (#349)', () => {
-  it('migrate the fixture catalog with every invariant holding', () => {
-    const db = new DatabaseSync(':memory:')
-    applyMigrations(db)
-    for (const { sql, params } of fixtureSeedStatements()) db.prepare(sql).run(...params)
-    withoutTaxonomy(db)
-    withCatalogIds(db)
-    const { mapping, plan } = migrate(db, { kept: ['design-tools'], hubs: 2, clustered: 0 })
-    expect(plan.moves.length).toBeGreaterThan(40)
-    expectMigrated(db, mapping, plan)
-  })
+  it(
+    'migrate the fixture catalog with every invariant holding',
+    () => {
+      const db = new DatabaseSync(':memory:')
+      applyMigrations(db)
+      for (const { sql, params } of fixtureSeedStatements()) db.prepare(sql).run(...params)
+      withoutTaxonomy(db)
+      withCatalogIds(db)
+      const { mapping, plan } = migrate(db, { kept: ['design-tools'], hubs: 2, clustered: 0 })
+      expect(plan.moves.length).toBeGreaterThan(40)
+      expectMigrated(db, mapping, plan)
+    },
+    REPLAY_TIMEOUT
+  )
 
-  it('migrate the scale catalog with every invariant holding', () => {
-    const db = new DatabaseSync(':memory:')
-    db.exec('PRAGMA foreign_keys = ON')
-    applyMigrations(db)
-    for (const { sql, params } of scaleCatalogStatements(generateScaleCatalog()))
-      db.prepare(sql).run(...params)
-    withoutTaxonomy(db)
-    const { mapping, plan, queueCleared } = migrate(db, {
-      catchAll: 'other',
-      kept: ['video-downloaders'],
-      hubs: 6,
-      clustered: 40
-    })
-    // The scale catalog has submissions in review on listings that move.
-    expect(queueCleared).toBe(true)
-    expect(plan.retiring.length).toBeGreaterThan(130)
-    expect(plan.moves.length).toBeGreaterThan(500)
-    expectMigrated(db, mapping, plan)
-  })
+  it(
+    'migrate the scale catalog with every invariant holding',
+    () => {
+      const db = new DatabaseSync(':memory:')
+      db.exec('PRAGMA foreign_keys = ON')
+      applyMigrations(db)
+      for (const { sql, params } of scaleCatalogStatements(generateScaleCatalog()))
+        db.prepare(sql).run(...params)
+      withoutTaxonomy(db)
+      const { mapping, plan, queueCleared } = migrate(db, {
+        catchAll: 'other',
+        kept: ['video-downloaders'],
+        hubs: 6,
+        clustered: 40
+      })
+      // The scale catalog has submissions in review on listings that move.
+      expect(queueCleared).toBe(true)
+      expect(plan.retiring.length).toBeGreaterThan(130)
+      expect(plan.moves.length).toBeGreaterThan(500)
+      expectMigrated(db, mapping, plan)
+    },
+    REPLAY_TIMEOUT
+  )
 })
 
 // ---------------------------------------------------------------------------------------------
@@ -821,8 +843,13 @@ function committed(name: string, actions?: ReadonlySet<string>): string {
 }
 
 describe('the committed taxonomy mapping and manifests (#349)', () => {
-  const reviewed = readReviewedInputs()
-  const plan = planTaxonomy(reviewed.inputs)
+  // Read and planned once, in a hook with its own time limit, for every test below.
+  let reviewed: ReturnType<typeof readReviewedInputs>
+  let plan: TaxonomyPlan
+  beforeAll(() => {
+    reviewed = readReviewedInputs()
+    plan = planTaxonomy(reviewed.inputs)
+  }, GENERATE_TIMEOUT)
 
   it('fits the reviewed catalog: 16 hubs, 125 tags, 30 best pages and 166 redirects', () => {
     const { mapping } = reviewed
@@ -872,75 +899,85 @@ describe('the committed taxonomy mapping and manifests (#349)', () => {
     for (const pin of pins) expect(removed.has(pin) || held.has(pin), pin).toBe(false)
   })
 
-  it('keeps the committed manifests identical to what the mapping generates', () => {
-    const manifests = buildTaxonomyManifests(
-      plan,
-      { date: taxonomyDefaults.date, keywordsCheckedAt: reviewed.mapping.keywordsCheckedAt },
-      committedBatchAssignments()
-    )
-    expect(committedTaxonomyManifests()).toEqual(
-      manifests.map(({ id: manifestId }) => `${manifestId}.yaml`)
-    )
-    for (const { id: manifestId, source } of manifests)
+  it(
+    'keeps the committed manifests identical to what the mapping generates',
+    () => {
+      const manifests = buildTaxonomyManifests(
+        plan,
+        { date: taxonomyDefaults.date, keywordsCheckedAt: reviewed.mapping.keywordsCheckedAt },
+        committedBatchAssignments()
+      )
+      expect(committedTaxonomyManifests()).toEqual(
+        manifests.map(({ id: manifestId }) => `${manifestId}.yaml`)
+      )
+      for (const { id: manifestId, source } of manifests)
+        expect(
+          readFileSync(resolve(taxonomyPaths.publications, `${manifestId}.yaml`), 'utf8'),
+          manifestId
+        ).toBe(source)
+    },
+    GENERATE_TIMEOUT
+  )
+
+  it(
+    'replays on the reviewed catalog after the manifests it follows, every invariant holding',
+    () => {
+      const db = reviewedCatalogDatabase()
+      // The owner's dispatch order before #341 (#321): #337 (its media updates touch no category or
+      // live state, and need its uploads), #333's removals and batches, #352, then #358 (its claim
+      // hold clears touch nothing here either).
+      const unpublishOnly = new Set(['listing-unpublish'])
+      const before: Array<[string, string]> = [
+        [
+          '2026-10-10-duplicate-listings',
+          committed('2026-10-10-duplicate-listings.yaml', unpublishOnly)
+        ],
+        ['2026-10-10-other-removals', committed('2026-10-10-other-removals.yaml')],
+        ...Array.from({ length: 9 }, (_, index): [string, string] => {
+          const name = `2026-10-10-other-categories-${String(index + 1).padStart(2, '0')}`
+          return [name, committed(`${name}.yaml`)]
+        }),
+        [
+          '2026-10-10-duplicate-listings-redirects',
+          committed('2026-10-10-duplicate-listings-redirects.yaml')
+        ],
+        ['2026-10-10-mismatch-removals', committed('2026-10-10-mismatch-removals.yaml')],
+        ['2026-10-10-mismatch-renames', committed('2026-10-10-mismatch-renames.yaml')],
+        ['2026-10-10-mismatch-categories', committed('2026-10-10-mismatch-categories.yaml')]
+      ]
+      for (const [name, source] of before) apply(db, name, source)
+      // The generator's view of the same state: its replay of those manifests matches the database's.
+      const generatorView = new Map(
+        reviewed.inputs.catalog.listings.map(entry => [entry.id, entry])
+      )
+      for (const entry of catalogFrom(db).listings)
+        expect(generatorView.get(entry.id), entry.slug).toEqual(entry)
+
+      const names = committedTaxonomyManifests()
+      expect(names[0]).toBe(`${ids.create}.yaml`)
+      expect(names[1]).toBe(`${ids.redirects}.yaml`)
+      expect(names.at(-1)).toBe(`${ids.retire}.yaml`)
+      for (const name of names) {
+        // Retiring early refuses whole: live listings are still filed under the narrow categories.
+        if (name === `${ids.move(1)}.yaml`)
+          expect(() => apply(db, ids.retire, committed(`${ids.retire}.yaml`))).toThrow(
+            /does not apply/u
+          )
+        expect(apply(db, name, committed(name)), name).toBeLessThanOrEqual(STATEMENT_CEILING)
+      }
+      expectMigrated(db, reviewed.mapping, plan)
+      // The 141 left in Other, and the five held among them, carry no tag.
       expect(
-        readFileSync(resolve(taxonomyPaths.publications, `${manifestId}.yaml`), 'utf8'),
-        manifestId
-      ).toBe(source)
-  })
-
-  it('replays on the reviewed catalog after the manifests it follows, every invariant holding', () => {
-    const db = reviewedCatalogDatabase()
-    // The owner's dispatch order before #341 (#321): #337 (its media updates touch no category or
-    // live state, and need its uploads), #333's removals and batches, #352, then #358 (its claim
-    // hold clears touch nothing here either).
-    const unpublishOnly = new Set(['listing-unpublish'])
-    const before: Array<[string, string]> = [
-      [
-        '2026-10-10-duplicate-listings',
-        committed('2026-10-10-duplicate-listings.yaml', unpublishOnly)
-      ],
-      ['2026-10-10-other-removals', committed('2026-10-10-other-removals.yaml')],
-      ...Array.from({ length: 9 }, (_, index): [string, string] => {
-        const name = `2026-10-10-other-categories-${String(index + 1).padStart(2, '0')}`
-        return [name, committed(`${name}.yaml`)]
-      }),
-      [
-        '2026-10-10-duplicate-listings-redirects',
-        committed('2026-10-10-duplicate-listings-redirects.yaml')
-      ],
-      ['2026-10-10-mismatch-removals', committed('2026-10-10-mismatch-removals.yaml')],
-      ['2026-10-10-mismatch-renames', committed('2026-10-10-mismatch-renames.yaml')],
-      ['2026-10-10-mismatch-categories', committed('2026-10-10-mismatch-categories.yaml')]
-    ]
-    for (const [name, source] of before) apply(db, name, source)
-    // The generator's view of the same state: its replay of those manifests matches the database's.
-    const generatorView = new Map(reviewed.inputs.catalog.listings.map(entry => [entry.id, entry]))
-    for (const entry of catalogFrom(db).listings)
-      expect(generatorView.get(entry.id), entry.slug).toEqual(entry)
-
-    const names = committedTaxonomyManifests()
-    expect(names[0]).toBe(`${ids.create}.yaml`)
-    expect(names[1]).toBe(`${ids.redirects}.yaml`)
-    expect(names.at(-1)).toBe(`${ids.retire}.yaml`)
-    for (const name of names) {
-      // Retiring early refuses whole: live listings are still filed under the narrow categories.
-      if (name === `${ids.move(1)}.yaml`)
-        expect(() => apply(db, ids.retire, committed(`${ids.retire}.yaml`))).toThrow(
-          /does not apply/u
-        )
-      expect(apply(db, name, committed(name)), name).toBeLessThanOrEqual(STATEMENT_CEILING)
-    }
-    expectMigrated(db, reviewed.mapping, plan)
-    // The 141 left in Other, and the five held among them, carry no tag.
-    expect(
-      all(
-        db,
-        `SELECT l.slug FROM listings l JOIN listing_categories lc ON lc.listing_id=l.id JOIN categories c
+        all(
+          db,
+          `SELECT l.slug FROM listings l JOIN listing_categories lc ON lc.listing_id=l.id JOIN categories c
          ON c.id=lc.category_id WHERE c.slug='other' AND ${LIVE} AND EXISTS
          (SELECT 1 FROM listing_tags lt WHERE lt.listing_id=l.id)`
-      )
-    ).toEqual([])
-  })
+        )
+      ).toEqual([])
+    },
+    REPLAY_TIMEOUT
+  )
 
   it('applies the committed manifests published after the snapshot the way the publisher does', () => {
     const listings = new Map([
