@@ -1,8 +1,10 @@
 # serpcompany/best.serp.co#333: listings the classifiers flagged for the owner while categorizing Other, by kind.
 # here says what d1/hygiene/2026-10-10-other-categories.yaml does with each: categorized (the flag is a note, or a
-# duplicate pair the owner decides), stays in Other (held until the owner decides), or left out because #337
-# unpublishes it. Nothing here is unpublished or retired by #333.
-#   adult and spam: candidates for unpublishing (#260 is closed; best.serp.co lists no adult products).
+# duplicate pair the owner decides), stays in Other (held until the owner decides), left out because #337
+# unpublishes it, or unpublished by the owner's decision. #333 unpublishes nothing else.
+#   decided: the owner's decision, where there is one. On 2026-10-10 the owner decided to unpublish the adult
+#     listing and the four spam listings (d1/publications/2026-10-10-other-removals.yaml).
+#   adult and spam: candidates for unpublishing (best.serp.co lists no adult products, #260).
 #   dead: the product or service is gone.  duplicate: two listings for one product.
 #   mismatch: the listing's text describes something else (a policy, an article, another product).
 #   other: not a product (research, articles, agencies), black-hat SEO, academic cheating, NSFW notes.
@@ -13,33 +15,39 @@ counts:
   duplicate: 8
   mismatch: 139
   other: 38
+  decided: 5
 adult:
   - slug: imgnai.com
     id: lst_b03d0534f14f6e26a4531b95
     website: https://serp.ly/imgnai
     flag: flagship tool is an NSFW AI image generator
-    here: stays in Other
+    decided: unpublish (owner, 2026-10-10)
+    here: unpublished by d1/publications/2026-10-10-other-removals.yaml
 spam:
   - slug: copycraftai.com
     id: lst_dd4203f6a5928714bf1f8dc6
     website: https://serp.ly/copycraft-ai
     flag: content promotes Indonesian "QRIS" gaming, likely a hijacked or repurposed domain
-    here: stays in Other
+    decided: unpublish (owner, 2026-10-10)
+    here: unpublished by d1/publications/2026-10-10-other-removals.yaml
   - slug: gistvid.com
     id: lst_76ffd86ae42ae275bb20c2ad
     website: https://serp.ly/gistvid
     flag: content is a review of Olimp Casino for Kazakhstan gamblers, likely a hijacked domain
-    here: stays in Other
+    decided: unpublish (owner, 2026-10-10)
+    here: unpublished by d1/publications/2026-10-10-other-removals.yaml
   - slug: sparktraffic.com
     id: lst_f6db3c974a96aee30012736f
     website: https://serp.ly/sparktraffic.com
     flag: sells bot-generated website traffic
-    here: stays in Other
+    decided: unpublish (owner, 2026-10-10)
+    here: unpublished by d1/publications/2026-10-10-other-removals.yaml
   - slug: trafficbotpro.com
     id: lst_8ff2452e604429a9ac8cf274
     website: https://serp.ly/trafficbotpro.com
     flag: traffic bot that generates artificial website visits
-    here: stays in Other
+    decided: unpublish (owner, 2026-10-10)
+    here: unpublished by d1/publications/2026-10-10-other-removals.yaml
 dead:
   - slug: blog.rossintelligence.com
     id: lst_5e25a65c76cf4f72196baa81

@@ -23,6 +23,7 @@ counts:
   proposedNewCategory: 584
   heldForFlags: 60
   retiredBy337: 4
+  unpublishedByOwner: 5
   flags:
     adult: 1
     spam: 4
@@ -54,6 +55,7 @@ alignments:
   - "interview prep: both halves file mock-interview tools under ai-career-coach with ai-job-search (talkberry.ai, English interview practice, under ai-language-teacher with ai-career-coach); no change"
   - "left out of the manifests: #337 (#332) unpublishes them as duplicates (4: flowrite.com, magical.so, phrasee.co, trajectdata.com)"
   - "held in Other for the owner (left out of the manifests): a mismatch, spam, dead, adult or other flag leaves the category uncertain; categorized anyway: duplicate flags, and opendream.ai, orderhive.com, openjourneybot.com and freedomgpt.com, whose flags are notes (60: bjoernkarmann.dk, blog.google, blog.rossintelligence.com, bookhero.ai, botto.com, browsegpt.ai, ca.la, chatworm.com, clip.audio, collegetools.io, contractreader.io, copylime.com, coverletterwrite.com, curaihealth.com, detangle.ai, drawmeasheep.net, earkind.com, earningscall.ai, fabric.so, figma.com, financebrain.ai, flexos.work, flipped.ai, freebeat.ai, getslate.ai, githubnext.com, goheather.io, gptinf.com, graydient.ai, headlime.com, il.ly, instant-portrait.com, interflexion.com, ivy.ai, joinsquad.co, kadoa.com, kaiber.ai, kleap.co, lifesight.io, magicthumbnails.com, makeavideo.studio, mutinyhq.com, nourishingsoftware.com, onetask.me, plantrips.net, prompthero.com, raplyrics.eu, replicate.com, reroom.ai, serper.dev, slashdreamer.com, teameet.cc, timecomplexity.ai, toptal.com, triplewhale.com, tubemagic.com, vice.com, wonderplan.ai, yesilhealth.com, zizoto.com)"
+  - "unpublished by the owner's decision of 2026-10-10 (2026-10-10-other-removals), so in no batch (5: copycraftai.com, gistvid.com, imgnai.com, sparktraffic.com, trafficbotpro.com)"
 newCategories:
   - slug: ai-developer-tools
     name: AI Developer Tools
@@ -2026,7 +2028,7 @@ listings:
   - slug: copycraftai.com
     id: lst_dd4203f6a5928714bf1f8dc6
     primary: other
-    reason: copy is unrelated; product unclear
+    reason: unpublished by d1/publications/2026-10-10-other-removals.yaml (owner decision of 2026-10-10)
     flag: 'spam: content promotes Indonesian "QRIS" gaming, likely a hijacked or repurposed domain'
     why: Listing text is about Indonesian QRIS gaming, not a copywriting tool
   - slug: copylime.com
@@ -4032,7 +4034,7 @@ listings:
   - slug: gistvid.com
     id: lst_76ffd86ae42ae275bb20c2ad
     primary: other
-    reason: copy is unrelated; product unclear
+    reason: unpublished by d1/publications/2026-10-10-other-removals.yaml (owner decision of 2026-10-10)
     flag: "spam: content is a review of Olimp Casino for Kazakhstan gamblers, likely a hijacked domain"
     why: Listing text is an online-casino review, not a video tool
   - slug: gitagpt.in
@@ -4867,7 +4869,7 @@ listings:
   - slug: imgnai.com
     id: lst_b03d0534f14f6e26a4531b95
     primary: other
-    reason: adult (#260)
+    reason: unpublished by d1/publications/2026-10-10-other-removals.yaml (owner decision of 2026-10-10)
     flag: "adult: flagship tool is an NSFW AI image generator"
     why: AI image generator whose flagship is NSFW image generation
   - slug: imgtopia.com
@@ -10264,7 +10266,7 @@ listings:
   - slug: sparktraffic.com
     id: lst_f6db3c974a96aee30012736f
     primary: other
-    reason: no existing category fits
+    reason: unpublished by d1/publications/2026-10-10-other-removals.yaml (owner decision of 2026-10-10)
     flag: "spam: sells bot-generated website traffic"
     why: Sells website traffic from a bot network that mimics real users
   - slug: spatial.ai
@@ -11423,7 +11425,7 @@ listings:
   - slug: trafficbotpro.com
     id: lst_8ff2452e604429a9ac8cf274
     primary: other
-    reason: no existing category fits
+    reason: unpublished by d1/publications/2026-10-10-other-removals.yaml (owner decision of 2026-10-10)
     flag: "spam: traffic bot that generates artificial website visits"
     why: Traffic bot software that simulates human website visits
   - slug: trainengine.ai

@@ -231,8 +231,10 @@ one or two listings. They move to real categories through reviewed files:
   most `other` flags) stays in Other, with the classifiers' category kept as `held`.
   `decidedAt` is `pending` until the owner accepts it.
 - **The owner's list.** `d1/hygiene/2026-10-10-other-owner-flags.yaml` collects every flag by kind: adult,
-  spam, dead, duplicate, mismatch, and other. #333 unpublishes nothing; those listings need their own
-  decision.
+  spam, dead, duplicate, mismatch, and other. On 2026-10-10 the owner decided to unpublish the adult
+  listing and four spam listings: `d1/publications/2026-10-10-other-removals.yaml`, row-level
+  `listing-unpublish` operations like the other hygiene removals, so not `unowned`. The other flags
+  wait for the owner's decision.
 - **The manifests.** `pnpm catalog:other-categories` writes `d1/publications/2026-10-10-other-categories-NN.yaml`
   from the proposal and the inventory. Each listing with a real primary gets one `listing-categories-set`
   operation ([Catalog publication](./catalog-publication.md#category-operations)): `expected` is `[other]`,

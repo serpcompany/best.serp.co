@@ -108,6 +108,40 @@ describe('the Other categorization manifests (#333)', () => {
     expect(() => categorySetOperations(proposals, moved, live)).toThrow(/not Other alone/u)
   })
 
+  it("keeps the owner's removals out of every batch, as the reviewed inventory lists them", () => {
+    const { proposals: committed, inventory: listings } = readOtherCategoryInputs()
+    const source = readFileSync(resolve('d1/publications/2026-10-10-other-removals.yaml'), 'utf8')
+    const removals = parseManifest(source).operations.flatMap(operation =>
+      operation.action === 'listing-unpublish' ? [operation] : []
+    )
+    expect(removals.map(operation => operation.slug)).toEqual([
+      'copycraftai.com',
+      'gistvid.com',
+      'imgnai.com',
+      'sparktraffic.com',
+      'trafficbotpro.com'
+    ])
+    const batched = new Set(
+      committedOtherCategoryManifests().flatMap(name =>
+        parseManifest(readFileSync(resolve('d1/publications', name), 'utf8')).operations.map(
+          operation => ('id' in operation ? operation.id : '')
+        )
+      )
+    )
+    for (const removal of removals) {
+      expect(
+        listings.find(listing => listing.id === removal.id),
+        removal.slug
+      ).toMatchObject({
+        slug: removal.slug,
+        categories: removal.categories,
+        website: removal.expected?.website
+      })
+      expect(batched.has(removal.id), removal.slug).toBe(false)
+      expect(committed.find(proposal => proposal.id === removal.id)?.primary).toBe('other')
+    }
+  })
+
   it('keeps the committed manifests identical to what the committed proposal generates', () => {
     const { proposals: committed, inventory: listings, liveCategories } = readOtherCategoryInputs()
     const manifests = buildOtherCategoryManifests(
