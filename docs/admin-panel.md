@@ -10,10 +10,10 @@ and top bar since #261); pages set their breadcrumb with `AdminCrumbs`.
 | Screen | Route | Reads |
 |---|---|---|
 | Review queue | `/admin/submissions/` (`?view=changes`, `?view=all`) | `selectReviewQueuePlan` |
-| Submission review | `/admin/submissions/<id>/` | `selectSubmissionReviewPlans` |
-| Revision review | `/admin/revisions/<id>/` | `selectRevisionReviewPlans` |
+| Submission review | `/admin/submissions/<id>/` | `selectSubmissionReviewPlans`, `selectActiveTagsPlan` |
+| Revision review | `/admin/revisions/<id>/` | `selectRevisionReviewPlans`, `selectActiveTagsPlan` |
 | Listings | `/admin/listings/` (`?q=`, `status`, `source`, `link`, `page`, `size`) | `selectAdminListingsPlans` |
-| Listing | `/admin/listings/<slug>/` | `selectAdminListingPlans` |
+| Listing | `/admin/listings/<slug>/` | `selectAdminListingPlans`, `selectActiveTagsPlan` |
 | Admins | `/admin/admins/` | `selectAdminAllowlistPlan` |
 | Orders (#68) | `/admin/orders/` | `selectAdminOrdersPlan` (`src/db/billing.ts`) |
 
@@ -29,12 +29,13 @@ forbids `'use server'`): an action id is reachable from any path, so no path gat
 
 | Endpoint (`POST` unless noted) | Body | Decision |
 |---|---|---|
-| `/api/admin/submissions/<id>/approve` | `expectedContentVersion`, optional `edits`, `linkRel` | `approveSubmission` |
+| `/api/admin/submissions/<id>/approve` | `expectedContentVersion`, optional `edits` (`tagSlugs` included), `linkRel` | `approveSubmission` |
 | `/api/admin/submissions/<id>/request-changes` | `note` | `requestSubmissionChanges` |
 | `/api/admin/submissions/<id>/reject` | `reason`, `category` (`prohibited` \| `other`) | `rejectSubmission` |
 | `/api/admin/{submissions,listings}/<id>/allow-resubmission` | optional `urlKey` (checked only) | `allowResubmission` |
 | `/api/admin/revisions/<id>/{approve,request-changes,reject}` | as above, no category | `approveRevision`, … |
 | `/api/admin/listings/<id>/details` | `details`, `expectedChecksum` | `updateListingDetails` |
+| `/api/admin/listings/<id>/tags` | `tags`, `expectedTags` | `setListingTags` |
 | `/api/admin/listings/<id>/{unpublish,republish}` | optional `note` | `unpublishListing`, `republishListing` |
 | `/api/admin/listings/<id>/link-rel` | `linkRel` | `setListingLinkRel` |
 | `/api/admin/listings/<id>/{transfer-owner,remove-owner}` | `email`, `expectedOwnerUserId` | `transferListingOwner`, `removeListingOwner` |
@@ -58,21 +59,24 @@ below), and otherwise sends the reviewed statement plans as one D1 batch:
 
 - **Compare and swap.** Approvals send the `content_version` the admin saw (a reviewer's inline
   edit increments it in the same batch, then the approval swaps on the new value), listing edits
-  the listing `checksum`, ownership changes the owner the admin saw. A stale page gets 409 and
+  the listing `checksum`, a tag edit the tags the admin saw (retired ones included), ownership
+  changes the owner the admin saw. A stale page gets 409 and
   reloads. A race between two identical requests ends with one write and one replay. A catalog
   decision whose batch lost only the race for the global publication version (another listing
   published in between, while this item is as it was read) runs once more on fresh state, so
   two admins on different listings don't see a false 409.
 - **Publication.** Anything that changes public output (approve, reject a live listing,
-  unpublish, republish, link, details, ownership) goes through `prepareCatalogPublication` and
+  unpublish, republish, link, details, tags, ownership) goes through `prepareCatalogPublication` and
   records a `publication_runs` row (`actor` = the admin's email, `workflow = 'app/admin'`),
   advancing the catalog epoch, so cached pages turn over within about a minute.
 - **Audit.** Submission decisions are `listing_submission_events` (actor, note or reason and
   category, the fields a reviewer edited), revision decisions `listing_revision_events`, and
   listing changes `listing_events` (`edited`, `unpublished` with the note, `republished`,
-  `link_rel_changed`, `owner_granted`, `owner_revoked`, `owner_transferred`).
+  `link_rel_changed`, `owner_granted`, `owner_revoked`, `owner_transferred`); a tag edit is
+  `edited` with `fields: ['tags']` and the tags before and after.
 - **Rules from the plans.** A listing whose submission is in review cannot be edited or
-  unpublished (edit or reject the submission instead); a rejected listing stays down and
+  unpublished (edit or reject the submission instead), though its tags can: they aren't part of
+  the checksum the submission's approval compares; a rejected listing stays down and
   read-only; a transfer needs a verified account; the last admin cannot be removed (the plan
   refuses it inside the batch, so two admins cannot remove each other at once).
 - **URLs follow the submission intake.** A website or logo URL that an edit changes must pass
@@ -129,6 +133,24 @@ nothing. The contract:
 - When the hook throws, the rejection stands, the decision answers
   `{ok: true, refundPending: true}`, and the refund stays pending for the next replay or sweep.
 
+## Tags (#341)
+
+The listing page's Tags field (stock shadcn Combobox, multiple selection, the active tags grouped
+by hub with the listing's own hub first) saves on its own with "Save tags": `setListingTags`
+runs `buildSetListingTagsPlans`, which opens the publication only while the listing is approved,
+its submission isn't rejected, and its tags are still the `expectedTags` the page showed; then
+replaces them through active tags (a plain `INSERT … SELECT … WHERE is_active = 1`, never an
+upsert), sets `updated_at` (the sitemap `lastmod`), logs the event, and finishes the
+publication. A retired tag the listing still carries is compared but no longer offered, so
+saving leaves it off. The checksum stays, which is why the edit is allowed while the listing's
+own submission is in review.
+
+The review screens show the Creator's suggested tags (`tag_slugs`), and "Edit, then approve"
+edits them as `edits.tagSlugs` (up to three active tags), logged as `tags` among the edited
+fields. A revision's tags can't be edited at review: approve it, then set the listing's tags
+here. Hubs, tags, and best pages themselves change only through manifests
+([Catalog publication](./catalog-publication.md#taxonomy-operations)).
+
 ## Unpublished listings answer 410
 
 Unpublishing keeps the row (`status = 'approved'`, `is_active = 0`); the public queries drop it
@@ -174,7 +196,7 @@ the app writes production data, and agents never use the production admin panel.
 `apps/web/src/lib/admin/decisions.test.ts` (node:sqlite), `scripts/d1-workerd-plans.test.ts` (every
 plan builder and read on Wrangler-local D1), and `apps/web/e2e/admin-panel.spec.ts`
 (Playwright: the gate, approve, request changes, reject, allow resubmission, unpublish with 410
-and republish, a redirected duplicate's 308 (#338), the allowlist, and a replay of each
-decision). The suite runs on its own local Worker and empty D1 (`PLAYWRIGHT_PORT` + 3, started by
+and republish, a redirected duplicate's 308 (#338), the Tags field (#341), the allowlist, and a
+replay of each decision). The suite runs on its own local Worker and empty D1 (`PLAYWRIGHT_PORT` + 3, started by
 `playwright.config.ts` from the same build), because it publishes listings and the smoke suite
 counts the fixture seed's listings exactly.

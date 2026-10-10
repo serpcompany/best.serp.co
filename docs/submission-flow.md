@@ -95,9 +95,9 @@ status in `submission-plans.test.ts`; see [Data model](./data-model.md#statement
 
 Admins decide in `/admin` ([Admin panel](./admin-panel.md)). The review queue lists
 `verified` and `paid_pending_review` submissions and `pending_review` revisions, oldest first.
-On a submission an admin can approve (optionally editing the name, category, short and long
-description, and logo first, and choosing the outbound link; the edit and the approval are one
-batch), request changes with a note, or reject with a reason and a category; on a rejected
+On a submission an admin can approve (optionally editing the name, category, suggested tags,
+short and long description, and logo first, and choosing the outbound link; the edit and the
+approval are one batch), request changes with a note, or reject with a reason and a category; on a rejected
 prohibited URL, "Allow resubmission" lifts the block. Each decision is these plans with the
 `content_version` guard, is idempotent (a replay answers `replayed: true` and sends nothing),
 records the admin's email in the events, and emails the submitter once ("approved", "changes
@@ -117,8 +117,10 @@ The flow follows the approved #70 mockups (screens 2, 2b, 3). Every step needs t
 owner except filling in the form; the anonymous capability-token flow is gone.
 
 1. **`/submit/`** (screen 2). The form works signed out. Required: website, name, short
-   description (160 characters at most), primary category (from D1), and logo; the long
-   description is optional, and FAQs and links come later from the dashboard (#65). Signed out,
+   description (160 characters at most), primary category (an active D1 category, a hub), and
+   logo; Tags (up to three active D1 tags, the chosen category's listed first, no free text,
+   [below](#tags-and-retired-categories-341)) and the long description are optional, and FAQs
+   and links come later from the dashboard (#65). Signed out,
    the form is kept in this browser's `localStorage` (`bsc_submit_draft_v1`: only what was
    typed, never a token or an id), "Sign in and continue" goes to
    `/login/?callbackUrl=/submit/`, and the login card says the draft is waiting. Signed in, the
@@ -201,6 +203,18 @@ owner except filling in the form; the anonymous capability-token flow is gone.
    A pass moves the submission to `verified` (the review queue) and sends "submission received"
    to the submitter and "ready for review" to `EMAIL_ADMIN_RECIPIENT`, both keyed
    `submission-verified:<id>` in the email ledger.
+
+### Tags and retired categories (#341)
+
+A Creator may suggest up to three active tags (on `/submit/` and the owner's listing edit),
+stored in `tag_slugs`: null on a submission without tags, and on a revision whose tags equal the
+listing's own, which approval then leaves alone. Approval and payment
+(`createListingFromSubmissionPlans`) give the new listing the suggested tags still active, in
+order; a live or revision approval (`applyStagedContentPlans`) replaces its tags only when
+`tag_slugs` is not null. A row saved before its narrow category retired still goes live:
+`resolveStagedCategorySql` (`plan-support.ts`) files it under an active category with that slug,
+or else under the hub of the active tag with that slug, and adds that tag first. New saves still
+require an active category.
 
 ### Fetching submitters' sites
 
