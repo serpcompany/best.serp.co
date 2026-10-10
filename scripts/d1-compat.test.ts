@@ -67,6 +67,7 @@ describe('D1 compatibility of generated statements (#95 release blocker, SQLITE_
       'category-unpublish',
       'listing-categories-add',
       'listing-categories-remove',
+      'listing-categories-set',
       'listing-claim-hold-add',
       'listing-content-remove-suffix',
       'listing-media-update',

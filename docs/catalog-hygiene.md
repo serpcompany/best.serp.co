@@ -2,6 +2,8 @@
 
 What best.serp.co lists, and how listings that don't belong leave: [adult products](#adult-products-260)
 are never listed, and [the listing domain check](#the-check) finds hijacked, parked, and dead domains.
+[Listings filed under Other](#listings-filed-under-other-333) covers moving listings out of the
+catch-all category.
 
 ## Listing domains
 
@@ -210,4 +212,38 @@ archived with it in `.archive/scripts/` (#315); the committed manifest is the re
   imported FAQs never show twice.
   It never matches text in prose, and is a no-op once the manifest is published; remove it
   then.
+
+## Listings filed under Other (#333)
+
+The v1 import filed 2,419 of the 2,690 live listings under Other alone, so most category pages held
+one or two listings. They move to real categories through reviewed files:
+
+- **The inventory.** `d1/hygiene/2026-10-10-other-inventory.json` lists those 2,419 listings: name,
+  website, short description, and the start of the long description. It came from the reviewed catalog,
+  the archived v1 import with the committed manifests replayed, by a one-off script posted on #333. Each
+  listing's `categories` is what a manifest operation expects. `2026-10-10-categories.json` lists the 138
+  other live categories.
+- **The proposal.** `d1/hygiene/2026-10-10-other-categories.yaml` gives each listing a primary category
+  and up to two secondaries, or Other with a reason. Two classifier agents wrote it in two halves by slug
+  order, and the `alignments` record how their calls were made consistent. A cluster with no fitting
+  category is proposed in `newCategories` and created by no manifest, so its listings stay in Other until
+  the owner decides. A listing whose flag makes its category uncertain (mismatch, spam, dead, adult, and
+  most `other` flags) stays in Other, with the classifiers' category kept as `held`.
+  `decidedAt` is `pending` until the owner accepts it.
+- **The owner's list.** `d1/hygiene/2026-10-10-other-owner-flags.yaml` collects every flag by kind: adult,
+  spam, dead, duplicate, mismatch, and other. #333 unpublishes nothing; those listings need their own
+  decision.
+- **The manifests.** `pnpm catalog:other-categories` writes `d1/publications/2026-10-10-other-categories-NN.yaml`
+  from the proposal and the inventory. Each listing with a real primary gets one `listing-categories-set`
+  operation ([Catalog publication](./catalog-publication.md#category-operations)): `expected` is `[other]`,
+  and `categories` is the primary, then the secondaries. A batch holds 200 operations, about as many
+  statements as the legacy media batches. `scripts/other-categories-manifest.test.ts` keeps the manifests
+  identical to what the proposal generates, and replays them on the inventory, so that Other loses exactly
+  the proposed listings.
+
+The manifests are row-level, so each fits staging and production. Publish them in order, staging first,
+then production after promotion. A batch refuses whole, writing nothing, if any of its listings changed
+since the reviewed catalog: an admin edit, an approved revision, or a duplicate retired by #332. To fix a
+refused batch, set that listing's `primary` to `other` in the proposal with the reason, regenerate, and
+publish the regenerated batches. The batches before it don't change.
 

@@ -1,0 +1,996 @@
+# serpcompany/best.serp.co#333: listings the classifiers flagged for the owner while categorizing Other, by kind.
+# here says what d1/hygiene/2026-10-10-other-categories.yaml does with each: categorized (the flag is a note, or a
+# duplicate pair the owner decides), stays in Other (held until the owner decides), or left out because #337
+# unpublishes it. Nothing here is unpublished or retired by #333.
+#   adult and spam: candidates for unpublishing (#260 is closed; best.serp.co lists no adult products).
+#   dead: the product or service is gone.  duplicate: two listings for one product.
+#   mismatch: the listing's text describes something else (a policy, an article, another product).
+#   other: not a product (research, articles, agencies), black-hat SEO, academic cheating, NSFW notes.
+counts:
+  adult: 1
+  spam: 4
+  dead: 5
+  duplicate: 8
+  mismatch: 139
+  other: 38
+adult:
+  - slug: imgnai.com
+    id: lst_b03d0534f14f6e26a4531b95
+    website: https://serp.ly/imgnai
+    flag: flagship tool is an NSFW AI image generator
+    here: stays in Other
+spam:
+  - slug: copycraftai.com
+    id: lst_dd4203f6a5928714bf1f8dc6
+    website: https://serp.ly/copycraft-ai
+    flag: content promotes Indonesian "QRIS" gaming, likely a hijacked or repurposed domain
+    here: stays in Other
+  - slug: gistvid.com
+    id: lst_76ffd86ae42ae275bb20c2ad
+    website: https://serp.ly/gistvid
+    flag: content is a review of Olimp Casino for Kazakhstan gamblers, likely a hijacked domain
+    here: stays in Other
+  - slug: sparktraffic.com
+    id: lst_f6db3c974a96aee30012736f
+    website: https://serp.ly/sparktraffic.com
+    flag: sells bot-generated website traffic
+    here: stays in Other
+  - slug: trafficbotpro.com
+    id: lst_8ff2452e604429a9ac8cf274
+    website: https://serp.ly/trafficbotpro.com
+    flag: traffic bot that generates artificial website visits
+    here: stays in Other
+dead:
+  - slug: blog.rossintelligence.com
+    id: lst_5e25a65c76cf4f72196baa81
+    website: https://serp.ly/ross-intelligence
+    flag: ROSS Intelligence wound down in 2021; listing links to its blog
+    here: stays in Other
+  - slug: instacart.com
+    id: lst_77502c1d83dad6f747f36dbc
+    website: https://serp.ly/instacart-chatgpt-plugin
+    flag: ChatGPT plugins were retired in 2024
+    here: stays in Other
+  - slug: klarna.com
+    id: lst_a70d4d8fd9ecaeca027b271d
+    website: https://serp.ly/klarna-chatgpt-plugin
+    flag: ChatGPT plugins were retired in 2024
+    here: stays in Other
+  - slug: magicthumbnails.com
+    id: lst_87a3a7f579857d54d68e92b7
+    website: https://serp.ly/magicthumbnails
+    flag: content says the service shut down in February 2024
+    here: stays in Other
+  - slug: medium.engineering
+    id: lst_17013bab63a52960e2ed4a21
+    website: https://serp.ly/mediumgpt
+    flag: ChatGPT plugins were retired in 2024
+    here: stays in Other
+duplicate:
+  - slug: maestrolabs.com
+    id: lst_4c31906882b562d432dbb957
+    website: https://serp.ly/flowrite
+    flag: "same product as flowrite.com (Flowrite, now MaestroLabs), which #337 retires; maestrolabs.com stays"
+    here: "categorized: ai-email-writing-assistants"
+  - slug: notion.com
+    id: lst_07d139284ae444577f159706
+    website: https://serp.ly/notion-search
+    flag: "same product as notion.ai (Notion AI), found after #332; owner decides which stays"
+    here: "categorized: ai-productivity-tools, ai-knowledge-management"
+  - slug: phrasee.co
+    id: lst_520c843ef16b99939a10de32
+    website: https://serp.ly/phrasee.co
+    flag: same product and description as jacquard.com (Phrasee, now Jacquard)
+    here: "left out: #337 unpublishes it"
+  - slug: plusai.com
+    id: lst_9178db1976b647af0ee6a538
+    website: https://serp.ly/plusai.com
+    flag: "same company and product as plusdocs.com, found after #332; owner decides which stays"
+    here: "categorized: ai-presentation-maker"
+  - slug: plusdocs.com
+    id: lst_d2b096011b7cf4a03641f07a
+    website: https://serp.ly/plusdocs
+    flag: "same company and product as plusai.com (Plus AI), found after #332; owner decides which stays"
+    here: "categorized: ai-presentation-maker"
+  - slug: timely.com
+    id: lst_7209bfcc01723a5393382fec
+    website: https://serp.ly/timely
+    flag: "same product as timelyapp.com, which #337 retires; timely.com stays, in ai-time-tracking (#337 review)"
+    here: "categorized: ai-time-tracking"
+  - slug: timeos.ai
+    id: lst_ce9486f34a719d8172fdbf08
+    website: https://serp.ly/magical
+    flag: "same product as magical.so (timeOS, formerly Magical), which #337 retires; timeos.ai stays"
+    here: "categorized: ai-meeting-assistant, ai-note-taker"
+  - slug: trajectdata.com
+    id: lst_7cccdaebce54e5ccc387136b
+    website: https://serp.ly/scale-serp
+    flag: same product and identical text as the scaleserp.com listing
+    here: "left out: #337 unpublishes it"
+mismatch:
+  - slug: autoreviews.ai
+    id: lst_9a0b151d58241705baa5f6c8
+    website: https://serp.ly/autoreviews
+    flag: description and content are an article about Lima restaurants, not the product
+    here: stays in Other
+  - slug: auxworld.app
+    id: lst_5f6f2cffeb3e720033b6293b
+    website: https://serp.ly/auxworld
+    flag: description and content are a GDPR policy summary, not the product
+    here: stays in Other
+  - slug: bbva.com
+    id: lst_1155e368a2b3ce2b9bc406d5
+    website: https://serp.ly/spanish-speaking-banking-agent
+    flag: listing describes BBVA bank's subsidiaries, not an AI banking agent
+    here: stays in Other
+  - slug: beemerdocs.com
+    id: lst_9b54a5e9e2a0884f7117d021
+    website: https://serp.ly/beemer
+    flag: description and content are a generic AI-startups article, not the product
+    here: stays in Other
+  - slug: bookhero.ai
+    id: lst_6bcc5fd4189ff3cea0108d0b
+    website: https://serp.ly/bookhero
+    flag: description and content are its terms of service, not a product description
+    here: stays in Other
+  - slug: brevity.sh
+    id: lst_5b9d0bd8b09ce53a24b488d5
+    website: https://serp.ly/brevity
+    flag: description and content are a privacy-practices summary, not the product
+    here: stays in Other
+  - slug: browsegpt.ai
+    id: lst_661111087adaeb437f24c109
+    website: https://serp.ly/browsegpt
+    flag: content wrongly attributes BrowseGPT to Anthropic
+    here: stays in Other
+  - slug: builtin.com
+    id: lst_180026526d1b535cd7080e46
+    website: https://serp.ly/date-night-short-film
+    flag: listing is an AI short-film case study, not a tool
+    here: stays in Other
+  - slug: buzzfeed.com
+    id: lst_b917e08eb26f2af9ddeab347
+    website: https://serp.ly/buzzfeed
+    flag: description wrongly says BuzzFeed's app carries CNN and E! News
+    here: stays in Other
+  - slug: ca.la
+    id: lst_2e730c948253ad95fd4a8da3
+    website: https://serp.ly/cala
+    flag: description calls the product "Mercer"
+    here: stays in Other
+  - slug: campari.com
+    id: lst_25b448bfdf296ace3f929e62
+    website: https://serp.ly/red-diaries-fellini-forward-by-campari
+    flag: listing is a brand film campaign, not a tool
+    here: stays in Other
+  - slug: chatwithdocs.co
+    id: lst_64261277839deb0c5967e676
+    website: https://serp.ly/chatwithdocs
+    flag: description and content are a privacy and data-processing analysis
+    here: stays in Other
+  - slug: chatworm.com
+    id: lst_f1aaec3b491292846c210ae6
+    website: https://serp.ly/chat-worm
+    flag: description and content are its privacy policy
+    here: stays in Other
+  - slug: clip.audio
+    id: lst_46e586b88ad547c2938271b5
+    website: https://serp.ly/clip-audio
+    flag: listed as "Clip audio" but the content describes EasyWMA
+    here: stays in Other
+  - slug: contractreader.io
+    id: lst_ef3784c483e678e16633d42b
+    website: https://serp.ly/contractreader
+    flag: description and content are its privacy policy
+    here: stays in Other
+  - slug: coolgiftideas.io
+    id: lst_8943cfd783321a23347689b9
+    website: https://serp.ly/cool-gift-ideas
+    flag: description and content are an outdoor-gift listicle, not the product
+    here: stays in Other
+  - slug: copylime.com
+    id: lst_ad67c4d0410bc6e2340069c1
+    website: https://serp.ly/copylime
+    flag: content is a generic article on paraphrasing techniques, not the product
+    here: stays in Other
+  - slug: coverletterwrite.com
+    id: lst_ec6b6907a2bfe632f3256ae9
+    website: https://serp.ly/coverletterwrite
+    flag: description and content are HotConvo's privacy policy
+    here: stays in Other
+  - slug: curaihealth.com
+    id: lst_2990348d63566133229bac88
+    website: https://serp.ly/curai
+    flag: content is about company culture and hiring, not the product
+    here: stays in Other
+  - slug: deepmind.google
+    id: lst_60cd25ea97f789bebeccbbeb
+    website: https://serp.ly/deepmind-retro
+    flag: listed as "DeepMind RETRO" but the content covers Veo and Imagen
+    here: stays in Other
+  - slug: detangle.ai
+    id: lst_100de91ad39ef1d481615e77
+    website: https://serp.ly/detangle-ai
+    flag: description and content are its privacy policy
+    here: stays in Other
+  - slug: dev-radar.com
+    id: lst_d6e3af78fcf56ee30a8cd2f6
+    website: https://serp.ly/dev-radar
+    flag: content is a JavaScript news roundup, not a product description
+    here: stays in Other
+  - slug: earningscall.ai
+    id: lst_e41fa6f53c3dbf173400bc25
+    website: https://serp.ly/earningsdigest
+    flag: content is a generic explainer on earnings calls
+    here: stays in Other
+  - slug: essaywriters.ai
+    id: lst_200354ee6d99cc882cf96231
+    website: https://serp.ly/essay-writer-ai
+    flag: description and content are its terms of use
+    here: stays in Other
+  - slug: evintersection.com
+    id: lst_d5c89c7198f2d967643e7230
+    website: https://serp.ly/ev-intersection
+    flag: content is a "best electric vehicles" review, not a tool
+    here: stays in Other
+  - slug: extrapolate.app
+    id: lst_0151927a284dc3ec31aae926
+    website: https://serp.ly/extrapolate
+    flag: description and content are its legal terms
+    here: stays in Other
+  - slug: fabric.so
+    id: lst_fb706ee091f854530c2c5c15
+    website: https://serp.ly/fabric
+    flag: description and content are its data-handling policy
+    here: stays in Other
+  - slug: faceapp.com
+    id: lst_e0a376d8610948dc75b595bc
+    website: https://serp.ly/faceapp
+    flag: description is about Google Maps imaging
+    here: stays in Other
+  - slug: fgeneds.com
+    id: lst_c0aadeefa42334af82659911
+    website: https://serp.ly/fgeneds
+    flag: description and content are a privacy-policy summary
+    here: stays in Other
+  - slug: figma.com
+    id: lst_eb2eb75ce38971b317bc4b46
+    website: https://serp.ly/diagram
+    flag: content is a FigJam sequence-diagram guide
+    here: stays in Other
+  - slug: financebrain.ai
+    id: lst_16fdff0edd214351897faf6c
+    website: https://serp.ly/financebrain-5-01
+    flag: content is an article on corporate finance careers
+    here: stays in Other
+  - slug: findgiftsfor.com
+    id: lst_692155562a3ec71d881c94b9
+    website: https://serp.ly/findgiftsfor
+    flag: content is a Father's Day gift listicle, not the product
+    here: stays in Other
+  - slug: flexos.work
+    id: lst_d94d392151ee20f82b1e4eb4
+    website: https://serp.ly/small-steps
+    flag: content is a roundup of several productivity tools
+    here: stays in Other
+  - slug: flipped.ai
+    id: lst_9e5b6ba1460b0c5a2b6918e7
+    website: https://serp.ly/flipped
+    flag: description and content are its privacy practices
+    here: stays in Other
+  - slug: freebeat.ai
+    id: lst_2488ec9a080057fc7a5815bb
+    website: https://serp.ly/freebeat.ai
+    flag: content mixes the video generator with home-fitness routines
+    here: stays in Other
+  - slug: futurism.com
+    id: lst_733ce9e7037e300d90670f6f
+    website: https://serp.ly/coca-cola
+    flag: listing is a news article about Coca-Cola, not a tool
+    here: stays in Other
+  - slug: gems.so
+    id: lst_ed623e45f614ed9cbc000eaf
+    website: https://serp.ly/gems
+    flag: description and content are a privacy-policy summary
+    here: stays in Other
+  - slug: getchunky.io
+    id: lst_c88519c73bddb939411702d4
+    website: https://serp.ly/chunky
+    flag: description and content are a privacy policy
+    here: stays in Other
+  - slug: getmindguide.com
+    id: lst_cc0a13a08d17a3e60c2a6480
+    website: https://serp.ly/mindguide
+    flag: content is mostly a privacy and terms review
+    here: stays in Other
+  - slug: getslate.ai
+    id: lst_e1f97383042d765ad2fad2a4
+    website: https://serp.ly/zeeno
+    flag: description and content are its terms and conditions
+    here: stays in Other
+  - slug: getzuro.com
+    id: lst_b50056d12a6793a753ae8cfb
+    website: https://serp.ly/zuro
+    flag: description and content are a privacy policy and terms of use
+    here: stays in Other
+  - slug: giftbox.co
+    id: lst_b0fd1a1cb800bcb33dff99e5
+    website: https://serp.ly/gift-box
+    flag: description and content are subscription terms and a privacy policy
+    here: stays in Other
+  - slug: glyf.in
+    id: lst_e6dd8701a58d74b3ccbc1960
+    website: https://serp.ly/glyf
+    flag: description and content are a privacy-policy summary
+    here: stays in Other
+  - slug: goheather.io
+    id: lst_309b2cfc6aff3767b829292c
+    website: https://serp.ly/tally-work
+    flag: listed as "Tally.Work" but the content describes goHeather
+    here: stays in Other
+  - slug: google.com
+    id: lst_a24eed247152530e567d4b7c
+    website: https://serp.ly/apprentice-bard
+    flag: content is about fantasy role-playing game elements
+    here: stays in Other
+  - slug: govdash.com
+    id: lst_8b6bf8b5dea3e471120960e0
+    website: https://serp.ly/olli-ai
+    flag: listed as "Olli.ai" but the content describes GovDash
+    here: stays in Other
+  - slug: headlime.com
+    id: lst_3181e3545f1555f3a2b97584
+    website: https://serp.ly/headlime
+    flag: content is a CSV formatting guide
+    here: stays in Other
+  - slug: henshu.ai
+    id: lst_46f3a93fab87e9991efe28c0
+    website: https://henshu.ai
+    flag: description and content are its terms of service
+    here: stays in Other
+  - slug: heroguide.ai
+    id: lst_0fead6f869bf0b5685e44e3d
+    website: https://serp.ly/brandscript-generator
+    flag: description and content describe Chargezoom accounts receivable, not a BrandScript generator
+    here: stays in Other
+  - slug: il.ly
+    id: lst_59edce7642b39c54683ffbc4
+    website: https://serp.ly/castpush
+    flag: content reviews StoryChief, Typefully and TweetHunter instead of Castpush
+    here: stays in Other
+  - slug: instant-portrait.com
+    id: lst_9dc79868e5357394ceeaf5e8
+    website: https://serp.ly/instant-portrait
+    flag: description and content are its data-collection policy
+    here: stays in Other
+  - slug: institutionalinvestor.com
+    id: lst_3eca7e30ed63d6e1e7187d61
+    website: https://serp.ly/jerome-powell-bot
+    flag: listing is a magazine article, not a tool
+    here: stays in Other
+  - slug: interflexion.com
+    id: lst_26f1d1e47b825f8a0aee8c64
+    website: https://serp.ly/interflexion
+    flag: content is a job posting, not a product description
+    here: stays in Other
+  - slug: irmoai.com
+    id: lst_22c26314c034b0506b9e10d2
+    website: https://serp.ly/irmo
+    flag: description and content are its terms and conditions
+    here: stays in Other
+  - slug: itraveledthere.io
+    id: lst_b40d1965a9afbd5b5a9b6644
+    website: https://serp.ly/itraveledthere
+    flag: content is a travel-photography techniques article, not the product
+    here: stays in Other
+  - slug: ivy.ai
+    id: lst_6db5fa5f9739c00330650eae
+    website: https://serp.ly/ivy-ai
+    flag: content is a generic overview of AI technology
+    here: stays in Other
+  - slug: jessezhang.org
+    id: lst_e8a8194c24cdf98a41854bac
+    website: https://serp.ly/papers-gpt
+    flag: content is a personal technical portfolio, not Papers GPT
+    here: stays in Other
+  - slug: joinrhubarb.com
+    id: lst_47f752f0373223f81dd5de9e
+    website: https://serp.ly/artickl
+    flag: listed as "artickl" but the content describes Rhubarb
+    here: stays in Other
+  - slug: joinsquad.co
+    id: lst_21c54d39c669ee0db1f92feb
+    website: https://serp.ly/quazilla-by-squad
+    flag: listed as "Quazilla by Squad" but the content describes the Squad habit app
+    here: stays in Other
+  - slug: kadoa.com
+    id: lst_0016fd7139440ce2b067e28b
+    website: https://serp.ly/joblens
+    flag: listed as "Joblens" but the content describes Kadoa
+    here: stays in Other
+  - slug: kaiber.ai
+    id: lst_ca8f70fd1b9778d1678449c1
+    website: https://serp.ly/kaiber-ai
+    flag: content is about Kaiber Labs' art projects rather than the product
+    here: stays in Other
+  - slug: kamaraapp.com
+    id: lst_e187bd1246ba1555202b9cd5
+    website: https://serp.ly/kamara
+    flag: description and content are its terms and privacy
+    here: stays in Other
+  - slug: kleap.co
+    id: lst_43ecde23c619be17d8569b3e
+    website: https://serp.ly/kleap
+    flag: content is about a QR code generator
+    here: stays in Other
+  - slug: klynk.ai
+    id: lst_c402e8563e7c2725905c9962
+    website: https://serp.ly/klynk
+    flag: description and content are a data-collection policy
+    here: stays in Other
+  - slug: knowbuddy.ai
+    id: lst_9dc185da437179d0e0812db2
+    website: https://serp.ly/knowbuddy
+    flag: description and content are a privacy summary
+    here: stays in Other
+  - slug: korewa.ai
+    id: lst_66fa7b65e6de3a5ea8131ff2
+    website: https://serp.ly/korewa
+    flag: description and content are its legal and privacy terms
+    here: stays in Other
+  - slug: kotaku.com
+    id: lst_e5c385731eea4cf758a44cea
+    website: https://serp.ly/video-game-reviewer
+    flag: listing is a Kotaku article, not a tool
+    here: stays in Other
+  - slug: letsfoodie.com
+    id: lst_80f38e54e082d555c03e7016
+    website: https://serp.ly/recipes-by-ai
+    flag: content is an article about French mirepoix, not the product
+    here: stays in Other
+  - slug: lifesight.io
+    id: lst_c3685bbd8f03a485050b86f8
+    website: https://serp.ly/moda
+    flag: listed as "Moda" on lifesight.io
+    here: stays in Other
+  - slug: linktr.ee
+    id: lst_3697ffd0390be1797de944d2
+    website: https://serp.ly/dreamlife-ai
+    flag: listing is a Linktree link and the content describes sales recruitment, not a product
+    here: stays in Other
+  - slug: lovelacestudio.com
+    id: lst_49aeeb51a957c870506947e6
+    website: https://serp.ly/lovelace-studio
+    flag: description and content are its CCPA privacy policy
+    here: stays in Other
+  - slug: medium.com
+    id: lst_1911071766bbc41a9e8e013f
+    website: https://serp.ly/inventorbot
+    flag: listing is a Medium article, not a tool
+    here: stays in Other
+  - slug: meiro.cc
+    id: lst_0c970e9b0f6faca5ce1300c3
+    website: https://serp.ly/meiro
+    flag: content is a Make integration how-to, not a product description
+    here: stays in Other
+  - slug: mikeai.co
+    id: lst_e9c853a2b4c577c4f52c6089
+    website: https://serp.ly/mikeai
+    flag: content describes bank and card money transfers, not an AI tool
+    here: stays in Other
+  - slug: mirrorthink.ai
+    id: lst_d9b7038019521350945ec598
+    website: https://serp.ly/mirrorthink
+    flag: description and content cover subscription and refund policies, not the product
+    here: stays in Other
+  - slug: mutinyhq.com
+    id: lst_414adeabaecab8db594c8c29
+    website: https://serp.ly/mutiny
+    flag: description and content summarize its privacy and data-collection policy, not the product
+    here: stays in Other
+  - slug: mynd.so
+    id: lst_5a79da39350f6b5cfb7c0242
+    website: https://serp.ly/mynd
+    flag: description and content are its privacy and terms-of-use policies; product not described
+    here: stays in Other
+  - slug: namelyai.com
+    id: lst_f4eebe99eb569a99e17a804b
+    website: https://serp.ly/callconnect
+    flag: description and content compare two companies' privacy policies; product not described
+    here: stays in Other
+  - slug: nautilushomeschool.com
+    id: lst_5dcb90595dbd5cd6f3aa781b
+    website: https://serp.ly/story-multiplier
+    flag: listed as "Story multiplier" but the text describes a homeschool curriculum
+    here: stays in Other
+  - slug: notepd.com
+    id: lst_a8b275a1d9b4092d4474f6e3
+    website: https://serp.ly/write-with-james
+    flag: content is an essay on James Altucher's writing career, not a product description
+    here: stays in Other
+  - slug: nourishingsoftware.com
+    id: lst_a3a7b0ac3de6e92997424afa
+    website: https://serp.ly/productivity-pet
+    flag: description and content cover the app's privacy and data-collection practices, not its features
+    here: stays in Other
+  - slug: onetask.me
+    id: lst_be0db4b7d9c5ff6589f93827
+    website: https://serp.ly/simpler
+    flag: content is a generic essay on AI decision trees, not the product
+    here: stays in Other
+  - slug: ora.ai
+    id: lst_05cb99f9e2832e8d9a46dc86
+    website: https://serp.ly/ora-ai
+    flag: description and content are its privacy and data-handling practices; product not described
+    here: stays in Other
+  - slug: perxeive.com
+    id: lst_06fafc4b597cfd997189d43c
+    website: https://serp.ly/perxeive
+    flag: description and content explain the ReAct reasoning framework, not Perxeive
+    here: stays in Other
+  - slug: philosophy.fyi
+    id: lst_d1c47389617fd3b00190a007
+    website: https://serp.ly/philosophy
+    flag: description and content are its privacy policy; product not described
+    here: stays in Other
+  - slug: plantrips.net
+    id: lst_7c07fff1ceb3fff1a0ab5a70
+    website: https://serp.ly/plantrips
+    flag: description and content are a sample 14-day Thailand itinerary, not the product
+    here: stays in Other
+  - slug: podcastworld.io
+    id: lst_49b36ab05426dce4b3af20df
+    website: https://serp.ly/podcast-disclosed
+    flag: description and content review The Mel Robbins Podcast and others, not the product
+    here: stays in Other
+  - slug: prompthero.com
+    id: lst_7b9eb63603e37a100a34740c
+    website: https://serp.ly/prompthero
+    flag: description and content describe one example cyborg image prompt, not the product
+    here: stays in Other
+  - slug: prompts.ai
+    id: lst_aa994ab82b20f971f6cde6a7
+    website: https://prompts.ai
+    flag: description and content are a one-line privacy-policy summary; product not described
+    here: stays in Other
+  - slug: question-aid.com
+    id: lst_71d2760fca9652cf7a87bf0b
+    website: https://serp.ly/questionaid
+    flag: description and content are its terms of service; product not described
+    here: stays in Other
+  - slug: quino.ai
+    id: lst_6c7b0c7299222e8d2453cd14
+    website: https://serp.ly/quino
+    flag: description and content are its terms and conditions; product not described
+    here: stays in Other
+  - slug: rapideditor.org
+    id: lst_4275884092ff11a244ddc555
+    website: https://serp.ly/mapwith-ai
+    flag: description and content are its data policy and terms of use, not the product
+    here: stays in Other
+  - slug: raplyrics.eu
+    id: lst_048fc38286c84531cfc79405
+    website: https://serp.ly/raplyrics
+    flag: description is a rap-history essay title, not the product
+    here: stays in Other
+  - slug: react.dev
+    id: lst_9c69952e69ab3057da6774ab
+    website: https://serp.ly/text-to-jsx
+    flag: listed as "Text to JSX" but the content is React's JSX documentation, not a tool
+    here: stays in Other
+  - slug: reroom.ai
+    id: lst_2a2a252bb0118ce7668b1dd4
+    website: https://reroom.ai
+    flag: description and content describe one sample office redesign, not the product
+    here: stays in Other
+  - slug: riffusion.com
+    id: lst_d18bb5bd94d45912b957eef4
+    website: https://serp.ly/riffusion
+    flag: description and content summarize its terms and data practices, not the product
+    here: stays in Other
+  - slug: riogpt.com
+    id: lst_d63eeb22dc5a32c96514ef87
+    website: https://serp.ly/riogpt
+    flag: description and content are its terms of use and privacy rules; product not described
+    here: stays in Other
+  - slug: roblox.com
+    id: lst_0225b131dfae5a0f7ec1353d
+    website: https://serp.ly/roblox.com
+    flag: description and content are Roblox's community standards; not an AI tool listing
+    here: stays in Other
+  - slug: salley.co
+    id: lst_ac7d8b7bc8ff1d40e833a485
+    website: https://serp.ly/salley
+    flag: description is about a refund policy and content about a leadership program; the product is unclear
+    here: stays in Other
+  - slug: serper.dev
+    id: lst_d16531f2468cffa7d520320e
+    website: https://serp.ly/serper
+    flag: description and content cover its data collection and privacy practices, not the API
+    here: stays in Other
+  - slug: seths.blog
+    id: lst_62dbd4f799836d0e7833fe41
+    website: https://serp.ly/seths-chatbot
+    flag: description and content are a blog essay about ChatGPT, not the chatbot
+    here: stays in Other
+  - slug: shello-ai.com
+    id: lst_353ad6a655ecb829238bb883
+    website: https://serp.ly/shello-ai
+    flag: description and content are its privacy and data-handling practices; product not described
+    here: stays in Other
+  - slug: sketchpro.ai
+    id: lst_2f6d4577a08133c3860df9f1
+    website: https://serp.ly/sketchpro-ai
+    flag: description and content are a templated privacy policy with a "[Company Name]" placeholder
+    here: stays in Other
+  - slug: slashdreamer.com
+    id: lst_9b669e386179257df16f65b3
+    website: https://serp.ly/dreamer
+    flag: content summarizes its terms of service rather than the product
+    here: stays in Other
+  - slug: steno.ai
+    id: lst_0940e0a8e3ac40d94be4aa4e
+    website: https://serp.ly/steno
+    flag: description and content are its data-collection practices and terms of service; product not described
+    here: stays in Other
+  - slug: supermanage.ai
+    id: lst_de04ce8cc40f853146b1d6f6
+    website: https://serp.ly/supermanage-ai
+    flag: content is a generic article on team management, not the product
+    here: stays in Other
+  - slug: synexr.com
+    id: lst_6b0a4492baa479f10c0ff396
+    website: https://serp.ly/synexr
+    flag: description and content describe the "Paradise Picnic Reserve", unrelated to Synexr
+    here: stays in Other
+  - slug: tally.so
+    id: lst_0fe97057f423a0ccbc2a27bc
+    website: https://serp.ly/startup-pitch-generator
+    flag: listed as "Startup Pitch Generator" but the text describes the Tally form builder
+    here: stays in Other
+  - slug: teameet.cc
+    id: lst_7851f855e53e35b3f0317f14
+    website: https://serp.ly/teameet
+    flag: description and content are its data-collection and privacy practices, not the product
+    here: stays in Other
+  - slug: thinktask.io
+    id: lst_12153b22b196f08b84410376
+    website: https://serp.ly/thinktask
+    flag: description and content are pricing, privacy and terms text; product not clearly described
+    here: stays in Other
+  - slug: timecomplexity.ai
+    id: lst_12051c8372fe6f55caa96816
+    website: https://serp.ly/timecomplexity
+    flag: description and content are a general guide to time complexity, not the tool
+    here: stays in Other
+  - slug: toptal.com
+    id: lst_c5eb74d3a5b1552e3053b613
+    website: https://serp.ly/ai-project-description-generator
+    flag: content is a generic essay on AI content generation, not the tool
+    here: stays in Other
+  - slug: totemotech.com
+    id: lst_1b8b02fc8639ba2296b92ac3
+    website: https://serp.ly/totemotech
+    flag: description and content are a Japanese tech and gaming news roundup
+    here: stays in Other
+  - slug: transkrip.xyz
+    id: lst_9d07564d525863952c348da8
+    website: https://serp.ly/transkrip
+    flag: description and content are its privacy policy and terms of service
+    here: stays in Other
+  - slug: triplewhale.com
+    id: lst_4a8b8006361d29300b80f3de
+    website: https://serp.ly/willy
+    flag: content is a general article on AI in digital marketing, not the product
+    here: stays in Other
+  - slug: trustfinta.com
+    id: lst_98d348511e769332b3d28049
+    website: https://serp.ly/finta
+    flag: description and content lead with branded merchandise (mouse pad, hat, hoodie) rather than the product
+    here: stays in Other
+  - slug: trychart.com
+    id: lst_795ef4aec773c35b3a889240
+    website: https://serp.ly/chart
+    flag: description and content are its data-collection and privacy practices; product not described
+    here: stays in Other
+  - slug: trykai.app
+    id: lst_70b06cbf874323fa578fc620
+    website: https://serp.ly/kai-app
+    flag: description and content focus on its data practices rather than features
+    here: stays in Other
+  - slug: tubemagic.com
+    id: lst_ba7217e8db768dd57cecb220
+    website: https://serp.ly/morise-ai
+    flag: listed under the name "Morise.ai" but the text describes TubeMagic
+    here: stays in Other
+  - slug: twain.ai
+    id: lst_1aa53dfc89bdec73e738beef
+    website: https://serp.ly/usetwain
+    flag: description and content are its privacy practices; product not described
+    here: stays in Other
+  - slug: typeblock.co
+    id: lst_1dc73ba63ac1ba4664e1c206
+    website: https://serp.ly/typeblock
+    flag: description and content are a coding tutorial on OpenAI API streaming
+    here: stays in Other
+  - slug: ulog.ai
+    id: lst_d616541bc319bbf807ad3ed6
+    website: https://serp.ly/ulog
+    flag: description and content are its security, bug-bounty and privacy practices; product not described
+    here: stays in Other
+  - slug: up.codes
+    id: lst_45c9d56de66e6927a0c31051
+    website: https://serp.ly/upcodes
+    flag: description and content summarize New York City building codes, not the product
+    here: stays in Other
+  - slug: usedouble.com
+    id: lst_9eb86fa44ddd6cdc89ec0b9b
+    website: https://serp.ly/double
+    flag: description and content are its privacy policy; product not described
+    here: stays in Other
+  - slug: versy.ai
+    id: lst_908cb59b33bde891eb1fb787
+    website: https://serp.ly/versy-ai
+    flag: description and content are its terms of service and privacy policy; product not described
+    here: stays in Other
+  - slug: visus.ai
+    id: lst_0df9d8da7e9444769360a923
+    website: https://serp.ly/visus
+    flag: description and content are its data-collection and privacy practices; product not described
+    here: stays in Other
+  - slug: vogent.ai
+    id: lst_dba282aa0242c1e73fbc1590
+    website: https://serp.ly/elto
+    flag: description and content are an article about web design careers
+    here: stays in Other
+  - slug: webquery.net
+    id: lst_bc082459984d538bc3b0080b
+    website: https://serp.ly/webquery
+    flag: description and content are its terms of service and privacy policy; product not described
+    here: stays in Other
+  - slug: wewritecards.com
+    id: lst_77ae684cc2eadf6a913e6c0d
+    website: https://serp.ly/we-write-cards
+    flag: listed as "We Write Cards" but the text describes Lazy Cards
+    here: stays in Other
+  - slug: withpoly.com
+    id: lst_361c73d9369d39c27c3c2adc
+    website: https://withpoly.com
+    flag: description and content are its terms of service agreement; product not described
+    here: stays in Other
+  - slug: wiz.chat
+    id: lst_dd2e21700357ffbf55a374fb
+    website: https://serp.ly/wiz-chat
+    flag: description and content are its terms of service; product not described
+    here: stays in Other
+  - slug: wizu.com
+    id: lst_217eaa52954b8a32eaae9ab0
+    website: https://serp.ly/case-study-writer
+    flag: listed as "Case Study Writer" but the text describes Wizu conversational surveys
+    here: stays in Other
+  - slug: wnr.ai
+    id: lst_e2679b55281eb985e69245b7
+    website: https://serp.ly/wnr
+    flag: description and content are its community guidelines; product not described
+    here: stays in Other
+  - slug: wonderplan.ai
+    id: lst_6176283ba2033646b3fbba64
+    website: https://serp.ly/wonderplan
+    flag: description and content are a sample US itinerary and history overview, not the product
+    here: stays in Other
+  - slug: writepanda.ai
+    id: lst_7506e4284cf646247968a59c
+    website: https://serp.ly/write-panda
+    flag: description and content are its privacy policy and terms of service; product not described
+    here: stays in Other
+  - slug: writepaw.com
+    id: lst_06b2871c098329279341b86c
+    website: https://serp.ly/writepaw
+    flag: description and content are its terms of service and privacy policy
+    here: stays in Other
+  - slug: yesilhealth.com
+    id: lst_eecc7937b38e911c4bfe5e88
+    website: https://serp.ly/yesil-health
+    flag: description and content are a general women's health guide, not the product
+    here: stays in Other
+  - slug: yoursearch.ai
+    id: lst_96bcf8728b85ea63ab330be1
+    website: https://serp.ly/yoursearch
+    flag: description and content describe login and verification UI text; product not described
+    here: stays in Other
+  - slug: zizoto.com
+    id: lst_3fa8fadd5f00694fa8480b01
+    website: https://serp.ly/zizoto
+    flag: description and content are its terms of service rather than the product
+    here: stays in Other
+other:
+  - slug: babylontraffic.com
+    id: lst_68ae48f069b83b796f35752a
+    website: https://serp.ly/babylontraffic.com
+    flag: sells artificial website traffic from proxies, a black-hat SEO product
+    here: stays in Other
+  - slug: bjoernkarmann.dk
+    id: lst_928fb49dfea53856898eb299
+    website: https://serp.ly/paragraphica
+    flag: an art-project camera, not a usable software product
+    here: stays in Other
+  - slug: blog.google
+    id: lst_d2f7919049702dd2963b7fe1
+    website: https://blog.google
+    flag: a research model announced on blog.google, not a standalone product; superseded by Gemini
+    here: stays in Other
+  - slug: boredhumans.com
+    id: lst_79235d919fdb51b7df5cc60c
+    website: https://serp.ly/boredhumans
+    flag: 'one of its tools is a celebrity-style "virtual girlfriend" (owner question in #260)'
+    here: stays in Other
+  - slug: botto.com
+    id: lst_893f55d321289d392ca22727
+    website: https://serp.ly/botto
+    flag: an AI art project, not a tool users run themselves
+    here: stays in Other
+  - slug: centerconstructionus.com
+    id: lst_199357ea1990cfb9ff604709
+    website: https://serp.ly/centerconstructionus.com
+    flag: a local roofing contractor, unrelated to the directory
+    here: stays in Other
+  - slug: clickseo.io
+    id: lst_b36e1ec8bbf104f63cbe10b4
+    website: https://serp.ly/clickseo.io
+    flag: sells bot traffic to manipulate Google rankings, a black-hat SEO product
+    here: stays in Other
+  - slug: collegetools.io
+    id: lst_34a6254128744203a5387fca
+    website: https://serp.ly/college-tools
+    flag: markets hidden answers inside LMS quizzes, i.e. academic cheating
+    here: stays in Other
+  - slug: ctrify.com
+    id: lst_a7da3750fe77057068557f2c
+    website: https://serp.ly/ctrify
+    flag: sells click-through-rate manipulation, a black-hat SEO product
+    here: stays in Other
+  - slug: ctrmaster.co
+    id: lst_0fb5d7882d85e0a13cb217d4
+    website: https://serp.ly/ctrmaster.co
+    flag: sells click-through-rate manipulation, a black-hat SEO product
+    here: stays in Other
+  - slug: drawmeasheep.net
+    id: lst_1c89bfadb6c88a3392726eac
+    website: https://drawmeasheep.net
+    flag: an art blog project, not a usable tool
+    here: stays in Other
+  - slug: earkind.com
+    id: lst_3116fb5e4a066794366ae805
+    website: https://serp.ly/earkind
+    flag: an AI-generated podcast show, not a tool
+    here: stays in Other
+  - slug: eightsleep.com
+    id: lst_ccde81cef2a1a7ec07a003d2
+    website: https://serp.ly/pod-ai-by-eightsleep
+    flag: a hardware smart bed, not a software tool
+    here: stays in Other
+  - slug: freedomgpt.com
+    id: lst_821e01a7fd89534e3ab9d9d4
+    website: https://serp.ly/freedomgpt
+    flag: markets an uncensored chatbot (Liberty); not adult
+    here: "categorized: ai-chatbots"
+  - slug: getinspo.co
+    id: lst_6672728a53176a9df7746153
+    website: https://serp.ly/inspo
+    flag: "imported copy is an essay that mentions escorts, not the product (owner question in #260)"
+    here: stays in Other
+  - slug: githubnext.com
+    id: lst_fb8cb45ea945475aa2623277
+    website: https://serp.ly/hey,-github!
+    flag: a GitHub Next research preview, not a shipping product
+    here: stays in Other
+  - slug: gptinf.com
+    id: lst_531523d29ca24e1012c2d9ad
+    website: https://serp.ly/gptinf
+    flag: markets bypassing AI-content detectors, including in academic work
+    here: stays in Other
+  - slug: graydient.ai
+    id: lst_e4cd27584045e22d95fbd69e
+    website: https://serp.ly/pirate-diffusion
+    flag: Pirate Diffusion is marketed as uncensored and permits NSFW image generation
+    here: stays in Other
+  - slug: idw-online.de
+    id: lst_dd08d9496d31db72c99ff8da
+    website: https://serp.ly/opengpt-x
+    flag: a press release about a research consortium, not a usable tool
+    here: stays in Other
+  - slug: jamesyu.org
+    id: lst_a91faccd5a59db32abf3a414
+    website: https://serp.ly/centaur-bard
+    flag: a personal project page, not a usable tool
+    here: stays in Other
+  - slug: lifearchitect.ai
+    id: lst_a29e89f0ccaaa9f97eb51f88
+    website: https://serp.ly/gpt-3-leta
+    flag: an informational site and video series, not a usable tool
+    here: stays in Other
+  - slug: livekit.io
+    id: lst_fba8f8c4b45e258bb7536c19
+    website: https://serp.ly/kitt
+    flag: Kitt is a LiveKit demo app; LiveKit itself is a developer platform
+    here: stays in Other
+  - slug: makeavideo.studio
+    id: lst_a25957a959adf7a9727dff5f
+    website: https://serp.ly/make-a-video
+    flag: a Meta research demo, not a publicly available product
+    here: stays in Other
+  - slug: medarc.ai
+    id: lst_c0d68e67d274fa20ec667497
+    website: https://serp.ly/medarc
+    flag: a research collective, not a usable tool
+    here: stays in Other
+  - slug: memprompt.com
+    id: lst_7f35edd387c30761a5c41d88
+    website: https://serp.ly/memprompt
+    flag: an academic research project page, not a usable tool
+    here: stays in Other
+  - slug: opendream.ai
+    id: lst_d54f33d12601d7461ff8bdd0
+    website: https://serp.ly/opendream
+    flag: "paid plan advertises NSFW prompt support (general art tool, kept in #260)"
+    here: "categorized: ai-art-generators, ai-image-generators"
+  - slug: openjourneybot.com
+    id: lst_344258a2d11f80d864ecd3f3
+    website: https://serp.ly/openjourney-bot
+    flag: "a paid tier advertises uncensored image generation (general image generator, like opendream.ai in #260)"
+    here: "categorized: ai-image-generators, ai-art-generators"
+  - slug: orderhive.com
+    id: lst_66ac6d5550027a4a919958c4
+    website: https://serp.ly/orderhive.com
+    flag: Orderhive is now Cin7 and the listing text describes Cin7
+    here: "categorized: order-management-software, multi-channel-ecommerce-software"
+  - slug: pioneer.app
+    id: lst_c3583ef0977cca5ec978ee75
+    website: https://serp.ly/gpt-3-demo-day-by-pioneer
+    flag: a startup accelerator and its demo day event, not a product
+    here: stays in Other
+  - slug: pudding.cool
+    id: lst_53019b9e1a4b0749bed05a50
+    website: https://serp.ly/nothing-breaks-like-a-i-heart
+    flag: an interactive essay from The Pudding, not a product
+    here: stays in Other
+  - slug: replicate.com
+    id: lst_a8004ac9537c734125cfd07c
+    website: https://serp.ly/film
+    flag: the listing is Google Research's FILM model hosted on Replicate, filed under the slug replicate.com
+    here: stays in Other
+  - slug: sportsprediction.ai
+    id: lst_e370d3a896d1ed8ac6f25258
+    website: https://serp.ly/ai-sports-prediction
+    flag: sports betting (gambling) predictions
+    here: stays in Other
+  - slug: studycrumb.com
+    id: lst_cd6fbabc56e9de5a55863835
+    website: https://serp.ly/studycrumb
+    flag: mainly a human academic writing service for students, not an AI tool
+    here: stays in Other
+  - slug: syntheticstandard.com
+    id: lst_d1d90900c2f4ca4fa3899c41
+    website: https://serp.ly/synthetic-standard
+    flag: an AI-written news publication, not a tool
+    here: stays in Other
+  - slug: towardsdatascience.com
+    id: lst_949757868520edabed992c0b
+    website: https://serp.ly/wu-dao-2-0
+    flag: a Towards Data Science article about Wu Dao 2.0, not a product
+    here: stays in Other
+  - slug: uploadvr.com
+    id: lst_78e3ae75ecdaf00627dde6a8
+    website: https://serp.ly/vr-non-player-characters
+    flag: a news article from UploadVR, not a product
+    here: stays in Other
+  - slug: vice.com
+    id: lst_e91939971d24849a53f9f1fa
+    website: https://serp.ly/codevox
+    flag: the listing is CodeVox but is filed under the slug vice.com
+    here: stays in Other
+  - slug: watercoolertrivia.com
+    id: lst_135b9cf2a6b439a08393dad4
+    website: https://serp.ly/gpt-3-vs-water-cooler-trivia-participants
+    flag: a blog experiment comparing GPT-3 with trivia players, not a product
+    here: stays in Other
