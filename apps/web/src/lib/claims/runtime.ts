@@ -5,10 +5,8 @@ import { createClaimOperations } from '@/db/claims'
 import { createDatabase } from '@/db/client'
 import { claimCodeKey, consumeRequestRateLimit } from '@/lib/auth/server'
 import { emailEventKey, enqueueEmail } from '@/lib/email/server'
-import { featureCopy } from '@/lib/feature-copy'
 import { features as siteFeatures } from '@/lib/features'
-import { badgeProgramEnabled } from '@/lib/worker/scheduled'
-import { type ClaimFlags, claimFlags } from './flags'
+import { claimFlags } from './flags'
 import { claimRecipientRateLimitRules } from './limits'
 import { safeResolveLanding } from './product'
 import type { ClaimDependencies } from './service'
@@ -16,7 +14,8 @@ import type { ClaimDependencies } from './service'
 /**
  * Server-only adapter for claims (#67): validates the Worker's `DB` binding and
  * `D1_RUNTIME_ENV`, and wires the claim flow to D1 (`@/db/claims`), the
- * code key, and the email module. All SQL lives in `src/db`.
+ * code key, and the email module. All SQL lives in `src/db`. The flags and the dialog's copy
+ * are in `./current`, which the listing page reads without loading this module (#334).
  */
 
 const runtimeEnvironments = new Set(['local', 'staging', 'production'])
@@ -24,7 +23,6 @@ const runtimeEnvironments = new Set(['local', 'staging', 'production'])
 interface ClaimEnv {
   D1_RUNTIME_ENV?: string
   DB?: D1Database
-  LOCAL_BADGE_PROGRAM?: string
   LOCAL_CLAIMS?: string
   LOCAL_ORDERS?: string
   SITE_ENVIRONMENT?: string
@@ -33,21 +31,6 @@ interface ClaimEnv {
 async function claimEnv(): Promise<ClaimEnv> {
   const { env } = await getCloudflareContext({ async: true })
   return env as unknown as ClaimEnv
-}
-
-/** Whether claims are on for this Worker (`features.claims`, or a local Worker that asks). */
-export async function currentClaimFlags(): Promise<ClaimFlags> {
-  return claimFlags(await claimEnv(), siteFeatures)
-}
-
-/**
- * The claim dialog's flagged copy (`featureCopy().claim`): it promises weekly checks only while
- * the badge program actually runs on this Worker (#66, `badgeProgramEnabled`).
- */
-export async function currentClaimCopy() {
-  const env = await claimEnv()
-  return featureCopy({ ...siteFeatures, badgeProgram: badgeProgramEnabled(env, siteFeatures) })
-    .claim
 }
 
 export async function claimDependencies(): Promise<ClaimDependencies> {

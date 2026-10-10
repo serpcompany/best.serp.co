@@ -37,7 +37,8 @@ the sites belongs in the theme's token values, not in a component.
   menu holds the Light, Dark and System row (`ThemeMenuRow`), the phone menu has `ThemeToggle`,
   and the dashboards have serplists' theme row, `ThemeMenuButton`, in the sidebar footer.
 - **Long text.** A listing's Markdown renders in `prose` through `components/content/
-  mdx-components.tsx`. The legal pages use `.prose-docs` from `globals.css`, as serp.co does.
+  mdx-components.tsx`, from the tree the data cache keeps for it (`components/content/
+  markdown-tree.tsx`, #334). The legal pages use `.prose-docs` from `globals.css`, as serp.co does.
 
 ### Tokens
 

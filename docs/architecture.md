@@ -47,7 +47,9 @@ change runs in a protected workflow.
   jobs: [draft reminders](./submission-flow.md#draft-reminders-and-expiry) and the
   [billing sweep](./billing.md) (hourly), and the [badge program](./badge-program.md).
 - `apps/web/src/lib/catalog/` acquires the binding, validates the runtime environment,
-  and deduplicates reads per request. It contains no SQL.
+  and deduplicates reads per request. It also derives each listing body's Markdown tree
+  through the epoch-keyed data cache, so a listing page renders it instead of parsing the
+  body ([Caching](./caching.md), #334). It contains no SQL.
 - `apps/web/src/lib/submissions/` validates the binding, fetches submitters' pages and images
   only through its bounded safe fetcher (badge checks, URL prefill, logo checks), and
   delegates every submission read and write to `apps/web/src/db/`, scoped to the owner.

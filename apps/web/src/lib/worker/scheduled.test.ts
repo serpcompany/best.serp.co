@@ -2,13 +2,13 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SqliteD1 } from '@/db/test-support'
+import { badgeProgramEnabled } from '../badge-program/enabled'
 import { BADGE_DAILY_CRON, BADGE_WEEKLY_CRON } from '../badge-program/schedule'
 import { MISSING_PROVIDER_SECRETS, TEST_PROVIDER_SECRETS } from '../billing/providers/test-support'
 import { clearDevEmailOutbox, readDevEmailOutbox } from '../email/senders'
 import type { SiteFeatures } from '../features'
 import { submissionBadgeVerificationTargets } from '../submissions/presentation'
 import {
-  badgeProgramEnabled,
   badgeProgramJob,
   billingJob,
   createBadgeProgramJob,
