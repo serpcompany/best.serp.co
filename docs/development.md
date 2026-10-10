@@ -15,8 +15,9 @@ pnpm db:verify:local
 migrations, and seeds fake data in a few seconds: 55 published listings in three categories
 (one paginates) and an empty one, listings with and without a logo, hosted media, FAQs,
 resource links, owners, claim and badge-program states, an unpublished and a never-published
-listing, and three users: `admin@example.com` (allowlisted), `submitter@example.com` (a
-submission in every status, a pending revision) and `owner@example.com`. Its logos are generated
+listing, tags (one retired), best pages with pins, taxonomy redirects, and three users:
+`admin@example.com` (allowlisted), `submitter@example.com` (a submission in every status, a
+pending revision) and `owner@example.com`. Its logos are generated
 PNGs hosted through the real media ingestion path. Re-running it gives the same rows; it refuses
 a Worker config that is not the local one. Stop a running preview first, or restart it after.
 The facts tests assert (slugs, names, counts) live in `apps/web/e2e/seed-facts.ts`, the rows in

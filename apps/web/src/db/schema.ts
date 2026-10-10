@@ -105,6 +105,15 @@ export type WithdrawalReason = (typeof withdrawalReasons)[number]
 const isoInstantCheck = (column: { name: string }) =>
   sql`${sql.identifier(column.name)} IS strftime('%Y-%m-%dT%H:%M:%fZ', ${sql.identifier(column.name)})`
 
+/** How many tags a Creator may suggest on a submission or revision (#341). */
+export const MAX_SUGGESTED_TAGS = 3
+
+/** A JSON array of at most `MAX_SUGGESTED_TAGS` entries, or NULL ("not given"). */
+const tagSlugsCheck = (column: { name: string }) => {
+  const value = sql.identifier(column.name)
+  return sql`${value} IS NULL OR (json_valid(${value}) AND json_type(${value}) = 'array' AND json_array_length(${value}) <= ${sql.raw(String(MAX_SUGGESTED_TAGS))})`
+}
+
 export const listingOwnerRoles = ['owner'] as const
 /**
  * How a listing's owner was established: their approved submission, a badge or paid claim (#67),
@@ -281,6 +290,188 @@ export const listingCategories = sqliteTable(
       .where(sql`${table.isPrimary} = 1`),
     index('listing_categories_category_idx').on(table.categoryId, table.listingId),
     index('listing_categories_listing_order_idx').on(table.listingId, table.sortOrder)
+  ]
+)
+
+/**
+ * The three-layer taxonomy (serpcompany/best.serp.co#341): a category is a broad topic hub, a tag
+ * a finer grouping inside one hub that a listing may carry many of, and a best page a ranked list
+ * at `/best/<slug>/` that targets one search phrase. The triggers of `0013_taxonomy_triggers` keep
+ * an active tag under an active hub and a membership off a retired tag.
+ */
+export const tags = sqliteTable(
+  'tags',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    /** `/products/tags/<slug>/`; a retired narrow category's slug is reused as its tag's. */
+    slug: text('slug').notNull(),
+    name: text('name').notNull(),
+    description: text('description').notNull().default(''),
+    /** The tag's hub. */
+    categoryId: integer('category_id')
+      .notNull()
+      .references(() => categories.id, { onDelete: 'restrict' }),
+    sortOrder: integer('sort_order').notNull().default(0),
+    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+    createdAt: text('created_at').notNull().default(currentTimestamp),
+    updatedAt: text('updated_at').notNull().default(currentTimestamp)
+  },
+  table => [
+    unique('tags_slug_unique').on(table.slug),
+    check('tags_is_active_boolean', booleanCheck(table.isActive)),
+    index('tags_category_idx').on(table.categoryId, table.isActive, table.sortOrder, table.name)
+  ]
+)
+
+/** A listing's tags, with no primary; `sort_order` 0 is the tag most central to the listing. */
+export const listingTags = sqliteTable(
+  'listing_tags',
+  {
+    listingId: text('listing_id')
+      .notNull()
+      .references(() => listings.id, { onDelete: 'cascade' }),
+    tagId: integer('tag_id')
+      .notNull()
+      .references(() => tags.id, { onDelete: 'restrict' }),
+    sortOrder: integer('sort_order').notNull().default(0)
+  },
+  table => [
+    primaryKey({ columns: [table.listingId, table.tagId] }),
+    index('listing_tags_tag_idx').on(table.tagId, table.listingId)
+  ]
+)
+
+/** How many listings a best page shows (`list_size`), and its default. */
+export const BEST_PAGE_LIST_SIZE = { default: 10, max: 25, min: 5 } as const
+
+/**
+ * A keyword-targeted ranking at `/best/<slug>/`. Its pool is the public listings with its tag, in
+ * its category, or both together; `best_page_listings` pins the top positions and excludes misfits.
+ * `keyword_volume` and `keyword_checked_at` record the keyword check, for the audit trail only.
+ */
+export const bestPages = sqliteTable(
+  'best_pages',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    /** The keyword, slugified. */
+    slug: text('slug').notNull(),
+    /** The exact search phrase. */
+    keyword: text('keyword').notNull(),
+    /** The `<title>`, without the site suffix. */
+    title: text('title').notNull(),
+    heading: text('heading').notNull(),
+    intro: text('intro').notNull(),
+    tagId: integer('tag_id').references(() => tags.id, { onDelete: 'restrict' }),
+    categoryId: integer('category_id').references(() => categories.id, { onDelete: 'restrict' }),
+    listSize: integer('list_size').notNull().default(BEST_PAGE_LIST_SIZE.default),
+    keywordVolume: integer('keyword_volume'),
+    keywordCheckedAt: text('keyword_checked_at'),
+    sortOrder: integer('sort_order').notNull().default(0),
+    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+    createdAt: text('created_at').notNull().default(currentTimestamp),
+    updatedAt: text('updated_at').notNull().default(currentTimestamp)
+  },
+  table => [
+    unique('best_pages_slug_unique').on(table.slug),
+    check(
+      'best_pages_list_size_range',
+      sql`${table.listSize} BETWEEN ${sql.raw(String(BEST_PAGE_LIST_SIZE.min))} AND ${sql.raw(String(BEST_PAGE_LIST_SIZE.max))}`
+    ),
+    check('best_pages_pool', sql`${table.tagId} IS NOT NULL OR ${table.categoryId} IS NOT NULL`),
+    check('best_pages_is_active_boolean', booleanCheck(table.isActive)),
+    check('best_pages_keyword_checked_at_iso', isoInstantCheck(table.keywordCheckedAt)),
+    index('best_pages_tag_idx').on(table.tagId),
+    index('best_pages_category_idx').on(table.categoryId)
+  ]
+)
+
+/**
+ * A best page's editorial pins (`position` 1 is the top, with an optional `blurb`) and exclusions
+ * (`excluded`, no position). Every term is NOT NULL-checked, because a CHECK that evaluates to
+ * NULL passes.
+ */
+export const bestPageListings = sqliteTable(
+  'best_page_listings',
+  {
+    bestPageId: integer('best_page_id')
+      .notNull()
+      .references(() => bestPages.id, { onDelete: 'cascade' }),
+    listingId: text('listing_id')
+      .notNull()
+      .references(() => listings.id, { onDelete: 'cascade' }),
+    position: integer('position'),
+    excluded: integer('excluded', { mode: 'boolean' }).notNull().default(false),
+    blurb: text('blurb')
+  },
+  table => [
+    primaryKey({ columns: [table.bestPageId, table.listingId] }),
+    check('best_page_listings_excluded_boolean', booleanCheck(table.excluded)),
+    check(
+      'best_page_listings_pin_or_exclusion',
+      sql`(${table.excluded} = 0 AND ${table.position} IS NOT NULL AND ${table.position} >= 1)
+        OR (${table.excluded} = 1 AND ${table.position} IS NULL AND ${table.blurb} IS NULL)`
+    ),
+    uniqueIndex('best_page_listings_position_idx')
+      .on(table.bestPageId, table.position)
+      .where(sql`${table.position} IS NOT NULL`),
+    index('best_page_listings_listing_idx').on(table.listingId)
+  ]
+)
+
+/** What an old taxonomy URL was: `/products/categories/<slug>/`, a tag page, or a best page. */
+export const taxonomyRedirectSourceKinds = ['category', 'tag', 'best'] as const
+export type TaxonomyRedirectSourceKind = (typeof taxonomyRedirectSourceKinds)[number]
+/** Where it now points: a category, tag, or best page, or the directory (`/products/`). */
+export const taxonomyRedirectTargetKinds = ['category', 'tag', 'best', 'directory'] as const
+export type TaxonomyRedirectTargetKind = (typeof taxonomyRedirectTargetKinds)[number]
+
+/**
+ * Permanent redirects of retired or renamed taxonomy URLs, written by reviewed manifests. The
+ * target is a foreign key, not a path, so a target renamed later keeps the redirect pointing at
+ * its current URL, as `listing_slug_redirects` does for listings. Exactly the target column of
+ * `target_kind` is set (none for `directory`).
+ */
+export const taxonomyRedirects = sqliteTable(
+  'taxonomy_redirects',
+  {
+    sourceKind: text('source_kind', { enum: taxonomyRedirectSourceKinds }).notNull(),
+    sourceSlug: text('source_slug').notNull(),
+    targetKind: text('target_kind', { enum: taxonomyRedirectTargetKinds }).notNull(),
+    targetCategoryId: integer('target_category_id').references(() => categories.id, {
+      onDelete: 'restrict'
+    }),
+    targetTagId: integer('target_tag_id').references(() => tags.id, { onDelete: 'restrict' }),
+    targetBestPageId: integer('target_best_page_id').references(() => bestPages.id, {
+      onDelete: 'restrict'
+    }),
+    manifestId: text('manifest_id').notNull(),
+    createdAt: text('created_at').notNull().default(currentTimestamp)
+  },
+  table => [
+    primaryKey({ columns: [table.sourceKind, table.sourceSlug] }),
+    check(
+      'taxonomy_redirects_source_kind_valid',
+      sql`${table.sourceKind} IN (${sqlList(taxonomyRedirectSourceKinds)})`
+    ),
+    check(
+      'taxonomy_redirects_target_kind_valid',
+      sql`${table.targetKind} IN (${sqlList(taxonomyRedirectTargetKinds)})`
+    ),
+    check(
+      'taxonomy_redirects_target_matches_kind',
+      sql`(${table.targetKind} = 'category' AND ${table.targetCategoryId} IS NOT NULL
+          AND ${table.targetTagId} IS NULL AND ${table.targetBestPageId} IS NULL)
+        OR (${table.targetKind} = 'tag' AND ${table.targetTagId} IS NOT NULL
+          AND ${table.targetCategoryId} IS NULL AND ${table.targetBestPageId} IS NULL)
+        OR (${table.targetKind} = 'best' AND ${table.targetBestPageId} IS NOT NULL
+          AND ${table.targetCategoryId} IS NULL AND ${table.targetTagId} IS NULL)
+        OR (${table.targetKind} = 'directory' AND ${table.targetCategoryId} IS NULL
+          AND ${table.targetTagId} IS NULL AND ${table.targetBestPageId} IS NULL)`
+    ),
+    // Full indexes on the target foreign keys, so deleting a target is a seek (#77).
+    index('taxonomy_redirects_target_category_idx').on(table.targetCategoryId),
+    index('taxonomy_redirects_target_tag_idx').on(table.targetTagId),
+    index('taxonomy_redirects_target_best_page_idx').on(table.targetBestPageId)
   ]
 )
 
@@ -624,7 +815,9 @@ export const listingSubmissions = sqliteTable(
     /** The listing checksum written when a paid submission was published before review. */
     publishedChecksum: text('published_checksum'),
     /** Increments on every edit of the staged content; approval compares and swaps on it. */
-    contentVersion: integer('content_version').notNull().default(1)
+    contentVersion: integer('content_version').notNull().default(1),
+    /** The Creator's suggested tags (#341): a JSON array of tag slugs, or null when not given. */
+    tagSlugs: text('tag_slugs')
   },
   table => [
     check(
@@ -729,6 +922,7 @@ export const listingSubmissions = sqliteTable(
       'listing_submissions_withdrawal_reason_when_withdrawn',
       sql`(${table.status} = 'withdrawn') = (${table.withdrawalReason} IS NOT NULL)`
     ),
+    check('listing_submissions_tag_slugs_valid', tagSlugsCheck(table.tagSlugs)),
     uniqueIndex('listing_submissions_active_slug_idx')
       .on(table.slug)
       .where(sql`${table.status} IN (${sqlList(activeSubmissionStatuses)})`),
@@ -1112,7 +1306,9 @@ export const listingRevisions = sqliteTable(
     createdAt: text('created_at').notNull().default(currentTimestamp),
     updatedAt: text('updated_at').notNull().default(currentTimestamp),
     /** Increments on every edit; approval compares and swaps on the version the reviewer saw. */
-    contentVersion: integer('content_version').notNull().default(1)
+    contentVersion: integer('content_version').notNull().default(1),
+    /** The owner's tags (#341), as on a submission; null leaves the listing's tags unchanged. */
+    tagSlugs: text('tag_slugs')
   },
   table => [
     check('listing_revisions_status_valid', sql`${table.status} IN (${sqlList(revisionStatuses)})`),
@@ -1121,6 +1317,7 @@ export const listingRevisions = sqliteTable(
       'listing_revisions_rejection_when_rejected',
       sql`${table.rejectionReason} IS NULL OR ${table.status} = 'rejected'`
     ),
+    check('listing_revisions_tag_slugs_valid', tagSlugsCheck(table.tagSlugs)),
     uniqueIndex('listing_revisions_open_idx')
       .on(table.listingId)
       .where(sql`${table.status} IN (${sqlList(openRevisionStatuses)})`),
@@ -1624,11 +1821,39 @@ export const accountsRelations = relations(accounts, ({ one }) => ({
 }))
 
 export const categoriesRelations = relations(categories, ({ many }) => ({
-  listings: many(listingCategories)
+  bestPages: many(bestPages),
+  listings: many(listingCategories),
+  tags: many(tags)
+}))
+
+export const tagsRelations = relations(tags, ({ many, one }) => ({
+  bestPages: many(bestPages),
+  category: one(categories, { fields: [tags.categoryId], references: [categories.id] }),
+  listings: many(listingTags)
+}))
+
+export const listingTagsRelations = relations(listingTags, ({ one }) => ({
+  listing: one(listings, { fields: [listingTags.listingId], references: [listings.id] }),
+  tag: one(tags, { fields: [listingTags.tagId], references: [tags.id] })
+}))
+
+export const bestPagesRelations = relations(bestPages, ({ many, one }) => ({
+  category: one(categories, { fields: [bestPages.categoryId], references: [categories.id] }),
+  listings: many(bestPageListings),
+  tag: one(tags, { fields: [bestPages.tagId], references: [tags.id] })
+}))
+
+export const bestPageListingsRelations = relations(bestPageListings, ({ one }) => ({
+  bestPage: one(bestPages, {
+    fields: [bestPageListings.bestPageId],
+    references: [bestPages.id]
+  }),
+  listing: one(listings, { fields: [bestPageListings.listingId], references: [listings.id] })
 }))
 
 export const listingsRelations = relations(listings, ({ many }) => ({
   badgeChecks: many(badgeChecks),
+  bestPages: many(bestPageListings),
   events: many(listingEvents),
   categories: many(listingCategories),
   faqs: many(listingFaqs),
@@ -1637,7 +1862,8 @@ export const listingsRelations = relations(listings, ({ many }) => ({
   resourceLinks: many(listingResourceLinks),
   revisions: many(listingRevisions),
   slugRedirects: many(listingSlugRedirects),
-  submissions: many(listingSubmissions)
+  submissions: many(listingSubmissions),
+  tags: many(listingTags)
 }))
 
 export const listingCategoriesRelations = relations(listingCategories, ({ one }) => ({

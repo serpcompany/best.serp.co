@@ -13,11 +13,14 @@ import {
 import {
   SEED_ID,
   SEED_NOW,
+  seedBestPages,
   seedCategories,
   seedFacts,
   seedListings,
   seedRevisions,
   seedSubmissions,
+  seedTags,
+  seedTaxonomyRedirects,
   seedUsers
 } from '../apps/web/e2e/seed-facts'
 import { validateCanonicalLocalConfig } from './d1-local-config'
@@ -365,6 +368,75 @@ export function seedFactViolations(
       seedListingId(seedListings.held.slug)
     ]),
     1
+  )
+
+  // The taxonomy (#341): tags and their hubs and listings, best pages, and redirects.
+  expect(
+    'active tags',
+    list('SELECT slug FROM tags WHERE is_active=1 ORDER BY slug'),
+    Object.values(seedTags)
+      .filter(tag => tag !== seedTags.retired)
+      .map(tag => tag.slug)
+      .sort()
+  )
+  for (const tag of Object.values(seedTags)) {
+    expect(
+      `${tag.slug} hub`,
+      value('SELECT c.slug FROM tags t JOIN categories c ON c.id=t.category_id WHERE t.slug=?', [
+        tag.slug
+      ]) ?? null,
+      tag.category.slug
+    )
+    expect(
+      `${tag.slug} published listings`,
+      value(
+        `SELECT COUNT(*) FROM listing_tags lt JOIN tags t ON t.id=lt.tag_id
+          JOIN listings l ON l.id=lt.listing_id WHERE t.slug=? AND ${PUBLISHED}`,
+        [tag.slug]
+      ),
+      tag.listingCount
+    )
+  }
+  for (const page of Object.values(seedBestPages)) {
+    expect(
+      `${page.slug} pool`,
+      value(
+        `SELECT COALESCE(t.slug,'-')||' in '||COALESCE(c.slug,'-') FROM best_pages b
+          LEFT JOIN tags t ON t.id=b.tag_id LEFT JOIN categories c ON c.id=b.category_id
+          WHERE b.slug=? AND b.is_active=1`,
+        [page.slug]
+      ) ?? null,
+      `${page.tag?.slug ?? '-'} in ${page.category?.slug ?? '-'}`
+    )
+    const entries = (excluded: number) =>
+      list(
+        `SELECT l.slug FROM best_page_listings p JOIN best_pages b ON b.id=p.best_page_id
+          JOIN listings l ON l.id=p.listing_id WHERE b.slug=? AND p.excluded=?
+          ORDER BY p.position, l.slug`,
+        [page.slug, excluded]
+      )
+    expect(
+      `${page.slug} pins`,
+      entries(0),
+      page.pins.map(pin => pin.slug)
+    )
+    expect(
+      `${page.slug} exclusions`,
+      entries(1),
+      page.excluded.map(listing => listing.slug)
+    )
+  }
+  expect(
+    'taxonomy redirects',
+    list(
+      `SELECT r.source_kind||':'||r.source_slug||' > '||r.target_kind||':'||
+          COALESCE(c.slug,t.slug,b.slug,'') FROM taxonomy_redirects r
+        LEFT JOIN categories c ON c.id=r.target_category_id LEFT JOIN tags t ON t.id=r.target_tag_id
+        LEFT JOIN best_pages b ON b.id=r.target_best_page_id ORDER BY 1`
+    ),
+    seedTaxonomyRedirects
+      .map(({ from, to }) => `${from.kind}:${from.slug} > ${to.kind}:${to.slug ?? ''}`)
+      .sort()
   )
 
   if (options.media) {
