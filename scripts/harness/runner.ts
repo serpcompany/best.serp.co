@@ -56,7 +56,7 @@ const fullOnlySteps: HarnessStep[] = [
     command: 'pnpm',
     args: ['db:check'],
     remediation:
-      'Fix the migration history drizzle-kit reports; never edit generated SQL by hand. See docs/data-model.md.'
+      'Fix the migration history drizzle-kit reports. Hand-finish a generated migration as docs/data-model.md#hand-finished-migrations says, then check that a second pnpm db:generate reports no changes.'
   },
   {
     name: 'repository tests',

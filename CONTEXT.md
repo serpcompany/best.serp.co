@@ -21,7 +21,7 @@ A curated catalog entry that may be published on best.serp.co.
 _Avoid_: Product, website record, item
 
 **Category**:
-A broad topic hub that Visitors browse Listings by; a published Listing has exactly one.
+A broad topic hub that Visitors browse Listings by; a published Listing has exactly one primary Category and may be filed under more.
 _Avoid_: Tag, collection, hub page
 
 **Tag**:
