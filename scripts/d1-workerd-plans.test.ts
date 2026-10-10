@@ -26,7 +26,12 @@ import { assertD1StatementLimits } from '../apps/web/src/db/sql-limits'
 import * as submissionPlansModule from '../apps/web/src/db/submission-plans'
 import type { UrlKey } from '../apps/web/src/lib/url-key'
 import { assertD1Compatible } from './d1-compat'
-import { buildPublicationPlan, executePublicationPlan, parseManifest } from './d1-publisher'
+import {
+  buildPublicationPlan,
+  executePublicationPlan,
+  manifestSchema,
+  parseManifest
+} from './d1-publisher'
 import { project } from './project'
 
 /**
@@ -1851,5 +1856,157 @@ describe('taxonomy CHECKs and triggers on Wrangler-local D1 (workerd, #341)', ()
       /listing_submissions_tag_slugs_valid/u
     )
     await submission('sub-taxonomy', '[]')
+  })
+
+  it('applies the publisher’s taxonomy operations on D1, and a refusal names its reason (#344)', async () => {
+    await db.batch([
+      db.prepare("INSERT INTO categories (slug, name) VALUES ('taxonomy-ops-hub', 'Ops hub')"),
+      db.prepare(
+        `INSERT INTO listings (id, slug, name, description, website, status, source_kind,
+          source_identity, checksum) VALUES ('lst_taxonomy_ops', 'taxonomy-ops.example', 'Ops', 'd',
+          'https://taxonomy-ops.example/', 'draft', 'workerd', 'taxonomy-ops', 'c')`
+      ),
+      db.prepare(
+        `INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
+          SELECT 'lst_taxonomy_ops', id, 0, 1 FROM categories WHERE slug = 'taxonomy-ops-hub'`
+      ),
+      db
+        .prepare(
+          "UPDATE listings SET status = 'approved', published_at = ? WHERE id = 'lst_taxonomy_ops'"
+        )
+        .bind(NOW)
+    ])
+    const publish = async (id: string, operations: Record<string, unknown>[]) => {
+      const live = await first<{ checksum: string; version: number }>(
+        'SELECT version, checksum FROM publication_state WHERE id = 1'
+      )
+      if (!live) throw new Error('Missing publication state.')
+      const manifest = manifestSchema.parse({
+        version: 1,
+        id,
+        concurrency: 'rows',
+        provenance: { actor: 'test', workflow: 'test/workerd' },
+        operations
+      })
+      const plan = buildPublicationPlan(manifest, id, NOW, live)
+      for (const item of plan.statements) checked(item.query, item.bindings)
+      await executePublicationPlan(db, plan)
+    }
+    const page = {
+      keyword: 'ops',
+      title: 'Best Ops',
+      heading: 'Best Ops',
+      intro: 'Ops tools.'
+    }
+    const listingRef = { id: 'lst_taxonomy_ops', slug: 'taxonomy-ops.example' }
+    await publish('workerd-taxonomy-ops', [
+      { action: 'tag-create', tag: { slug: 'ops-a', name: 'A', category: 'taxonomy-ops-hub' } },
+      { action: 'tag-create', tag: { slug: 'ops-b', name: 'B', category: 'taxonomy-ops-hub' } },
+      { action: 'listing-tags-set', ...listingRef, expected: [], tags: ['ops-a', 'ops-b'] },
+      { action: 'best-page-create', page: { ...page, slug: 'ops-best', tag: 'ops-a' } },
+      {
+        action: 'best-page-create',
+        page: { ...page, slug: 'ops-hub-best', category: 'taxonomy-ops-hub' }
+      },
+      {
+        action: 'best-page-listings-set',
+        slug: 'ops-best',
+        expected: { pins: [], exclude: [] },
+        pins: [{ ...listingRef, blurb: 'Why.' }],
+        exclude: []
+      },
+      {
+        action: 'taxonomy-redirect-set',
+        from: { kind: 'category', slug: 'ops-old' },
+        expected: null,
+        to: { kind: 'best', slug: 'ops-hub-best' }
+      }
+    ])
+    await publish('workerd-taxonomy-ops-2', [
+      {
+        action: 'tag-update',
+        slug: 'ops-a',
+        expected: { name: 'A', description: '', category: 'taxonomy-ops-hub' },
+        tag: { name: 'Ops A', description: 'First.', category: 'taxonomy-ops-hub', order: 1 }
+      },
+      {
+        action: 'best-page-update',
+        slug: 'ops-best',
+        expected: {
+          ...page,
+          tag: 'ops-a',
+          category: null,
+          listSize: 10,
+          keywordVolume: null,
+          keywordCheckedAt: null,
+          order: 0
+        },
+        page: {
+          ...page,
+          tag: 'ops-a',
+          category: 'taxonomy-ops-hub',
+          listSize: 5,
+          keywordVolume: 70,
+          keywordCheckedAt: NOW,
+          order: 0
+        }
+      },
+      {
+        action: 'best-page-unpublish',
+        slug: 'ops-hub-best',
+        redirect: { kind: 'tag', slug: 'ops-b' }
+      },
+      { action: 'tag-unpublish', slug: 'ops-b', redirect: { kind: 'best', slug: 'ops-best' } }
+    ])
+    expect(
+      (
+        await db
+          .prepare(
+            `SELECT r.source_kind || ' ' || r.source_slug || ' -> ' || r.target_kind || ' ' ||
+              COALESCE(c.slug, t.slug, b.slug) AS redirect FROM taxonomy_redirects r
+              LEFT JOIN categories c ON c.id = r.target_category_id
+              LEFT JOIN tags t ON t.id = r.target_tag_id
+              LEFT JOIN best_pages b ON b.id = r.target_best_page_id
+              WHERE r.source_slug LIKE 'ops-%' ORDER BY 1`
+          )
+          .all<{ redirect: string }>()
+      ).results.map(row => row.redirect)
+    ).toEqual([
+      'best ops-hub-best -> best ops-best',
+      'category ops-old -> best ops-best',
+      'tag ops-b -> best ops-best'
+    ])
+    expect(
+      await first(
+        `SELECT json_group_array(tag) AS tags FROM (SELECT t.slug || ':' || t.is_active AS tag
+          FROM listing_tags lt JOIN tags t ON t.id = lt.tag_id
+          WHERE lt.listing_id = 'lst_taxonomy_ops' ORDER BY lt.sort_order)`
+      )
+    ).toEqual({ tags: '["ops-a:1","ops-b:0"]' })
+    expect(
+      await first(
+        `SELECT b.list_size, b.keyword_checked_at, l.position, l.excluded, l.blurb
+          FROM best_pages b JOIN best_page_listings l ON l.best_page_id = b.id WHERE b.slug = 'ops-best'`
+      )
+    ).toEqual({ blurb: 'Why.', excluded: 0, keyword_checked_at: NOW, list_size: 5, position: 1 })
+    expect(await listing('lst_taxonomy_ops')).toMatchObject({ checksum: 'c', status: 'approved' })
+
+    // A stale `expected`: the reason names the operation, and nothing is written.
+    const before = await first('SELECT version, checksum FROM publication_state WHERE id = 1')
+    await expect(
+      publish('workerd-taxonomy-ops-stale', [
+        { action: 'listing-tags-set', ...listingRef, expected: ['ops-b'], tags: [] }
+      ])
+    ).rejects.toThrow(
+      /bad JSON path: 'listing-tags-set taxonomy-ops\.example: its tags are not the expected ones'/u
+    )
+    expect(await first('SELECT version, checksum FROM publication_state WHERE id = 1')).toEqual(
+      before
+    )
+    expect(
+      await first(
+        "SELECT COUNT(*) AS count FROM listing_tags WHERE listing_id = 'lst_taxonomy_ops'"
+      )
+    ).toEqual({ count: 2 })
   })
 })

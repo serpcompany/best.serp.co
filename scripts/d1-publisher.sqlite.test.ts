@@ -10,6 +10,7 @@ import {
   submissionStatuses
 } from '../apps/web/src/db/schema'
 import { assertD1StatementLimits } from '../apps/web/src/db/sql-limits'
+import { d1CompatViolations } from './d1-compat'
 import { freshMigrationNames, freshMigrationsDirectory } from './d1-drizzle-local'
 import {
   buildPublicationPlan,
@@ -1766,5 +1767,1279 @@ describe('listing-claim-hold-add and -clear (#67: holds for the owner’s review
       expect(holds(db)).toEqual([])
       expect(db.prepare('SELECT version FROM publication_state').get()).toEqual({ version: 4 })
     }
+  })
+})
+
+describe('taxonomy operations in a row-level manifest (#344, #341 design 4.1)', () => {
+  type Operation = Record<string, unknown>
+  let sequence = 0
+  const rows = (operations: Operation[], id = 'taxonomy') =>
+    manifestSchema.parse({
+      version: 1,
+      id,
+      concurrency: 'rows',
+      provenance: { actor: 'test@example.com', workflow: 'test/sqlite' },
+      operations
+    })
+  /** Plans `operations` as a row-level manifest against the database's live publication state. */
+  const planFor = (db: DatabaseSync, operations: Operation[]) => {
+    sequence += 1
+    const state = db.prepare('SELECT version,checksum FROM publication_state WHERE id=1').get() as {
+      checksum: string
+      version: number
+    }
+    return buildPublicationPlan(
+      rows(operations, `taxonomy-${sequence}`),
+      `taxonomy ${sequence}`,
+      now,
+      state
+    )
+  }
+  const publish = (db: DatabaseSync, operations: Operation[]) => {
+    const publication = planFor(db, operations)
+    executeInTestTransaction(db, publication)
+    return publication
+  }
+  /**
+   * The fixture listing (`old-slug`, under `seo`) and a second live listing (`other-product`),
+   * with a taxonomy: hubs `seo` and `writing`, an empty hub, and a retired hub; active tags
+   * `ai-writing` and `ai-seo`; `old-tag`, retired under `writing` but still on `other-product`;
+   * `stale-tag`, retired under the retired hub; an active best page `ai-seo-tools` on `ai-seo`,
+   * and a retired one, `old-best`. Retired rows are written active first, then retired, as the
+   * triggers require.
+   */
+  const seeded = () => {
+    const db = database()
+    db.exec(`
+      INSERT INTO categories (id,slug,name) VALUES (2,'writing','Writing'),(3,'retired-hub','Retired hub'),(4,'empty-hub','Empty hub');
+      INSERT INTO tags (id,slug,name,description,category_id,sort_order) VALUES
+        (1,'ai-writing','AI Writing','Words.',2,0),
+        (2,'ai-seo','AI SEO','',1,1),
+        (3,'old-tag','Old tag','',2,2),
+        (4,'stale-tag','Stale tag','',3,0);
+      INSERT INTO listings (id,slug,name,description,website,status,published_at,source_kind,source_identity,checksum)
+        VALUES ('lst_sqlite_other','other-product','Other product','Description','https://other.example','draft','${now}','test','fixture','${'d'.repeat(64)}');
+      INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary) VALUES ('lst_sqlite_other',1,0,1);
+      UPDATE listings SET status='approved' WHERE id='lst_sqlite_other';
+      INSERT INTO listing_tags (listing_id,tag_id,sort_order) VALUES ('lst_sqlite_other',3,0),('lst_sqlite_other',1,1);
+      UPDATE tags SET is_active=0 WHERE slug IN ('old-tag','stale-tag');
+      UPDATE categories SET is_active=0 WHERE slug='retired-hub';
+      INSERT INTO best_pages (id,slug,keyword,title,heading,intro,tag_id) VALUES
+        (1,'ai-seo-tools','ai seo tools','Best AI SEO Tools','Best AI SEO Tools','The intro.',2),
+        (2,'old-best','old best','Best Old','Best Old','Old intro.',1);
+      UPDATE best_pages SET is_active=0 WHERE slug='old-best';
+    `)
+    return db
+  }
+  /** Everything a taxonomy operation may write, so a refusal can be shown to write nothing. */
+  const snapshot = (db: DatabaseSync) => ({
+    bestPageListings: db.prepare('SELECT * FROM best_page_listings ORDER BY 1, 2').all(),
+    bestPages: db.prepare('SELECT * FROM best_pages ORDER BY id').all(),
+    events: db.prepare('SELECT * FROM listing_events ORDER BY id').all(),
+    listingTags: db.prepare('SELECT * FROM listing_tags ORDER BY 1, 2').all(),
+    listings: db
+      .prepare('SELECT id,slug,status,is_active,checksum,updated_at FROM listings ORDER BY id')
+      .all(),
+    redirects: db.prepare('SELECT * FROM taxonomy_redirects ORDER BY 1, 2').all(),
+    runs: db.prepare('SELECT * FROM publication_runs ORDER BY id').all(),
+    state: db.prepare('SELECT * FROM publication_state').all(),
+    tags: db.prepare('SELECT * FROM tags ORDER BY id').all()
+  })
+  /** Asserts the batch is refused with exactly `reason`, writing nothing. */
+  const refuses = (db: DatabaseSync, operations: Operation[], reason: string) => {
+    const before = snapshot(db)
+    expect(() => publish(db, operations), reason).toThrow(`bad JSON path: '${reason}'`)
+    expect(snapshot(db)).toEqual(before)
+  }
+  const tagOf = (db: DatabaseSync, slug: string) =>
+    db
+      .prepare(
+        'SELECT t.name,t.description,c.slug AS category,t.sort_order,t.is_active,t.updated_at FROM tags t JOIN categories c ON c.id=t.category_id WHERE t.slug=?'
+      )
+      .get(slug)
+  const listingTags = (db: DatabaseSync, id = 'lst_sqlite_test') =>
+    db
+      .prepare(
+        'SELECT t.slug,lt.sort_order FROM listing_tags lt JOIN tags t ON t.id=lt.tag_id WHERE lt.listing_id=? ORDER BY lt.sort_order'
+      )
+      .all(id)
+  /** Every redirect as `source -> target`, the target named by kind and slug. */
+  const redirects = (db: DatabaseSync) =>
+    (
+      db
+        .prepare(
+          `SELECT r.source_kind||' '||r.source_slug||' -> '||r.target_kind||COALESCE(' '||c.slug,' '||t.slug,' '||b.slug,'') AS redirect, r.manifest_id
+           FROM taxonomy_redirects r LEFT JOIN categories c ON c.id=r.target_category_id
+           LEFT JOIN tags t ON t.id=r.target_tag_id LEFT JOIN best_pages b ON b.id=r.target_best_page_id
+           ORDER BY r.source_kind, r.source_slug`
+        )
+        .all() as Array<{ manifest_id: string; redirect: string }>
+    ).map(row => row.redirect)
+  const booleanBindings = (publication: PublicationPlan) =>
+    publication.statements.flatMap(item => item.bindings).filter(b => typeof b === 'boolean')
+  const tagCreate = (tag: Record<string, unknown>) => ({ action: 'tag-create', tag })
+  const tagsSet = (expected: string[], tags: string[], extra: Operation = {}) => ({
+    action: 'listing-tags-set',
+    id: 'lst_sqlite_test',
+    slug: 'old-slug',
+    expected,
+    tags,
+    ...extra
+  })
+  const redirectSet = (from: Operation, expected: Operation | null, to: Operation) => ({
+    action: 'taxonomy-redirect-set',
+    from,
+    expected,
+    to
+  })
+  const seoTools = {
+    keyword: 'ai seo tools',
+    title: 'Best AI SEO Tools',
+    heading: 'Best AI SEO Tools',
+    intro: 'The intro.',
+    tag: 'ai-seo',
+    category: null,
+    listSize: 10,
+    keywordVolume: null,
+    keywordCheckedAt: null,
+    order: 0
+  }
+  const pin = (id: string, slug: string, blurb?: string) => ({
+    id,
+    slug,
+    ...(blurb ? { blurb } : {})
+  })
+  const test = pin('lst_sqlite_test', 'old-slug')
+  const other = pin('lst_sqlite_other', 'other-product')
+  const pins = (db: DatabaseSync, slug = 'ai-seo-tools') =>
+    db
+      .prepare(
+        `SELECT l.slug,bpl.position,bpl.excluded,bpl.blurb FROM best_page_listings bpl
+         JOIN best_pages b ON b.id=bpl.best_page_id JOIN listings l ON l.id=bpl.listing_id
+         WHERE b.slug=? ORDER BY bpl.excluded, bpl.position, l.slug`
+      )
+      .all(slug)
+
+  describe('tag-create', () => {
+    it('adds an active tag under its hub, at any version, binding no boolean', () => {
+      const db = seeded()
+      db.prepare('UPDATE publication_state SET version=11').run()
+      const publication = publish(db, [
+        tagCreate({
+          slug: 'ai-copywriting',
+          name: 'AI Copywriting',
+          description: 'Ads.',
+          category: 'writing',
+          order: 3
+        }),
+        // A tag may share a category's slug: the URLs differ (design 1.5).
+        tagCreate({ slug: 'seo', name: 'SEO', category: 'seo' })
+      ])
+      expect(booleanBindings(publication)).toEqual([])
+      expect(tagOf(db, 'ai-copywriting')).toEqual({
+        category: 'writing',
+        description: 'Ads.',
+        is_active: 1,
+        name: 'AI Copywriting',
+        sort_order: 3,
+        updated_at: now
+      })
+      expect(tagOf(db, 'seo')).toMatchObject({ description: '', sort_order: 0, is_active: 1 })
+      expect(db.prepare('SELECT version FROM publication_state').get()).toEqual({ version: 12 })
+      expect(publication.affectedRoutes.split('\n')).toEqual(
+        expect.arrayContaining([
+          '/products/tags/',
+          '/products/tags/ai-copywriting/',
+          '/products/tags/seo/',
+          '/products/categories/writing/',
+          '/products/categories/seo/',
+          '/sitemap-tags.xml',
+          '/sitemap-best.xml',
+          '/sitemap-categories.xml'
+        ])
+      )
+    })
+
+    it('refuses a slug a tag has, active or retired', () => {
+      for (const slug of ['ai-writing', 'old-tag']) {
+        refuses(
+          seeded(),
+          [tagCreate({ slug, name: 'Again', category: 'writing' })],
+          `tag-create ${slug}: a tag has this slug, active or retired`
+        )
+      }
+    })
+
+    it('refuses a missing or retired hub', () => {
+      for (const category of ['nope', 'retired-hub']) {
+        refuses(
+          seeded(),
+          [tagCreate({ slug: 'new-tag', name: 'New', category })],
+          `tag-create new-tag: the category ${category} is missing or retired`
+        )
+      }
+    })
+  })
+
+  describe('tag-update', () => {
+    const update = (slug: string, expected: Operation, tag: Operation) => ({
+      action: 'tag-update',
+      slug,
+      expected,
+      tag
+    })
+    const aiWriting = { name: 'AI Writing', description: 'Words.', category: 'writing' }
+
+    it('renames a tag, moves it to another hub, and keeps it active', () => {
+      const db = seeded()
+      const publication = publish(db, [
+        update('ai-writing', aiWriting, {
+          name: 'AI Writing Tools',
+          description: 'More words.',
+          category: 'seo',
+          order: 7
+        })
+      ])
+      expect(tagOf(db, 'ai-writing')).toEqual({
+        category: 'seo',
+        description: 'More words.',
+        is_active: 1,
+        name: 'AI Writing Tools',
+        sort_order: 7,
+        updated_at: now
+      })
+      expect(publication.affectedRoutes.split('\n')).toEqual(
+        expect.arrayContaining([
+          '/products/tags/ai-writing/',
+          '/products/categories/writing/',
+          '/products/categories/seo/'
+        ])
+      )
+    })
+
+    it('edits a retired tag with a plain UPDATE and leaves it retired', () => {
+      // An upsert would fire the BEFORE INSERT trigger and be refused (#354 review).
+      const db = seeded()
+      publish(db, [
+        update(
+          'old-tag',
+          { name: 'Old tag', description: '', category: 'writing' },
+          { name: 'Older tag', description: 'Gone.', category: 'seo', order: 2 }
+        )
+      ])
+      expect(tagOf(db, 'old-tag')).toMatchObject({
+        category: 'seo',
+        is_active: 0,
+        name: 'Older tag'
+      })
+      // Its membership stays.
+      expect(listingTags(db, 'lst_sqlite_other')).toEqual([
+        { slug: 'old-tag', sort_order: 0 },
+        { slug: 'ai-writing', sort_order: 1 }
+      ])
+    })
+
+    it('refuses a tag that is missing or not as expected', () => {
+      for (const [slug, expected] of [
+        ['nope', aiWriting],
+        ['ai-writing', { ...aiWriting, name: 'Renamed since' }],
+        ['ai-writing', { ...aiWriting, description: 'Edited since.' }],
+        ['ai-writing', { ...aiWriting, category: 'seo' }]
+      ] as const) {
+        refuses(
+          seeded(),
+          [update(slug, expected, { ...aiWriting, name: 'New name', order: 0 })],
+          `tag-update ${slug}: the tag is missing or not as expected`
+        )
+      }
+    })
+
+    it('refuses a missing or retired hub, also for a retired tag that keeps its retired hub', () => {
+      for (const category of ['nope', 'retired-hub']) {
+        refuses(
+          seeded(),
+          [update('ai-writing', aiWriting, { ...aiWriting, category, order: 0 })],
+          `tag-update ai-writing: the category ${category} is missing or retired`
+        )
+      }
+      // The triggers allow this rename (a retired tag, its hub unchanged); the publisher doesn't.
+      const stale = { name: 'Stale tag', description: '', category: 'retired-hub' }
+      refuses(
+        seeded(),
+        [update('stale-tag', stale, { ...stale, name: 'Renamed', order: 0 })],
+        'tag-update stale-tag: the category retired-hub is missing or retired'
+      )
+    })
+  })
+
+  describe('tag-unpublish', () => {
+    const unpublish = (slug: string, redirect: Operation) => ({
+      action: 'tag-unpublish',
+      slug,
+      redirect
+    })
+
+    it('retires a tag, keeps its memberships, and redirects its URL and every redirect aimed at it', () => {
+      const db = seeded()
+      publish(db, [
+        // Old category URLs already sent to the tag, and its own URL's pre-staged redirect.
+        redirectSet({ kind: 'category', slug: 'ai-content' }, null, {
+          kind: 'tag',
+          slug: 'ai-writing'
+        }),
+        redirectSet({ kind: 'best', slug: 'ai-writer' }, null, { kind: 'tag', slug: 'ai-writing' }),
+        redirectSet({ kind: 'tag', slug: 'ai-writing' }, null, { kind: 'directory' }),
+        // A redirect from the new target's own URL to the tag would point at itself: removed.
+        redirectSet({ kind: 'tag', slug: 'ai-seo' }, null, { kind: 'tag', slug: 'ai-writing' })
+      ])
+      db.exec("UPDATE best_pages SET is_active=0 WHERE slug='ai-seo-tools'")
+      const publication = publish(db, [unpublish('ai-writing', { kind: 'tag', slug: 'ai-seo' })])
+      expect(tagOf(db, 'ai-writing')).toMatchObject({ is_active: 0, updated_at: now })
+      expect(listingTags(db, 'lst_sqlite_other')).toEqual([
+        { slug: 'old-tag', sort_order: 0 },
+        { slug: 'ai-writing', sort_order: 1 }
+      ])
+      expect(redirects(db)).toEqual([
+        'best ai-writer -> tag ai-seo',
+        'category ai-content -> tag ai-seo',
+        'tag ai-writing -> tag ai-seo'
+      ])
+      expect(db.prepare('SELECT DISTINCT manifest_id FROM taxonomy_redirects').all()).toEqual([
+        { manifest_id: publication.manifest.id }
+      ])
+      expect(publication.affectedRoutes.split('\n')).toEqual(
+        expect.arrayContaining(['/products/tags/ai-writing/', '/products/tags/ai-seo/'])
+      )
+      expect(booleanBindings(publication)).toEqual([])
+    })
+
+    it('redirects to the directory, a category, or a best page', () => {
+      for (const [redirect, expected] of [
+        [{ kind: 'directory' }, 'tag ai-writing -> directory'],
+        [{ kind: 'category', slug: 'writing' }, 'tag ai-writing -> category writing'],
+        [{ kind: 'best', slug: 'ai-seo-tools' }, 'tag ai-writing -> best ai-seo-tools']
+      ] as const) {
+        const db = seeded()
+        publish(db, [unpublish('ai-writing', redirect)])
+        expect(redirects(db)).toEqual([expected])
+      }
+    })
+
+    it('refuses while an active best page uses the tag; a retired one does not count', () => {
+      const db = seeded()
+      refuses(
+        db,
+        [unpublish('ai-seo', { kind: 'directory' })],
+        'tag-unpublish ai-seo: an active best page uses the tag'
+      )
+      // `old-best` uses `ai-writing`, but it is retired.
+      publish(db, [unpublish('ai-writing', { kind: 'directory' })])
+      expect(tagOf(db, 'ai-writing')).toMatchObject({ is_active: 0 })
+    })
+
+    it('refuses a missing or retired target', () => {
+      for (const [kind, slug] of [
+        ['tag', 'nope'],
+        ['tag', 'old-tag'],
+        ['category', 'retired-hub'],
+        ['best', 'old-best']
+      ]) {
+        refuses(
+          seeded(),
+          [unpublish('ai-writing', { kind, slug })],
+          `tag-unpublish ai-writing: the redirect target ${kind === 'best' ? 'best page' : kind} ${slug} is missing or retired`
+        )
+      }
+    })
+
+    it('refuses a missing or already retired tag, and a redirect to itself', () => {
+      for (const slug of ['nope', 'old-tag']) {
+        refuses(
+          seeded(),
+          [unpublish(slug, { kind: 'directory' })],
+          `tag-unpublish ${slug}: no active tag has this slug`
+        )
+      }
+      expect(() => rows([unpublish('ai-writing', { kind: 'tag', slug: 'ai-writing' })])).toThrow(
+        /cannot redirect to itself/u
+      )
+    })
+  })
+
+  describe('listing-tags-set', () => {
+    it('sets a listing’s tags in order without changing its checksum, and logs the edit', () => {
+      const db = seeded()
+      const before = db.prepare("SELECT checksum FROM listings WHERE id='lst_sqlite_test'").get()
+      db.prepare('UPDATE publication_state SET version=20').run()
+      const publication = publish(db, [tagsSet([], ['ai-writing', 'ai-seo'])])
+      expect(booleanBindings(publication)).toEqual([])
+      expect(listingTags(db)).toEqual([
+        { slug: 'ai-writing', sort_order: 0 },
+        { slug: 'ai-seo', sort_order: 1 }
+      ])
+      expect(
+        db.prepare("SELECT checksum,updated_at FROM listings WHERE id='lst_sqlite_test'").get()
+      ).toEqual({ ...before, updated_at: now })
+      expect(
+        db.prepare('SELECT listing_id,event_type,detail,actor FROM listing_events').all()
+      ).toEqual([
+        {
+          listing_id: 'lst_sqlite_test',
+          event_type: 'edited',
+          detail: JSON.stringify({
+            fields: ['tags'],
+            manifest: publication.manifest.id,
+            from: [],
+            to: ['ai-writing', 'ai-seo']
+          }),
+          actor: 'test@example.com'
+        }
+      ])
+      expect(db.prepare('SELECT version FROM publication_state').get()).toEqual({ version: 21 })
+      expect(publication.affectedRoutes.split('\n')).toEqual(
+        expect.arrayContaining([
+          '/products/old-slug/',
+          '/products/tags/',
+          '/products/tags/ai-writing/',
+          '/products/tags/ai-seo/'
+        ])
+      )
+      // Replaced again, compared on the order just written; and emptied.
+      publish(db, [tagsSet(['ai-writing', 'ai-seo'], ['ai-seo'])])
+      expect(listingTags(db)).toEqual([{ slug: 'ai-seo', sort_order: 0 }])
+      publish(db, [tagsSet(['ai-seo'], [])])
+      expect(listingTags(db)).toEqual([])
+    })
+
+    it('drops a retired tag’s membership, which expected names, and refuses keeping it', () => {
+      const db = seeded()
+      refuses(
+        db,
+        [
+          tagsSet(['old-tag', 'ai-writing'], ['ai-writing', 'old-tag'], {
+            id: 'lst_sqlite_other',
+            slug: 'other-product'
+          })
+        ],
+        'listing-tags-set other-product: the tag old-tag is missing or retired'
+      )
+      publish(db, [
+        tagsSet(['old-tag', 'ai-writing'], ['ai-writing'], {
+          id: 'lst_sqlite_other',
+          slug: 'other-product'
+        })
+      ])
+      expect(listingTags(db, 'lst_sqlite_other')).toEqual([{ slug: 'ai-writing', sort_order: 0 }])
+    })
+
+    it('tags an unpublished listing, and one whose paid submission is in review', () => {
+      const db = seeded()
+      db.exec("UPDATE listings SET is_active=0 WHERE id='lst_sqlite_test'")
+      publish(db, [tagsSet([], ['ai-seo'])])
+      expect(listingTags(db)).toEqual([{ slug: 'ai-seo', sort_order: 0 }])
+      // The checksum stays, so that paid submission can still be approved (design 4.1).
+      db.exec(`INSERT INTO listing_submissions (id,slug,name,description,website,content,
+        category_slug,logo_url,status,plan,paid_at,listing_id,published_checksum)
+      VALUES ('sub','other.example','Other','d','https://other.example/','c','seo','l',
+        'paid_pending_review','paid','${now}','lst_sqlite_other',
+        (SELECT checksum FROM listings WHERE id='lst_sqlite_other'))`)
+      publish(db, [
+        tagsSet(['old-tag', 'ai-writing'], ['ai-seo'], {
+          id: 'lst_sqlite_other',
+          slug: 'other-product'
+        })
+      ])
+      expect(
+        db
+          .prepare(
+            "SELECT COUNT(*) AS count FROM listings l JOIN listing_submissions s ON s.listing_id=l.id WHERE s.id='sub' AND l.checksum=s.published_checksum"
+          )
+          .get()
+      ).toEqual({ count: 1 })
+    })
+
+    it('refuses tags that changed since generation, in content or order', () => {
+      const db = seeded()
+      for (const expected of [['ai-writing'], ['ai-writing', 'old-tag'], ['old-tag']]) {
+        refuses(
+          db,
+          [tagsSet(expected, ['ai-seo'], { id: 'lst_sqlite_other', slug: 'other-product' })],
+          'listing-tags-set other-product: its tags are not the expected ones'
+        )
+      }
+      // Another listing's change in the same batch is rolled back with it.
+      refuses(
+        db,
+        [
+          tagsSet([], ['ai-seo']),
+          tagsSet(['ai-writing'], ['ai-seo'], { id: 'lst_sqlite_other', slug: 'other-product' })
+        ],
+        'listing-tags-set other-product: its tags are not the expected ones'
+      )
+    })
+
+    it('refuses a listing that is renamed, missing, or not approved', () => {
+      refuses(
+        seeded(),
+        [tagsSet([], ['ai-seo'], { slug: 'new-slug' })],
+        'listing-tags-set new-slug: no approved listing has this id and slug'
+      )
+      refuses(
+        seeded(),
+        [tagsSet([], ['ai-seo'], { id: 'lst_sqlite_missing' })],
+        'listing-tags-set old-slug: no approved listing has this id and slug'
+      )
+      for (const status of ['review', 'rejected']) {
+        const db = seeded()
+        db.exec(`UPDATE listings SET status='${status}' WHERE id='lst_sqlite_test'`)
+        refuses(
+          db,
+          [tagsSet([], ['ai-seo'])],
+          'listing-tags-set old-slug: no approved listing has this id and slug'
+        )
+      }
+    })
+
+    it('refuses a missing or retired tag', () => {
+      for (const tags of [['nope'], ['ai-seo', 'old-tag'], ['ai-seo', 'stale-tag']]) {
+        refuses(
+          seeded(),
+          [tagsSet([], tags)],
+          `listing-tags-set old-slug: the tag ${tags.at(-1)} is missing or retired`
+        )
+      }
+    })
+
+    it('refuses no change and duplicates, and sits beside a categories operation', () => {
+      expect(() => rows([tagsSet(['ai-seo'], ['ai-seo'])])).toThrow(
+        /already has exactly these tags/u
+      )
+      expect(() => rows([tagsSet([], ['ai-seo', 'ai-seo'])])).toThrow(/Duplicate listing tag/u)
+      expect(() => rows([tagsSet([], ['ai-seo']), tagsSet([], ['ai-writing'])])).toThrow(
+        /Duplicate listing-tags-set listing/u
+      )
+      // The migration moves a listing's tags and categories in one manifest (design 4.2).
+      const db = seeded()
+      db.exec("INSERT INTO categories (id,slug,name) VALUES (5,'marketing','Marketing')")
+      publish(db, [
+        tagsSet([], ['ai-seo']),
+        {
+          action: 'listing-categories-set',
+          id: 'lst_sqlite_test',
+          slug: 'old-slug',
+          expected: ['seo'],
+          categories: ['marketing']
+        }
+      ])
+      expect(listingTags(db)).toEqual([{ slug: 'ai-seo', sort_order: 0 }])
+    })
+  })
+
+  describe('best-page-create', () => {
+    const create = (page: Operation) => ({ action: 'best-page-create', page })
+    const page = {
+      slug: 'ai-writing-assistant',
+      keyword: 'ai writing assistant',
+      title: 'Best AI Writing Assistants',
+      heading: 'Best AI Writing Assistants',
+      intro: 'Tools that draft and edit.'
+    }
+    const bestOf = (db: DatabaseSync, slug: string) =>
+      db
+        .prepare(
+          `SELECT b.keyword,b.title,b.heading,b.intro,t.slug AS tag,c.slug AS category,b.list_size,
+             b.keyword_volume,b.keyword_checked_at,b.sort_order,b.is_active,b.created_at,b.updated_at
+           FROM best_pages b LEFT JOIN tags t ON t.id=b.tag_id LEFT JOIN categories c ON c.id=b.category_id
+           WHERE b.slug=?`
+        )
+        .get(slug)
+
+    it('creates a page on a tag, a category, or both, with its defaults', () => {
+      const db = seeded()
+      const publication = publish(db, [
+        create({ ...page, tag: 'ai-writing' }),
+        create({
+          ...page,
+          slug: 'seo-software',
+          category: 'seo',
+          listSize: 25,
+          keywordVolume: 5400,
+          keywordCheckedAt: '2026-10-10T08:00:00.000Z',
+          order: 4
+        }),
+        create({ ...page, slug: 'ai-seo-writing', tag: 'ai-writing', category: 'seo' })
+      ])
+      expect(booleanBindings(publication)).toEqual([])
+      expect(bestOf(db, 'ai-writing-assistant')).toEqual({
+        category: null,
+        created_at: now,
+        heading: 'Best AI Writing Assistants',
+        intro: 'Tools that draft and edit.',
+        is_active: 1,
+        keyword: 'ai writing assistant',
+        keyword_checked_at: null,
+        keyword_volume: null,
+        list_size: 10,
+        sort_order: 0,
+        tag: 'ai-writing',
+        title: 'Best AI Writing Assistants',
+        updated_at: now
+      })
+      expect(bestOf(db, 'seo-software')).toMatchObject({
+        category: 'seo',
+        keyword_checked_at: '2026-10-10T08:00:00.000Z',
+        keyword_volume: 5400,
+        list_size: 25,
+        sort_order: 4,
+        tag: null
+      })
+      expect(bestOf(db, 'ai-seo-writing')).toMatchObject({ category: 'seo', tag: 'ai-writing' })
+      expect(publication.affectedRoutes.split('\n')).toEqual(
+        expect.arrayContaining([
+          '/best/',
+          '/best/ai-writing-assistant/',
+          '/best/seo-software/',
+          '/products/tags/ai-writing/',
+          '/products/categories/seo/',
+          '/sitemap-best.xml'
+        ])
+      )
+    })
+
+    it('refuses a slug a best page has, active or retired', () => {
+      for (const slug of ['ai-seo-tools', 'old-best']) {
+        refuses(
+          seeded(),
+          [create({ ...page, slug, tag: 'ai-writing' })],
+          `best-page-create ${slug}: a best page has this slug, active or retired`
+        )
+      }
+    })
+
+    it('refuses a missing or retired tag or category', () => {
+      for (const [field, value, kind] of [
+        ['tag', 'nope', 'tag'],
+        ['tag', 'old-tag', 'tag'],
+        ['category', 'nope', 'category'],
+        ['category', 'retired-hub', 'category']
+      ]) {
+        refuses(
+          seeded(),
+          [create({ ...page, tag: 'ai-writing', category: 'seo', [field as string]: value })],
+          `best-page-create ai-writing-assistant: the ${kind} ${value} is missing or retired`
+        )
+      }
+    })
+
+    it('refuses a page without a pool, a list size out of range, and a loose instant', () => {
+      expect(() => rows([create(page)])).toThrow(/needs a tag, a category, or both/u)
+      for (const listSize of [4, 26]) {
+        expect(() => rows([create({ ...page, tag: 'ai-seo', listSize })])).toThrow()
+      }
+      for (const keywordCheckedAt of [
+        '2026-10-10T08:00:00Z',
+        '2026-10-10',
+        '2026-02-30T00:00:00.000Z'
+      ]) {
+        expect(() => rows([create({ ...page, tag: 'ai-seo', keywordCheckedAt })])).toThrow()
+      }
+      expect(() => rows([create({ ...page, tag: 'ai-seo', title: '   ' })])).toThrow(/blank/u)
+      expect(() =>
+        rows([create({ ...page, tag: 'ai-seo' }), create({ ...page, tag: 'ai-writing' })])
+      ).toThrow(/Duplicate best page operation target/u)
+    })
+  })
+
+  describe('best-page-update', () => {
+    const update = (expected: Operation, page: Operation) => ({
+      action: 'best-page-update',
+      slug: 'ai-seo-tools',
+      expected,
+      page
+    })
+    const changed = {
+      keyword: 'best seo ai',
+      title: 'Best SEO AI',
+      heading: 'The best SEO AI',
+      intro: 'A new intro.',
+      tag: null,
+      category: 'seo',
+      listSize: 15,
+      keywordVolume: 900,
+      keywordCheckedAt: '2026-10-09T00:00:00.000Z',
+      order: 2
+    }
+
+    it('rewrites every field but the slug, and back', () => {
+      const db = seeded()
+      const publication = publish(db, [update(seoTools, changed)])
+      expect(booleanBindings(publication)).toEqual([])
+      expect(
+        db
+          .prepare(
+            `SELECT b.keyword,b.title,b.heading,b.intro,b.tag_id,c.slug AS category,b.list_size,
+               b.keyword_volume,b.keyword_checked_at,b.sort_order,b.is_active,b.updated_at
+             FROM best_pages b LEFT JOIN categories c ON c.id=b.category_id WHERE b.slug='ai-seo-tools'`
+          )
+          .get()
+      ).toEqual({
+        category: 'seo',
+        heading: 'The best SEO AI',
+        intro: 'A new intro.',
+        is_active: 1,
+        keyword: 'best seo ai',
+        keyword_checked_at: '2026-10-09T00:00:00.000Z',
+        keyword_volume: 900,
+        list_size: 15,
+        sort_order: 2,
+        tag_id: null,
+        title: 'Best SEO AI',
+        updated_at: now
+      })
+      expect(publication.affectedRoutes.split('\n')).toEqual(
+        expect.arrayContaining([
+          '/best/ai-seo-tools/',
+          '/products/tags/ai-seo/',
+          '/products/categories/seo/'
+        ])
+      )
+      publish(db, [update(changed, seoTools)])
+      expect(
+        db
+          .prepare("SELECT keyword,tag_id,category_id FROM best_pages WHERE slug='ai-seo-tools'")
+          .get()
+      ).toEqual({ keyword: 'ai seo tools', tag_id: 2, category_id: null })
+    })
+
+    it('refuses a page that is missing or differs from expected in any field', () => {
+      refuses(
+        seeded(),
+        [{ ...update(seoTools, changed), slug: 'nope' }],
+        'best-page-update nope: the best page is missing or not as expected'
+      )
+      const stale: Record<string, unknown> = {
+        keyword: 'other',
+        title: 'Other',
+        heading: 'Other',
+        intro: 'Other.',
+        tag: 'ai-writing',
+        category: 'seo',
+        listSize: 11,
+        keywordVolume: 1,
+        keywordCheckedAt: '2026-01-01T00:00:00.000Z',
+        order: 9
+      }
+      for (const [field, value] of Object.entries(stale)) {
+        refuses(
+          seeded(),
+          [update({ ...seoTools, [field]: value }, changed)],
+          'best-page-update ai-seo-tools: the best page is missing or not as expected'
+        )
+      }
+    })
+
+    it('refuses a missing or retired tag or category', () => {
+      for (const [field, value] of [
+        ['tag', 'old-tag'],
+        ['category', 'retired-hub'],
+        ['category', 'nope']
+      ]) {
+        refuses(
+          seeded(),
+          [update(seoTools, { ...changed, [field]: value })],
+          `best-page-update ai-seo-tools: the ${field} ${value} is missing or retired`
+        )
+      }
+    })
+
+    it('refuses no change and a page without a pool', () => {
+      expect(() => rows([update(seoTools, seoTools)])).toThrow(/already has exactly these values/u)
+      expect(() => rows([update(seoTools, { ...seoTools, tag: null })])).toThrow(
+        /needs a tag, a category, or both/u
+      )
+    })
+  })
+
+  describe('best-page-listings-set', () => {
+    const set = (expected: Operation, next: Operation, slug = 'ai-seo-tools') => ({
+      action: 'best-page-listings-set',
+      slug,
+      expected,
+      ...next
+    })
+    const none = { pins: [], exclude: [] }
+
+    it('pins listings in order with blurbs and excludes others, then replaces them', () => {
+      const db = seeded()
+      const first = { pins: [pin(other.id, other.slug, 'The pick.'), test], exclude: [] }
+      const publication = publish(db, [set(none, first)])
+      expect(booleanBindings(publication)).toEqual([])
+      expect(pins(db)).toEqual([
+        { blurb: 'The pick.', excluded: 0, position: 1, slug: 'other-product' },
+        { blurb: null, excluded: 0, position: 2, slug: 'old-slug' }
+      ])
+      expect(
+        db.prepare("SELECT updated_at FROM best_pages WHERE slug='ai-seo-tools'").get()
+      ).toEqual({ updated_at: now })
+      expect(publication.affectedRoutes.split('\n')).toEqual(
+        expect.arrayContaining(['/best/', '/best/ai-seo-tools/'])
+      )
+      const second = { pins: [test], exclude: [other] }
+      publish(db, [set(first, second)])
+      expect(pins(db)).toEqual([
+        { blurb: null, excluded: 0, position: 1, slug: 'old-slug' },
+        { blurb: null, excluded: 1, position: null, slug: 'other-product' }
+      ])
+      // And emptied.
+      publish(db, [set(second, none)])
+      expect(pins(db)).toEqual([])
+    })
+
+    it('refuses pins and exclusions that changed since generation', () => {
+      const db = seeded()
+      const reason =
+        'best-page-listings-set ai-seo-tools: its pins and exclusions are not the expected ones'
+      const ordered = { pins: [pin(test.id, test.slug, 'Why.'), other], exclude: [] }
+      publish(db, [set(none, ordered)])
+      for (const expected of [
+        none,
+        // Another order, or another blurb.
+        { pins: [other, pin(test.id, test.slug, 'Why.')], exclude: [] },
+        { pins: [test, other], exclude: [] },
+        { pins: [pin(test.id, test.slug, 'Why.')], exclude: [other] }
+      ]) {
+        refuses(db, [set(expected, { pins: [], exclude: [test] })], reason)
+      }
+      // The same pins, other exclusions.
+      const excluded = { pins: [pin(test.id, test.slug, 'Why.')], exclude: [other] }
+      publish(db, [set(ordered, excluded)])
+      refuses(
+        db,
+        [set({ pins: excluded.pins, exclude: [] }, { pins: [], exclude: [test] })],
+        reason
+      )
+    })
+
+    it('refuses a missing page', () => {
+      refuses(
+        seeded(),
+        [set(none, { pins: [test], exclude: [] }, 'nope')],
+        'best-page-listings-set nope: no best page has this slug'
+      )
+    })
+
+    it('refuses a pin or exclusion that is renamed, missing, or not approved', () => {
+      for (const next of [
+        { pins: [pin(test.id, 'renamed')], exclude: [] },
+        { pins: [], exclude: [pin(test.id, 'renamed')] }
+      ]) {
+        refuses(
+          seeded(),
+          [set(none, next)],
+          `best-page-listings-set ai-seo-tools: no approved listing is renamed (${test.id})`
+        )
+      }
+      refuses(
+        seeded(),
+        [set(none, { pins: [pin('lst_sqlite_missing', 'gone')], exclude: [] })],
+        'best-page-listings-set ai-seo-tools: no approved listing is gone (lst_sqlite_missing)'
+      )
+      for (const status of ['review', 'rejected']) {
+        for (const next of [
+          { pins: [other, test], exclude: [] },
+          { pins: [other], exclude: [test] }
+        ]) {
+          const db = seeded()
+          db.exec(`UPDATE listings SET status='${status}' WHERE id='lst_sqlite_test'`)
+          refuses(
+            db,
+            [set(none, next)],
+            `best-page-listings-set ai-seo-tools: no approved listing is old-slug (${test.id})`
+          )
+        }
+      }
+    })
+
+    it('refuses a listing pinned and excluded, named twice, too many pins, or no change', () => {
+      expect(() => rows([set(none, { pins: [test], exclude: [test] })])).toThrow(
+        /pinned or excluded twice/u
+      )
+      expect(() => rows([set(none, { pins: [test, test], exclude: [] })])).toThrow(
+        /pinned or excluded twice/u
+      )
+      expect(() =>
+        rows([set({ pins: [test], exclude: [test] }, { pins: [], exclude: [] })])
+      ).toThrow(/pinned or excluded twice/u)
+      const many = Array.from({ length: 26 }, (_, index) =>
+        pin(`lst_sqlite_pin_${index}`, `pin-${index}`)
+      )
+      expect(() => rows([set(none, { pins: many, exclude: [] })])).toThrow()
+      expect(() => rows([set(none, none)])).toThrow(/already has exactly these pins/u)
+      // Created and pinned in one manifest, as the first set is (design 4.2).
+      expect(() =>
+        rows([
+          {
+            action: 'best-page-create',
+            page: { ...seoTools, slug: 'new-best' }
+          },
+          set(none, { pins: [test], exclude: [] }, 'new-best')
+        ])
+      ).not.toThrow()
+    })
+  })
+
+  describe('best-page-unpublish', () => {
+    const unpublish = (slug: string, redirect: Operation) => ({
+      action: 'best-page-unpublish',
+      slug,
+      redirect
+    })
+
+    it('retires a page, keeps its pins, and redirects its URL and every redirect aimed at it', () => {
+      const db = seeded()
+      publish(db, [
+        redirectSet({ kind: 'category', slug: 'ai-seo' }, null, {
+          kind: 'best',
+          slug: 'ai-seo-tools'
+        }),
+        {
+          action: 'best-page-listings-set',
+          slug: 'ai-seo-tools',
+          expected: { pins: [], exclude: [] },
+          pins: [test],
+          exclude: []
+        }
+      ])
+      const publication = publish(db, [unpublish('ai-seo-tools', { kind: 'tag', slug: 'ai-seo' })])
+      expect(booleanBindings(publication)).toEqual([])
+      expect(
+        db.prepare("SELECT is_active,updated_at FROM best_pages WHERE slug='ai-seo-tools'").get()
+      ).toEqual({ is_active: 0, updated_at: now })
+      expect(pins(db)).toHaveLength(1)
+      expect(redirects(db)).toEqual([
+        'best ai-seo-tools -> tag ai-seo',
+        'category ai-seo -> tag ai-seo'
+      ])
+      expect(publication.affectedRoutes.split('\n')).toEqual(
+        expect.arrayContaining(['/best/', '/best/ai-seo-tools/', '/products/tags/ai-seo/'])
+      )
+      // With the page retired, its tag can retire too.
+      publish(db, [{ action: 'tag-unpublish', slug: 'ai-seo', redirect: { kind: 'directory' } }])
+      expect(redirects(db)).toEqual([
+        'best ai-seo-tools -> directory',
+        'category ai-seo -> directory',
+        'tag ai-seo -> directory'
+      ])
+    })
+
+    it('refuses a missing or retired target, a missing or retired page, and itself', () => {
+      for (const [kind, slug] of [
+        ['best', 'old-best'],
+        ['tag', 'old-tag'],
+        ['category', 'nope']
+      ]) {
+        refuses(
+          seeded(),
+          [unpublish('ai-seo-tools', { kind, slug })],
+          `best-page-unpublish ai-seo-tools: the redirect target ${kind === 'best' ? 'best page' : kind} ${slug} is missing or retired`
+        )
+      }
+      for (const slug of ['nope', 'old-best']) {
+        refuses(
+          seeded(),
+          [unpublish(slug, { kind: 'directory' })],
+          `best-page-unpublish ${slug}: no active best page has this slug`
+        )
+      }
+      expect(() =>
+        rows([unpublish('ai-seo-tools', { kind: 'best', slug: 'ai-seo-tools' })])
+      ).toThrow(/cannot redirect to itself/u)
+    })
+  })
+
+  describe('taxonomy-redirect-set', () => {
+    it('adds a redirect, re-points it, and sends it to the directory, from any source kind', () => {
+      const db = seeded()
+      const publication = publish(db, [
+        // A category that still renders: its page wins until it empties (design 2.2).
+        redirectSet({ kind: 'category', slug: 'seo' }, null, {
+          kind: 'best',
+          slug: 'ai-seo-tools'
+        }),
+        redirectSet({ kind: 'tag', slug: 'gone-tag' }, null, { kind: 'category', slug: 'writing' }),
+        redirectSet({ kind: 'best', slug: 'gone-best' }, null, { kind: 'directory' })
+      ])
+      expect(booleanBindings(publication)).toEqual([])
+      expect(redirects(db)).toEqual([
+        'best gone-best -> directory',
+        'category seo -> best ai-seo-tools',
+        'tag gone-tag -> category writing'
+      ])
+      expect(
+        db
+          .prepare(
+            "SELECT target_category_id,target_tag_id,target_best_page_id,manifest_id,created_at FROM taxonomy_redirects WHERE source_slug='gone-best'"
+          )
+          .get()
+      ).toEqual({
+        created_at: now,
+        manifest_id: publication.manifest.id,
+        target_best_page_id: null,
+        target_category_id: null,
+        target_tag_id: null
+      })
+      expect(publication.affectedRoutes.split('\n')).toEqual(
+        expect.arrayContaining([
+          '/products/categories/seo/',
+          '/best/ai-seo-tools/',
+          '/products/tags/gone-tag/',
+          '/products/categories/writing/',
+          '/best/gone-best/',
+          '/products/'
+        ])
+      )
+      const repoint = publish(db, [
+        redirectSet(
+          { kind: 'category', slug: 'seo' },
+          { kind: 'best', slug: 'ai-seo-tools' },
+          { kind: 'tag', slug: 'ai-writing' }
+        ),
+        redirectSet(
+          { kind: 'best', slug: 'gone-best' },
+          { kind: 'directory' },
+          {
+            kind: 'best',
+            slug: 'ai-seo-tools'
+          }
+        )
+      ])
+      expect(redirects(db)).toEqual([
+        'best gone-best -> best ai-seo-tools',
+        'category seo -> tag ai-writing',
+        'tag gone-tag -> category writing'
+      ])
+      expect(
+        db.prepare("SELECT manifest_id FROM taxonomy_redirects WHERE source_slug='seo'").get()
+      ).toEqual({ manifest_id: repoint.manifest.id })
+    })
+
+    it('refuses a current target other than expected', () => {
+      const db = seeded()
+      publish(db, [redirectSet({ kind: 'category', slug: 'old' }, null, { kind: 'directory' })])
+      for (const [from, expected] of [
+        [{ kind: 'category', slug: 'old' }, null],
+        [
+          { kind: 'category', slug: 'old' },
+          { kind: 'tag', slug: 'ai-writing' }
+        ],
+        [{ kind: 'tag', slug: 'old' }, { kind: 'directory' }],
+        [{ kind: 'category', slug: 'new' }, { kind: 'directory' }]
+      ] as const) {
+        refuses(
+          db,
+          [redirectSet(from, expected, { kind: 'best', slug: 'ai-seo-tools' })],
+          `taxonomy-redirect-set ${from.kind} ${from.slug}: its current target is not the expected one`
+        )
+      }
+    })
+
+    it('refuses a missing or retired target', () => {
+      for (const [kind, slug] of [
+        ['category', 'retired-hub'],
+        ['category', 'nope'],
+        ['tag', 'old-tag'],
+        ['tag', 'nope'],
+        ['best', 'old-best'],
+        ['best', 'nope']
+      ]) {
+        refuses(
+          seeded(),
+          [redirectSet({ kind: 'category', slug: 'old' }, null, { kind, slug })],
+          `taxonomy-redirect-set category old: the redirect target ${kind === 'best' ? 'best page' : kind} ${slug} is missing or retired`
+        )
+      }
+    })
+
+    it('refuses a redirect to itself, one that changes nothing, and a source written twice', () => {
+      const from = { kind: 'tag', slug: 'ai-seo' }
+      expect(() => rows([redirectSet(from, null, from)])).toThrow(/cannot redirect to itself/u)
+      expect(() => rows([redirectSet(from, { kind: 'directory' }, { kind: 'directory' })])).toThrow(
+        /already points there/u
+      )
+      expect(() =>
+        rows([
+          redirectSet(from, null, { kind: 'directory' }),
+          redirectSet(from, { kind: 'directory' }, { kind: 'category', slug: 'seo' })
+        ])
+      ).toThrow(/Duplicate taxonomy redirect source/u)
+      // A retirement writes its own URL's redirect.
+      expect(() =>
+        rows([
+          { action: 'tag-unpublish', slug: 'ai-seo', redirect: { kind: 'directory' } },
+          redirectSet(from, null, { kind: 'directory' })
+        ])
+      ).toThrow(/Duplicate taxonomy redirect source/u)
+      // The same slug under another kind is another URL.
+      expect(() =>
+        rows([
+          redirectSet(from, null, { kind: 'directory' }),
+          redirectSet({ kind: 'category', slug: 'ai-seo' }, null, { kind: 'directory' })
+        ])
+      ).not.toThrow()
+    })
+  })
+
+  describe('the end of the batch (#338 review’s ordering gap)', () => {
+    const retireEmptyHub = { action: 'category-unpublish', slug: 'empty-hub' }
+
+    it('refuses a redirect whose target a later operation retires', () => {
+      const toHub = redirectSet({ kind: 'category', slug: 'old' }, null, {
+        kind: 'category',
+        slug: 'empty-hub'
+      })
+      refuses(
+        seeded(),
+        [toHub, retireEmptyHub],
+        'taxonomy-redirect-set category old: by the end of the batch, its redirect is gone or its target is retired'
+      )
+      // In the other order, the target guard refuses it.
+      refuses(
+        seeded(),
+        [retireEmptyHub, toHub],
+        'taxonomy-redirect-set category old: the redirect target category empty-hub is missing or retired'
+      )
+      // A tag's retirement re-points its redirects in the batch, so it never leaves one behind.
+      const db = seeded()
+      publish(db, [
+        redirectSet({ kind: 'category', slug: 'old' }, null, { kind: 'tag', slug: 'ai-writing' }),
+        {
+          action: 'tag-unpublish',
+          slug: 'ai-writing',
+          redirect: { kind: 'category', slug: 'writing' }
+        }
+      ])
+      expect(redirects(db)).toEqual([
+        'category old -> category writing',
+        'tag ai-writing -> category writing'
+      ])
+    })
+
+    it('refuses a retirement redirect whose target a later operation retires', () => {
+      refuses(
+        seeded(),
+        [
+          {
+            action: 'tag-unpublish',
+            slug: 'ai-writing',
+            redirect: { kind: 'category', slug: 'empty-hub' }
+          },
+          retireEmptyHub
+        ],
+        'tag-unpublish ai-writing: by the end of the batch, its redirect is gone or its target is retired'
+      )
+    })
+
+    it('refuses a best page whose category a later operation retires', () => {
+      refuses(
+        seeded(),
+        [
+          {
+            action: 'best-page-create',
+            page: { ...seoTools, slug: 'hub-best', tag: null, category: 'empty-hub' }
+          },
+          retireEmptyHub
+        ],
+        'best-page-create hub-best: by the end of the batch, its tag or category is retired'
+      )
+      refuses(
+        seeded(),
+        [
+          {
+            action: 'best-page-update',
+            slug: 'ai-seo-tools',
+            expected: seoTools,
+            page: { ...seoTools, category: 'empty-hub' }
+          },
+          retireEmptyHub
+        ],
+        'best-page-update ai-seo-tools: by the end of the batch, its tag or category is retired'
+      )
+    })
+  })
+
+  it('plans every taxonomy operation in one row-level manifest D1 accepts, binding no boolean', () => {
+    const db = seeded()
+    db.exec(`INSERT INTO best_pages (slug,keyword,title,heading,intro,category_id)
+      VALUES ('writing-tools','writing tools','Best Writing Tools','Best Writing Tools','Intro.',2)`)
+    const writingTools = {
+      ...seoTools,
+      keyword: 'writing tools',
+      title: 'Best Writing Tools',
+      heading: 'Best Writing Tools',
+      intro: 'Intro.',
+      tag: null,
+      category: 'writing'
+    }
+    const publication = publish(db, [
+      tagCreate({ slug: 'ai-copywriting', name: 'AI Copywriting', category: 'writing' }),
+      {
+        action: 'tag-update',
+        slug: 'ai-writing',
+        expected: { name: 'AI Writing', description: 'Words.', category: 'writing' },
+        tag: { name: 'AI Writers', description: 'Words.', category: 'writing', order: 1 }
+      },
+      tagsSet([], ['ai-copywriting', 'ai-writing']),
+      {
+        action: 'best-page-create',
+        page: { ...seoTools, slug: 'ai-copywriter', tag: 'ai-copywriting' }
+      },
+      {
+        action: 'best-page-update',
+        slug: 'writing-tools',
+        expected: writingTools,
+        page: { ...writingTools, listSize: 12 }
+      },
+      {
+        action: 'best-page-listings-set',
+        slug: 'ai-copywriter',
+        expected: { pins: [], exclude: [] },
+        pins: [test],
+        exclude: [other]
+      },
+      {
+        action: 'best-page-unpublish',
+        slug: 'ai-seo-tools',
+        redirect: { kind: 'tag', slug: 'ai-seo' }
+      },
+      {
+        action: 'tag-unpublish',
+        slug: 'ai-seo',
+        redirect: { kind: 'best', slug: 'ai-copywriter' }
+      },
+      redirectSet({ kind: 'category', slug: 'ai-content' }, null, {
+        kind: 'best',
+        slug: 'ai-copywriter'
+      })
+    ])
+    expect(booleanBindings(publication)).toEqual([])
+    for (const item of publication.statements) {
+      expect(d1CompatViolations(item.query), item.query).toEqual([])
+    }
+    expect(redirects(db)).toEqual([
+      'best ai-seo-tools -> best ai-copywriter',
+      'category ai-content -> best ai-copywriter',
+      'tag ai-seo -> best ai-copywriter'
+    ])
+    // A manifest without a taxonomy operation records the routes it always did.
+    const plain = buildPublicationPlan(
+      rows([{ action: 'category-unpublish', slug: 'empty-hub' }]),
+      'plain',
+      now,
+      { checksum: beforeChecksum, version: 4 }
+    )
+    expect(plain.affectedRoutes).not.toMatch(/sitemap-(?:tags|best)/u)
+    expect(publication.affectedRoutes.split('\n')).toEqual(
+      expect.arrayContaining(['/sitemap-tags.xml', '/sitemap-best.xml'])
+    )
   })
 })
