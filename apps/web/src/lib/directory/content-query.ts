@@ -1,3 +1,4 @@
+import type { ListingContentTree } from '../markdown/listing-content'
 import type { WebsiteMedia, WebsitePriority, WebsiteResourceLink } from '../seo/website-schema'
 import { getListingCategories } from './category-navigation'
 
@@ -146,6 +147,11 @@ export interface LegalEntry {
 }
 
 export interface WebsiteDetailMetadata extends WebsiteMetadata {
+  /**
+   * The body (`content`) as the tree the page renders, from the epoch-keyed data cache
+   * (`lib/markdown/listing-content.ts`, #334); absent without a body.
+   */
+  contentTree?: ListingContentTree
   relatedWebsites: WebsiteRelatedCardMetadata[]
   previousWebsite: WebsiteNavigationMetadata | null
   nextWebsite: WebsiteNavigationMetadata | null

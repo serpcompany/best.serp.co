@@ -47,7 +47,14 @@ From the edge inward:
    entries, featured/latest heads, details, search results (per normalized query and limit),
    and the full summary list (for sitemaps and the feed) are cached under epoch-scoped keys for
    24 hours, with live D1 fallback when the cache fails. The redirect lookups (renamed listing
-   slugs, moved taxonomy URLs, root-level URLs) are single seeks and stay uncached.
+   slugs, moved taxonomy URLs, root-level URLs) are single seeks and stay uncached. Each
+   listing body's parsed Markdown is cached too (`getDerivedValue`, built by
+   `lib/markdown/listing-content-tree.ts`, #334): the page renders the cached tree instead of
+   parsing the body on every uncached render. A tree's JSON is about twice its body for prose
+   and up to about 9 times for markup-dense Markdown (19 KB on average for 10.8 KB bodies, 39 KB
+   at most for a 21 KB one), far below the Cache API's object limit. Its key also names the
+   tree's format (`LISTING_CONTENT_FORMAT`), which a change to the parser's output must bump,
+   because the data cache survives deployments.
 4. React `cache()` deduplicates reads within a request.
 
 Both Cache API layers are per data center and populate on demand. A deployment gets a new

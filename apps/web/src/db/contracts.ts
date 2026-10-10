@@ -72,6 +72,7 @@ export interface CatalogCacheEvent {
     | 'best-page-items'
     | 'featured-summaries'
     | 'latest-summaries'
+    | 'listing-content'
     | 'listing-detail'
     | 'listing-name-order'
     | 'listing-name-page'
@@ -83,6 +84,22 @@ export interface CatalogCacheEvent {
 }
 
 export type CatalogObserver = (event: CatalogCacheEvent | CatalogQueryEvent) => void
+
+/**
+ * A value the web adapter derives from this epoch's public catalog data, such as a listing
+ * body's parsed Markdown (#334). The data cache keeps it under the epoch like the catalog's own
+ * reads, so it is computed once per epoch and data center instead of on every render.
+ */
+export interface CatalogDerivation<T> {
+  /** What is derived; its data cache events carry it as the operation. */
+  kind: 'listing-content'
+  /** The input's identity within the epoch, such as the listing's slug. */
+  id: string
+  /** Names the output's shape: change it whenever the same input would derive another value. */
+  format: string
+  compute(): T | Promise<T>
+  validate(value: unknown): value is T
+}
 
 export interface CatalogDataCache {
   get(key: string): Promise<unknown | null>
@@ -319,6 +336,8 @@ export interface CatalogOperations {
   getCategoryBySlug(slug: string): Promise<PublishedCategory | null>
   getFeaturedListingCount(): Promise<number>
   getFeaturedListings(limit?: number): Promise<ListingSummary[]>
+  /** `derivation`'s value for the current epoch, from the data cache when it is there. */
+  getDerivedValue<T>(derivation: CatalogDerivation<T>): Promise<T>
   getLatestListings(limit?: number): Promise<ListingSummary[]>
   getListingBySlug(slug: string): Promise<ListingDetail | null>
   getListingNamePage(query?: ListingNamePageQuery): Promise<ListingNamePage>

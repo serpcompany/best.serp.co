@@ -15,6 +15,7 @@ import { type CompiledQuery, d1ErrorCode, runQuery } from './client'
 import type {
   BestPageItem,
   CatalogCacheEvent,
+  CatalogDerivation,
   CatalogOperation,
   CatalogOperations,
   CatalogOperationsConfig,
@@ -585,6 +586,21 @@ function isDetailCacheEntry(value: unknown, publicationVersion: number): value i
     candidate.publicationVersion === publicationVersion &&
     (candidate.detail === null || isListingDetail(candidate.detail))
   )
+}
+
+interface DerivedCacheEntry<T> {
+  publicationVersion: number
+  value: T
+}
+
+function isDerivedCacheEntry<T>(
+  value: unknown,
+  publicationVersion: number,
+  validate: (value: unknown) => value is T
+): value is DerivedCacheEntry<T> {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<DerivedCacheEntry<T>>
+  return candidate.publicationVersion === publicationVersion && validate(candidate.value)
 }
 
 interface NameOrderEntry {
@@ -1301,6 +1317,27 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
     const detail = await queryListingBySlug(slug)
     await writeCache('listing-detail', cacheKey, { detail, publicationVersion })
     return detail
+  }
+
+  /**
+   * A value derived from this epoch's public data (`CatalogDerivation`): read from the data
+   * cache when this epoch already has it, otherwise computed and written there (#334). Reads no
+   * D1 rows itself.
+   */
+  async function getDerivedValue<T>(derivation: CatalogDerivation<T>): Promise<T> {
+    const { key, publicationVersion } = await epochKey(`catalog-${derivation.kind}`)
+    const cacheKey = `${key}:${derivation.format}:${derivation.id}`
+    const cached = await readCache(
+      derivation.kind,
+      cacheKey,
+      (value): value is DerivedCacheEntry<T> =>
+        isDerivedCacheEntry(value, publicationVersion, derivation.validate)
+    )
+    if (cached) return cached.value
+
+    const value = await derivation.compute()
+    await writeCache(derivation.kind, cacheKey, { publicationVersion, value })
+    return value
   }
 
   /**
@@ -2032,6 +2069,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
     async getFeaturedListings(limit = 6) {
       return publicationHead('featured-summaries', limit)
     },
+    getDerivedValue,
     async getLatestListings(limit = 12) {
       return publicationHead('latest-summaries', limit)
     },

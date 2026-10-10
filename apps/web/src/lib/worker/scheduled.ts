@@ -19,6 +19,7 @@ import { createBadgeProgramOperations } from '@/db/badge-program'
 import { createDatabase } from '@/db/client'
 import { createDraftJobOperations } from '@/db/draft-jobs'
 import { site } from '@/lib/site'
+import { badgeProgramEnabled } from '../badge-program/enabled'
 import { runBadgeProgram } from '../badge-program/program'
 import { BADGE_DAILY_CRON, BADGE_WEEKLY_CRON } from '../badge-program/schedule'
 import { ordersEnabledFor } from '../billing/flags'
@@ -71,22 +72,6 @@ export interface ScheduledJobInput {
 export interface ScheduledJob {
   name: string
   run(input: ScheduledJobInput): Promise<Record<string, unknown>>
-}
-
-/**
- * The badge program runs only while `features.badgeProgram` is on (on since #130, the owner's
- * launch decision), or on a local Worker that asks for it.
- */
-export function badgeProgramEnabled(
-  env: ScheduledEnv,
-  features: SiteFeatures = siteFeatures
-): boolean {
-  if (features.badgeProgram) return true
-  return (
-    env.LOCAL_BADGE_PROGRAM === 'on' &&
-    env.SITE_ENVIRONMENT === 'local' &&
-    env.D1_RUNTIME_ENV === 'local'
-  )
 }
 
 /**

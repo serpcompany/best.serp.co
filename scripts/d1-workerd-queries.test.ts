@@ -488,6 +488,16 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
       await ops.getListingBySlug(slug)
     }
     expect(await ops.getListingBySlug(widest.slug)).toMatchObject({ slug: widest.slug })
+    // A derived value (a listing body's parsed Markdown, #334) reads no rows beyond the epoch.
+    expect(
+      await ops.getDerivedValue({
+        compute: () => widest.slug,
+        format: 'workerd',
+        id: widest.slug,
+        kind: 'listing-content',
+        validate: (value): value is string => typeof value === 'string'
+      })
+    ).toBe(widest.slug)
     // Previous and next are the neighbours in publication order, across every boundary.
     for (const { index, listing } of navigationStops) {
       // A fresh operations object, so no detail read earlier in this test is reused.

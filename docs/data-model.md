@@ -32,9 +32,13 @@ Column meanings and constraints are commented in `schema.ts`. By area:
   category's, or both, and `best_page_listings` pins the top positions and excludes listings that
   don't fit. `taxonomy_redirects` sends a retired or renamed category, tag, or best page URL to its
   target, held as a foreign key so a later rename keeps it current. Submissions and revisions keep
-  a Creator's suggested tags in `tag_slugs` (a JSON array of at most three, or null). The catalog
-  reads them (#345: [Public catalog](./public-catalog.md#reads)); the routes and writes are later
-  steps of #341.
+  a Creator's suggested tags in `tag_slugs` (a JSON array of at most three, or null). The
+  publisher writes the taxonomy tables ([Catalog publication](./catalog-publication.md#taxonomy-operations)),
+  and the catalog reads them (#345: [Public catalog](./public-catalog.md#reads)); the routes and
+  app writes are later steps of #341. Write tags and memberships with `UPDATE`, or
+  `INSERT … SELECT … WHERE is_active = 1`, never an upsert: SQLite fires a `BEFORE INSERT`
+  trigger on an upsert's attempted insert even when it becomes an update, so the taxonomy
+  triggers would refuse one that touches a retired tag.
 - **Publication**: `publication_state` is a single row holding the catalog version and
   checksum; `publication_runs` records every applied publication, and `migration_runs` the
   one-time import (locally, the fixture seed's run).
