@@ -116,6 +116,30 @@ function foreignMediaKeys(database: DatabaseSync): string[] {
   })
 }
 
+/**
+ * Committed renames no later manifest follows with a media update of the listing under the slug
+ * it has by then: the new slug, or the one a later rename gives it (a→b, then b→c, with the
+ * update under c). A listing with no logo or image ships an empty update (`expected: []`,
+ * `media: {}`), which the publisher refuses if the listing has media after all. A manifest holds
+ * one operation per listing, so the update is always in a later manifest.
+ */
+function unrehostedRenames(manifests: ReadonlyArray<ReturnType<typeof parseManifest>>): string[] {
+  return manifests.flatMap((manifest, index) =>
+    manifest.operations.flatMap(op => {
+      if (op.action !== 'listing-slug-change') return []
+      let slug = op.to
+      for (const later of manifests.slice(index + 1))
+        for (const next of later.operations) {
+          if (next.action === 'listing-media-update' && next.id === op.id && next.slug === slug)
+            return []
+          if (next.action === 'listing-slug-change' && next.id === op.id && next.from === slug)
+            slug = next.to
+        }
+      return [`${manifest.id}: ${op.from} -> ${op.to}`]
+    })
+  )
+}
+
 /** Applies a manifest as the publisher's batch would, in one transaction. */
 function publish(database: DatabaseSync, manifest: Record<string, unknown>): void {
   const source = stringify(manifest)
@@ -250,7 +274,10 @@ describe('hosted catalog media (#95)', () => {
         INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary) VALUES ('lst_fixture_media',1,0,1);
         INSERT INTO listing_media (listing_id,kind,url,sort_order,media_key,sha256,content_type,bytes,width,height)
           VALUES ('lst_fixture_media','logo','${before.source}',0,'${before.key}','${before.sha256}','image/png',2048,128,128);
-        UPDATE listings SET status='approved' WHERE id='lst_fixture_media';
+        INSERT INTO listings (id,slug,name,description,website,status,published_at,source_kind,source_identity,checksum)
+          VALUES ('lst_fixture_bare','fixture-bare-old','Bare fixture','A fixture listing with no logo or image.','https://bare.fixture.test/','draft','2026-10-01','fixture','fixture-bare','${'d'.repeat(64)}');
+        INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary) VALUES ('lst_fixture_bare',1,0,1);
+        UPDATE listings SET status='approved' WHERE id IN ('lst_fixture_media','lst_fixture_bare');
         INSERT INTO publication_state (id,version,manifest_id,checksum,published_at) VALUES (1,1,NULL,'${'b'.repeat(64)}','2026-10-01T00:00:00.000Z');
       `)
       expect(foreignMediaKeys(database)).toEqual([])
@@ -271,12 +298,39 @@ describe('hosted catalog media (#95)', () => {
             to: 'fixture-new',
             categories: ['seo'],
             reason: 'Rename'
+          },
+          {
+            action: 'listing-slug-change',
+            id: 'lst_fixture_bare',
+            from: 'fixture-bare-old',
+            to: 'fixture-bare-new',
+            categories: ['seo'],
+            reason: 'Rename'
           }
         ]
       })
       expect(foreignMediaKeys(database)).toEqual([`fixture-new logo ${before.key}`])
 
-      // So a rename ships with a media update that re-hosts its images under the new slug.
+      // An empty media update says the listing has no logo or image: refused for one that has.
+      const bareUpdate = (id: string, slug: string) => ({
+        action: 'listing-media-update',
+        id,
+        slug,
+        expected: [],
+        media: {}
+      })
+      expect(() =>
+        publish(database, {
+          version: 1,
+          id: 'fixture-rename-empty-media',
+          concurrency: 'rows',
+          provenance,
+          operations: [bareUpdate('lst_fixture_media', 'fixture-new')]
+        })
+      ).toThrow(/malformed JSON/u)
+
+      // So a rename ships with a media update that re-hosts its images under the new slug, or,
+      // for a listing with no logo or image, an empty one the publisher checks against its rows.
       publish(database, {
         version: 1,
         id: 'fixture-rename-media',
@@ -289,7 +343,8 @@ describe('hosted catalog media (#95)', () => {
             slug: 'fixture-new',
             expected: [{ kind: 'logo', url: before.source, key: before.key }],
             media: { logo: hashed('fixture-new', 'b') }
-          }
+          },
+          bareUpdate('lst_fixture_bare', 'fixture-bare-new')
         ]
       })
       expect(foreignMediaKeys(database)).toEqual([])
@@ -301,24 +356,55 @@ describe('hosted catalog media (#95)', () => {
     const manifests = files(publicationsDirectory, /\.ya?ml$/u).map(file =>
       parseManifest(readFileSync(resolve(publicationsDirectory, file), 'utf8'))
     )
-    const unmoved = manifests.flatMap((manifest, index) =>
-      manifest.operations.flatMap(op =>
-        op.action === 'listing-slug-change' &&
-        !manifests
-          .slice(index + 1)
-          .some(later =>
-            later.operations.some(
-              next =>
-                next.action === 'listing-media-update' && next.id === op.id && next.slug === op.to
-            )
-          )
-          ? [`${manifest.id}: ${op.from} -> ${op.to}`]
-          : []
+    expect(
+      unrehostedRenames(manifests),
+      'Re-host a renamed listing’s media under its new slug, or ship an empty media update for one with none (docs/media.md).'
+    ).toEqual([])
+  })
+
+  // #320: a renamed listing with no logo or image, and a chained rename (a→b, then b→c).
+  it('accepts an empty media update, and an update under the slug a chained rename gives', () => {
+    const provenance = { actor: 'fixture@example.test', workflow: 'test/catalog-media' }
+    const manifest = (id: string, operations: Record<string, unknown>[]) =>
+      parseManifest(
+        stringify({
+          version: 1,
+          id,
+          basePublicationVersion: 1,
+          provenance: { ...provenance, beforeChecksum: 'b'.repeat(64) },
+          operations
+        })
       )
+    const rename = (from: string, to: string) => ({
+      action: 'listing-slug-change',
+      id: 'lst_fixture_chain',
+      from,
+      to,
+      categories: ['seo'],
+      reason: 'Rename'
+    })
+    const update = (slug: string) => ({
+      action: 'listing-media-update',
+      id: 'lst_fixture_chain',
+      slug,
+      expected: [],
+      media: {}
+    })
+    const first = manifest('fixture-a-to-b', [rename('fixture-a', 'fixture-b')])
+    const second = manifest('fixture-b-to-c', [rename('fixture-b', 'fixture-c')])
+    expect(unrehostedRenames([first])).toEqual(['fixture-a-to-b: fixture-a -> fixture-b'])
+    expect(unrehostedRenames([first, manifest('fixture-b-media', [update('fixture-b')])])).toEqual(
+      []
     )
     expect(
-      unmoved,
-      'Re-host a renamed listing’s media under its new slug (docs/media.md).'
+      unrehostedRenames([first, second, manifest('fixture-c-media', [update('fixture-c')])])
     ).toEqual([])
+    // An update under a slug the listing no longer has, or before the rename, doesn't count.
+    expect(
+      unrehostedRenames([first, second, manifest('fixture-b-media', [update('fixture-b')])])
+    ).toEqual(['fixture-a-to-b: fixture-a -> fixture-b', 'fixture-b-to-c: fixture-b -> fixture-c'])
+    expect(unrehostedRenames([manifest('fixture-b-media', [update('fixture-b')]), first])).toEqual([
+      'fixture-a-to-b: fixture-a -> fixture-b'
+    ])
   })
 })

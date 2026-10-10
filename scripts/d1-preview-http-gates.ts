@@ -965,9 +965,12 @@ export async function runHttpGates(
 
 /**
  * The live listing and categories the gates request on a deployed Worker. They are real catalog
- * rows, because the gates run against staging's and production's data: the v1 import's first
- * listing and its first category no manifest retires, which the gates read from the import's
- * parity report until #315 archived it. A committed manifest that unpublishes the listing or
+ * rows, because the gates run against staging's and production's data. The listing is the v1
+ * import's first one (#315). The category is that listing's own, `video-downloaders`, with 63
+ * live listings on staging and production on 2026-10-10 (#320). An empty category answers 404,
+ * so the gates no longer sample `ai-advertising-tools`, which one unpublish would have emptied;
+ * and while the listing the gates already require is filed under this one, it can't be empty. A
+ * committed manifest that unpublishes or renames the listing, takes the category off it, or
  * retires every category here fails `d1-preview-http-gates.test.ts`; name another live one then.
  */
 export interface HttpGateSamples {
@@ -977,7 +980,7 @@ export interface HttpGateSamples {
 }
 
 export const httpGateSamples: HttpGateSamples = {
-  categories: ['ai-advertising-tools'],
+  categories: ['video-downloaders'],
   listing: '123movies-downloader'
 }
 

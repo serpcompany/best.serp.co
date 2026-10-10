@@ -35,9 +35,9 @@ Every listing image carries `data-listing-image="logo|image"`. Guards:
   keys (`listings/<slug>/<kind>/`), each in an upload plan with the same bytes, or no image, and
   no listing content to embed an image, so no other host is ever rendered. On fixture rows, it
   also requires a `listing-slug-change` to leave no media keyed to the old slug, and every
-  committed rename to be followed by a `listing-media-update` under the new slug. (Until #315 the
-  same checks also ran on every published logo and image of the v1 import; that test is archived
-  with the import.)
+  committed rename to be followed by a `listing-media-update` under the listing's slug at that
+  point (an empty one for a listing with no logo or image). (Until #315 the same checks also ran
+  on every published logo and image of the v1 import; that test is archived with the import.)
 
 ## Media health check
 
