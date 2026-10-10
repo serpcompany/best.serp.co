@@ -12,6 +12,7 @@ import { buildCustomRoute } from 'next/dist/lib/build-custom-route'
 import loadCustomRoutes from 'next/dist/lib/load-custom-routes'
 import { resolveRobots } from 'next/dist/lib/metadata/resolvers/resolve-basics'
 import { matchHas } from 'next/dist/shared/lib/router/utils/prepare-destination'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { rootLayoutMetadata } from '@/components/layout/root-shell'
 import { siteRoutes } from '@/lib/site'
@@ -31,15 +32,56 @@ vi.mock('@/lib/auth/header-state', () => ({ getHeaderAuthState: async () => null
 vi.mock('@/components/auth/sign-out-button', () => ({
   useSignOut: () => [false, async () => {}]
 }))
-// The taxonomy indexes are indexable once they list something (#346): one tag and one best page.
-const taxonomy = vi.hoisted(() => ({
-  bestPages: [{ hub: 'writing', listSize: 10, poolSize: 5, slug: 'ai-writer' }],
-  tags: [{ category: 'writing', count: 3, slug: 'ai-writing' }]
-}))
+// The taxonomy pages and indexes (#346): a category of each kind, and tags and best pages on
+// either side of their thresholds. The indexes are indexable once they list something.
+const taxonomy = vi.hoisted(() => {
+  const page = (slug: string, tag: string | null, poolSize: number) => ({
+    category: tag ? null : 'writing',
+    heading: `Best ${slug}`,
+    hub: 'writing',
+    intro: 'Ranked.',
+    keyword: slug,
+    lastModifiedAt: '2026-09-01T00:00:00.000Z',
+    listSize: 10,
+    order: 0,
+    poolSize,
+    slug,
+    tag,
+    title: `Best ${slug}`
+  })
+  const tag = (slug: string, count: number) => ({
+    category: 'writing',
+    count,
+    description: '',
+    lastModifiedAt: null,
+    name: slug,
+    order: 0,
+    slug
+  })
+  return {
+    bestPages: [page('ai-writer', null, 5), page('ai-chatbot', 'ai-chatbots', 40)],
+    categories: [
+      { count: 841, description: '', name: 'Other', order: 0, slug: 'other' },
+      { count: 63, description: '', name: 'Video Downloaders', order: 1, slug: 'video-downloaders' }
+    ],
+    smallBestPage: page('ai-summarizer', 'ai-summaries', 4),
+    tags: [tag('ai-writing', 12), tag('ai-chatbots', 40), tag('ai-summaries', 9)]
+  }
+})
+vi.mock('server-only', () => ({}))
 vi.mock('@/lib/catalog/repository', () => ({
   getActiveCategories: async () => [],
   getActiveTags: async () => taxonomy.tags,
-  getBestPages: async () => taxonomy.bestPages
+  getBestPageBySlug: async (slug: string) =>
+    [...taxonomy.bestPages, taxonomy.smallBestPage].find(page => page.slug === slug) ?? null,
+  getBestPageItems: async (slug: string) => {
+    const page = [...taxonomy.bestPages, taxonomy.smallBestPage].find(item => item.slug === slug)
+    return Array.from({ length: page ? Math.min(page.listSize, page.poolSize) : 0 }, () => ({}))
+  },
+  getBestPages: async () => taxonomy.bestPages,
+  getCategoryBySlug: async (slug: string) =>
+    taxonomy.categories.find(category => category.slug === slug) ?? null,
+  getTagBySlug: async (slug: string) => taxonomy.tags.find(tag => tag.slug === slug) ?? null
 }))
 // The other registry pages' data and form modules (#167); their metadata does not use them.
 vi.mock('@/lib/content-loader', () => ({
@@ -203,23 +245,80 @@ describe('exported page metadata', () => {
 })
 
 describe('the taxonomy indexes (#346)', () => {
-  it('render noindex, follow while they list nothing, before the taxonomy is published', async () => {
+  it('render only their heading, noindex, follow, before the taxonomy is published', async () => {
     const saved = { bestPages: taxonomy.bestPages, tags: taxonomy.tags }
     try {
-      taxonomy.bestPages = [{ hub: 'writing', listSize: 10, poolSize: 0, slug: 'ai-writer' }]
-      taxonomy.tags = [{ category: 'writing', count: 2, slug: 'ai-writing' }]
-      for (const page of [
-        await import('../../app/(site)/best/page'),
-        await import('../../app/(site)/products/tags/page')
-      ]) {
+      taxonomy.bestPages = taxonomy.bestPages.map(page => ({ ...page, poolSize: 0 }))
+      taxonomy.tags = taxonomy.tags.map(tag => ({ ...tag, count: 2 }))
+      for (const [page, heading] of [
+        [await import('../../app/(site)/best/page'), 'Best'],
+        [await import('../../app/(site)/products/tags/page'), 'Tags']
+      ] as const) {
         expect(resolveRobots((await page.generateMetadata()).robots)).toEqual({
           basic: 'noindex, follow',
           googleBot: 'noindex, follow'
         })
+        const html = renderToStaticMarkup(await page.default())
+        expect(html).toContain(`>${heading}</h1>`)
+        // No "0 tags of products on SERP." count line, and no list.
+        expect(html).not.toMatch(/\b0 (?:best|tags)\b/u)
+        expect(html).not.toContain('<ul')
       }
     } finally {
       Object.assign(taxonomy, saved)
     }
+  })
+})
+
+describe('the taxonomy pages’ robots (#346; #341 design 2.3)', () => {
+  const robotsOf = async (
+    load: () => Promise<{ generateMetadata: (props: never) => Promise<{ robots?: unknown }> }>,
+    params: Record<string, string>
+  ) =>
+    resolveRobots(
+      (
+        await (
+          await load()
+        ).generateMetadata({
+          params: Promise.resolve(params),
+          searchParams: Promise.resolve({})
+        } as never)
+      ).robots as Parameters<typeof resolveRobots>[0]
+    )
+  const noindexFollow = { basic: 'noindex, follow', googleBot: 'noindex, follow' }
+  const categoryPage = () => import('../../app/(site)/products/categories/[category]/page')
+  const tagPage = () => import('../../app/(site)/products/tags/[tag]/page')
+  const bestPage = () => import('../../app/(site)/best/[keyword]/page')
+
+  it('keeps the transitional Other category noindex, follow and out of its sitemap', async () => {
+    expect(await robotsOf(categoryPage, { category: 'other' })).toEqual(noindexFollow)
+    expect(noindexIn(await robotsOf(categoryPage, { category: 'video-downloaders' }))).toBe(false)
+    const { createTaxonomiesSitemapResponse } = await import('../seo/sitemaps')
+    const sitemap = await (
+      await createTaxonomiesSitemapResponse({
+        getWebsites: () =>
+          taxonomy.categories.map(category => ({
+            category: category.slug,
+            publishedAt: '2026-05-16',
+            slug: `${category.slug}-listing`
+          }))
+      })
+    ).text()
+    expect(sitemap).toContain(
+      '<loc>https://best.serp.co/products/categories/video-downloaders/</loc>'
+    )
+    expect(sitemap).not.toContain('/products/categories/other/')
+  })
+
+  it('indexes a tag from 10 listings, unless a best page ranks it alone', async () => {
+    expect(noindexIn(await robotsOf(tagPage, { tag: 'ai-writing' }))).toBe(false)
+    expect(await robotsOf(tagPage, { tag: 'ai-summaries' })).toEqual(noindexFollow)
+    expect(await robotsOf(tagPage, { tag: 'ai-chatbots' })).toEqual(noindexFollow)
+  })
+
+  it('indexes a best page from 5 entries', async () => {
+    expect(noindexIn(await robotsOf(bestPage, { keyword: 'ai-writer' }))).toBe(false)
+    expect(await robotsOf(bestPage, { keyword: 'ai-summarizer' })).toEqual(noindexFollow)
   })
 })
 

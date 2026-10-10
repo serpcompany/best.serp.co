@@ -236,6 +236,28 @@ describe('submission decisions', () => {
     ).toMatchObject({ error: 'invalid_category', status: 422 })
   })
 
+  // `/products/categories/` and `/products/tags/` are the site's own pages (#346).
+  it('refuses to approve a submission whose slug is a reserved listing slug', async () => {
+    const { context, emails, row, submission } = fixture()
+    for (const slug of ['tags', 'categories']) {
+      submission(`sub_${slug}`, slug, 'verified')
+      expect(
+        await approveSubmission(context(), {
+          expectedContentVersion: 1,
+          submissionId: `sub_${slug}`
+        }),
+        slug
+      ).toMatchObject({ error: 'invalid_slug', ok: false, status: 422 })
+      expect(row('SELECT COUNT(*) AS n FROM listings WHERE slug = ?', slug), slug).toEqual({
+        n: 0
+      })
+      expect(row('SELECT status FROM listing_submissions WHERE id = ?', `sub_${slug}`)).toEqual({
+        status: 'verified'
+      })
+    }
+    expect(emails).toEqual([])
+  })
+
   it('requests changes with a note, emails each occurrence once, and replays as a no-op', async () => {
     const { context, emails, row, submission } = fixture()
     submission('sub_quill', 'quillmate.app', 'verified')

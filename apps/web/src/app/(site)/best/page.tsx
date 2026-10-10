@@ -39,7 +39,12 @@ export default async function BestIndexPage() {
         <SiteBreadcrumb items={[{ name: 'Best', href: bestPath }]} baseUrl={siteOrigin()} />
         <PageHero
           title="Best"
-          description={`${listed.length} best ${siteCopy.listingName.singular} ${listed.length === 1 ? 'list' : 'lists'} on ${SITE_NAME}.`}
+          // Empty (before the taxonomy is published), it shows only its heading.
+          description={
+            listed.length
+              ? `${listed.length} best ${siteCopy.listingName.singular} ${listed.length === 1 ? 'list' : 'lists'} on ${SITE_NAME}.`
+              : undefined
+          }
         />
       </PageSection>
       <div className="py-6">

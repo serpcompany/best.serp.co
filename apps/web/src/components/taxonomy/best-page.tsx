@@ -18,7 +18,7 @@ import { ListingImage } from '../listing/listing-image'
 import { JsonLd } from '../seo/json-ld'
 import { Badge } from '../ui/badge'
 import { buttonVariants } from '../ui/button'
-import { Card } from '../ui/card'
+import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '../ui/item'
 import { outboundWebsiteRel } from '../website/website-detail-header'
 
 /** Where a best page's "See all" goes: its tag's page, else its hub's (design 5.1). */
@@ -98,7 +98,10 @@ export function bestPageSchema(page: PublishedBestPage, items: BestPageItem[]) {
   }
 }
 
-/** One entry: its position, logo, name, blurb or description, chips, and "Visit Site" (5.1). */
+/**
+ * One entry (design 5.1), a stock outline `Item`: its position and logo as media, then its name,
+ * the pin's blurb or its description and its hub and tag chips, then "Visit Site".
+ */
 function BestPageEntry({
   hub,
   item,
@@ -109,30 +112,30 @@ function BestPageEntry({
   position: number
 }) {
   return (
-    <Card className="flex-row flex-wrap items-start gap-4 p-4 sm:flex-nowrap sm:p-5">
-      <span className="w-6 shrink-0 pt-3 text-right text-lg font-semibold tabular-nums text-muted-foreground">
+    <Item variant="outline">
+      <ItemMedia className="w-6 justify-end text-lg font-semibold tabular-nums text-muted-foreground">
         {position}
-      </span>
-      {/* Wrapped: Card drops its top padding when an image is its first child. */}
-      <div className="shrink-0">
+      </ItemMedia>
+      <ItemMedia>
         <ListingImage name={item.name} src={item.media?.logo} size={48} className="rounded-lg" />
-      </div>
-      <div className="flex min-w-0 flex-1 basis-48 flex-col gap-2">
-        <h2 className="text-lg font-semibold">
-          <Link
-            href={getRoute('listing.detail', { slug: item.slug })}
-            className="hover:underline"
-            data-analytics="website-click"
-            data-source="best"
-            data-website-name={item.name}
-            data-website-slug={item.slug}
-          >
-            {item.name}
-          </Link>
-        </h2>
-        <p className="text-sm text-muted-foreground">{item.blurb ?? item.description}</p>
+      </ItemMedia>
+      <ItemContent className="min-w-0 basis-48">
+        <ItemTitle>
+          <h2 className="text-base font-semibold">
+            <Link
+              href={getRoute('listing.detail', { slug: item.slug })}
+              data-analytics="website-click"
+              data-source="best"
+              data-website-name={item.name}
+              data-website-slug={item.slug}
+            >
+              {item.name}
+            </Link>
+          </h2>
+        </ItemTitle>
+        <ItemDescription>{item.blurb ?? item.description}</ItemDescription>
         {hub || item.tags.length ? (
-          <div className="flex flex-wrap gap-1.5">
+          <div className="mt-1 flex flex-wrap gap-1.5">
             {hub ? (
               <Badge
                 variant="secondary"
@@ -152,8 +155,8 @@ function BestPageEntry({
             ))}
           </div>
         ) : null}
-      </div>
-      <div className="flex basis-full justify-end sm:basis-auto">
+      </ItemContent>
+      <ItemActions className="basis-full justify-end sm:basis-auto">
         <Link
           href={withDubVia(item.website)}
           target="_blank"
@@ -163,8 +166,8 @@ function BestPageEntry({
           Visit Site
           <ExternalLink data-icon="inline-end" aria-hidden />
         </Link>
-      </div>
-    </Card>
+      </ItemActions>
+    </Item>
   )
 }
 

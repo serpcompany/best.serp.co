@@ -42,7 +42,12 @@ export default async function TagsPage() {
         <SiteBreadcrumb items={[{ name: 'Tags', href: tagsPath }]} baseUrl={siteOrigin()} />
         <PageHero
           title="Tags"
-          description={`${linked.length} ${linked.length === 1 ? 'tag' : 'tags'} of ${siteCopy.listingName.plural} on ${SITE_NAME}.`}
+          // Empty (before the taxonomy is published), it shows only its heading.
+          description={
+            linked.length
+              ? `${linked.length} ${linked.length === 1 ? 'tag' : 'tags'} of ${siteCopy.listingName.plural} on ${SITE_NAME}.`
+              : undefined
+          }
         />
       </PageSection>
       <div className="py-6">

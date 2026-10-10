@@ -56,6 +56,24 @@ const DEFAULT_TIMEOUT_MS = 10_000
 export const defaultArtifactDirectory = resolve(project.appDirectory, '.open-next')
 const SITEMAP_INDEX_PATH = '/sitemap-index.xml'
 const SITEMAP_COMPATIBILITY_PATH = '/sitemap.xml'
+/**
+ * Child sitemaps that may list nothing: the taxonomy's (#346), empty until the owner publishes its
+ * tags and best pages (#349) and while none of them is indexable.
+ */
+const SITEMAP_PATHS_ALLOWED_EMPTY: ReadonlySet<string> = new Set([
+  sitemapPaths.tags,
+  sitemapPaths.best
+])
+
+/** True for a child sitemap (URL or path) that may list no URL (`SITEMAP_PATHS_ALLOWED_EMPTY`). */
+export function sitemapMayBeEmpty(sitemapUrl: string): boolean {
+  try {
+    return SITEMAP_PATHS_ALLOWED_EMPTY.has(new URL(sitemapUrl, 'https://sitemap.invalid').pathname)
+  } catch {
+    return false
+  }
+}
+
 /** The child sitemaps' URLs before #167; each must answer one permanent redirect to its file. */
 const MOVED_SITEMAP_PATHS = [
   ['/sitemaps/pages/1.xml', sitemapPaths.pages],
@@ -455,7 +473,9 @@ function auditArtifactSitemapFile(
   }
 
   if (locs.length === 0) {
-    addIssue(audit, 'error', 'Sitemap file contains no loc entries.', { sitemapUrl })
+    if (!sitemapMayBeEmpty(sitemapUrl)) {
+      addIssue(audit, 'error', 'Sitemap file contains no loc entries.', { sitemapUrl })
+    }
     return
   }
 
@@ -774,7 +794,9 @@ async function auditLiveSitemapFile(
   }
 
   if (locs.length === 0) {
-    addIssue(audit, 'error', 'Sitemap file contains no loc entries.', { sitemapUrl })
+    if (!sitemapMayBeEmpty(sitemapUrl)) {
+      addIssue(audit, 'error', 'Sitemap file contains no loc entries.', { sitemapUrl })
+    }
     return
   }
 
