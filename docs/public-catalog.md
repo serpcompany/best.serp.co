@@ -47,9 +47,10 @@ check, for example) never touches it.
 ## Reads
 
 List and card operations return summary projections; only detail operations hydrate content,
-media, resource links, tags, and the active best pages that pin or exclude the listing. List pages read one page at a time (`getListingNamePage`): the
-public ids of the directory, of one category, or of one tag in name order are cached per epoch,
-and only the requested page's summaries are then read by id.
+media, resource links, tags, and the active best pages that pin or exclude the listing. List
+pages read one page at a time (`getListingNamePage`): the public ids of the directory, of one
+category, or of one tag in name order are cached per epoch, and only the requested page's
+summaries are then read by id.
 
 Each read keeps a reviewed SQL shape, explained where it is built in
 `apps/web/src/db/catalog.ts`: the shell counts come from one pass over public memberships (the

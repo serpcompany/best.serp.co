@@ -7,18 +7,14 @@ import {
   generateWebsiteDetailRouteMetadata,
   WebsiteDetailRoutePage
 } from '@/components/website-routes/detail-page'
-import {
-  getActiveCategories,
-  getBestPages,
-  getCategoryBySlug,
-  getUnpublishedListing
-} from '@/lib/catalog/repository'
+import { getActiveCategories, getBestPages, getUnpublishedListing } from '@/lib/catalog/repository'
 import { currentClaimCopy, currentClaimFlags } from '@/lib/claims/current'
 import { getWebsiteBySlug, getWebsiteCanonicalRedirect } from '@/lib/content-loader'
 import { featuredInBestPages } from '@/lib/directory/featured-in'
 import { getFeaturedOnBadgePreviewPathFromKey } from '@/lib/directory/featured-on-badge-url'
 import { GONE_RENDER_HEADER } from '@/lib/routing/gone-listing'
 import { getRoute } from '@/lib/routing/routes'
+import { renderingCategory } from '@/lib/seo/taxonomy-indexing'
 import { site } from '@/lib/site'
 import { siteConfig } from '@/lib/site/site-config'
 import { submissionBadgeTargets } from '@/lib/submissions/presentation'
@@ -58,17 +54,6 @@ async function goneListing(slug: string) {
 }
 
 /**
- * The 410 page links the listing's hub while the hub's page renders (it has a public listing,
- * #347), else the directory.
- */
-async function withRenderingHub(
-  gone: NonNullable<Awaited<ReturnType<typeof getUnpublishedListing>>>
-) {
-  const hub = gone.category ? await getCategoryBySlug(gone.category) : null
-  return hub && hub.count > 0 ? gone : { ...gone, category: null, categoryName: null }
-}
-
-/**
  * Website detail page component
  *
  * @param params - Page parameters containing the website slug
@@ -83,7 +68,11 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     const canonicalSlug = await getWebsiteCanonicalRedirect(slug)
     if (canonicalSlug) permanentRedirect(getRoute('listing.detail', { slug: canonicalSlug }))
     const gone = await goneListing(slug)
-    if (gone) return <GoneListing listing={await withRenderingHub(gone)} />
+    // Its hub only while the hub's page renders, else the directory (#347).
+    if (gone) {
+      const hub = renderingCategory(await getActiveCategories(), gone.category)
+      return <GoneListing hub={hub} listing={gone} />
+    }
     notFound()
   }
 

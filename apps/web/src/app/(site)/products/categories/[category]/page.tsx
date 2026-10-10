@@ -13,16 +13,21 @@ import {
 import { BestPagesSection } from '@/components/taxonomy/best-page'
 import { Badge } from '@/components/ui/badge'
 import {
+  getActiveCategories,
   getActiveTags,
   getBestPages,
-  getCategoryBySlug,
   getListingNamePage,
   type PublishedCategory
 } from '@/lib/catalog/repository'
 import { getCategoryIcon } from '@/lib/directory/categories'
 import { getRoute } from '@/lib/routing/routes'
 import { type PageSearchParams, redirectMovedTaxonomyPage } from '@/lib/routing/taxonomy-redirect'
-import { isCategoryIndexable, linkedTags, listedBestPages } from '@/lib/seo/taxonomy-indexing'
+import {
+  isCategoryIndexable,
+  linkedTags,
+  listedBestPages,
+  renderingCategory
+} from '@/lib/seo/taxonomy-indexing'
 
 interface CategoryPageProps {
   params: Promise<{ category: string }>
@@ -37,10 +42,9 @@ function presentCategory(storedCategory: PublishedCategory) {
   }
 }
 
-/** The category at `slug` when it has a public listing: the hub renders (#341 design 2.2). */
+/** The category at `slug` when its page renders (`renderingCategory`, #341 design 2.2). */
 async function publicCategory(slug: string): Promise<PublishedCategory | null> {
-  const storedCategory = await getCategoryBySlug(slug)
-  return storedCategory && storedCategory.count > 0 ? storedCategory : null
+  return renderingCategory(await getActiveCategories(), slug)
 }
 
 /**

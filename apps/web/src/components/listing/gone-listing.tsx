@@ -17,19 +17,26 @@ import {
   ItemMedia,
   ItemTitle
 } from '@/components/ui/item'
-import type { UnpublishedListing } from '@/db/contracts'
+import type { PublishedCategory, UnpublishedListing } from '@/db/contracts'
 import { getRoute } from '@/lib/routing/routes'
 
 /**
  * The page an unpublished listing's URL shows, with status 410 Gone (#64; screen 9's
- * "Unpublished (410)" state): the listing is gone, a link to its hub (its category's page, #347;
- * the directory without one), and "Relist it".
+ * "Unpublished (410)" state): the listing is gone, a link to its hub, and "Relist it". `hub` is
+ * the listing's category only while that category's page renders (`renderingCategory`, #347);
+ * without it the page links the directory, never a category page that answers 404.
  */
-export function GoneListing({ listing }: { listing: UnpublishedListing }) {
-  const categoryHref = listing.category
-    ? getRoute('category.page', { category: listing.category })
+export function GoneListing({
+  hub,
+  listing
+}: {
+  hub: Pick<PublishedCategory, 'name' | 'slug'> | null
+  listing: Pick<UnpublishedListing, 'name'>
+}) {
+  const categoryHref = hub
+    ? getRoute('category.page', { category: hub.slug })
     : getRoute('listing.list')
-  const categoryName = listing.categoryName ?? 'the directory'
+  const categoryName = hub?.name ?? 'the directory'
   return (
     <section className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-16">
       <Empty className="border border-dashed">
@@ -50,7 +57,7 @@ export function GoneListing({ listing }: { listing: UnpublishedListing }) {
         </EmptyHeader>
         <EmptyContent>
           <Link href={categoryHref} className={buttonVariants({ variant: 'outline' })}>
-            Browse {listing.categoryName ?? 'products'}
+            Browse {hub?.name ?? 'products'}
             <ArrowRight />
           </Link>
         </EmptyContent>

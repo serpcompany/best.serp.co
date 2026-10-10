@@ -30,8 +30,8 @@ const linkIcons: Record<string, typeof Layers3> = {
  * The header's Products menu, less its first link (the homepage the button already offers) and
  * "Best" (#347), which the menu gained after this page's two-card grid was designed.
  */
-const popularPages = productLinks.filter(
-  link => link.href !== getRoute('home') && link.href !== getRoute('best.index')
+const popularPages = productLinks({ bestIndexListed: false }).filter(
+  link => link.href !== getRoute('home')
 )
 
 /**

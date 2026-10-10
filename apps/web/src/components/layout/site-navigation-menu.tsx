@@ -11,18 +11,25 @@ import {
   NavigationMenuTrigger,
   navigationMenuTriggerStyle
 } from '@/components/ui/navigation-menu'
-import { headerItems, isCurrentPage, isMenuActive } from './site-links'
+import { type HeaderItem, isCurrentPage, isMenuActive } from './site-links'
 
 /**
  * The header's navigation (serplists' `SiteNavigationMenu`, #256): a menu opens on hover or
  * click, and its links stay in the HTML while it is closed (`keepMounted`).
  */
-export function SiteNavigationMenu({ className }: { className?: string }) {
+export function SiteNavigationMenu({
+  className,
+  items
+}: {
+  className?: string
+  /** `headerItems()`, built on the server (#347). */
+  items: readonly HeaderItem[]
+}) {
   const pathname = usePathname()
   return (
     <NavigationMenu aria-label="Site" className={className}>
       <NavigationMenuList>
-        {headerItems.map(item =>
+        {items.map(item =>
           item.kind === 'link' ? (
             <NavigationMenuItem key={item.link.href}>
               <NavigationMenuLink

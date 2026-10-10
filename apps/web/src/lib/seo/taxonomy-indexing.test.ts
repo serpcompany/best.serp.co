@@ -9,7 +9,8 @@ import {
   isBestPageIndexable,
   isCategoryIndexable,
   isTagIndexable,
-  isTagLinked
+  isTagLinked,
+  renderingCategory
 } from './taxonomy-indexing'
 
 const tagOnly = (tag: string, poolSize: number, listSize = 10) => ({
@@ -62,5 +63,22 @@ describe('taxonomy robots predicates (#341, design 2.3)', () => {
   it('keeps the transitional catch-all hub out of search', () => {
     expect(isCategoryIndexable({ slug: 'other' })).toBe(false)
     expect(isCategoryIndexable({ slug: 'video-downloaders' })).toBe(true)
+  })
+})
+
+describe('whether a category page renders (#347 review)', () => {
+  const categories = [
+    { count: 12, name: 'Writing', slug: 'writing' },
+    { count: 0, name: 'Audio', slug: 'audio' }
+  ]
+
+  it('returns a category with a public listing', () => {
+    expect(renderingCategory(categories, 'writing')).toEqual(categories[0])
+  })
+
+  it('returns null for a category with no public listing, an unknown one, or none', () => {
+    expect(renderingCategory(categories, 'audio')).toBeNull()
+    expect(renderingCategory(categories, 'retired')).toBeNull()
+    expect(renderingCategory(categories, null)).toBeNull()
   })
 })

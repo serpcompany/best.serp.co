@@ -119,14 +119,23 @@ publisher's affected routes) build their URLs from it.
   logo, name, the owner's blurb or the description, hub and tag chips, and "Visit Site" with the
   listing's `link_rel`. Their JSON-LD is a `CollectionPage` with an ordered `ItemList` and a
   `BreadcrumbList`, and no `Review` or rating.
-- **Links between the layers** (design 5.3, #347). The Products menu links `/best/` beside
-  Categories. The homepage (and `/products/`) shows a grid of the hubs, the categories that hold a
-  tag. A hub's page shows its tags with 3 or more listings as chips, most listings first, and its
-  best pages under "Best {hub} lists". A listing page's breadcrumb, and its JSON-LD, run Products,
-  its hub, the listing; its header shows its hub and tag chips named from D1, and "Featured in"
-  names up to three best pages that show it ([Public catalog](./public-catalog.md#reads)). The
-  410 page links the listing's hub while the hub's page renders, else the directory. The grid,
-  chips and best-page links render only with taxonomy data, so pages without it look as before.
+- **Links between the layers** (design 5.3, #347).
+  - The Products menu links `/best/` beside Categories once the best index lists a best page
+    (`linksBestIndex`), so it never links an index that shows only its heading.
+  - The homepage (and `/products/`) shows a grid of the hubs: the categories that hold a tag.
+  - A hub's page shows its tags with 3 or more listings as chips, most listings first, and its
+    best pages under "Best {hub} lists".
+  - A listing page's breadcrumb, and its JSON-LD, run Products, its hub, the listing. Its header
+    shows its hub badge and its other categories named from D1, then its tag chips, and "Featured
+    in" names up to three best pages that show it ([Public catalog](./public-catalog.md#reads)).
+  - The 410 page links the listing's hub while the hub's page renders (`renderingCategory`), else
+    the directory.
+
+  Without tags or best pages there is no hub grid, tag chip, "Best {hub} lists", "Featured in" or
+  "Best" link. These change on every page all the same: a listing's breadcrumb gains its hub, its
+  hub badge and category names come from D1, an untagged listing's related listings start after
+  its own name ([Public catalog](./public-catalog.md#reads)), the 410 page links the hub instead
+  of `/products/?category=`, and the nav gains "Best" once a best page exists.
 - **Reserved slugs.** No listing may take `categories` or `tags` (`reservedListingSlugs`, derived
   from the registry's pages under `/products/`): submission intake, the admin panel's approval and
   the publisher's manifest schema refuse them, and the Worker's 410 check skips them.

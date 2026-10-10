@@ -77,10 +77,11 @@ const ROWS_READ_BUDGET: Record<CatalogQueryShape, number> = {
   // more, 2,442 (2,757 on all nine of one listing's tags before the cap). Filling from the hub:
   // 196 when it walks the name index, 119 through a small hub's members.
   'related-shared-tags': 3_000,
-  // Onward from the listing's own name, wrapping round to the start (#331): 77 and 52 at worst
-  // over every 25th untagged listing and the last names (78 and 79 from the start before).
+  // Onward from the listing's own name, wrapping round to the start (#331). Members: 77 at worst
+  // (78 from the start before). Seek: 84 on its longest walk (`longestWalk`, 62 name-index
+  // entries at the widest gap between a large category's names), 79 from the start before.
   'related-single-category-members': 500,
-  'related-single-category-seek': 200, // the sparsest category over 128
+  'related-single-category-seek': 200,
   // worst: a term in the catch-all's name (`other`, `the`): 10,826; 15,520 before #345's
   // uncorrelated category and tag subqueries. The widest searches have their own budget below.
   'search-summaries': 17_000,
@@ -162,7 +163,7 @@ const small = first(
 )
 /**
  * The sparsest category the related query reaches through the name index (more than 128 public
- * members, the fewest such), with a listing filed only there: the longest walk to four members.
+ * members, the fewest such), with a listing filed only there.
  */
 const sparse = first(
   [...publicMembers]
@@ -172,6 +173,43 @@ const sparse = first(
   'sparse category'
 )
 const binary = (left: string, right: string) => (left < right ? -1 : left > right ? 1 : 0)
+/** The entries of `listings_related_name_idx` (published and active), in its name order. */
+const nameIndex = scale.listings
+  .filter(listing => listing.status === 'approved' && listing.isActive && listing.publishedAt)
+  .sort((left, right) => binary(left.name, right.name) || binary(left.slug, right.slug))
+/**
+ * How many name-index entries the seek walk visits for an untagged listing in one large category
+ * (#331): onward from its own name until four public members of its category, then from the
+ * start for only as many as that walk lacked.
+ */
+function seekWalk(listing: ScaleListing): number {
+  const category = listing.categories[0] as string
+  const member = (other: ScaleListing) => isLive.has(other) && other.categories.includes(category)
+  const position = nameIndex.indexOf(listing)
+  let visited = 0
+  let found = 0
+  for (const other of [...nameIndex.slice(position + 1), ...nameIndex.slice(0, position)]) {
+    visited += 1
+    if (member(other) && ++found === 4) break
+  }
+  return visited
+}
+/**
+ * The seek's worst case since it starts at the listing's own name (#347 review): the untagged
+ * listing, in one category of more than 128 public members, whose walk visits the most entries,
+ * at the widest gap between its category's names.
+ */
+const longestWalk = first(
+  untagged
+    .filter(
+      listing =>
+        listing.categories.length === 1 &&
+        (publicMembers.get(listing.categories[0] as string) ?? 0) > 128
+    )
+    .map(listing => ({ listing, walk: seekWalk(listing) }))
+    .sort((left, right) => right.walk - left.walk),
+  'listing the seek reaches'
+)
 /** Public listings in publication order (`PUBLICATION_ORDER` in `catalog.ts`): newest first. */
 const publicationOrder = [...live].sort(
   (left, right) =>
@@ -563,12 +601,13 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
       await ops.getListingNamePage(query)
     }
     // The detail shapes: several categories (worst related scan), one dense, one sparse and one
-    // small category, the most FAQs, links and images, an unpublished listing, and a slug that
-    // does not exist.
+    // small category, the seek's longest walk, the most FAQs, links and images, an unpublished
+    // listing, and a slug that does not exist.
     for (const slug of [
       widest.slug,
       dense.slug,
       sparse.listing.slug,
+      longestWalk.listing.slug,
       small.listing.slug,
       richest.slug,
       unpublished.slug,
@@ -926,6 +965,7 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
       dense,
       sparse.listing,
       small.listing,
+      longestWalk.listing,
       lastIn(CATCH_ALL_CATEGORY),
       lastIn(sparse.slug),
       ...singleUntagged.filter((_, index) => index % 25 === 0)
