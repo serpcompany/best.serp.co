@@ -140,6 +140,16 @@ describe('a public page error in the Worker logs (#355)', () => {
     expect(String(logged.mock.calls[0]?.[0])).not.toContain('private')
   })
 
+  it('logs an error once when Next.js reports it twice', () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const error = new Error('detail read failed')
+    const context = { routePath: '/(site)/products/[slug]', routeType: 'render' }
+    logRequestError(error, { method: 'GET', path: '/products/fixture-studio/' }, context)
+    logRequestError(error, { method: 'GET', path: '/products/fixture-studio/' }, context)
+    logRequestError(new Error('detail read failed'), { method: 'GET', path: '/' }, context)
+    expect(logged).toHaveBeenCalledTimes(2)
+  })
+
   it('logs a thrown non-error as its message', () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
     logRequestError('boom', { method: 'GET', path: '/' }, { routePath: '/', routeType: 'render' })

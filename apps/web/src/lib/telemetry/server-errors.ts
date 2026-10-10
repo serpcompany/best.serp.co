@@ -89,6 +89,12 @@ interface RequestErrorContext {
 }
 
 /**
+ * Errors already logged. Next.js can report one error twice: a page and its metadata await the
+ * same failed read. Sentry skips the second report of an error object, and so does the log.
+ */
+const loggedErrors = new WeakSet<object>()
+
+/**
  * A public page's request error, as one JSON line on `console.error` for Workers Observability.
  * Like a Sentry report it carries the error and the route, never user data: the path without
  * its query string, and no headers.
@@ -98,6 +104,10 @@ export function logRequestError(
   request: ErroredRequest,
   context: RequestErrorContext
 ): void {
+  if (typeof error === 'object' && error !== null) {
+    if (loggedErrors.has(error)) return
+    loggedErrors.add(error)
+  }
   const thrown = error instanceof Error ? error : undefined
   const digest = (error as { digest?: unknown } | null)?.digest
   console.error(
