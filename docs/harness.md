@@ -72,11 +72,13 @@ The checker enforces:
 - required docs, indexes, and agent configuration exist;
 - the root agent map remains concise;
 - maps (`AGENTS.md`, `README.md`) stay within 120 lines and leaves under `docs/` within
-  300, counted at 100 columns; a doc listed in `DOC_LINE_ALLOWANCES` may shrink but not grow,
-  and its entry must go once it fits. serp `main` asks for "a few hundred lines"
-  (`docs/engineering/standards/agent-harness.md`); the numbers are from serp's docs-are-maps
-  draft, not yet merged;
-- local Markdown links resolve;
+  300, counted in code points at 100 columns (serp's
+  `docs/engineering/standards/agent-harness/docs-are-maps.md`); a doc listed in
+  `DOC_LINE_ALLOWANCES` may shrink but not grow, and its entry must go once it fits;
+- files and folders under `docs/` are kebab-case; only `README.md`, `AGENTS.md` and
+  `CLAUDE.md` are uppercase (serp's docs README, "Writing Guidance");
+- local Markdown links resolve, and so do their `#anchors`, against the heading slugs GitHub
+  generates;
 - lint commands are read-only;
 - the root harness command surface remains available.
 

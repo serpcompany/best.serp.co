@@ -1,5 +1,6 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   checkDocumentation,
@@ -8,6 +9,7 @@ import {
   markdownAnchors,
   validateDocumentationBudgets,
   validateDocumentNames,
+  validateLinkAnchor,
   validatePlanningDocumentation,
   wrappedLineCount
 } from './harness/docs-health.ts'
@@ -63,6 +65,24 @@ describe('repository harness contract', () => {
       'linked-heading',
       'custom-anchor'
     ])
+  })
+
+  it('fails a link whose anchor names no heading in its target doc (#190)', () => {
+    const root = mkdtempSync(join(tmpdir(), 'docs-anchors-'))
+    try {
+      writeFileSync(join(root, 'runbook.md'), '# Runbook\n\n## After a deploy\n')
+      writeFileSync(join(root, 'caching.md'), '# Caching\n\n## Why this design\n')
+      const check = (target: string) => validateLinkAnchor(root, 'caching.md', target)
+      expect(check('./runbook.md#after-a-deploy')).toBeNull()
+      expect(check('#why-this-design')).toBeNull()
+      expect(check('./runbook.md')).toBeNull()
+      expect(check('./runbook.md#caching-after-a-deploy')).toBe(
+        'caching.md: broken anchor ./runbook.md#caching-after-a-deploy'
+      )
+      expect(check('#gone')).toBe('caching.md: broken anchor #gone')
+    } finally {
+      rmSync(root, { force: true, recursive: true })
+    }
   })
 
   it('holds maps and leaves to the docs-are-maps size budgets at 100 columns', () => {

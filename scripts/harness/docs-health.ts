@@ -130,7 +130,11 @@ export function markdownAnchors(source: string): Set<string> {
 }
 
 /** A local Markdown link's `#fragment` that names no heading or anchor in its target file. */
-function validateLinkAnchor(root: string, sourcePath: string, rawTarget: string): string | null {
+export function validateLinkAnchor(
+  root: string,
+  sourcePath: string,
+  rawTarget: string
+): string | null {
   const targetWithoutTitle = rawTarget.split(/\s+"/u)[0] || rawTarget
   const target = targetWithoutTitle.replace(/^<|>$/gu, '')
   const hash = target.indexOf('#')

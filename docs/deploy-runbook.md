@@ -132,7 +132,7 @@ change to the crawl policy:
 
 ```bash
 curl -sI https://staging.best.serp.co/ | grep -i -e x-site-environment -e x-robots-tag  # staging; noindex, nofollow
-curl -sI -A 'AhrefsSiteAudit/6.1' https://staging.best.serp.co/ | grep -ci x-robots-tag  # 0
+curl -sI -A 'AhrefsSiteAudit/6.1' https://staging.best.serp.co/ | grep -i -e x-site-environment -e x-robots-tag  # staging; no x-robots-tag
 curl -s https://staging.best.serp.co/robots.txt  # AhrefsSiteAudit: Allow /; everyone else: Disallow /
 curl -sI https://best-serp-co-staging.serpcompany.workers.dev/about | grep -i location  # https://staging.best.serp.co/about/
 ```

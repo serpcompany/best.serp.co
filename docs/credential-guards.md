@@ -84,9 +84,9 @@ boundary.
   and `production` only from `main`, so only workflows on those branches can use their
   secrets.
 - **Still open:** both environments still hold the same account-wide Cloudflare token
-  ([deploy runbook](./deploy-runbook.md#github-environments)), so a workflow merged to `staging`
-  that uses the `staging` environment could still reach production directly. That path
-  requires a pull request and the required checks, but no approving review.
+  ([deploy credentials](./deploy-credentials.md#github-environments)), so a workflow merged to
+  `staging` that uses the `staging` environment could still reach production directly. That
+  path requires a pull request and the required checks, but no approving review.
 - **No human gate on staging data:** the `staging` environment has no reviewers, so anything
   that can dispatch workflows can run the staging publication or upload. Agents never do
   (AGENTS.md); a `staging-data` environment would enforce it
