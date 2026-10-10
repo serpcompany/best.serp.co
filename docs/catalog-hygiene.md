@@ -1,7 +1,10 @@
 # Catalog hygiene
 
 What best.serp.co lists, and how listings that don't belong leave: [adult products](#adult-products-260)
-are never listed, and [the listing domain check](#the-check) finds hijacked, parked, and dead domains.
+are never listed, [the listing domain check](#the-check) finds hijacked, parked, and dead domains,
+and a product listed twice keeps [one listing](#duplicate-listings-332).
+[Listings filed under Other](#listings-filed-under-other-333) covers moving listings out of the
+catch-all category.
 
 ## Listing domains
 
@@ -181,6 +184,23 @@ archived with the import in `.archive/scripts/v1-import-publications.test.ts` (#
 the generator reads the environment's own D1 (`--env`), and `scripts/listing-domain-check.test.ts`
 covers it on fixture listings.
 
+## Duplicate listings (#332)
+
+Some products were imported twice, under two slugs with the same name and description.
+`d1/publications/2026-10-10-duplicate-listings.yaml` keeps one listing of each pair and unpublishes
+the other (410, like the cleanups above); its header says which slug stays and why. No manifest
+operation can redirect one listing's slug to another listing, so the retired URL answers 410.
+
+- **Media first.** Where the retired listing had a logo or image the kept one lacked, a
+  `listing-media-update` earlier in the same batch gives the kept listing a copy under its own key
+  (`d1/media/2026-10-10-duplicate-listings.json`, copied from the retired listing's hosted object),
+  so the upload plan goes to the environment before the manifest.
+- **Nothing stranded.** Each unpublish carries `expected.unowned: true`: the batch refuses a listing
+  that has a current owner, an open claim, a pending, paid, or refunding order (on the listing or
+  its submission), an open revision, or a submission that is not rejected or withdrawn. Those
+  records would stay on the retired row, so the owner moves or settles them first. The hygiene
+  manifests above leave it out: a hijacked, dead, or adult listing leaves whoever claimed it.
+
 ## Listing FAQs (#105)
 
 The one-time import wrote each listing's FAQs twice: as `listing_faqs` rows and as a closing
@@ -211,3 +231,31 @@ archived with it in `.archive/scripts/` (#315); the committed manifest is the re
   It never matches text in prose, and is a no-op once the manifest is published; remove it
   then.
 
+## Listings filed under Other (#333)
+
+The v1 import filed 2,419 of the 2,690 live listings under Other alone. They move to real
+categories through reviewed files:
+
+- **Inventory.** `d1/hygiene/2026-10-10-other-inventory.json`: each listing's name, website, short
+  description, start of its long description, and `categories` (what an operation expects), from
+  the reviewed catalog by a one-off script posted on #333. `2026-10-10-categories.json` lists the
+  138 other live categories.
+- **Proposal.** `d1/hygiene/2026-10-10-other-categories.yaml` (`decidedAt: pending` until the owner
+  accepts it): a primary category and up to two secondaries per listing, or Other with a reason.
+  Two classifier agents wrote it in halves; `alignments` record how their calls were made one.
+  Clusters with no fitting category are in `newCategories`, which no manifest creates. A flag that
+  makes the category uncertain keeps the listing in Other, its category kept as `held`.
+- **Owner flags.** `d1/hygiene/2026-10-10-other-owner-flags.yaml`, by kind. The owner decided on
+  2026-10-10 to unpublish the adult listing and four spam listings
+  (`d1/publications/2026-10-10-other-removals.yaml`, hygiene removals, so not `unowned`).
+- **Manifests.** `pnpm catalog:other-categories` writes
+  `d1/publications/2026-10-10-other-categories-NN.yaml`: one `listing-categories-set` per listing
+  with a real primary ([Catalog publication](./catalog-publication.md#category-operations)),
+  `expected: [other]`, 180 per batch. A listing keeps the batch its committed manifest gives it;
+  new work goes to a new batch. `scripts/other-categories-manifest.test.ts` keeps them identical
+  to the proposal and replays them on the inventory, each at most 2,000 statements.
+
+They are row-level: publish them in order, staging first, then production after promotion. A batch
+refuses whole if one of its listings changed since the reviewed catalog (an admin edit, a revision,
+a #332 retirement): set its `primary` to `other` with the reason and regenerate, which rewrites only
+that batch. Publish it where it was refused; where the original applied, there is nothing to redo.

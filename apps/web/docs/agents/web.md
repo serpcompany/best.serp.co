@@ -34,8 +34,8 @@ the sites belongs in the theme's token values, not in a component.
   `--font-sans` and `--font-geist-mono`.
 - **Light and dark.** `next-themes` (`components/layout/theme-provider.tsx`) puts the `dark`
   class on `<html>` and follows the system until a visitor picks a theme. The header's account
-  menu holds the Light, Dark and System row (`ThemeMenuRow`); the phone menu and the dashboards
-  have `ThemeToggle`.
+  menu holds the Light, Dark and System row (`ThemeMenuRow`), the phone menu has `ThemeToggle`,
+  and the dashboards have serplists' theme row, `ThemeMenuButton`, in the sidebar footer.
 - **Long text.** A listing's Markdown renders in `prose` through `components/content/
   mdx-components.tsx`, from the tree the data cache keeps for it (`components/content/
   markdown-tree.tsx`, #334). The legal pages use `.prose-docs` from `globals.css`, as serp.co does.
@@ -142,12 +142,15 @@ Public URLs are part of the SEO contract: changing one needs a permanent redirec
 ## Dashboards
 
 `/account` and `/admin` share the shadcn sidebar shell in `components/dashboard/` (its parts are
-in [Accounts](../../../../docs/accounts.md)). Their UI rules are serp's
+in [Accounts](../../../../docs/accounts.md)): dashboard-01's inset sidebar for `/account` and
+sidebar-07's icon sidebar for `/admin`, whose rows, footer account menu and top bar follow
+serplists' console `AppShell` and `AppSidebar` (#261), without its public navigation and footer.
+Their UI rules are serp's
 [dashboard UI rules](https://github.com/serpcompany/serp/blob/main/docs/engineering/websites/features/submissions/account-dashboard.md#ui-rules),
-from best.serp.co's own review: start from the stock blocks (dashboard-01, sidebar-07) and keep
-their structure; show unbuilt items with a "Soon" badge, never greyed out; put `Empty` inside a
-`Card` under a visible heading; give every page a heading and a description; and status tones are
-classes on `Alert` and `Badge`. The owner-approved #70 mockups and their copy
+from best.serp.co's own review: start from the stock blocks (dashboard-01, sidebar-07), and take
+the rows, the footer account menu and the top bar from serplists; show unbuilt items with a
+"Soon" badge, never greyed out; put `Empty` inside a `Card` under a visible heading; give every
+page a heading and a description; and status tones are classes on `Alert` and `Badge`. The owner-approved #70 mockups and their copy
 (`.archive/mockups/submissions/`) are the contract for those screens: a visible change needs the
 owner's re-approval.
 

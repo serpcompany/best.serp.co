@@ -11,6 +11,8 @@
       "!**/coverage",
       "!**/.content-collections",
       "!d1/media/*.json",
+      // Catalog hygiene evidence (#333's inventory is past Biome's 1 MiB file limit).
+      "!d1/hygiene/*.json",
       "!**/.open-next",
       "!**/.wrangler",
       "!apps/web/cloudflare-env.d.ts",

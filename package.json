@@ -14,6 +14,7 @@
     "build": "pnpm worker:build",
     "catalog:claim-holds": "pnpm tsx scripts/claim-holds-manifest.ts",
     "catalog:domains": "pnpm tsx scripts/listing-domain-check.ts",
+    "catalog:other-categories": "pnpm tsx scripts/other-categories-manifest.ts",
     "cf-typegen": "pnpm --filter web cf-typegen",
     "check": "pnpm tsx scripts/harness/runner.ts full",
     "check:links": "lychee --config ./lychee.toml --verbose .",
