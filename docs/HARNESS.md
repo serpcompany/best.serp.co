@@ -199,8 +199,7 @@ risk on the governing ticket before closing it.
 
 Run the deterministic garden locally with `pnpm docs:garden`. The scheduled
 `.github/workflows/harness-gardening.yml` repeats documentation, architecture,
-migration-fixture, worktree-fixture, and fast-loop checks without write or deployment
-permission.
+worktree-fixture, and fast-loop checks without write or deployment permission.
 
 ## Known boundaries
 

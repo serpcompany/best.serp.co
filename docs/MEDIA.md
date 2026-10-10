@@ -46,7 +46,9 @@ under a live listing's path.
 - **A slug change keeps the media rows.** The key carries the slug, and a `listing-slug-change`
   manifest keeps the listing's media rows: re-host them under the new slug with a later
   `listing-media-update`, or media health reports them as `foreign_key`
-  (`scripts/catalog-media.test.ts` holds committed manifests to that).
+  (`scripts/catalog-media.test.ts` holds committed manifests to that). A listing with no logo or
+  image gets an empty update (`expected: []`, `media: {}`), which the publisher refuses if it has
+  media after all. After a second rename, the update goes under the latest slug.
 - **The production bucket is shared with serp.co.** `storeHostedMedia` is the only write to the
   bucket and refuses any key outside this site's three scopes, whatever bucket it is handed;
   `scopedMediaBucket` refuses the same before R2, and deletes only pending keys. The Worker never

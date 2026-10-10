@@ -80,6 +80,41 @@ function gates(
   })
 }
 
+interface SampleOperation {
+  action?: string
+  from?: string
+  listing?: { categories?: string[]; slug?: string }
+  remove?: string[]
+  slug?: string
+  to?: string
+}
+type SampleManifest = { operations?: SampleOperation[] } | null
+
+/**
+ * What manifests do to the gates' samples: the categories they retire, the listing slugs they
+ * take off the site, and the sample categories they detach from the sample listing, with a
+ * `listing-categories-remove` or a `listing-update` whose categories leave one out (#320).
+ */
+function sampleChanges(
+  manifests: readonly SampleManifest[],
+  { categories, listing }: { categories: readonly string[]; listing: string }
+): { detached: Set<string>; gone: Set<string>; retired: Set<string> } {
+  const detached = new Set<string>()
+  const gone = new Set<string>()
+  const retired = new Set<string>()
+  for (const operation of manifests.flatMap(manifest => manifest?.operations ?? [])) {
+    if (operation.action === 'category-unpublish' && operation.slug) retired.add(operation.slug)
+    if (operation.action === 'listing-unpublish' && operation.slug) gone.add(operation.slug)
+    if (operation.action === 'listing-slug-change' && operation.from) gone.add(operation.from)
+    if (operation.action === 'listing-categories-remove' && operation.slug === listing)
+      for (const removed of operation.remove ?? []) detached.add(removed)
+    if (operation.action === 'listing-update' && operation.listing?.slug === listing)
+      for (const sampled of categories)
+        if (!operation.listing.categories?.includes(sampled)) detached.add(sampled)
+  }
+  return { detached, gone, retired }
+}
+
 /** Requests the trailing-slash gates make, and the canonical redirects they require. */
 const trailingSlashGatePaths = ['/about', '/robots.txt/', '/api/search/']
 const canonicalRedirects: Record<string, string> = {
@@ -201,20 +236,87 @@ describe('environment-specific HTTP gates', () => {
       .split('\n')
       .filter(path => /\.ya?ml$/u.test(path))
     expect(committed.length).toBeGreaterThan(0)
-    const retired = new Set<string>()
-    const gone = new Set<string>()
-    for (const path of committed) {
-      const manifest = parse(readFileSync(resolve(path), 'utf8')) as {
-        operations?: Array<{ action?: string; from?: string; slug?: string }>
-      }
-      for (const operation of manifest.operations ?? []) {
-        if (operation.action === 'category-unpublish' && operation.slug) retired.add(operation.slug)
-        if (operation.action === 'listing-unpublish' && operation.slug) gone.add(operation.slug)
-        if (operation.action === 'listing-slug-change' && operation.from) gone.add(operation.from)
-      }
-    }
+    const { detached, gone, retired } = sampleChanges(
+      committed.map(path => parse(readFileSync(resolve(path), 'utf8')) as SampleManifest),
+      httpGateSamples
+    )
     expect(gone.has(httpGateSamples.listing), httpGateSamples.listing).toBe(false)
-    expect(httpGateSamples.categories.filter(slug => !retired.has(slug))).not.toEqual([])
+    const [sampled] = httpGateSamples.categories.filter(slug => !retired.has(slug))
+    expect(sampled).toBeDefined()
+    // #320: the sampled category is the sample listing's own, so it can't be empty while the
+    // listing the gates already require is live and filed under it.
+    expect(detached.has(String(sampled)), String(sampled)).toBe(false)
+  })
+
+  it('counts every manifest operation that takes a sample off the site (#320)', () => {
+    const changes = (...operations: SampleOperation[]) => sampleChanges([{ operations }], samples)
+    expect(
+      changes(
+        { action: 'category-unpublish', slug: category },
+        { action: 'listing-unpublish', slug },
+        { action: 'listing-slug-change', from: 'renamed-product', to: 'other-product' }
+      )
+    ).toEqual({
+      detached: new Set(),
+      gone: new Set([slug, 'renamed-product']),
+      retired: new Set([category])
+    })
+    // Either way the sample listing leaves the sampled category: removed, or left out of the
+    // categories a listing-update replaces its memberships with.
+    expect(
+      changes({ action: 'listing-categories-remove', slug, remove: [category] }).detached
+    ).toEqual(new Set([category]))
+    expect(
+      changes({ action: 'listing-update', listing: { slug, categories: ['other'] } }).detached
+    ).toEqual(new Set([category]))
+    // An update that keeps it, and changes to other listings, leave it attached.
+    expect(
+      changes(
+        { action: 'listing-update', listing: { slug, categories: ['other', category] } },
+        { action: 'listing-update', listing: { slug: 'other-product', categories: ['other'] } },
+        { action: 'listing-categories-remove', slug: 'other-product', remove: [category] }
+      ).detached
+    ).toEqual(new Set())
+  })
+
+  it('requests the pinned samples, and only with GETs apart from the empty sign-in (#320)', async () => {
+    const requests: Array<{ method: string; url: URL }> = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = new URL(String(input))
+        requests.push({ method: init?.method ?? 'GET', url })
+        // The checked-in samples' legacy listing URL redirects like the fixture's.
+        if (url.pathname === `/${httpGateSamples.listing}/`)
+          return withCrawlPolicy(
+            url,
+            new Response(null, {
+              status: 308,
+              headers: { location: `/products/${httpGateSamples.listing}/` }
+            })
+          )
+        return withCrawlPolicy(url, successfulResponse(url))
+      })
+    )
+    await expect(
+      runHttpGates('production', origin, {
+        publicationsDirectory: noPublications,
+        wranglerConfigPath: switchOffConfigPath
+      })
+    ).resolves.toBeUndefined()
+    const paths = requests.map(request => request.url.pathname)
+    expect(paths).toEqual(
+      expect.arrayContaining([
+        `/products/categories/${httpGateSamples.categories[0]}/`,
+        `/products/${httpGateSamples.listing}/`
+      ])
+    )
+    expect(paths.filter(path => path.startsWith('/products/categories/'))).toHaveLength(1)
+    expect(
+      requests
+        .filter(request => request.method !== 'GET')
+        .map(request => `${request.method} ${request.url.pathname}`)
+    ).toEqual([`POST ${badSignInPath}`])
   })
 
   it('keeps Staging isolated from the Production hostname', async () => {
