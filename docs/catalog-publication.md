@@ -52,7 +52,7 @@ row-level, so one manifest fits staging and production. Each listing operation n
 | `listing-categories-remove` | Removes `remove`, which must be secondary categories | The slug or categories aren't exactly `expected`, or one of them is the primary |
 | `listing-categories-set` | Replaces the listing's categories with `categories`, the first as primary (#333) | As for `-add`, the listing isn't approved, or its own submission is in review (`paid_pending_review` or `changes_requested`) |
 | `category-create` | Adds an active category: `slug`, `name`, `description`, `order` | The slug exists, active or retired |
-| `category-unpublish` | Retires a category ([Catalog hygiene](./catalog-hygiene.md#adult-products-260)) | The slug doesn't exist, or a live listing is still filed under it |
+| `category-unpublish` | Retires a category ([Catalog hygiene](./catalog-hygiene.md#adult-products-260)) | The slug doesn't exist, a live listing is still filed under it, or a listing filed under it is a slug redirect's source ([Slug redirects](#slug-redirects)) |
 
 `listing-categories-set` is the only row-level operation that changes a listing's primary category:
 `-add` and `-remove` never touch it. Within the batch, it moves the listing to a draft, replaces its
@@ -70,6 +70,41 @@ Publish a manifest's `category-create` before the operations that file listings 
 category, earlier in the same manifest or in an earlier one. A category with no live listing
 answers 404. As with every publication, the catalog epoch advances, so cached pages turn over.
 
+## Slug redirects
+
+`listing-slug-redirect` sends an unpublished listing's slug to another, live listing (#338): its
+page answers 308 instead of 410. It names `from` and `to`, each a listing's `id` and `slug`, and a
+`reason`, and it adds one `listing_slug_redirects` row: the `to` listing's id, `from`'s slug, and
+`to`'s slug. It is row-level, so one manifest fits staging and production.
+
+- **What changes.** Only the redirect row: both listings stay as they are. `from` stays unpublished,
+  so it stays out of the sitemap, search, RSS, and category pages, and Republish in `/admin` still
+  brings it back, its live page then winning over the redirect. The product page follows `to`'s id
+  to its current slug, so a later rename of `to` still lands in one hop. If `to` is unpublished
+  later, the lookup finds no live listing and `from` answers 410 again.
+- **Refused, with nothing written, when:**
+  - `from` isn't that id and slug, unpublished (approved and inactive), as its 410 page finds it.
+    A listing filed under a retired category answers 404 and keeps it, so no adult listing's
+    traffic is sent elsewhere ([Catalog hygiene](./catalog-hygiene.md#adult-products-260)).
+  - `to` isn't that id and slug, live (approved, active, and published by now).
+  - A redirect already exists for `from`'s slug.
+  - It would make a chain or a loop: `to`'s slug is itself a redirected slug, or an older slug
+    redirects to `from` and would end at an unpublished listing.
+  - By the end of the batch, `from` is no longer unpublished outside retired categories, or `to`
+    is no longer live, whatever the order of the operations. A later `listing-update` that moves
+    `to`'s `published_at` into the future refuses the batch, for example.
+  - The same manifest unpublishes `to`, or redirects `from` twice. Two duplicates may share a `to`.
+- **Category retirements.** A listing filed under a retired category answers 404, and a redirect
+  must not turn that into a 308. So `category-unpublish` refuses while any listing filed under the
+  category is the source of a redirect, in the same batch or one published earlier: re-file that
+  listing first (`listing-categories-remove` or `-set`, earlier in the same batch or in an earlier
+  one), and its redirect keeps working.
+- **Errors.** Each of these guards names the operation and its reason in the error D1 reports, for
+  example `bad JSON path: 'category-unpublish other: a listing filed under it is the source of a
+  slug redirect; re-file that listing first'`. Nothing is written.
+- **Order.** Publish it after the manifest that unpublishes `from`, on each environment. As with
+  every publication, the catalog epoch advances, so the cached 410 turns over.
+
 ## Listing details
 
 `listing-details-set` (#340) replaces a listing's name, short description, or website, the fields
@@ -84,6 +119,10 @@ The batch is refused, with nothing written, when:
 - its own submission is in review (`paid_pending_review` or `changes_requested`);
 - a new website is another listing's, the host of a submission in flight, or under a block
   (`listingWebsiteConflicts`, which the admin edit checks too).
+
+Each refusal names the operation and its reason in the error D1 reports, as the slug redirect's
+guards do, for example `bad JSON path: 'listing-details-set ca.la: the listing is not approved, or
+its slug, name, description, or website changed since the manifest'`.
 
 The manifest itself is refused when a field in `details` equals `expected`, the name is over 80
 characters or the description over 160 (the admin panel's limits), or the website isn't a public

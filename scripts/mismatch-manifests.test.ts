@@ -264,6 +264,7 @@ describe('the mismatch manifests (#340)', () => {
     for (const name of [
       ...committedOtherCategoryManifests(),
       '2026-10-10-duplicate-listings.yaml',
+      '2026-10-10-duplicate-listings-redirects.yaml',
       '2026-10-10-other-removals.yaml'
     ])
       expect(sources.has(name), name).toBe(true)

@@ -12,7 +12,10 @@ import {
   MEDIA_HASH_LENGTH,
   parseMediaKey
 } from '../apps/web/src/db/media-keys'
-import { listingHasQueuedSubmission } from '../apps/web/src/db/plan-support'
+import {
+  listingHasQueuedSubmission,
+  listingInRetiredCategory
+} from '../apps/web/src/db/plan-support'
 import { validatePublicHttpUrl } from '../apps/web/src/db/public-url'
 import { hasFileExtension } from '../apps/web/src/lib/seo/canonical-url'
 import { assertD1Compatible } from './d1-compat'
@@ -30,6 +33,13 @@ import { catalogSitemapRoutes, categoryRoute, listingIndexRoute, listingRoute } 
 export const GUARD_FAILURE = "json_extract('', '$')"
 /** Refuses the batch unless the statement right before it changed exactly one row. */
 const CHANGED_ONE_GUARD = `SELECT CASE WHEN changes()=1 THEN 1 ELSE ${GUARD_FAILURE} END`
+/**
+ * A guard failure that says why (#338 review): it rolls the batch back like `GUARD_FAILURE`, and
+ * D1 names the reason in its error (`bad JSON path: '<reason>'`), so the workflow's log says what
+ * to fix. The reason names manifest values (slugs), so it is bound like every runtime value: the
+ * statement binds it as the parameter for this `?`, its last.
+ */
+export const REASONED_GUARD_FAILURE = "json_extract('{}', ?)"
 
 /** A slug that already exists; renaming or unpublishing it must stay possible. */
 const existingSlug = z.string().regex(/^[a-z0-9.-]+$/)
@@ -211,6 +221,36 @@ const operation = z.discriminatedUnion('action', [
     })
     .strict(),
   /**
+   * Sends an unpublished listing's slug to another, live listing with a 308 (#338: #332's retired
+   * duplicates go to the listing they duplicated instead of answering 410). It adds one
+   * `listing_slug_redirects` row, `(to.id, from.slug, to.slug)`. The product page looks a slug up
+   * there before it renders the gone page and follows `to.id` to that listing's current slug, so
+   * a later rename of `to` still lands in one hop. `from` stays unpublished, so it stays out of
+   * the sitemap, search, RSS and category pages, and Republish in `/admin` can still bring it
+   * back (its live page then wins over the redirect).
+   *
+   * Row-level guarded, so a `rows` manifest may hold it. The batch refuses when:
+   * - `from` isn't this id and slug, unpublished (`approved`, `is_active = 0`) as its 410 page
+   *   finds it: never filed under a retired category, whose listings answer 404 (#260);
+   * - `to` isn't this id and slug, live (`approved`, `is_active = 1`, published by now);
+   * - a redirect already exists for `from.slug`;
+   * - `to.slug` is itself a redirected slug (a chain, or a loop back to `from`);
+   * - older slugs redirect to `from` (a chain: they would end at an unpublished listing);
+   * - by the end of the batch, `from` is live again or filed under a retired category, or `to` is
+   *   no longer live (#338 review: a later operation in the same batch, in any order).
+   *
+   * A later `category-unpublish` refuses while `from` is filed under that category, so a redirected
+   * listing never ends up in a retired category with a 308 instead of its 404 (#260).
+   */
+  z
+    .object({
+      action: z.literal('listing-slug-redirect'),
+      from: z.object({ id: listingId, slug: existingSlug }).strict(),
+      to: z.object({ id: listingId, slug: existingSlug }).strict(),
+      reason: z.string().trim().min(1).max(200)
+    })
+    .strict(),
+  /**
    * Replaces a listing's logo and images with hosted copies (#95). `expected` is the listing's
    * logo and image rows (kind, source url, and hosted key, ordered by kind then sort order) when
    * the manifest was generated: the batch refuses a listing whose media changed since (a
@@ -341,7 +381,8 @@ const operation = z.discriminatedUnion('action', [
    * sitemaps, search, and the submit and edit forms, its page answers 404, and so do its
    * unpublished listings (#260). Refused while any live listing remains in it, primary or
    * secondary, so it follows the unpublish operations of its listings. That guard is its own
-   * row-level check, so a `rows` manifest may hold it (#260: the Adult category).
+   * row-level check, so a `rows` manifest may hold it (#260: the Adult category). Also refused
+   * while a listing filed under it is a slug redirect's source (#338): re-file that listing first.
    */
   z.object({ action: z.literal('category-unpublish'), slug: categorySlug }).strict()
 ])
@@ -367,9 +408,11 @@ export const manifestConcurrency = ['publication', 'rows'] as const
  * media rows (`expected`), categories (`expected`, added, removed, or replaced), a description's
  * length and ending (#105), an unpublish with its `expected.website` (#100: categories, live,
  * website, no submission in review; with `expected.unowned`, no ownership records either, #332), a
- * category retirement (#260: no live listing left in it), a new category (#333: its insert
- * refuses the batch when the slug exists, retired or not), and a listing's name, short
- * description, and website (#340: `expected`).
+ * category retirement (#260: no live listing and no slug redirect's source left in it, #338), a new
+ * category (#333: its insert refuses the batch when the slug exists, retired or not), a slug
+ * redirect (#338: an unpublished source, a live target, no redirect for the slug, no chain or
+ * loop, all still true at the end of the batch), and a listing's name, short description, and
+ * website (#340: `expected`).
  */
 const rowLevelActions = new Set<string>([
   'listing-media-update',
@@ -381,6 +424,7 @@ const rowLevelActions = new Set<string>([
   'listing-unpublish',
   'listing-claim-hold-add',
   'listing-claim-hold-clear',
+  'listing-slug-redirect',
   'category-create',
   'category-unpublish'
 ])
@@ -412,7 +456,7 @@ export const manifestSchema = z
           context.addIssue({
             code: z.ZodIssueCode.custom,
             message:
-              'A row-level manifest holds only listing-media-update, listing-categories-add/-remove/-set, listing-details-set, listing-content-remove-suffix, listing-unpublish, listing-claim-hold-add/-clear, and category-create/-unpublish operations.',
+              'A row-level manifest holds only listing-media-update, listing-categories-add/-remove/-set, listing-details-set, listing-content-remove-suffix, listing-unpublish, listing-claim-hold-add/-clear, listing-slug-redirect, and category-create/-unpublish operations.',
             path: ['operations', index, 'action']
           })
         }
@@ -525,6 +569,15 @@ export const manifestSchema = z
           path: ['operations', index, 'to']
         })
       if (
+        op.action === 'listing-slug-redirect' &&
+        (op.from.id === op.to.id || op.from.slug === op.to.slug)
+      )
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'A listing slug cannot redirect to its own listing.',
+          path: ['operations', index, 'to']
+        })
+      if (
         op.action === 'category-create' ||
         op.action === 'category-update' ||
         op.action === 'category-unpublish'
@@ -539,14 +592,21 @@ export const manifestSchema = z
         categoryTargets.add(target)
         return
       }
+      // A redirect changes nothing of its target's row, so only its source counts here.
       const id =
-        op.action === 'listing-create' || op.action === 'listing-update' ? op.listing.id : op.id
+        op.action === 'listing-create' || op.action === 'listing-update'
+          ? op.listing.id
+          : op.action === 'listing-slug-redirect'
+            ? op.from.id
+            : op.id
       const target =
         op.action === 'listing-create' || op.action === 'listing-update'
           ? op.listing.slug
           : op.action === 'listing-slug-change'
             ? op.to
-            : op.slug
+            : op.action === 'listing-slug-redirect'
+              ? op.from.slug
+              : op.slug
       if (ids.has(id))
         context.addIssue({
           code: z.ZodIssueCode.custom,
@@ -561,6 +621,19 @@ export const manifestSchema = z
         })
       ids.add(id)
       slugs.add(target)
+    })
+    // A redirect to a listing this manifest unpublishes would end at a gone page. Its own guard
+    // catches an unpublish that comes first; this catches one that comes after it.
+    const unpublished = new Set(
+      value.operations.flatMap(op => (op.action === 'listing-unpublish' ? [op.id] : []))
+    )
+    value.operations.forEach((op, index) => {
+      if (op.action === 'listing-slug-redirect' && unpublished.has(op.to.id))
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'A redirect’s target cannot be unpublished in the same manifest.',
+          path: ['operations', index, 'to']
+        })
     })
   })
 export type PublicationManifest = z.infer<typeof manifestSchema>
@@ -750,6 +823,10 @@ function listingStatements(
   out.push(statement("UPDATE listings SET status='approved' WHERE id=?", value.id))
   return out
 }
+/** How a guard failure names a `listing-slug-redirect` operation. */
+function redirectLabel(op: { from: { slug: string }; to: { slug: string } }): string {
+  return `listing-slug-redirect ${op.from.slug} to ${op.to.slug}`
+}
 export const parseManifest = (source: string): PublicationManifest =>
   manifestSchema.parse(parse(source))
 
@@ -848,7 +925,14 @@ export function buildPublicationPlan(
           now,
           op.slug
         ),
-        statement(CHANGED_ONE_GUARD)
+        statement(CHANGED_ONE_GUARD),
+        // #338: never while a listing filed under it is a slug redirect's source. Retired, that
+        // listing would answer 404 (#260), but the product page reads the redirect first.
+        statement(
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listing_categories lc JOIN categories c ON c.id=lc.category_id JOIN listings l ON l.id=lc.listing_id JOIN listing_slug_redirects r ON r.old_slug=l.slug WHERE c.slug=?) THEN ${REASONED_GUARD_FAILURE} ELSE 1 END`,
+          op.slug,
+          `category-unpublish ${op.slug}: a listing filed under it is the source of a slug redirect; re-file that listing first`
+        )
       )
       addCategories([op.slug])
     }
@@ -1082,6 +1166,7 @@ export function buildPublicationPlan(
     if (op.action === 'listing-details-set') {
       const next = { ...op.expected, ...op.details }
       const website = op.details.website
+      const label = `listing-details-set ${op.slug}`
       // A new website must not be another listing's, a submission's in flight, or blocked.
       const conflicts = website
         ? Object.values(listingWebsiteConflicts({ listingId: op.id, website }))
@@ -1090,14 +1175,16 @@ export function buildPublicationPlan(
         // As in the admin panel (#64): never while the listing's own submission is in review, whose
         // approval needs the checksum the listing was paid at.
         statement(
-          `SELECT CASE WHEN ${listingHasQueuedSubmission('?')} THEN ${GUARD_FAILURE} ELSE 1 END`,
-          op.id
+          `SELECT CASE WHEN ${listingHasQueuedSubmission('?')} THEN ${REASONED_GUARD_FAILURE} ELSE 1 END`,
+          op.id,
+          `${label}: its own submission is in review`
         ),
         ...(conflicts.length > 0
           ? [
               statement(
-                `SELECT CASE WHEN ${conflicts.map(conflict => conflict.sql).join(' OR ')} THEN ${GUARD_FAILURE} ELSE 1 END`,
-                ...conflicts.flatMap(conflict => conflict.params)
+                `SELECT CASE WHEN ${conflicts.map(conflict => conflict.sql).join(' OR ')} THEN ${REASONED_GUARD_FAILURE} ELSE 1 END`,
+                ...conflicts.flatMap(conflict => conflict.params),
+                `${label}: the new website belongs to another listing or a submission in flight, or is blocked`
               )
             ]
           : []),
@@ -1116,7 +1203,10 @@ export function buildPublicationPlan(
           op.expected.description,
           op.expected.website
         ),
-        statement(CHANGED_ONE_GUARD),
+        statement(
+          `SELECT CASE WHEN changes()=1 THEN 1 ELSE ${REASONED_GUARD_FAILURE} END`,
+          `${label}: the listing is not approved, or its slug, name, description, or website changed since the manifest`
+        ),
         // The admin panel's activity record for an edit (#64): "Details edited: name, ...".
         statement(
           "INSERT INTO listing_events (listing_id,event_type,detail,actor) VALUES (?,'edited',?,?)",
@@ -1198,6 +1288,66 @@ export function buildPublicationPlan(
       routes.add(listingRoute(op.to))
       addCategories(op.categories)
     }
+    if (op.action === 'listing-slug-redirect') {
+      const redirect = redirectLabel(op)
+      statements.push(
+        // The source: unpublished, exactly as its slug answers 410 today
+        // (`isUnpublishedListingSlug`). One filed under a retired category answers 404 and stays
+        // there: #260 sends no adult listing's traffic elsewhere. Its row is never changed.
+        statement(
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=? AND status='approved' AND is_active=0 AND published_at IS NOT NULL) AND NOT ${listingInRetiredCategory('?')} THEN 1 ELSE ${REASONED_GUARD_FAILURE} END`,
+          op.from.id,
+          op.from.slug,
+          op.from.id,
+          `${redirect}: the source is not this unpublished listing, or is filed under a retired category`
+        ),
+        // The target: public now, by the predicates the product page's redirect lookup applies.
+        statement(
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=? AND status='approved' AND is_active=1 AND published_at IS NOT NULL AND published_at<=?) THEN 1 ELSE ${REASONED_GUARD_FAILURE} END`,
+          op.to.id,
+          op.to.slug,
+          now,
+          `${redirect}: the target is not this live listing`
+        ),
+        // No redirect for the slug yet; no chain or loop: the target's slug isn't redirected, and
+        // no older slug redirects to the source.
+        statement(
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listing_slug_redirects WHERE old_slug IN (?, ?) OR listing_id=?) THEN ${REASONED_GUARD_FAILURE} ELSE 1 END`,
+          op.from.slug,
+          op.to.slug,
+          op.from.id,
+          `${redirect}: the slug already redirects, or this would make a chain or a loop`
+        ),
+        statement(
+          'INSERT INTO listing_slug_redirects (listing_id,old_slug,new_slug,manifest_id,reason,created_at) VALUES (?,?,?,?,?,?)',
+          op.to.id,
+          op.from.slug,
+          op.to.slug,
+          manifest.id,
+          op.reason,
+          now
+        )
+      )
+      // The source's page turns from 410 to 308; the target's page is unchanged.
+      routes.add(listingRoute(op.from.slug))
+    }
+  }
+  // #338 review: each redirect still holds once every operation of the batch ran. A later
+  // `category-unpublish` could retire its source's category (that listing answers 404, #260), and
+  // a later `listing-update` could leave its target unpublished or not yet due. Either refuses the
+  // whole batch, in whichever order the manifest lists them.
+  for (const op of manifest.operations) {
+    if (op.action !== 'listing-slug-redirect') continue
+    statements.push(
+      statement(
+        `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND status='approved' AND is_active=0 AND published_at IS NOT NULL) AND NOT ${listingInRetiredCategory('?')} AND EXISTS (SELECT 1 FROM listings WHERE id=? AND status='approved' AND is_active=1 AND published_at IS NOT NULL AND published_at<=?) THEN 1 ELSE ${REASONED_GUARD_FAILURE} END`,
+        op.from.id,
+        op.from.id,
+        op.to.id,
+        now,
+        `${redirectLabel(op)}: by the end of the batch, its source is no longer unpublished outside retired categories, or its target is no longer live`
+      )
+    )
   }
   const affectedRoutes = [
     ...new Set([

@@ -189,8 +189,11 @@ covers it on fixture listings.
 
 Some products were imported twice, under two slugs with the same name and description.
 `d1/publications/2026-10-10-duplicate-listings.yaml` keeps one listing of each pair and unpublishes
-the other (410, like the cleanups above); its header says which slug stays and why. No manifest
-operation can redirect one listing's slug to another listing, so the retired URL answers 410.
+the other (410, like the cleanups above); its header says which slug stays and why. Then
+`2026-10-10-duplicate-listings-redirects.yaml` sends each retired slug on to the listing it
+duplicated: `/products/<retired>/` answers 308 to `/products/<kept>/`
+([Slug redirects](./catalog-publication.md#slug-redirects), #338). Publish it after the first
+manifest on each environment: until the retired listings are unpublished, it refuses whole.
 
 - **Media first.** Where the retired listing had a logo or image the kept one lacked, a
   `listing-media-update` earlier in the same batch gives the kept listing a copy under its own key
@@ -263,19 +266,16 @@ that batch. Publish it where it was refused; where the original applied, there i
 
 ## Mismatched listings (#340)
 
-#333 flagged 139 listings whose copy doesn't describe their product. #340 checked each against its
-website, read-only: `d1/hygiene/2026-10-10-mismatch-audit.yaml` holds the verdicts, evidence, and the
-owner's `decision` of 2026-10-10. `pnpm catalog:mismatch` turns them into three row-level manifests:
+#333 flagged 139 listings whose copy doesn't describe their product; #340 checked each website.
+`d1/hygiene/2026-10-10-mismatch-audit.yaml` holds the verdicts, evidence, and owner's `decision`
+(2026-10-10), which `pnpm catalog:mismatch` turns into three row-level manifests:
 
-- `2026-10-10-mismatch-removals` unpublishes 127: 40 dead, hijacked, or not products (hygiene
-  removals, not `unowned`; 3 more are held for a recheck), 75 real products whose copy would need
-  regenerating, and 12 renamed products whose long description is about something else (both
-  `unowned`, as [duplicates](#duplicate-listings-332) are).
-- `2026-10-10-mismatch-renames` gives 8 renamed products their new name, a short description from
-  the live site, and their own URL where the serp.ly link no longer reaches them
-  (`listing-details-set`, [Catalog publication](./catalog-publication.md#listing-details)), and fixes
-  faceapp.com's description. `-categories` moves the 4 whose category is live out of Other.
+- `-removals` unpublishes 127: 40 dead, hijacked, or not products (not `unowned`; 3 more are held),
+  and 87 real products, 75 needing new copy and 12 renamed with another product's long
+  description (`unowned`, as [duplicates](#duplicate-listings-332) are).
+- `-renames` gives 8 renamed products a new name, a description from the live site, and their own
+  URL where the serp.ly link no longer reaches them ([`listing-details-set`](./catalog-publication.md#listing-details)),
+  and fixes faceapp.com's description; `-categories` moves the 4 with a live category.
 
-`scripts/mismatch-manifests.test.ts` keeps them identical to the audit and disjoint from #333's and
-#332's manifests, and replays them after #333's. Publish them after #333's batches and removals,
-staging first, in any order among themselves.
+`scripts/mismatch-manifests.test.ts` keeps them identical to the audit and disjoint from #332's,
+#333's, and #338's, and replays them after #333's. Publish them after those, staging first.

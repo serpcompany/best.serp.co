@@ -137,7 +137,10 @@ page (the listing is gone, a link to its category, "Relist it"). Next.js cannot 
 the Worker entry does it (`lib/routing/gone-listing.ts`): when a `/products/<slug>/` render is a
 404, it asks D1 whether the slug is unpublished (`isUnpublishedListingSlug`, one index seek) and,
 if so, renders the page again with `x-best-serp-co-render-gone: 1`, which makes the page render
-the gone page, and answers it with 410. The edge cache stores the 410 under the epoch.
+the gone page, and answers it with 410. The edge cache stores the 410 under the epoch. The page
+looks up `listing_slug_redirects` first, so an unpublished duplicate that a manifest redirected to
+the listing it duplicated answers 308 there instead
+([Slug redirects](./catalog-publication.md#slug-redirects)).
 
 An unpublished listing filed under a retired category (`categories.is_active = 0`, primary or
 secondary) keeps its plain 404 (#260): `isUnpublishedListingSlug` and `getUnpublishedListing` leave
@@ -171,7 +174,7 @@ the app writes production data, and agents never use the production admin panel.
 `apps/web/src/lib/admin/decisions.test.ts` (node:sqlite), `scripts/d1-workerd-plans.test.ts` (every
 plan builder and read on Wrangler-local D1), and `apps/web/e2e/admin-panel.spec.ts`
 (Playwright: the gate, approve, request changes, reject, allow resubmission, unpublish with 410
-and republish, the allowlist, and a replay of each decision). The suite runs on its own local
-Worker and empty D1 (`PLAYWRIGHT_PORT` + 3, started by `playwright.config.ts` from the same
-build), because it publishes listings and the smoke suite counts the fixture seed's listings
-exactly.
+and republish, a redirected duplicate's 308 (#338), the allowlist, and a replay of each
+decision). The suite runs on its own local Worker and empty D1 (`PLAYWRIGHT_PORT` + 3, started by
+`playwright.config.ts` from the same build), because it publishes listings and the smoke suite
+counts the fixture seed's listings exactly.
