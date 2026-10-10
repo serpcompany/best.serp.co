@@ -1,0 +1,69 @@
+# serpcompany/best.serp.co#333: unpublish 5 listings found while categorizing Other, as the owner decided in
+# chat on 2026-10-10. Their pages answer 410 Gone and leave the sitemap, search, RSS, and the Other
+# category page. The rows stay (Republish in /admin brings one back).
+# - imgnai.com, adult: best.serp.co lists no adult products (#260), and its flagship tool is an NSFW
+#   AI image generator. The Adult category is retired, so it can't be filed there first: like any adult
+#   listing found after #260's manifests, its URL answers 410, not 404 (docs/catalog-hygiene.md).
+# - copycraftai.com, spam: its content promotes Indonesian "QRIS" gaming, likely a hijacked or
+#   repurposed domain.
+# - gistvid.com, spam: its content reviews Olimp Casino for Kazakhstan gamblers, likely a hijacked domain.
+# - sparktraffic.com, spam: sells bot-generated website traffic.
+# - trafficbotpro.com, spam: a traffic bot that generates artificial website visits.
+# Flags: d1/hygiene/2026-10-10-other-owner-flags.yaml. The owner hasn't decided on the four other
+# traffic-bot listings flagged `other:` (babylontraffic.com, clickseo.io, ctrify.com, ctrmaster.co), so
+# they aren't here.
+# Not `unowned` (#332): a hygiene removal takes the listing down even if someone owns or claimed it,
+# as the hijacked-domain, dead-domain, and adult manifests do.
+# Ids are the v1 import's (lst_ + sha256("legacy-product-map" NUL slug)[0:24], recomputed). The
+# categories ([other]) and websites match each listing's public page on staging and production,
+# checked 2026-10-10 with read-only GETs; no page showed a Verified owner badge. None of the five is in
+# the 2026-10-10-other-categories batches. Row-level: a listing whose website or categories changed,
+# that is no longer live, or whose own submission is in review refuses the whole batch, with nothing
+# written. Apply staging first, then production after promotion.
+version: 1
+id: 2026-10-10-other-removals
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  - action: listing-unpublish
+    id: lst_dd4203f6a5928714bf1f8dc6
+    slug: copycraftai.com
+    categories:
+      - other
+    reason: "#333 spam (owner decision 2026-10-10): content promotes Indonesian QRIS gaming, likely a hijacked or repurposed domain"
+    expected:
+      website: https://serp.ly/copycraft-ai
+  - action: listing-unpublish
+    id: lst_76ffd86ae42ae275bb20c2ad
+    slug: gistvid.com
+    categories:
+      - other
+    reason: "#333 spam (owner decision 2026-10-10): content reviews Olimp Casino for Kazakhstan gamblers, likely a hijacked domain"
+    expected:
+      website: https://serp.ly/gistvid
+  - action: listing-unpublish
+    id: lst_b03d0534f14f6e26a4531b95
+    slug: imgnai.com
+    categories:
+      - other
+    reason: "#333 adult (owner decision 2026-10-10, #260): flagship tool is an NSFW AI image generator"
+    expected:
+      website: https://serp.ly/imgnai
+  - action: listing-unpublish
+    id: lst_f6db3c974a96aee30012736f
+    slug: sparktraffic.com
+    categories:
+      - other
+    reason: "#333 spam (owner decision 2026-10-10): sells bot-generated website traffic"
+    expected:
+      website: https://serp.ly/sparktraffic.com
+  - action: listing-unpublish
+    id: lst_8ff2452e604429a9ac8cf274
+    slug: trafficbotpro.com
+    categories:
+      - other
+    reason: "#333 spam (owner decision 2026-10-10): a traffic bot that generates artificial website visits"
+    expected:
+      website: https://serp.ly/trafficbotpro.com
