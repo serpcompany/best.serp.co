@@ -82,6 +82,7 @@ function gates(
 
 interface SampleOperation {
   action?: string
+  categories?: string[]
   from?: string
   listing?: { categories?: string[]; slug?: string }
   remove?: string[]
@@ -93,7 +94,8 @@ type SampleManifest = { operations?: SampleOperation[] } | null
 /**
  * What manifests do to the gates' samples: the categories they retire, the listing slugs they
  * take off the site, and the sample categories they detach from the sample listing, with a
- * `listing-categories-remove` or a `listing-update` whose categories leave one out (#320).
+ * `listing-categories-remove`, or a `listing-update` or `listing-categories-set` (#333) whose
+ * categories leave one out (#320).
  */
 function sampleChanges(
   manifests: readonly SampleManifest[],
@@ -111,6 +113,9 @@ function sampleChanges(
     if (operation.action === 'listing-update' && operation.listing?.slug === listing)
       for (const sampled of categories)
         if (!operation.listing.categories?.includes(sampled)) detached.add(sampled)
+    if (operation.action === 'listing-categories-set' && operation.slug === listing)
+      for (const sampled of categories)
+        if (!operation.categories?.includes(sampled)) detached.add(sampled)
   }
   return { detached, gone, retired }
 }
@@ -269,12 +274,17 @@ describe('environment-specific HTTP gates', () => {
     expect(
       changes({ action: 'listing-update', listing: { slug, categories: ['other'] } }).detached
     ).toEqual(new Set([category]))
+    expect(
+      changes({ action: 'listing-categories-set', slug, categories: ['other'] }).detached
+    ).toEqual(new Set([category]))
     // An update that keeps it, and changes to other listings, leave it attached.
     expect(
       changes(
         { action: 'listing-update', listing: { slug, categories: ['other', category] } },
         { action: 'listing-update', listing: { slug: 'other-product', categories: ['other'] } },
-        { action: 'listing-categories-remove', slug: 'other-product', remove: [category] }
+        { action: 'listing-categories-remove', slug: 'other-product', remove: [category] },
+        { action: 'listing-categories-set', slug, categories: ['other', category] },
+        { action: 'listing-categories-set', slug: 'other-product', categories: ['other'] }
       ).detached
     ).toEqual(new Set())
   })
