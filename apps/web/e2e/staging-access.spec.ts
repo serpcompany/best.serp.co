@@ -21,7 +21,7 @@ import { expectedResponse, test } from './test'
 
 test.skip(
   !stagingAccessSuiteEnabled,
-  'needs the local staging-access Worker from playwright.config.ts'
+  'needs the local staging-access Worker from playwright.staging-access.config.ts'
 )
 // One worker seeds the suite's D1 once, then the tests share it.
 test.describe.configure({ mode: 'serial' })

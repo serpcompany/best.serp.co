@@ -49,7 +49,7 @@ test.use({
  * dark, for comparison with the #70 mockups.
  */
 
-test.skip(!adminSuiteEnabled, 'needs the local account Worker from playwright.config.ts')
+test.skip(!adminSuiteEnabled, 'needs the local account Worker from playwright.suites.config.ts')
 test.describe.configure({ mode: 'serial' })
 test.use({ baseURL: adminOrigin(accountServer) })
 
