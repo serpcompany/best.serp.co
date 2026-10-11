@@ -31,6 +31,24 @@ export async function runQuery<T>(
   return (await client.database.run(query)) as D1Result<T>
 }
 
+/**
+ * Execute typed, parameterized statements as one D1 batch: one round trip to D1, where they run
+ * in order, each result keeping its own metadata. A listing page's detail, related listings and
+ * neighbours are read this way (#378).
+ */
+export async function runBatch(
+  client: Database,
+  queries: readonly CompiledQuery[]
+): Promise<D1Result<unknown>[]> {
+  if (queries.length === 0) throw new Error('A batch needs at least one statement.')
+  return client.binding.batch(
+    queries.map(query => {
+      const compiled = query.toSQL()
+      return client.binding.prepare(compiled.sql).bind(...compiled.params)
+    })
+  )
+}
+
 /** D1 and SQLite failure messages mapped to a stable reason (D1 limits: docs/data-model.md). */
 const D1_ERROR_REASONS: ReadonlyArray<readonly [RegExp, string]> = [
   [/too many SQL variables|variable number must be between/iu, 'too_many_variables'],

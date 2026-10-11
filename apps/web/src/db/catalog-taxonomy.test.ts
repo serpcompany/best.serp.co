@@ -352,9 +352,14 @@ describe('taxonomy reads (#345)', () => {
   it('carries active tags on the detail and ranks related listings by shared tags', async () => {
     const { events, operations: catalog } = operations()
     const start = sqlite.statements.length
+    const roundTrips = sqlite.roundTrips.length
     const bravo = await catalog.getListingBySlug('bravo')
-    // Epoch, detail, related, previous, next.
+    // Epoch, detail, related, previous, next: the last four in one batch (#378).
     expect(sqlite.statements.length - start).toBe(5)
+    expect(sqlite.roundTrips.slice(roundTrips).map(trip => trip.kind)).toEqual([
+      'statement',
+      'batch'
+    ])
     // Most central first, then slug; the retired tag is left out.
     expect(bravo?.tags).toEqual([
       { name: 'Editors', slug: 'editors' },

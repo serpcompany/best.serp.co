@@ -11,7 +11,7 @@ import {
   TAXONOMY_TARGET_JOINS,
   TAXONOMY_TARGET_SLUG
 } from './catalog-epoch'
-import { type CompiledQuery, d1ErrorCode, runQuery } from './client'
+import { type CompiledQuery, d1ErrorCode, runBatch, runQuery } from './client'
 import type {
   BestPageItem,
   CatalogCacheEvent,
@@ -90,10 +90,10 @@ async function sha256Hex(value: string): Promise<string> {
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
 }
 /**
- * A single-category listing's related candidates are read from its category's members
- * when the category is at most this large; larger (dense) categories walk the name index
- * instead, which finds four members after a handful of rows. Both plans return the same
- * rows; this only picks the cheaper one (see `relatedListings`).
+ * A hub's related candidates (an untagged listing in one category, or a tagged listing whose tags
+ * yield fewer than four) are read from its members when it has at most this many memberships;
+ * larger (dense) hubs walk the name index instead, which finds four members after a handful of
+ * rows. Both plans return the same rows; this only picks the cheaper one (see `relatedStatement`).
  */
 const RELATED_MEMBER_SCAN_LIMIT = 128
 /**
@@ -202,14 +202,20 @@ interface NavigationRow {
   website: string
 }
 
+/**
+ * A row of `relatedStatement`: the ranking and the fill's plan, then a related listing, whose
+ * columns are null on the one row of a listing with nothing related.
+ */
 interface RelatedRow {
-  description: string
-  id: string
-  is_unofficial: number
+  description: string | null
+  fill_plan: string | null
+  id: string | null
+  is_unofficial: number | null
+  kind: string
   logo: string | null
-  name: string
-  slug: string
-  website: string
+  name: string | null
+  slug: string | null
+  website: string | null
 }
 
 interface NameOrderRow {
@@ -248,6 +254,41 @@ function parameterizedQuery<T>(text: string, bindings: unknown[]): SQL<T> {
 
 function finiteMetric(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+/** One metric summed over a batch's results, or null when any of them lacks it. */
+function sumMetric(
+  results: readonly D1Result<unknown>[],
+  read: (meta: QueryMeta) => unknown
+): number | null {
+  let total = 0
+  for (const result of results) {
+    const value = finiteMetric(read((result.meta ?? {}) as QueryMeta))
+    if (value === null) return null
+    total += value
+  }
+  return total
+}
+
+/** The telemetry of one statement that ran, from D1's metadata for it. */
+function queryEvent(
+  operation: CatalogOperation,
+  queryShape: CatalogQueryShape,
+  result: D1Result<unknown>,
+  wallDurationMs: number
+): CatalogQueryEvent {
+  const meta = result.meta as QueryMeta | undefined
+  return {
+    d1DurationMs: finiteMetric(meta?.duration),
+    event: 'd1_query',
+    operation,
+    queryShape,
+    resultRows: result.results.length,
+    rowsRead: finiteMetric(meta?.rows_read),
+    rowsWritten: finiteMetric(meta?.rows_written),
+    success: result.success,
+    wallDurationMs
+  }
 }
 
 /** Published and active, at any publication time (no `asOf` binding). */
@@ -808,120 +849,378 @@ function nameOrderScopeKey(scope: NameOrderScope): string {
 }
 
 /**
- * The candidates of a tagged listing's related listings (#341 design 3.2, #362 review), in one
- * statement:
- *
- * - `tagged`: the listings sharing its `RELATED_SCORED_TAGS` most central active tags, scored by
- *   how many they share, ties broken on a keyset from its own name and slug (the names after it
- *   first, then from the start), at most four.
- * - When `tagged` has fewer than four, its hub (primary category) fills the rest with score 0 and
- *   the same keyset: through the hub's members when the hub has at most
- *   `RELATED_MEMBER_SCAN_LIMIT` memberships, else by walking the public name index from its own
- *   name and then from the start, as an untagged listing in one category does. `fill.plan` picks
- *   the branch, and the others' `LIMIT` is 0, which SQLite checks before reading a row; no branch
- *   reads anything once `tagged` has four. Each returns at most four rows, which always covers
- *   the gap: at most as many of them repeat `tagged` as `tagged` has, which leaves at least as
- *   many new ones as it lacks.
+ * A statement whose values are numbered parameters (`?1`, `?2`, …), each bound once however often
+ * the text names it. The statements batched for a listing page name the operation time (`?1`) and
+ * the slug (`?2`) many times (#378).
  */
-function relatedByTags(
-  row: { id: string; name: string; slug: string },
-  asOf: string
-): { bindings: unknown[]; candidates: string } {
-  const columns = 'l.id, l.slug, l.name, l.description, l.website, l.is_unofficial, 0 AS score'
-  const limit = (plan: 'members' | 'walk') =>
-    `CASE WHEN (SELECT plan FROM fill) = '${plan}' THEN 4 ELSE 0 END`
-  const walk = (comparison: '<' | '>', wrap: 0 | 1) => `SELECT * FROM (
-         SELECT ${columns}, ${wrap} AS wrap
-         FROM listings l INDEXED BY listings_related_name_idx
-         WHERE ${publicEligibilitySql()}
-           AND (l.name, l.slug) ${comparison} (?, ?)
-           AND EXISTS (
-             SELECT 1 FROM listing_categories member
-             WHERE member.listing_id = l.id AND member.category_id = (SELECT id FROM fill)
-           )
-         ORDER BY l.name ASC, l.slug ASC
-         LIMIT ${limit('walk')}
-       )`
-  return {
-    bindings: [
-      row.id,
-      row.name,
-      row.slug,
-      row.id,
-      asOf,
-      row.id,
-      row.name,
-      row.slug,
-      asOf,
-      row.id,
-      asOf,
-      row.name,
-      row.slug,
-      asOf,
-      row.name,
-      row.slug
-    ],
-    candidates: `WITH current_tags AS (
-         SELECT lt.tag_id
-         FROM listing_tags lt
-         CROSS JOIN tags t ON t.id = lt.tag_id
-         WHERE lt.listing_id = ? AND t.is_active = 1
-         ORDER BY lt.sort_order ASC, t.slug ASC
-         LIMIT ${RELATED_SCORED_TAGS}
-       ),
-       tagged AS (
-         SELECT l.id, l.slug, l.name, l.description, l.website, l.is_unofficial,
-           COUNT(*) AS score,
-           CASE WHEN (l.name, l.slug) > (?, ?) THEN 0 ELSE 1 END AS wrap
-         FROM current_tags current
-         CROSS JOIN listing_tags shared INDEXED BY listing_tags_tag_idx
-           ON shared.tag_id = current.tag_id
-         CROSS JOIN listings l ON l.id = shared.listing_id
-         WHERE shared.listing_id != ? AND ${publicEligibilitySql()}
-         GROUP BY l.id
-         ORDER BY score DESC, wrap ASC, l.name ASC, l.slug ASC
-         LIMIT 4
-       ),
-       fill AS (
-         SELECT hub.category_id AS id,
-           CASE
-             WHEN (SELECT COUNT(*) FROM tagged) >= 4 THEN 'none'
-             WHEN NOT EXISTS (
-               SELECT 1 FROM listing_categories sized INDEXED BY listing_categories_category_idx
-               WHERE sized.category_id = hub.category_id
-               LIMIT 1 OFFSET ${RELATED_MEMBER_SCAN_LIMIT}
-             ) THEN 'members'
-             ELSE 'walk'
-           END AS plan
-         FROM listing_categories hub
-         WHERE hub.listing_id = ? AND hub.is_primary = 1
-         LIMIT 1
-       )
-       SELECT id, slug, name, description, website, is_unofficial,
-         MAX(score) AS score, MIN(wrap) AS wrap
-       FROM (
-         SELECT * FROM tagged
-         UNION ALL
-         SELECT * FROM (
-           SELECT ${columns},
-             CASE WHEN (l.name, l.slug) > (?, ?) THEN 0 ELSE 1 END AS wrap
-           FROM listing_categories member INDEXED BY listing_categories_category_idx
-           CROSS JOIN listings l ON l.id = member.listing_id
-           WHERE member.category_id = (SELECT id FROM fill)
-             AND ${publicEligibilitySql()}
-             AND l.id != ?
-           ORDER BY wrap ASC, l.name ASC, l.slug ASC
-           LIMIT ${limit('members')}
-         )
-         UNION ALL
-         ${walk('>', 0)}
-         UNION ALL
-         ${walk('<', 1)}
-       )
-       GROUP BY id
-       ORDER BY score DESC, wrap ASC, name ASC, slug ASC
-       LIMIT 4`
+function numberedQuery(text: string, bindings: unknown[]): CompiledQuery {
+  const numbers = new Set([...text.matchAll(/\?(\d+)/gu)].map(match => Number(match[1])))
+  const complete = Array.from({ length: bindings.length }, (_, index) => index + 1).every(number =>
+    numbers.has(number)
+  )
+  if (/\?(?!\d)/u.test(text) || numbers.size !== bindings.length || !complete) {
+    throw new Error(
+      `Catalog query expected numbered bindings 1 to ${bindings.length}; it names ${[...numbers].join(', ') || 'none'}.`
+    )
   }
+  return { toSQL: () => ({ params: bindings, sql: text }) }
+}
+
+/** The bindings of every statement in a listing page's batch: `?1` the operation time, `?2` the slug. */
+const AS_OF = '?1'
+const SLUG = '?2'
+
+/** Public at the operation time (`publicEligibilitySql`, with the time as `?1`). */
+function eligibleAt(alias = 'l'): string {
+  return `${publishedSql(alias)} AND ${alias}.published_at <= ${AS_OF}`
+}
+
+/**
+ * The public listing the slug names, which each statement batched with its detail resolves for
+ * itself (one seek on the unique slug), so none of them waits for the detail row (#378). When the
+ * slug names no public listing, it is empty and so is every statement built on it.
+ */
+const CURRENT_LISTING = `current_listing AS MATERIALIZED (
+    SELECT l.id, l.slug, l.name, l.published_at, l.display_order
+    FROM listings l
+    WHERE ${eligibleAt()} AND l.slug = ${SLUG}
+    LIMIT 1
+  )`
+
+/** The listing's detail row: its summary, body, media, links, FAQs, tags and best-page marks. */
+function detailStatement(slug: string, asOf: string): CompiledQuery {
+  return numberedQuery(
+    `SELECT
+        ${summaryColumns},
+        l.content,
+        l.entity_type,
+        l.priority,
+        l.link_rel,
+        EXISTS (
+          SELECT 1 FROM listing_owners o
+          WHERE o.listing_id = l.id AND o.role = 'owner' AND o.revoked_at IS NULL
+        ) AS verified_owner,
+        COALESCE((
+          SELECT json_group_array(ordered.url)
+          FROM (
+            SELECT COALESCE(m.media_key, m.url) AS url FROM listing_media m
+            WHERE m.listing_id = l.id AND m.kind = 'image'
+            ORDER BY m.sort_order ASC
+          ) ordered
+        ), '[]') AS images,
+        (
+          SELECT m.url FROM listing_media m
+          WHERE m.listing_id = l.id AND m.kind = 'video'
+          ORDER BY m.sort_order ASC LIMIT 1
+        ) AS video,
+        COALESCE((
+          SELECT json_group_array(json_object('label', ordered.label, 'url', ordered.url))
+          FROM (
+            SELECT r.label, r.url FROM listing_resource_links r
+            WHERE r.listing_id = l.id
+            ORDER BY r.sort_order ASC
+          ) ordered
+        ), '[]') AS resource_links,
+        COALESCE((
+          SELECT json_group_array(json_object('question', ordered.question, 'answer', ordered.answer))
+          FROM (
+            SELECT f.question, f.answer FROM listing_faqs f
+            WHERE f.listing_id = l.id
+            ORDER BY f.sort_order ASC
+          ) ordered
+        ), '[]') AS faqs,
+        COALESCE((
+          SELECT json_group_array(json_object('slug', ordered.slug, 'name', ordered.name))
+          FROM (
+            SELECT t.slug, t.name FROM listing_tags lt
+            JOIN tags t ON t.id = lt.tag_id
+            WHERE lt.listing_id = l.id AND t.is_active = 1
+            ORDER BY lt.sort_order ASC, t.slug ASC
+          ) ordered
+        ), '[]') AS tags,
+        COALESCE((
+          SELECT json_group_array(json_object('page', ordered.slug, 'position', ordered.position))
+          FROM (
+            SELECT b.slug, e.position FROM best_page_listings e
+            JOIN best_pages b ON b.id = e.best_page_id
+            WHERE e.listing_id = l.id AND b.is_active = 1
+            ORDER BY b.slug ASC
+          ) ordered
+        ), '[]') AS best_page_marks
+      FROM listings l
+      WHERE ${eligibleAt()} AND l.slug = ${SLUG}
+      LIMIT 1`,
+    [asOf, slug]
+  )
+}
+
+/**
+ * Up to four related listings, in one statement that picks its ranking from the listing the slug
+ * names (#378: it needs neither the detail row nor the shell statistics first), with each related
+ * logo resolved only for the returned rows.
+ *
+ * - Tags (#341, design 3.2, #362 review): ranked by how many of the listing's
+ *   `RELATED_SCORED_TAGS` most central active tags they share (bounded by the size of those tags).
+ *   Ties break on a keyset from the listing's own name and slug: the listings after it in name
+ *   order first, wrapping round to the start, so listings that share the same tags link onward to
+ *   different neighbours instead of all linking to the first names (#331).
+ * - No tags, several categories: ranked by shared categories (most first), counted from the
+ *   listing's own categories (bounded by the size of those categories), then name and slug.
+ * - No tags, one category, and a tagged listing whose tags yield fewer than four: its hub (primary
+ *   category) fills the rest with score 0 and the same keyset (design 3.2, #331), so two listings
+ *   in one large category (the catch-all `other`) link onward to different neighbours. `fill.plan`
+ *   picks how: through the hub's members when it has at most `RELATED_MEMBER_SCAN_LIMIT`
+ *   memberships (a probe of at most that many index entries plus one), else by walking the public
+ *   name index from the listing's own name, where a dense category yields four members almost
+ *   immediately, then from the start only for as many as that walk lacked. Both plans return the
+ *   same rows; the probe only picks the cheaper one.
+ *
+ * The branches that don't apply have `LIMIT 0`, which SQLite checks before reading a row. The
+ * first row always carries the ranking (`kind`) and the fill's plan (`fill_plan`), which name the
+ * statement's query shape; when nothing is related, it is the only row and its listing columns are
+ * null.
+ */
+function relatedStatement(slug: string, asOf: string): CompiledQuery {
+  const columns = 'l.id, l.slug, l.name, l.description, l.website, l.is_unofficial'
+  const currentNameSlug = '(SELECT name, slug FROM current_listing)'
+  const walk = (name: 'onward' | 'wrapped', comparison: '<' | '>', wrap: 0 | 1, limit: string) =>
+    `${name} AS (
+    SELECT ${columns}, 0 AS score, ${wrap} AS wrap
+    FROM listings l INDEXED BY listings_related_name_idx
+    WHERE ${eligibleAt()}
+      AND (l.name, l.slug) ${comparison} ${currentNameSlug}
+      AND EXISTS (
+        SELECT 1 FROM listing_categories member
+        WHERE member.listing_id = l.id AND member.category_id = (SELECT id FROM fill)
+      )
+    ORDER BY l.name ASC, l.slug ASC
+    LIMIT CASE WHEN (SELECT plan FROM fill) = 'walk' THEN ${limit} ELSE 0 END
+  )`
+  return numberedQuery(
+    `WITH ${CURRENT_LISTING},
+  current_tags AS (
+    SELECT lt.tag_id
+    FROM listing_tags lt
+    CROSS JOIN tags t ON t.id = lt.tag_id
+    WHERE lt.listing_id = (SELECT id FROM current_listing) AND t.is_active = 1
+    ORDER BY lt.sort_order ASC, t.slug ASC
+    LIMIT ${RELATED_SCORED_TAGS}
+  ),
+  ranking AS MATERIALIZED (
+    SELECT CASE
+      WHEN EXISTS (SELECT 1 FROM current_tags) THEN 'tags'
+      WHEN (
+        SELECT COUNT(*)
+        FROM listing_categories lc
+        CROSS JOIN categories c ON c.id = lc.category_id
+        WHERE lc.listing_id = current.id AND c.is_active = 1
+      ) > 1 THEN 'categories'
+      ELSE 'hub'
+    END AS kind
+    FROM current_listing current
+  ),
+  tagged AS (
+    SELECT ${columns},
+      COUNT(*) AS score,
+      CASE WHEN (l.name, l.slug) > ${currentNameSlug} THEN 0 ELSE 1 END AS wrap
+    FROM current_tags current
+    CROSS JOIN listing_tags shared INDEXED BY listing_tags_tag_idx
+      ON shared.tag_id = current.tag_id
+    CROSS JOIN listings l ON l.id = shared.listing_id
+    WHERE shared.listing_id != (SELECT id FROM current_listing) AND ${eligibleAt()}
+    GROUP BY l.id
+    ORDER BY score DESC, wrap ASC, l.name ASC, l.slug ASC
+    LIMIT 4
+  ),
+  shared_categories AS (
+    SELECT ${columns}, COUNT(*) AS score, 0 AS wrap
+    FROM listing_categories current
+    CROSS JOIN listing_categories shared INDEXED BY listing_categories_category_idx
+      ON shared.category_id = current.category_id
+    CROSS JOIN listings l ON l.id = shared.listing_id
+    WHERE current.listing_id = (SELECT id FROM current_listing)
+      AND shared.listing_id != current.listing_id
+      AND ${eligibleAt()}
+    GROUP BY l.id
+    ORDER BY score DESC, l.name ASC, l.slug ASC
+    LIMIT CASE WHEN (SELECT kind FROM ranking) = 'categories' THEN 4 ELSE 0 END
+  ),
+  fill AS (
+    SELECT hub.category_id AS id,
+      CASE
+        WHEN (SELECT kind FROM ranking) = 'categories' THEN 'none'
+        WHEN (SELECT COUNT(*) FROM tagged) >= 4 THEN 'none'
+        WHEN NOT EXISTS (
+          SELECT 1 FROM listing_categories sized INDEXED BY listing_categories_category_idx
+          WHERE sized.category_id = hub.category_id
+          LIMIT 1 OFFSET ${RELATED_MEMBER_SCAN_LIMIT}
+        ) THEN 'members'
+        ELSE 'walk'
+      END AS plan
+    FROM listing_categories hub
+    WHERE hub.listing_id = (SELECT id FROM current_listing) AND hub.is_primary = 1
+    LIMIT 1
+  ),
+  members AS (
+    SELECT ${columns}, 0 AS score,
+      CASE WHEN (l.name, l.slug) > ${currentNameSlug} THEN 0 ELSE 1 END AS wrap
+    FROM listing_categories member INDEXED BY listing_categories_category_idx
+    CROSS JOIN listings l ON l.id = member.listing_id
+    WHERE member.category_id = (SELECT id FROM fill)
+      AND ${eligibleAt()}
+      AND l.id != (SELECT id FROM current_listing)
+    ORDER BY wrap ASC, l.name ASC, l.slug ASC
+    LIMIT CASE WHEN (SELECT plan FROM fill) = 'members' THEN 4 ELSE 0 END
+  ),
+  ${walk('onward', '>', 0, '4')},
+  ${walk('wrapped', '<', 1, '4 - (SELECT COUNT(*) FROM onward)')},
+  ranked AS (
+    SELECT id, slug, name, description, website, is_unofficial,
+      MAX(score) AS score, MIN(wrap) AS wrap
+    FROM (
+      SELECT * FROM tagged
+      UNION ALL SELECT * FROM shared_categories
+      UNION ALL SELECT * FROM members
+      UNION ALL SELECT * FROM onward
+      UNION ALL SELECT * FROM wrapped
+    )
+    GROUP BY id
+    ORDER BY score DESC, wrap ASC, name ASC, slug ASC
+    LIMIT 4
+  )
+SELECT
+  ranking.kind,
+  (SELECT plan FROM fill) AS fill_plan,
+  related.id,
+  related.slug,
+  related.name,
+  related.description,
+  related.website,
+  related.is_unofficial,
+  (
+    SELECT COALESCE(m.media_key, m.url) FROM listing_media m
+    WHERE m.listing_id = related.id AND m.kind = 'logo'
+    ORDER BY m.sort_order ASC LIMIT 1
+  ) AS logo
+FROM ranking
+LEFT JOIN ranked related ON 1
+ORDER BY related.score DESC, related.wrap ASC, related.name ASC, related.slug ASC`,
+    [asOf, slug]
+  )
+}
+
+/** The query shape a related statement ran as, named by its first row (`relatedStatement`). */
+function relatedQueryShape(row: RelatedRow | undefined): CatalogQueryShape {
+  switch (row?.kind) {
+    case 'tags':
+      return 'related-shared-tags'
+    case 'categories':
+      return 'related-shared-categories'
+    case 'hub':
+      if (row.fill_plan === 'members') return 'related-single-category-members'
+      if (row.fill_plan === 'walk') return 'related-single-category-seek'
+  }
+  throw new Error('Invalid D1 related listings plan.')
+}
+
+/**
+ * The adjacent listing in publication order. The three keyset branches (same publication time
+ * and display order, same publication time, earlier/later publication) are each an index seek on
+ * the current listing's values (`current_listing`). They run as one statement whose COALESCE
+ * only evaluates a branch when the previous ones found nothing, so each direction is one
+ * statement in the page's batch, without reading more rows.
+ */
+function navigationStatement(
+  direction: 'next' | 'previous',
+  slug: string,
+  asOf: string
+): CompiledQuery {
+  const current = (column: 'display_order' | 'published_at' | 'slug') =>
+    `(SELECT ${column} FROM current_listing)`
+  const branches =
+    direction === 'previous'
+      ? [
+          {
+            asOfBound: true,
+            order: 'l.slug DESC',
+            predicate: `l.published_at = ${current('published_at')} AND l.display_order = ${current('display_order')} AND l.slug < ${current('slug')}`
+          },
+          {
+            asOfBound: true,
+            order: 'l.display_order DESC, l.slug DESC',
+            predicate: `l.published_at = ${current('published_at')} AND l.display_order < ${current('display_order')}`
+          },
+          {
+            asOfBound: true,
+            order: 'l.published_at ASC, l.display_order DESC, l.slug DESC',
+            predicate: `l.published_at > ${current('published_at')}`
+          }
+        ]
+      : [
+          {
+            asOfBound: true,
+            order: 'l.slug ASC',
+            predicate: `l.published_at = ${current('published_at')} AND l.display_order = ${current('display_order')} AND l.slug > ${current('slug')}`
+          },
+          {
+            asOfBound: true,
+            order: 'l.display_order ASC, l.slug ASC',
+            predicate: `l.published_at = ${current('published_at')} AND l.display_order > ${current('display_order')}`
+          },
+          {
+            // Published before the current listing, which is public at `asOf`, so already
+            // public too. A second upper bound (`<= asOf`) would let SQLite seek on that one
+            // and walk every newer listing first: 3,425 rows for the oldest listing (#314).
+            asOfBound: false,
+            order: PUBLICATION_ORDER,
+            predicate: `l.published_at < ${current('published_at')}`
+          }
+        ]
+  return numberedQuery(
+    `WITH ${CURRENT_LISTING}
+      SELECT
+        l.slug,
+        l.name,
+        l.website,
+        (
+          SELECT COALESCE(m.media_key, m.url) FROM listing_media m
+          WHERE m.listing_id = l.id AND m.kind = 'logo'
+          ORDER BY m.sort_order ASC LIMIT 1
+        ) AS logo
+      FROM listings l
+      WHERE l.id = COALESCE(
+        ${branches
+          .map(
+            branch => `(
+          SELECT l.id
+          FROM listings l
+          WHERE ${branch.asOfBound ? eligibleAt() : publishedSql()} AND ${branch.predicate}
+          ORDER BY ${branch.order}
+          LIMIT 1
+        )`
+          )
+          .join(',\n        ')}
+      )
+      LIMIT 1`,
+    [asOf, slug]
+  )
+}
+
+function mapRelated(rows: RelatedRow[]): RelatedListing[] {
+  return rows.flatMap(related =>
+    related.id === null
+      ? []
+      : [
+          {
+            description: requireString(related.description, 'related description'),
+            isUnofficial: related.is_unofficial === 1 || undefined,
+            media: related.logo ? { logo: requireString(related.logo, 'related logo') } : undefined,
+            name: requireString(related.name, 'related name'),
+            slug: requireString(related.slug, 'related slug'),
+            website: requireString(related.website, 'related website')
+          }
+        ]
+  )
 }
 
 export function createCatalogOperations(config: CatalogOperationsConfig): CatalogOperations {
@@ -943,19 +1242,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
     let eventEmitted = false
     try {
       const result = await runQuery<T>(client, statement)
-      const meta = result.meta as QueryMeta
-      const event: CatalogQueryEvent = {
-        d1DurationMs: finiteMetric(meta?.duration),
-        event: 'd1_query',
-        operation,
-        queryShape,
-        resultRows: result.results.length,
-        rowsRead: finiteMetric(meta?.rows_read),
-        rowsWritten: finiteMetric(meta?.rows_written),
-        success: result.success,
-        wallDurationMs: performance.now() - startedAt
-      }
-      observe(event)
+      observe(queryEvent(operation, queryShape, result, performance.now() - startedAt))
       eventEmitted = true
       if (!result.success) throw new Error('D1 catalog query failed.')
       return result.results
@@ -1165,317 +1452,77 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
   }
 
   /**
-   * Adjacent listing in publication order. The three keyset branches (same publication
-   * time and display order, same publication time, earlier/later publication) are each an
-   * index seek. They run as one statement whose COALESCE only evaluates a branch when the
-   * previous ones found nothing, so a detail page needs one round trip per direction
-   * instead of up to three sequential ones, without reading more rows.
+   * A listing's detail, related listings and both neighbours, as one D1 batch of four statements
+   * that each find the listing by its slug: an uncached listing page waits on one round trip to
+   * D1 after the epoch, where it waited on two or three before (#378). Each statement reports its
+   * own rows and D1 time under its own query shape, all with the batch's wall time. A slug that
+   * names no public listing reports one `listing-detail` event with the batch's totals: the other
+   * three statements found no listing and read only their slug seeks.
    */
-  async function navigation(
-    current: Pick<SummaryRow, 'display_order' | 'published_at' | 'slug'>,
-    asOf: string,
-    direction: 'next' | 'previous'
-  ): Promise<ListingNavigation | null> {
-    const isPrevious = direction === 'previous'
-    const branches = isPrevious
-      ? [
-          {
-            asOfBound: true,
-            bindings: [current.published_at, current.display_order, current.slug],
-            order: 'l.slug DESC',
-            predicate: 'l.published_at = ? AND l.display_order = ? AND l.slug < ?'
-          },
-          {
-            asOfBound: true,
-            bindings: [current.published_at, current.display_order],
-            order: 'l.display_order DESC, l.slug DESC',
-            predicate: 'l.published_at = ? AND l.display_order < ?'
-          },
-          {
-            asOfBound: true,
-            bindings: [current.published_at],
-            order: 'l.published_at ASC, l.display_order DESC, l.slug DESC',
-            predicate: 'l.published_at > ?'
-          }
-        ]
-      : [
-          {
-            asOfBound: true,
-            bindings: [current.published_at, current.display_order, current.slug],
-            order: 'l.slug ASC',
-            predicate: 'l.published_at = ? AND l.display_order = ? AND l.slug > ?'
-          },
-          {
-            asOfBound: true,
-            bindings: [current.published_at, current.display_order],
-            order: 'l.display_order ASC, l.slug ASC',
-            predicate: 'l.published_at = ? AND l.display_order > ?'
-          },
-          {
-            // Published before the current listing, which is public at `asOf`, so already
-            // public too. A second upper bound (`<= asOf`) would let SQLite seek on that one
-            // and walk every newer listing first: 3,425 rows for the oldest listing (#314).
-            asOfBound: false,
-            bindings: [current.published_at],
-            order: PUBLICATION_ORDER,
-            predicate: 'l.published_at < ?'
-          }
-        ]
-
-    const rows = await queryAll<NavigationRow>(
-      'listing-detail',
-      isPrevious ? 'navigation-previous' : 'navigation-next',
-      parameterizedQuery<NavigationRow>(
-        `SELECT
-        l.slug,
-        l.name,
-        l.website,
-        (
-          SELECT COALESCE(m.media_key, m.url) FROM listing_media m
-          WHERE m.listing_id = l.id AND m.kind = 'logo'
-          ORDER BY m.sort_order ASC LIMIT 1
-        ) AS logo
-      FROM listings l
-      WHERE l.id = COALESCE(
-        ${branches
-          .map(
-            branch => `(
-          SELECT l.id
-          FROM listings l
-          WHERE ${branch.asOfBound ? publicEligibilitySql() : publishedSql()} AND ${branch.predicate}
-          ORDER BY ${branch.order}
-          LIMIT 1
-        )`
-          )
-          .join(',\n        ')}
-      )
-      LIMIT 1`,
-        branches.flatMap(branch => [...(branch.asOfBound ? [asOf] : []), ...branch.bindings])
-      )
-    )
-    return mapNavigation(rows[0])
-  }
-
   async function queryListingBySlug(slug: string): Promise<ListingDetail | null> {
     const asOf = operationTime()
-    const rows = await queryAll<DetailRow>(
+    const startedAt = performance.now()
+    let results: D1Result<unknown>[]
+    try {
+      results = await runBatch(client, [
+        detailStatement(slug, asOf),
+        relatedStatement(slug, asOf),
+        navigationStatement('previous', slug, asOf),
+        navigationStatement('next', slug, asOf)
+      ])
+    } catch (error) {
+      observe({
+        d1DurationMs: null,
+        errorCode: d1ErrorCode(error),
+        event: 'd1_query',
+        operation: 'listing-detail',
+        queryShape: 'listing-detail',
+        resultRows: 0,
+        rowsRead: null,
+        rowsWritten: null,
+        success: false,
+        wallDurationMs: performance.now() - startedAt
+      })
+      throw error
+    }
+    const wallDurationMs = performance.now() - startedAt
+    const [detailResult, relatedResult, previousResult, nextResult] = results as [
+      D1Result<DetailRow>,
+      D1Result<RelatedRow>,
+      D1Result<NavigationRow>,
+      D1Result<NavigationRow>
+    ]
+    const row = detailResult.results[0]
+    if (!row) {
+      observe({
+        ...queryEvent('listing-detail', 'listing-detail', detailResult, wallDurationMs),
+        d1DurationMs: sumMetric(results, meta => meta.duration),
+        rowsRead: sumMetric(results, meta => meta.rows_read),
+        rowsWritten: sumMetric(results, meta => meta.rows_written),
+        success: results.every(result => result.success)
+      })
+      if (!results.every(result => result.success)) throw new Error('D1 catalog query failed.')
+      return null
+    }
+    const shapes: CatalogQueryShape[] = [
       'listing-detail',
-      'listing-detail',
-      parameterizedQuery<DetailRow>(
-        `SELECT
-        ${summaryColumns},
-        l.content,
-        l.entity_type,
-        l.priority,
-        l.link_rel,
-        EXISTS (
-          SELECT 1 FROM listing_owners o
-          WHERE o.listing_id = l.id AND o.role = 'owner' AND o.revoked_at IS NULL
-        ) AS verified_owner,
-        COALESCE((
-          SELECT json_group_array(ordered.url)
-          FROM (
-            SELECT COALESCE(m.media_key, m.url) AS url FROM listing_media m
-            WHERE m.listing_id = l.id AND m.kind = 'image'
-            ORDER BY m.sort_order ASC
-          ) ordered
-        ), '[]') AS images,
-        (
-          SELECT m.url FROM listing_media m
-          WHERE m.listing_id = l.id AND m.kind = 'video'
-          ORDER BY m.sort_order ASC LIMIT 1
-        ) AS video,
-        COALESCE((
-          SELECT json_group_array(json_object('label', ordered.label, 'url', ordered.url))
-          FROM (
-            SELECT r.label, r.url FROM listing_resource_links r
-            WHERE r.listing_id = l.id
-            ORDER BY r.sort_order ASC
-          ) ordered
-        ), '[]') AS resource_links,
-        COALESCE((
-          SELECT json_group_array(json_object('question', ordered.question, 'answer', ordered.answer))
-          FROM (
-            SELECT f.question, f.answer FROM listing_faqs f
-            WHERE f.listing_id = l.id
-            ORDER BY f.sort_order ASC
-          ) ordered
-        ), '[]') AS faqs,
-        COALESCE((
-          SELECT json_group_array(json_object('slug', ordered.slug, 'name', ordered.name))
-          FROM (
-            SELECT t.slug, t.name FROM listing_tags lt
-            JOIN tags t ON t.id = lt.tag_id
-            WHERE lt.listing_id = l.id AND t.is_active = 1
-            ORDER BY lt.sort_order ASC, t.slug ASC
-          ) ordered
-        ), '[]') AS tags,
-        COALESCE((
-          SELECT json_group_array(json_object('page', ordered.slug, 'position', ordered.position))
-          FROM (
-            SELECT b.slug, e.position FROM best_page_listings e
-            JOIN best_pages b ON b.id = e.best_page_id
-            WHERE e.listing_id = l.id AND b.is_active = 1
-            ORDER BY b.slug ASC
-          ) ordered
-        ), '[]') AS best_page_marks
-      FROM listings l
-      WHERE ${publicEligibilitySql()} AND l.slug = ?
-      LIMIT 1`,
-        [asOf, slug]
+      relatedQueryShape(relatedResult.results[0]),
+      'navigation-previous',
+      'navigation-next'
+    ]
+    for (const [index, result] of results.entries()) {
+      observe(
+        queryEvent('listing-detail', shapes[index] ?? 'listing-detail', result, wallDurationMs)
       )
-    )
-    const row = rows[0]
-    if (!row) return null
+    }
+    if (!results.every(result => result.success)) throw new Error('D1 catalog query failed.')
 
-    const detail = mapDetail(row)
-    const [relatedWebsites, previousWebsite, nextWebsite] = await Promise.all([
-      relatedListings(row, asOf, detail.tags ?? []),
-      navigation(row, asOf, 'previous'),
-      navigation(row, asOf, 'next')
-    ])
     return {
-      ...detail,
-      nextWebsite,
-      previousWebsite,
-      relatedWebsites
+      ...mapDetail(row),
+      nextWebsite: mapNavigation(nextResult.results[0]),
+      previousWebsite: mapNavigation(previousResult.results[0]),
+      relatedWebsites: mapRelated(relatedResult.results)
     }
-  }
-
-  /**
-   * Up to four related listings. One statement, with each related logo resolved only for the
-   * returned rows.
-   *
-   * - Tags (#341, design 3.2): ranked by shared active tags (most first), counted from the
-   *   listing's three most central tags (`RELATED_SCORED_TAGS`, bounded by the size of those
-   *   tags). Ties break on a keyset from the listing's own name and slug: the listings after it in
-   *   name order first, wrapping round to the start, so listings that share the same tags link
-   *   onward to different neighbours instead of all linking to the first names (#331). When the
-   *   tags yield fewer than four, the rest come from its hub in the same statement, with the same
-   *   keyset (`relatedByTags`).
-   * - No tags: ranked by shared categories (most first), then name and slug.
-   *   - Several categories: count shared memberships from the listing's own categories
-   *     (bounded by the size of those categories).
-   *   - One category (design 3.2, #331): the members after it in name order, wrapping round to
-   *     the start, so two listings in one large category (the catch-all `other`) link onward to
-   *     different neighbours instead of all to its first names. Read from the category's members
-   *     when it is small, otherwise by walking the public name index from its own name, where a
-   *     dense category yields four members almost immediately, then from the start only for
-   *     as many as that walk lacked.
-   */
-  async function relatedListings(
-    row: DetailRow,
-    asOf: string,
-    tags: ListingTag[]
-  ): Promise<RelatedListing[]> {
-    const sharedCategoryCount = (row.categories || '')
-      .split(String.fromCharCode(31))
-      .filter(Boolean).length
-    let queryShape: CatalogQueryShape
-    let candidates: string
-    let bindings: unknown[]
-    let tieBreak = ''
-    if (tags.length > 0) {
-      queryShape = 'related-shared-tags'
-      tieBreak = 'related.wrap ASC, '
-      const statement = relatedByTags(row, asOf)
-      candidates = statement.candidates
-      bindings = statement.bindings
-    } else if (sharedCategoryCount > 1) {
-      queryShape = 'related-shared-categories'
-      candidates = `SELECT l.id, l.slug, l.name, l.description, l.website, l.is_unofficial,
-             COUNT(*) AS score
-           FROM listing_categories current
-           CROSS JOIN listing_categories shared INDEXED BY listing_categories_category_idx
-             ON shared.category_id = current.category_id
-           CROSS JOIN listings l ON l.id = shared.listing_id
-           WHERE current.listing_id = ?
-             AND shared.listing_id != current.listing_id
-             AND ${publicEligibilitySql()}
-           GROUP BY l.id
-           ORDER BY score DESC, l.name ASC, l.slug ASC
-           LIMIT 4`
-      bindings = [row.id, asOf]
-    } else {
-      const categorySize = (await getShellStats()).categories.find(
-        category => category.slug === row.category
-      )?.count
-      const currentCategory = `(
-               SELECT current.category_id
-               FROM listing_categories current
-               WHERE current.listing_id = ?
-               LIMIT 1
-             )`
-      tieBreak = 'related.wrap ASC, '
-      if (categorySize !== undefined && categorySize <= RELATED_MEMBER_SCAN_LIMIT) {
-        queryShape = 'related-single-category-members'
-        candidates = `SELECT l.id, l.slug, l.name, l.description, l.website, l.is_unofficial,
-             1 AS score,
-             CASE WHEN (l.name, l.slug) > (?, ?) THEN 0 ELSE 1 END AS wrap
-           FROM listing_categories shared INDEXED BY listing_categories_category_idx
-           CROSS JOIN listings l ON l.id = shared.listing_id
-           WHERE shared.category_id = ${currentCategory}
-             AND ${publicEligibilitySql()}
-             AND l.id != ?
-           ORDER BY wrap ASC, l.name ASC, l.slug ASC
-           LIMIT 4`
-        bindings = [row.name, row.slug, row.id, asOf, row.id]
-      } else {
-        queryShape = 'related-single-category-seek'
-        // The walk after its own name, then one from the start for only as many as it lacked
-        // (`LIMIT 0`, which SQLite checks before reading a row, when it found four).
-        const walk = (comparison: '<' | '>', wrap: 0 | 1, limit: string) => `SELECT
-             l.id, l.slug, l.name, l.description, l.website, l.is_unofficial,
-             1 AS score, ${wrap} AS wrap
-           FROM listings l INDEXED BY listings_related_name_idx
-           WHERE ${publicEligibilitySql()}
-             AND (l.name, l.slug) ${comparison} (?, ?)
-             AND EXISTS (
-               SELECT 1
-               FROM listing_categories shared
-               WHERE shared.listing_id = l.id
-                 AND shared.category_id = ${currentCategory}
-             )
-           ORDER BY l.name ASC, l.slug ASC
-           LIMIT ${limit}`
-        candidates = `WITH onward AS (${walk('>', 0, '4')})
-           SELECT * FROM onward
-           UNION ALL
-           SELECT * FROM (${walk('<', 1, '4 - (SELECT COUNT(*) FROM onward)')})`
-        bindings = [asOf, row.name, row.slug, row.id, asOf, row.name, row.slug, row.id]
-      }
-    }
-    const relatedRows = await queryAll<RelatedRow>(
-      'listing-detail',
-      queryShape,
-      parameterizedQuery<RelatedRow>(
-        `SELECT
-        related.id,
-        related.slug,
-        related.name,
-        related.description,
-        related.website,
-        related.is_unofficial,
-        (
-          SELECT COALESCE(m.media_key, m.url) FROM listing_media m
-          WHERE m.listing_id = related.id AND m.kind = 'logo'
-          ORDER BY m.sort_order ASC LIMIT 1
-        ) AS logo
-      FROM (
-        ${candidates}
-      ) related
-      ORDER BY related.score DESC, ${tieBreak}related.name ASC, related.slug ASC`,
-        bindings
-      )
-    )
-    return relatedRows.map(related => ({
-      description: requireString(related.description, 'related description'),
-      isUnofficial: related.is_unofficial === 1 || undefined,
-      media: related.logo ? { logo: requireString(related.logo, 'related logo') } : undefined,
-      name: requireString(related.name, 'related name'),
-      slug: requireString(related.slug, 'related slug'),
-      website: requireString(related.website, 'related website')
-    }))
   }
 
   async function loadListingBySlug(slug: string): Promise<ListingDetail | null> {

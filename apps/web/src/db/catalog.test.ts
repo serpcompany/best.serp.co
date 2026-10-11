@@ -110,6 +110,77 @@ describe('shared catalog data operations', () => {
     expect(await catalog.getListingBySlug('future')).toBeNull()
   })
 
+  it('reads an uncached listing in one round trip after the epoch, and a missing one too (#378)', async () => {
+    // A cold data cache: the epoch, then the detail, related listings and both neighbours in one
+    // batch. charlie ranks related listings by shared categories, bravo through its category's
+    // members; `future` is not public yet and `nothing` doesn't exist.
+    for (const slug of ['charlie', 'bravo', 'future', 'nothing']) {
+      const start = sqlite.roundTrips.length
+      const { events, operations: catalog } = operations()
+      const detail = await catalog.getListingBySlug(slug)
+      expect(sqlite.roundTrips.slice(start), slug).toEqual([
+        { kind: 'statement', sql: expect.stringContaining('FROM publication_state ps') },
+        { kind: 'batch', size: 4 }
+      ])
+      const queries = events.filter(
+        (event): event is CatalogQueryEvent =>
+          event.event === 'd1_query' && event.operation === 'listing-detail'
+      )
+      // Each statement reports its own shape and rows, all with the batch's wall time; a slug
+      // that names no public listing reports the batch as one event.
+      expect(queries.map(event => event.queryShape)).toEqual(
+        detail
+          ? [
+              'listing-detail',
+              slug === 'charlie' ? 'related-shared-categories' : 'related-single-category-members',
+              'navigation-previous',
+              'navigation-next'
+            ]
+          : ['listing-detail']
+      )
+      expect(new Set(queries.map(event => event.wallDurationMs)).size).toBe(1)
+      expect(queries.every(event => event.success)).toBe(true)
+    }
+    // With the epoch the Worker entry shared, the batch is the only round trip.
+    const start = sqlite.roundTrips.length
+    const reused = createCatalogOperations({
+      cache: new MemoryCatalogCache(),
+      client: createDatabase(sqlite.asD1Database()),
+      clock: now,
+      observe: () => undefined,
+      reuseEpoch: () => ({ effectiveAt: '2026-07-05T00:00:00.000Z', version: 1 })
+    })
+    expect((await reused.getListingBySlug('charlie'))?.nextWebsite?.slug).toBe('delta')
+    expect(sqlite.roundTrips.slice(start)).toEqual([{ kind: 'batch', size: 4 }])
+  })
+
+  it('reports a failed listing batch once, as its detail, without its SQL', async () => {
+    const failing = {
+      ...sqlite.asD1Database(),
+      batch: async () => {
+        throw new Error('D1_ERROR: too many SQL variables: SQLITE_ERROR')
+      }
+    } as unknown as D1Database
+    const events: Array<CatalogCacheEvent | CatalogQueryEvent> = []
+    const catalog = createCatalogOperations({
+      cache: new MemoryCatalogCache(),
+      client: createDatabase(failing),
+      clock: now,
+      observe: event => events.push(event)
+    })
+    await expect(catalog.getListingBySlug('charlie')).rejects.toThrow('too many SQL variables')
+    expect(
+      events.filter(event => event.event === 'd1_query' && event.operation === 'listing-detail')
+    ).toEqual([
+      expect.objectContaining({
+        errorCode: 'SQLITE_ERROR:too_many_variables',
+        queryShape: 'listing-detail',
+        rowsRead: null,
+        success: false
+      })
+    ])
+  })
+
   it('links every public listing to its neighbours in publication order, at every boundary', async () => {
     // The older-date branch of `next` has no `asOf` bound of its own since #314 (the current
     // listing is public, so older ones are too). Each branch, both directions: across a
@@ -995,5 +1066,12 @@ describe('related listings of untagged listings in one category (#331)', () => {
     )
     expect(shapes).toContain('related-single-category-seek')
     expect(shapes).toContain('related-single-category-members')
+    // The walk's plan comes from the statement itself, not the shell statistics (#378): one batch.
+    const start = sqlite.roundTrips.length
+    await catalog.getListingBySlug('other-020')
+    expect(sqlite.roundTrips.slice(start)).toEqual([{ kind: 'batch', size: 4 }])
+    expect(
+      events.some(event => event.event === 'd1_query' && event.queryShape === 'shell-stats')
+    ).toBe(false)
   })
 })

@@ -36,15 +36,17 @@ function sqlLiteral(value: unknown): string {
   throw new Error(`Unsupported benchmark SQL binding: ${typeof value}`)
 }
 
+/** Inlines a statement's values: anonymous `?` in order, or numbered `?N` (#378's batch). */
 function bindSql(sql: string, bindings: unknown[]): string {
   let index = 0
-  const bound = sql.replaceAll('?', () => {
-    const value = bindings[index]
-    index += 1
-    return sqlLiteral(value)
+  const used = new Set<number>()
+  const bound = sql.replaceAll(/\?(\d+)?/gu, (_, number: string | undefined) => {
+    const position = number === undefined ? index++ : Number(number) - 1
+    used.add(position)
+    return sqlLiteral(bindings[position])
   })
-  if (index !== bindings.length)
-    throw new Error(`Benchmark bound ${index} placeholders for ${bindings.length} values.`)
+  if (used.size !== bindings.length)
+    throw new Error(`Benchmark bound ${used.size} placeholders for ${bindings.length} values.`)
   return bound
 }
 
@@ -219,7 +221,7 @@ describe('representative D1 query benchmark', () => {
       ) FROM categories c WHERE c.is_active = 1`
     )
 
-    // Multi-category detail: related listings and both neighbours after the detail row.
+    // Multi-category detail: related listings and both neighbours, batched with the detail row.
     const catalog = operations()
     const currentId = 'serp-bench-160'
     const currentSlug = 'bench-160'
@@ -229,9 +231,11 @@ describe('representative D1 query benchmark', () => {
     expect(detail?.slug).toBe(currentSlug)
 
     const optimizedPrevious = detailStatements.find(statement =>
-      statement.sql.includes('l.slug < ?')
+      statement.sql.includes('l.slug < (SELECT slug FROM current_listing)')
     )
-    const optimizedNext = detailStatements.find(statement => statement.sql.includes('l.slug > ?'))
+    const optimizedNext = detailStatements.find(statement =>
+      statement.sql.includes('l.slug > (SELECT slug FROM current_listing)')
+    )
     const optimizedRelated = detailStatements.find(statement =>
       statement.sql.includes('related.score')
     )
@@ -431,7 +435,8 @@ describe('representative D1 query benchmark', () => {
       // The hub-size probe reads at most 129 entries of the category index; the walk is bounded
       // like the single-category seek above.
       expect(soloRows as number).toBeLessThanOrEqual(129 + 100)
-      expect(singleCategoryRows as number).toBeLessThanOrEqual(100)
+      // The same probe picks a single category's plan since #378 (it needs no shell statistics).
+      expect(singleCategoryRows as number).toBeLessThanOrEqual(129 + 100)
       expect(legacyShell.rows as number).toBeGreaterThan(coldShellRows as number)
       expect(warmShellRows as number).toBeLessThanOrEqual(10)
       expect(oneColdPlus99WarmAverage as number).toBeLessThanOrEqual(25)

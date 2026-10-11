@@ -66,22 +66,31 @@ const ROWS_READ_BUDGET: Record<CatalogQueryShape, number> = {
   'listing-detail': 100,
   'listing-name-order': 12_000, // `other`: 8,854 (3 rows per member)
   'listing-name-page-items': 1_200, // 100 ids: ~900
-  'navigation-next': 20, // 5 at worst, at every boundary (3,425 on the oldest before #314)
-  'navigation-previous': 20, // 5
+  // 12 at worst, at every boundary: 5 before #378 found the listing by its slug in the statement
+  // (3,425 on the oldest before #314)
+  'navigation-next': 20,
+  'navigation-previous': 20, // 12
   'publication-version': 5, // 2 index seeks
   'published-summaries': 35_000, // 28,203, cached per epoch for sitemaps and the feed
-  // Measured on listings without tags (a tagged listing ranks by its tags): 2,250 and 78; 2,401
-  // and 104 on the worst listings before they had tags (#345).
-  'related-shared-categories': 3_000, // worst untagged listing: 2,250
+  // Measured on listings without tags (a tagged listing ranks by its tags): 2,293 (2,250 before
+  // #378's slug lookup and ranking choice in the statement) and 78; 2,401 and 104 on the worst
+  // listings before they had tags (#345).
+  'related-shared-categories': 3_000, // worst untagged listing: 2,293
   // Scored on a listing's three most central tags (#362 review): the 335-listing tag and two
-  // more, 2,442 (2,757 on all nine of one listing's tags before the cap). Filling from the hub:
-  // 196 when it walks the name index, 119 through a small hub's members.
+  // more, 2,462 (2,442 before #378's slug lookup; 2,757 on all nine of one listing's tags before
+  // the cap). Filling from the hub, before #378: 196 when it walks the name index, 119 through a
+  // small hub's members.
   'related-shared-tags': 3_000,
-  // Onward from the listing's own name, wrapping round to the start (#331). Members: 77 at worst
-  // (78 from the start before). Seek: 84 on its longest walk (`longestWalk`, 62 name-index
-  // entries at the widest gap between a large category's names), 79 from the start before.
+  // Onward from the listing's own name, wrapping round to the start (#331). Since #378 the
+  // statement picks its plan itself, with the hub-size probe the tag fill already used (at most
+  // 129 entries of the category index), instead of reading the shell statistics first, so a
+  // listing page's reads are one batch; the probe and the slug lookup add about 60 rows to the
+  // members plan and 164 to the seek. Members: 138 at worst (77 before #378, 78 from the start
+  // before #331). Seek: 248 on its longest walk (`longestWalk`, 62 name-index entries at the
+  // widest gap between a large category's names; 84 before #378, 79 from the start before #331),
+  // so its budget rose from 200 to 400 with #378.
   'related-single-category-members': 500,
-  'related-single-category-seek': 200,
+  'related-single-category-seek': 400,
   // worst: a term in the catch-all's name (`other`, `the`): 10,826; 15,520 before #345's
   // uncorrelated category and tag subqueries. The widest searches have their own budget below.
   'search-summaries': 17_000,
