@@ -45,12 +45,13 @@ describe('the Tags field’s chips (#370)', () => {
       </Combobox>
     )
     const [stockButton] = removeButtons(stock)
-    expect(stockButton).toBeDefined()
-    expect(
-      removeButtons(html)[0]?.replace(' aria-label="Remove Mockups"', ''),
+    const drifted =
       'The chip-remove button copied in tags-combobox.tsx no longer matches the stock one in ' +
-        'components/ui/combobox.tsx. If the stock button now has its own name, delete the copy ' +
-        'and render the stock button; otherwise update the copy to match it'
-    ).toBe(stockButton)
+      'components/ui/combobox.tsx. If the stock button now has its own name, delete the copy ' +
+      'and render the stock button; otherwise update the copy to match it'
+    expect(stockButton, drifted).toBeDefined()
+    expect(removeButtons(html)[0]?.replace(' aria-label="Remove Mockups"', ''), drifted).toBe(
+      stockButton
+    )
   })
 })

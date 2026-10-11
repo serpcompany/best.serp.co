@@ -134,10 +134,12 @@ describe('a cached listing content tree (#334)', () => {
 
   it('links no email that starts inside a word or has a letter outside ASCII (#383)', () => {
     for (const text of [
-      // Not the word's tail (`user@…`) after `-`, `+` or `.`.
+      // Not the word's tail (`user@…`) after `-`, `+`, `.` or `_`.
       'naïve-user@example.test',
       'naïve+user@example.test',
       'café.user@example.test',
+      'naïve_user@example.test',
+      'josé_garcia@example.test',
       // Not `ſ` (U+017F) or the Kelvin sign (U+212A) as an ASCII letter.
       'ſupport@example.test',
       '\u212Aelvin@example.test',
