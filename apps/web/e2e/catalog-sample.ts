@@ -49,14 +49,16 @@ export interface CatalogSample {
 export const DIRECTORY_PAGE_SIZE = 48
 
 /**
- * Bounds on a deployed catalog. #260 left 2,690 live listings in 139 categories on staging; the
- * floors leave headroom for admin unpublishes, the ceilings for new listings.
+ * Bounds on a deployed catalog. After #341's taxonomy and #351's Other retirement (2026-10-12),
+ * staging lists 2,496 live listings and `/sitemap-categories.xml` lists the 16 hubs (the narrow
+ * categories became tags). The floors leave headroom for admin unpublishes; the ceilings, for new
+ * listings and the hubs admins can add (#405).
  */
 const deployedCatalog = {
   maximumCategoryCount: 200,
   maximumListingCount: 4500,
-  minimumCategoryCount: 130,
-  minimumListingCount: 2500
+  minimumCategoryCount: 12,
+  minimumListingCount: 2300
 } as const
 
 /** A local Worker, which serves the fixture seed (`pnpm test:e2e`, CI). */
