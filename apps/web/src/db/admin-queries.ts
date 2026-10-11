@@ -585,7 +585,8 @@ export function selectListingsInPoolPlan(input: {
  * One active best page (#405): its fields, its pins in position order (each with whether it is
  * live), its exclusions, and its live pool, the listings its pins are chosen from: those with its
  * tag (or, on a page without one, in its category), in its category when it names one too, less
- * its exclusions, by name.
+ * its exclusions, by name, each with whether it names a feature of a larger site (#409), which is
+ * never pinned.
  */
 export function selectAdminBestPagePlans(slug: string): StatementPlan[] {
   return [
@@ -611,7 +612,7 @@ export function selectAdminBestPagePlans(slug: string): StatementPlan[] {
       params: [slug]
     },
     {
-      sql: `SELECT l.id,l.slug,l.name FROM best_pages b JOIN listings l
+      sql: `SELECT l.id,l.slug,l.name,l.is_feature_listing FROM best_pages b JOIN listings l
           ON l.id IN (SELECT lt.listing_id FROM listing_tags lt WHERE lt.tag_id=b.tag_id
             UNION ALL SELECT lc.listing_id FROM listing_categories lc
               WHERE b.tag_id IS NULL AND lc.category_id=b.category_id)
@@ -997,7 +998,8 @@ export interface AdminBestPage extends AdminBestPageRow {
   intro: string
   listSize: number
   pins: Array<BestPageListing & { blurb: string | null; live: boolean }>
-  pool: BestPageListing[]
+  /** `featureListing`: it names a feature of a larger site (#409), so it is never pinned. */
+  pool: Array<BestPageListing & { featureListing: boolean }>
 }
 
 /** One open category suggestion (#406) and the submission or revision it came with. */
@@ -1404,7 +1406,10 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
           blurb: optionalText(pin.blurb),
           live: Number(pin.live) === 1
         })),
-        pool: (pool ?? []).map(listingRef)
+        pool: (pool ?? []).map(entry => ({
+          ...listingRef(entry),
+          featureListing: Number(entry.is_feature_listing) === 1
+        }))
       }
     },
 

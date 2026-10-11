@@ -243,7 +243,14 @@ export const listings = sqliteTable(
     updatedAt: text('updated_at').notNull().default(currentTimestamp),
     displayOrder: integer('display_order').notNull().default(0),
     source: text('source', { enum: listingSources }).notNull().default('admin'),
-    linkRel: text('link_rel', { enum: listingLinkRels }).notNull().default('follow')
+    linkRel: text('link_rel', { enum: listingLinkRels }).notNull().default('follow'),
+    /**
+     * The listing names one feature, add-on, model, or sub-tool of a larger site (Einstein GPT on
+     * salesforce.com), so its host's traffic measures the parent product and a best page never
+     * pins it (#349's rule, #409). Not `is_featured`, the paid placement. Set by the
+     * `listing-feature-listing-set` manifest operation; it changes no public page.
+     */
+    isFeatureListing: integer('is_feature_listing', { mode: 'boolean' }).notNull().default(false)
   },
   table => [
     unique('listings_slug_unique').on(table.slug),
@@ -255,6 +262,7 @@ export const listings = sqliteTable(
     ),
     check('listings_is_unofficial_boolean', booleanCheck(table.isUnofficial)),
     check('listings_is_featured_boolean', booleanCheck(table.isFeatured)),
+    check('listings_is_feature_listing_boolean', booleanCheck(table.isFeatureListing)),
     check('listings_is_active_boolean', booleanCheck(table.isActive)),
     check(
       'listings_status_valid',

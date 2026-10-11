@@ -24,8 +24,8 @@ import {
 } from './taxonomy-decisions'
 
 const NOW = new Date('2026-10-12T12:00:00.000Z')
-/** A listing in `FEATURE_LISTING_IDS` (aws.amazon.com's Amazon Polly). */
-const FEATURE_ID = 'lst_31a93dfdd1a9daea71399d95'
+/** A listing D1 marks as a feature of a larger site (#409: `is_feature_listing`). */
+const FEATURE_ID = 'lst_feature'
 
 function fixture() {
   const sqlite = new SqliteD1()
@@ -472,25 +472,27 @@ describe('best page decisions', () => {
     for (const [id, slug] of [
       ['lst_a', 'a.example'],
       ['lst_b', 'b.example'],
-      [FEATURE_ID, 'aws.amazon.com']
+      [FEATURE_ID, 'feature.example']
     ] as const) {
       listing(id, slug)
       tag(id, 'note-taking')
     }
+    db.exec(`UPDATE listings SET is_feature_listing = 1 WHERE id = '${FEATURE_ID}'`)
     listing('lst_other', 'other.example')
     const a = { id: 'lst_a', slug: 'a.example' }
     const b = { id: 'lst_b', slug: 'b.example' }
     const pin = (pins: Array<{ id: string; slug: string }>, expectedPins: typeof pins = []) =>
       setBestPagePins(context(), { expectedPins, pins, slug: 'note-app' })
-    expect(await pin([{ id: FEATURE_ID, slug: 'aws.amazon.com' }])).toMatchObject({
+    const before = version()
+    expect(await pin([{ id: FEATURE_ID, slug: 'feature.example' }])).toMatchObject({
       error: 'feature_listing',
       status: 422
     })
+    expect(version()).toBe(before)
     expect(await pin([{ id: 'lst_other', slug: 'other.example' }])).toMatchObject({
       error: 'invalid_pins'
     })
     expect(await pin([a, a])).toMatchObject({ error: 'invalid_pins' })
-    const before = version()
     expect(await pin([b, a])).toEqual({ ok: true, pins: ['lst_b', 'lst_a'], replayed: false })
     expect(version()).toBe(before + 1)
     expect(await pin([b, a])).toMatchObject({ replayed: true })
@@ -511,6 +513,12 @@ describe('best page decisions', () => {
     expect(await pin(many, [a])).toMatchObject({
       error: 'invalid_pins',
       message: 'Pin at most 5 listings.'
+    })
+    // D1's flag decides, not a list of ids: once a manifest clears it, the listing can be pinned.
+    db.exec(`UPDATE listings SET is_feature_listing = 0 WHERE id = '${FEATURE_ID}'`)
+    expect(await pin([a, { id: FEATURE_ID, slug: 'feature.example' }], [a])).toMatchObject({
+      ok: true,
+      replayed: false
     })
   })
 

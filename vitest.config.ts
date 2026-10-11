@@ -18,6 +18,7 @@ export const D1_TESTS = [
   'scripts/d1-workerd-plans.test.ts',
   'scripts/d1-workerd-queries.test.ts',
   'scripts/downloader-links-manifest.test.ts',
+  'scripts/feature-listings-manifest.test.ts',
   'scripts/fixtures/scale-catalog.test.ts',
   'scripts/listing-domain-check.test.ts',
   'scripts/media-health.test.ts',

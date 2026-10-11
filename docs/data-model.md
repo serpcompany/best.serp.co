@@ -30,7 +30,8 @@ Column meanings and constraints are commented in `schema.ts`. By area:
   `listing_tags` holds a listing's tags, with no primary. `best_pages` are rankings at
   `/best/<slug>/` that each target one search phrase: their pool is a tag's listings, a
   category's, or both, and `best_page_listings` pins the top positions and excludes listings that
-  don't fit. `taxonomy_redirects` sends a retired or renamed category, tag, or best page URL to its
+  don't fit. A listing that names a feature of a larger site (`listings.is_feature_listing`, #409,
+  set only by a reviewed manifest) is never pinned. `taxonomy_redirects` sends a retired or renamed category, tag, or best page URL to its
   target, held as a foreign key so a later rename keeps it current. Submissions and revisions keep
   a Creator's suggested tags in `tag_slugs` (a JSON array of at most three, or null), and a
   category they suggest in `suggested_category` with an optional `suggested_category_note`

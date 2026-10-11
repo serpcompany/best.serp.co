@@ -13,7 +13,7 @@ migration's manifests stay the record of how the catalog moved.
 - **Mapping.** `d1/hygiene/2026-10-10-taxonomy.yaml`: the hubs, the tags under them with the
   categories each one merges, the best pages (keyword and Ahrefs volume, intro, pins with the
   evidence that ranked them, exclusions), the listings that name a feature of a larger site (never
-  pinned), the redirects, and the clustered Other listings held for an owner flag. Its header records
+  pinned; #409 records them in D1 as `listings.is_feature_listing`), the redirects, and the clustered Other listings held for an owner flag. Its header records
   each decision and the rules behind the pins. It declares the listings each hub and tag ends with,
   and the generator refuses a plan that differs.
 - **Catalog.** The reviewed catalog, as committed files: `2026-10-10-other-inventory.json` (#333) and

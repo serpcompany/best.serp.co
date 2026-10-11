@@ -2087,6 +2087,171 @@ describe('listing-resources-set in a row-level manifest (#376: dead resource lin
   })
 })
 
+describe('listing-feature-listing-set in a row-level manifest (#409: features of larger sites)', () => {
+  const live = { checksum: beforeChecksum, version: 4 }
+  const rows = (operations: Record<string, unknown>[], id = 'features') =>
+    manifestSchema.parse({
+      version: 1,
+      id,
+      concurrency: 'rows',
+      provenance: { actor: 'test@example.com', workflow: 'test/sqlite' },
+      operations
+    })
+  const set = (extra: Record<string, unknown> = {}) => ({
+    action: 'listing-feature-listing-set',
+    id: 'lst_sqlite_test',
+    slug: 'old-slug',
+    reason: 'Names one feature of a larger site',
+    expected: false,
+    featureListing: true,
+    ...extra
+  })
+  const changedSince =
+    'the listing is not approved, or its slug or feature flag changed since the manifest'
+  const state = (db: DatabaseSync) =>
+    db
+      .prepare(
+        "SELECT slug,status,is_active,is_feature_listing,checksum,updated_at FROM listings WHERE id='lst_sqlite_test'"
+      )
+      .get()
+  const publish = (db: DatabaseSync, operations: Record<string, unknown>[]) =>
+    executeInTestTransaction(db, buildPublicationPlan(rows(operations), 'features', now, live))
+  /** Asserts the batch was refused whole: the listing, the version, and the log. */
+  const expectRefused = (db: DatabaseSync, before: ReturnType<typeof state>) => {
+    expect(state(db)).toEqual(before)
+    expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
+      version: 4
+    })
+    expect(db.prepare('SELECT COUNT(*) AS count FROM listing_events').get()).toEqual({ count: 0 })
+  }
+
+  it('sets the flag at any version, keeping the checksum and lastmod, and logs the edit', () => {
+    const db = database()
+    const before = state(db) as Record<string, unknown>
+    expect(before.is_feature_listing).toBe(0)
+    db.prepare('UPDATE publication_state SET version=9').run()
+    const publication = buildPublicationPlan(rows([set()]), 'features', now, {
+      ...live,
+      version: 9
+    })
+    expect(
+      publication.statements.flatMap(item => item.bindings).filter(b => typeof b === 'boolean')
+    ).toEqual([])
+    expect(publication.statements.flatMap(item => d1CompatViolations(item.query))).toEqual([])
+    executeInTestTransaction(db, publication)
+    // Only the flag changes: no public page does, so neither the checksum nor lastmod moves.
+    expect(state(db)).toEqual({ ...before, is_feature_listing: 1 })
+    expect(
+      db.prepare('SELECT listing_id,event_type,detail,actor FROM listing_events').all()
+    ).toEqual([
+      {
+        listing_id: 'lst_sqlite_test',
+        event_type: 'edited',
+        detail: JSON.stringify({
+          fields: ['feature listing'],
+          manifest: 'features',
+          reason: 'Names one feature of a larger site'
+        }),
+        actor: 'test@example.com'
+      }
+    ])
+    expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
+      version: 10
+    })
+    expect(publication.affectedRoutes.split('\n')).not.toContain('/products/old-slug/')
+    // Applied once: the flag is no longer `expected`, so it is refused.
+    const applied = state(db)
+    expect(() =>
+      executeInTestTransaction(
+        db,
+        buildPublicationPlan(rows([set()], 'again'), 'again', now, {
+          checksum: publication.afterChecksum,
+          version: 10
+        })
+      )
+    ).toThrow(`listing-feature-listing-set old-slug: ${changedSince}`)
+    expect(state(db)).toEqual(applied)
+    // And cleared again, the other way round.
+    executeInTestTransaction(
+      db,
+      buildPublicationPlan(
+        rows([set({ expected: true, featureListing: false })], 'cleared'),
+        'cleared',
+        now,
+        db.prepare('SELECT version,checksum FROM publication_state WHERE id=1').get() as {
+          checksum: string
+          version: number
+        }
+      )
+    )
+    expect(state(db)).toMatchObject({ is_feature_listing: 0 })
+  })
+
+  it('refuses the whole batch when the listing changed since generation', () => {
+    const second = 'lst_sqlite_second'
+    for (const changed of [
+      { expected: true, featureListing: false },
+      { slug: 'new-slug' },
+      { id: 'lst_sqlite_missing' }
+    ]) {
+      const db = database()
+      // A second listing's change in the same batch rolls back with it.
+      db.exec(`INSERT INTO listings (id,slug,name,description,website,status,published_at,source_kind,source_identity,checksum)
+        VALUES ('${second}','second','Second','d','https://second.example','draft','${now}','test','fixture','${'d'.repeat(64)}');
+        INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary) VALUES ('${second}',1,0,1);
+        UPDATE listings SET status='approved' WHERE id='${second}';`)
+      const before = state(db)
+      expect(
+        () => publish(db, [set({ id: second, slug: 'second' }), set(changed)]),
+        JSON.stringify(changed)
+      ).toThrow(
+        `listing-feature-listing-set ${'slug' in changed ? changed.slug : 'old-slug'}: ${changedSince}`
+      )
+      expectRefused(db, before)
+      expect(db.prepare('SELECT is_feature_listing FROM listings WHERE id=?').get(second)).toEqual({
+        is_feature_listing: 0
+      })
+    }
+  })
+
+  it.each(['draft', 'review', 'rejected'])('refuses a listing in %s', status => {
+    const db = database()
+    db.exec(`UPDATE listings SET status='${status}' WHERE id='lst_sqlite_test'`)
+    const before = state(db)
+    expect(() => publish(db, [set()])).toThrow(
+      `listing-feature-listing-set old-slug: ${changedSince}`
+    )
+    expectRefused(db, before)
+  })
+
+  it('flags an unpublished listing, and one whose own submission is in review', () => {
+    const db = database()
+    db.exec(`UPDATE listings SET is_active=0 WHERE id='lst_sqlite_test';
+      INSERT INTO listing_submissions (id,slug,name,description,website,content,
+        category_slug,logo_url,status,plan,paid_at,listing_id,published_checksum)
+      VALUES ('sub','example.com','Old','d','https://example.com/','c','seo','l',
+        'paid_pending_review','paid','${now}','lst_sqlite_test',
+        (SELECT checksum FROM listings WHERE id='lst_sqlite_test'))`)
+    publish(db, [set()])
+    // Its paid checksum still matches, so the submission can still be approved.
+    expect(state(db)).toMatchObject({
+      is_active: 0,
+      is_feature_listing: 1,
+      checksum: 'c'.repeat(64)
+    })
+  })
+
+  it('refuses no change, no reason, a non-boolean flag, and a listing named twice', () => {
+    expect(() => rows([set({ featureListing: false })])).toThrow(/already has this flag/u)
+    expect(() => rows([set({ reason: undefined })])).toThrow()
+    expect(() => rows([set({ reason: ' ' })])).toThrow()
+    expect(() => rows([set({ featureListing: 1 })])).toThrow()
+    expect(() => rows([set({ expected: 'false' })])).toThrow()
+    expect(() => rows([set({ flag: true })])).toThrow()
+    expect(() => rows([set(), set()])).toThrow(/Duplicate listing/u)
+  })
+})
+
 describe('listing-content-remove-suffix (#105: imported FAQ blocks move to the FAQs section)', () => {
   const body = 'Intro with an emoji 🚀 and more.'
   const suffix = '\n\n## FAQ\n\n### Is it free?\n\nYes.'

@@ -7,7 +7,6 @@ import { BestPageForm } from '@/components/admin/taxonomy-forms'
 import { RetireTaxonomy } from '@/components/admin/taxonomy-retire'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { buttonVariants } from '@/components/ui/button'
-import { isFeatureListing } from '@/lib/admin/feature-listings'
 import { getAdminReads } from '@/lib/admin/runtime'
 import { defaultRedirect, redirectChoices } from '@/lib/admin/taxonomy-view'
 import { requireAdmin } from '@/lib/auth/server'
@@ -95,7 +94,7 @@ export default async function BestPagePage({ params }: Props) {
       />
       <BestPagePins
         key={JSON.stringify(pins)}
-        candidates={page.pool.filter(listing => !isFeatureListing(listing.id))}
+        candidates={page.pool.filter(listing => !listing.featureListing)}
         listSize={page.listSize}
         pins={pins}
         slug={page.slug}

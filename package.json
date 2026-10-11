@@ -15,6 +15,7 @@
     "catalog:claim-holds": "pnpm tsx scripts/claim-holds-manifest.ts",
     "catalog:domains": "pnpm tsx scripts/listing-domain-check.ts",
     "catalog:downloader-links": "pnpm tsx scripts/downloader-links-manifest.ts",
+    "catalog:feature-listings": "pnpm tsx scripts/feature-listings-manifest.ts",
     "catalog:mismatch": "pnpm tsx scripts/mismatch-manifests.ts",
     "catalog:other-categories": "pnpm tsx scripts/other-categories-manifest.ts",
     "catalog:other-retirement": "pnpm tsx scripts/other-retirement.ts",

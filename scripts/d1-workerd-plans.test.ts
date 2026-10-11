@@ -1579,6 +1579,41 @@ operations:
     )
     expect(await live()).toEqual(linkedAgain)
 
+    // #409: the feature-of-a-larger-site flag, compared and swapped, on D1 too.
+    const flag = (id: string) => `version: 1
+id: ${id}
+concurrency: rows
+provenance:
+  actor: test
+  workflow: test/workerd
+operations:
+  - action: listing-feature-listing-set
+    id: lst_moved_workerd
+    slug: moved.example
+    reason: names a feature of a larger site
+    expected: false
+    featureListing: true
+`
+    const unflagged = await live()
+    const flagged = flag('workerd-feature-moved.example')
+    await executePublicationPlan(
+      db,
+      buildPublicationPlan(parseManifest(flagged), flagged, NOW, unflagged)
+    )
+    expect(await listing('lst_moved_workerd')).toMatchObject({ is_feature_listing: 1 })
+    const flaggedState = await live()
+    expect(flaggedState.version).toBe(unflagged.version + 1)
+    const flagTwice = flag('workerd-feature-again')
+    await expect(
+      executePublicationPlan(
+        db,
+        buildPublicationPlan(parseManifest(flagTwice), flagTwice, NOW, flaggedState)
+      )
+    ).rejects.toThrow(
+      /bad JSON path: 'listing-feature-listing-set moved\.example: the listing is not approved, or its slug or feature flag changed since the manifest'/u
+    )
+    expect(await live()).toEqual(flaggedState)
+
     // A listing whose website moved: the guard's malformed JSON rolls the whole batch back.
     const after = await live()
     const stale = manifest('lst_moved_workerd', 'moved.example', 'https://elsewhere.example/')
@@ -1849,7 +1884,9 @@ operations:
     expect(rows).toEqual([expect.objectContaining({ list_size: 10, tag: 'admin-tag-2' })])
     expect(pins).toEqual([expect.objectContaining({ id: 'lst_admin_tax', live: 1 })])
     expect(exclude).toEqual([])
-    expect(pool).toEqual([{ id: 'lst_admin_tax', name: 'Admin tax', slug: 'admin-tax.example' }])
+    expect(pool).toEqual([
+      { id: 'lst_admin_tax', is_feature_listing: 0, name: 'Admin tax', slug: 'admin-tax.example' }
+    ])
     for (const [kind, slug] of [
       ['category', 'admin-hub-2'],
       ['tag', 'admin-tag-2'],

@@ -159,6 +159,25 @@ or admin edit read before it is refused as stale instead of putting the old link
 unpublished. `pnpm catalog:downloader-links` writes #376's manifest from the link checks recorded in
 `d1/hygiene/2026-10-11-downloader-links.yaml`.
 
+## Feature listings
+
+`listing-feature-listing-set` (#409) sets or clears `listings.is_feature_listing`, which marks a
+listing that names one feature, add-on, model, or sub-tool of a larger site (Einstein GPT on
+salesforce.com). A best page never pins one ([Admin taxonomy](./admin-taxonomy.md#categories-tags-and-best-pages-405)).
+It is row-level. It names the listing's `id` and `slug`, a `reason` for the activity log, `expected`
+(the current flag), and `featureListing` (the new one). The batch is refused, with nothing written,
+when the slug or flag isn't `expected` or the listing isn't approved, for example `bad JSON path:
+'listing-feature-listing-set slack.com: the listing is not approved, or its slug or feature flag
+changed since the manifest'`. The manifest itself is refused when the two flags are equal.
+
+No public page changes, so, like `listing-tags-set`, it keeps the checksum and `updated_at` and
+records no listing route, and it allows a listing whose own submission is in review. It logs an
+`edited` event, which `/admin` shows as "Details edited: feature listing". `pnpm
+catalog:feature-listings` writes `2026-10-12-feature-listings` from #349's mapping
+(`featureListings` in `d1/hygiene/2026-10-10-taxonomy.yaml`). It needs migration
+`0015_feature_listings`, so it is published on each environment only after the deploy that applied
+it: staging after this change's staging deploy, production after Deploy Production.
+
 ## Taxonomy operations
 
 These operations write #341's taxonomy: tags, best pages, and redirects of old taxonomy URLs
