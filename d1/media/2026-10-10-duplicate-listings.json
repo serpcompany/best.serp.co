@@ -48,7 +48,7 @@
    "key": "best.serp.co/listings/scaleserp.com/image/991536ecff06271e.avif",
    "md5": "32f0c98ba6bd22e3fee721c7417e7caf",
    "sha256": "991536ecff06271ee0b57ddcc35a3f758b001f5e4179ec5a7ec07fa30c90a73a",
-   "source": "https://cdn-staging.serp.co/best.serp.co/listings/trajectdata.com/image/991536ecff06271e.avif",
+   "source": "repo:apps/web/public/media-sources/2026-10-10-duplicate-listings/scaleserp.com/image/991536ecff06271e.avif",
    "width": 800
   },
   {
@@ -58,7 +58,7 @@
    "key": "best.serp.co/listings/scaleserp.com/logo/991536ecff06271e.avif",
    "md5": "32f0c98ba6bd22e3fee721c7417e7caf",
    "sha256": "991536ecff06271ee0b57ddcc35a3f758b001f5e4179ec5a7ec07fa30c90a73a",
-   "source": "https://cdn-staging.serp.co/best.serp.co/listings/trajectdata.com/logo/991536ecff06271e.avif",
+   "source": "repo:apps/web/public/media-sources/2026-10-10-duplicate-listings/scaleserp.com/logo/991536ecff06271e.avif",
    "width": 800
   },
   {
