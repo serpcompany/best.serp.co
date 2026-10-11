@@ -28,9 +28,12 @@ import {
   type HttpGateSamples,
   httpGateSamples,
   liveSamples,
+  manifestMayHold,
   runHttpGates,
+  SAMPLE_CHANGING_ACTIONS,
   SAMPLE_FAILURE_HINT,
   taxonomyChanges,
+  taxonomyChangesOf,
   waitForWorkerVersion
 } from './d1-preview-http-gates.ts'
 
@@ -123,6 +126,15 @@ interface SampleOperation {
   to?: string | SamplePage
 }
 type SampleManifest = { operations?: SampleOperation[] } | null
+
+/** The operations on a listing that `sampleChanges` reads for the sample listing. */
+const sampleListingActions = [
+  'listing-categories-remove',
+  'listing-categories-set',
+  'listing-slug-change',
+  'listing-unpublish',
+  'listing-update'
+]
 
 /** What manifests do to the gates' samples (`sampleChanges`). */
 interface SampleChanges {
@@ -396,6 +408,10 @@ describe('environment-specific HTTP gates', () => {
   it('never samples a tag, best page or moved category a reviewed manifest retires or moves (#350)', async () => {
     const publications = join(fixtureDirectory, 'taxonomy-publications')
     mkdirSync(publications, { recursive: true })
+    // A manifest that names none of the operations the gates read is never parsed: not even
+    // this one, which isn't YAML.
+    writeFileSync(join(publications, 'listing-batch.yaml'), 'operations: [{ action: listing-')
+    expect(manifestMayHold('action: listing-media-update', SAMPLE_CHANGING_ACTIONS)).toBe(false)
     const changesOf = (...operations: SampleOperation[]) => {
       writeFileSync(join(publications, 'changes.yaml'), stringify({ operations }))
       return taxonomyChanges(publications)
@@ -493,9 +509,21 @@ describe('environment-specific HTTP gates', () => {
     const committed = execFileSync('git', ['ls-files', 'd1/publications'], { encoding: 'utf8' })
       .split('\n')
       .filter(path => /\.ya?ml$/u.test(path))
+      .map(path => ({ path, text: readFileSync(resolve(path), 'utf8') }))
     expect(committed.length).toBeGreaterThan(0)
+    // Each manifest that can change a sample is parsed once (`manifestMayHold`): one naming an
+    // operation that retires, creates or moves a taxonomy page, or one that names the sample
+    // listing and an operation on a listing. The large listing batches hold neither, and parsing
+    // all of `d1/publications` took this test past its timeout on CI.
+    const parsed = committed
+      .filter(
+        ({ text }) =>
+          manifestMayHold(text, [...SAMPLE_CHANGING_ACTIONS, 'tag-create', 'best-page-create']) ||
+          (text.includes(httpGateSamples.listing) && manifestMayHold(text, sampleListingActions))
+      )
+      .map(({ text }) => ({ manifest: parse(text) as SampleManifest, text }))
     const changes = sampleChanges(
-      committed.map(path => parse(readFileSync(resolve(path), 'utf8')) as SampleManifest),
+      parsed.map(({ manifest }) => manifest),
       httpGateSamples
     )
     const { bestPages, detached, gone, reactivated, redirects, retired, tags } = changes
@@ -525,12 +553,11 @@ describe('environment-specific HTTP gates', () => {
       )
     })
     expect(moved, 'a moved category that answers its 308').toBeDefined()
-    // The gates themselves pick the same samples from these manifests.
-    const publications = join(fixtureDirectory, 'committed-publications')
-    mkdirSync(publications, { recursive: true })
-    for (const path of committed)
-      writeFileSync(join(publications, path.split('/').at(-1) ?? ''), readFileSync(resolve(path)))
-    expect(liveSamples(httpGateSamples, taxonomyChanges(publications))).toEqual({
+    // The gates themselves pick the same samples from the manifests they parse.
+    const gateManifests = parsed
+      .filter(({ text }) => manifestMayHold(text, SAMPLE_CHANGING_ACTIONS))
+      .map(({ manifest }) => manifest)
+    expect(liveSamples(httpGateSamples, taxonomyChangesOf(gateManifests))).toEqual({
       bestPage: sampledBest,
       category: sampled,
       movedCategory: moved,

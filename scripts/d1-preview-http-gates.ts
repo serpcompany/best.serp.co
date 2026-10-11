@@ -1083,12 +1083,26 @@ interface ManifestOperation {
   to?: { kind?: unknown; slug?: unknown }
 }
 
+/** The manifest operations that retire or move a page the gates could sample (`taxonomyChanges`). */
+export const SAMPLE_CHANGING_ACTIONS: readonly string[] = [
+  'best-page-unpublish',
+  'category-unpublish',
+  'category-update',
+  'tag-unpublish',
+  'taxonomy-redirect-set'
+]
+
 /**
- * Reads the reviewed manifests for the pages they retire or move (#260, #350). A retired page
- * answers 404 or a 308 once its manifest is published, so the gates sample the first page no
- * manifest retires, which answers the same before and after.
+ * Whether a manifest's text may hold one of `actions`: one that never names an action can't hold
+ * it, so it needn't be parsed. That skips the large listing batches (most of `d1/publications`'
+ * 5 MB of YAML), which hold none of the operations the gates read.
  */
-export function taxonomyChanges(directory: string): TaxonomyChanges {
+export function manifestMayHold(text: string, actions: readonly string[]): boolean {
+  return actions.some(action => text.includes(action))
+}
+
+/** What these parsed manifests do to the pages the gates could sample (`taxonomyChanges`). */
+export function taxonomyChangesOf(manifests: readonly unknown[]): TaxonomyChanges {
   const changes: TaxonomyChanges = {
     categoryRedirects: new Map(),
     retiredBestPages: new Set(),
@@ -1101,10 +1115,7 @@ export function taxonomyChanges(directory: string): TaxonomyChanges {
     ['category-unpublish', changes.retiredCategories],
     ['tag-unpublish', changes.retiredTags]
   ])
-  for (const file of readdirSync(resolve(directory)).filter(name => /\.ya?ml$/u.test(name))) {
-    const manifest = parse(readFileSync(resolve(directory, file), 'utf8')) as {
-      operations?: ManifestOperation[]
-    } | null
+  for (const manifest of manifests as Array<{ operations?: ManifestOperation[] } | null>) {
     for (const operation of manifest?.operations ?? []) {
       const action = String(operation.action)
       if (typeof operation.slug === 'string') retiring.get(action)?.add(operation.slug)
@@ -1124,6 +1135,21 @@ export function taxonomyChanges(directory: string): TaxonomyChanges {
     }
   }
   return changes
+}
+
+/**
+ * Reads the reviewed manifests for the pages they retire or move (#260, #350). A retired page
+ * answers 404 or a 308 once its manifest is published, so the gates sample the first page no
+ * manifest retires, which answers the same before and after. Only manifests that name one of
+ * `SAMPLE_CHANGING_ACTIONS` are parsed (`manifestMayHold`).
+ */
+export function taxonomyChanges(directory: string): TaxonomyChanges {
+  const manifests: unknown[] = []
+  for (const file of readdirSync(resolve(directory)).filter(name => /\.ya?ml$/u.test(name))) {
+    const text = readFileSync(resolve(directory, file), 'utf8')
+    if (manifestMayHold(text, SAMPLE_CHANGING_ACTIONS)) manifests.push(parse(text))
+  }
+  return taxonomyChangesOf(manifests)
 }
 
 /**
