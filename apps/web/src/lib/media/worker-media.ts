@@ -14,6 +14,7 @@ import {
   type MediaOperations,
   type MediaRunSummary
 } from '@/db/media-operations'
+import { CodedError } from '../telemetry/coded-error'
 import { errorFields } from '../telemetry/error-fields'
 
 export interface MediaWorkerEnv {
@@ -31,10 +32,17 @@ function log(event: Record<string, unknown>): void {
 
 export function createWorkerMediaOperations(env: MediaWorkerEnv): MediaOperations {
   if (!runtimeEnvironments.has(env.D1_RUNTIME_ENV ?? '')) {
-    throw new Error('A valid D1_RUNTIME_ENV is required for listing media.')
+    throw new CodedError(
+      'd1_runtime_env_invalid',
+      'A valid D1_RUNTIME_ENV is required for listing media.'
+    )
   }
-  if (!env.DB) throw new Error('D1 binding DB is required for listing media.')
-  if (!env.MEDIA) throw new Error('R2 binding MEDIA is required for listing media.')
+  if (!env.DB) {
+    throw new CodedError('d1_binding_missing', 'D1 binding DB is required for listing media.')
+  }
+  if (!env.MEDIA) {
+    throw new CodedError('r2_binding_missing', 'R2 binding MEDIA is required for listing media.')
+  }
   return createMediaOperations({
     bucket: env.MEDIA,
     db: env.DB,

@@ -44,6 +44,7 @@ export function useSearch(query: string) {
         if (isMounted) setResults(results)
       } catch (error) {
         logger.error('search_failed', {
+          cause: error,
           data: error,
           tags: { type: 'component' }
         })

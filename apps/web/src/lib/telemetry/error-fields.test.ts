@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { BillingProviderError } from '../billing/provider'
+import { CodedError, FAILURE_CODES } from './coded-error'
 import { errorCode, errorFields, stackFrames } from './error-fields'
+import { ERROR_CODES } from './sentry'
 
 const PRIVATE = 'typed@example.com'
 
@@ -24,6 +26,23 @@ describe('what a Worker log line says about an error (#211)', () => {
       errorFields(new BillingProviderError(`No such customer: ${PRIVATE}`, 'provider_error', 502))
     ).toEqual({ code: 'provider_error', name: 'BillingProviderError' })
     expect(errorCode(Object.assign(new Error('x'), { code: 'invalid_url' }))).toBe('invalid_url')
+  })
+
+  it('logs a coded configuration or billing failure by its code, never its message', () => {
+    const fields = errorFields(
+      new CodedError('refund_paid_order_missing', 'No paid order for submission sub_1.')
+    )
+    expect(fields).toEqual({ code: 'refund_paid_order_missing', name: 'Error' })
+    expect(JSON.stringify(fields)).not.toContain('sub_1')
+    for (const code of FAILURE_CODES) expect(errorCode(new CodedError(code, 'x'))).toBe(code)
+  })
+
+  it('keeps the failure codes stable: snake_case, unique, and apart from the Sentry codes', () => {
+    for (const code of FAILURE_CODES) expect(code).toMatch(/^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/u)
+    expect(new Set(FAILURE_CODES).size).toBe(FAILURE_CODES.length)
+    expect(FAILURE_CODES.filter(code => (ERROR_CODES as readonly string[]).includes(code))).toEqual(
+      []
+    )
   })
 
   it('never takes a code that could be text', () => {

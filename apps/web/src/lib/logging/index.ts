@@ -6,6 +6,8 @@ type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
 interface LogOptions {
   level?: LogLevel
+  /** The caught error under a code: Sentry gets its type and stack, its message redacted. */
+  cause?: unknown
   data?: unknown
   extra?: Record<string, unknown>
   tags?: Record<string, string>
@@ -106,15 +108,19 @@ class Logger {
 
   /**
    * Logs to the console and reports to Sentry. The message is a stable code (#211): Sentry gets it
-   * as the error's message, so it never holds user input. Put context in `data`, which stays in
-   * the console (`scrubEvent` drops it). An `Error` is reported as it is, and the scrubber
-   * redacts its message unless that is a code.
+   * as the error's message, so it never holds user input. Pass the caught error as `cause`: Sentry
+   * gets its type and stack under the code, with its message redacted. Put context in `data`,
+   * which stays in the console (`scrubEvent` drops it). An `Error` is reported as it is, and the
+   * scrubber redacts its message unless that is a code.
    */
   error(message: ErrorCode | Error, options?: Omit<LogOptions, 'level'>) {
     // Always log errors
     const errorMessage = message instanceof Error ? message.message : message
     const errorStack = message instanceof Error ? message.stack : undefined
-    const error = message instanceof Error ? message : new Error(errorMessage)
+    const error =
+      message instanceof Error
+        ? message
+        : new Error(errorMessage, options?.cause === undefined ? {} : { cause: options.cause })
 
     // Console log for immediate visibility
     console.error(

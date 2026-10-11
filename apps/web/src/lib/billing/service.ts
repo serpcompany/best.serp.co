@@ -30,6 +30,7 @@ import {
 import type { AppEmailTemplates } from '../email/registry'
 import type { EmailRequest } from '../email/service'
 import type { TemplateInput } from '../email/templates'
+import { CodedError } from '../telemetry/coded-error'
 import { errorFields } from '../telemetry/error-fields'
 import type { GuardrailResult } from './guardrails'
 import {
@@ -895,7 +896,9 @@ async function providerRefund(
 ): Promise<string | null> {
   const charged = order.chargedCents ?? order.amountCents
   if (charged === 0) return null
-  if (!order.providerPaymentId) throw new Error(`Order ${order.id} has no payment to refund.`)
+  if (!order.providerPaymentId) {
+    throw new CodedError('refund_payment_missing', `Order ${order.id} has no payment to refund.`)
+  }
   const { refundId } = await deps.provider.refund({
     amountCents: charged,
     idempotencyKey: `refund:${order.id}`,
@@ -982,9 +985,11 @@ async function adminListingPlans(
  */
 async function finishRefund(deps: BillingDependencies, orderId: string): Promise<RefundListing> {
   const claimed = await deps.operations.order(orderId)
-  if (!claimed) throw new Error(`Order ${orderId} not found.`)
+  if (!claimed) throw new CodedError('refund_order_missing', `Order ${orderId} not found.`)
   if (claimed.status === 'refunded') return listingResult(claimed.refundListingAction)
-  if (claimed.status !== 'refunding') throw new Error(`Order ${orderId} has no claimed refund.`)
+  if (claimed.status !== 'refunding') {
+    throw new CodedError('refund_not_claimed', `Order ${orderId} has no claimed refund.`)
+  }
   let refundId: string | null
   try {
     refundId = await providerRefund(deps, claimed)
@@ -1003,7 +1008,7 @@ async function finishRefund(deps: BillingDependencies, orderId: string): Promise
   }
   for (let attempt = 0; attempt < PUBLICATION_ATTEMPTS; attempt += 1) {
     const order = await deps.operations.order(orderId)
-    if (!order) throw new Error(`Order ${orderId} not found.`)
+    if (!order) throw new CodedError('refund_order_missing', `Order ${orderId} not found.`)
     if (order.status === 'refunded') return listingResult(order.refundListingAction)
     let plans: StatementPlan[] = []
     let result: RefundListing = 'unchanged'
@@ -1028,7 +1033,10 @@ async function finishRefund(deps: BillingDependencies, orderId: string): Promise
   }
   const order = await deps.operations.order(orderId)
   if (order?.status === 'refunded') return listingResult(order.refundListingAction)
-  throw new Error(`The refund of order ${orderId} could not be recorded yet.`)
+  throw new CodedError(
+    'refund_not_recorded',
+    `The refund of order ${orderId} could not be recorded yet.`
+  )
 }
 
 /**
@@ -1070,16 +1078,28 @@ export async function refundRejectedSubmission(
 ): Promise<void> {
   const submission = await deps.operations.checkoutSubmission(input.submissionId)
   if (submission?.status !== 'rejected') {
-    throw new Error('Only a rejected submission is refunded this way.')
+    throw new CodedError(
+      'refund_submission_not_rejected',
+      'Only a rejected submission is refunded this way.'
+    )
   }
   const review = await deps.operations.rejection(input.submissionId)
-  if (review?.category !== 'other') throw new Error('A prohibited rejection is never refunded.')
+  if (review?.category !== 'other') {
+    throw new CodedError('refund_rejection_prohibited', 'A prohibited rejection is never refunded.')
+  }
   const order = await deps.operations.submissionPaymentOrder(input.submissionId)
-  if (!order) throw new Error(`No paid order for submission ${input.submissionId}.`)
+  if (!order) {
+    throw new CodedError(
+      'refund_paid_order_missing',
+      `No paid order for submission ${input.submissionId}.`
+    )
+  }
   if (order.status === 'paid') {
     const claimed = await claimRefund(deps, order, { actor: input.actor, reason: 'rejected' })
     const current = claimed ? null : await deps.operations.order(order.id)
-    if (current && current.status === 'paid') throw new Error('The refund could not be claimed.')
+    if (current && current.status === 'paid') {
+      throw new CodedError('refund_claim_failed', 'The refund could not be claimed.')
+    }
   }
   const current = await deps.operations.order(order.id)
   if (current?.status === 'refunding') {

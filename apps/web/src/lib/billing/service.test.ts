@@ -1120,6 +1120,17 @@ describe('refunds', () => {
     )
   }
 
+  it('throws a coded error a log line can name, not only a message (#211)', async () => {
+    const f = fixture()
+    f.submission('s1', 'draft', null)
+    await expect(
+      refundRejectedSubmission(f.deps, { actor: 'devin@serp.co', submissionId: 's1' })
+    ).rejects.toMatchObject({
+      code: 'refund_submission_not_rejected',
+      message: 'Only a rejected submission is refunded this way.'
+    })
+  })
+
   it('refunds a paid submission rejected as other, once, with its email', async () => {
     const f = fixture()
     await paidLive(f)

@@ -30,6 +30,7 @@ import {
   LISTING_CONTENT_FORMAT,
   type ListingContentTree
 } from '@/lib/markdown/listing-content'
+import { CodedError } from '@/lib/telemetry/coded-error'
 
 export type {
   BestPageItem,
@@ -47,9 +48,17 @@ export { MAX_SEARCH_LIMIT }
 const runtimeEnvironments = new Set(['local', 'staging', 'production'])
 
 function assertCatalogBinding(env: CloudflareEnv): D1Database {
-  if (!env.DB) throw new Error('D1 binding DB is required; catalog reads fail closed.')
+  if (!env.DB) {
+    throw new CodedError(
+      'd1_binding_missing',
+      'D1 binding DB is required; catalog reads fail closed.'
+    )
+  }
   if (!runtimeEnvironments.has(env.D1_RUNTIME_ENV)) {
-    throw new Error(`Invalid D1 runtime environment: ${env.D1_RUNTIME_ENV || 'missing'}.`)
+    throw new CodedError(
+      'd1_runtime_env_invalid',
+      `Invalid D1 runtime environment: ${env.D1_RUNTIME_ENV || 'missing'}.`
+    )
   }
   return env.DB
 }

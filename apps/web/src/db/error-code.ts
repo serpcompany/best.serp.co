@@ -13,6 +13,13 @@ const D1_ERROR_REASONS: ReadonlyArray<readonly [RegExp, string]> = [
   [/too many arguments on function/iu, 'too_many_function_arguments'],
   [/malformed JSON/iu, 'plan_assertion_failed'],
   [/constraint failed|SQLITE_CONSTRAINT/iu, 'constraint_failed'],
+  // Schema drift: a migration not applied yet, or applied out of order.
+  [/no such table/iu, 'missing_table'],
+  [/no such column|has no column named/iu, 'missing_column'],
+  // D1's transient failures (D1 docs, "Errors"): worth a retry.
+  [/overloaded/iu, 'overloaded'],
+  [/network connection lost/iu, 'connection_lost'],
+  [/object to be reset|DB reset because/iu, 'storage_reset'],
   [/timed? ?out|timeout/iu, 'timeout']
 ]
 

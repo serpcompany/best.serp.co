@@ -192,7 +192,7 @@ describe('a public page error in the Worker logs (#355)', () => {
     expect(logged).toHaveBeenCalledTimes(1)
     const line = JSON.parse(String(logged.mock.calls[0]?.[0]))
     expect(line).toMatchObject({
-      code: 'SQLITE_ERROR',
+      code: 'SQLITE_ERROR:missing_table',
       digest: '2817',
       event: 'request_error',
       method: 'GET',

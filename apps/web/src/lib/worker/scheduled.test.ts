@@ -175,14 +175,14 @@ describe('scheduled handler', () => {
     expect(status('waiting')).toMatchObject({ draft_reminders_sent: 1, status: 'draft' })
     expect(errors.mock.calls.map(([line]) => JSON.parse(String(line)))).toEqual([
       {
-        code: 'UNKNOWN',
+        code: 'billing_secrets_missing',
         cron: DRAFT_JOBS_CRON,
         event: 'scheduled_job_failed',
         job: 'billing-sweep',
         name: 'Error'
       }
     ])
-    // A code, never the message (#211): another job's message can hold user input.
+    // The failure's code, never its message (#211): another job's message can hold user input.
     expect(String(errors.mock.calls[0]?.[0])).not.toContain(MISSING_PROVIDER_SECRETS)
   })
 
@@ -205,7 +205,7 @@ describe('scheduled handler', () => {
       )
     ).rejects.toThrow(/scheduled job\(s\) failed/u)
     expect(JSON.parse(String(errors.mock.calls[0]?.[0]))).toEqual({
-      code: 'UNKNOWN',
+      code: 'd1_binding_missing',
       cron: DRAFT_JOBS_CRON,
       event: 'scheduled_job_failed',
       job: 'draft-reminders-and-expiry',

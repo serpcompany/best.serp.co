@@ -6,6 +6,7 @@ import { createDatabase } from '@/db/client'
 import { claimCodeKey, consumeRequestRateLimit } from '@/lib/auth/server'
 import { emailEventKey, enqueueEmail } from '@/lib/email/server'
 import { features as siteFeatures } from '@/lib/features'
+import { CodedError } from '@/lib/telemetry/coded-error'
 import { claimFlags } from './flags'
 import { claimRecipientRateLimitRules } from './limits'
 import { safeResolveLanding } from './product'
@@ -35,9 +36,9 @@ async function claimEnv(): Promise<ClaimEnv> {
 
 export async function claimDependencies(): Promise<ClaimDependencies> {
   const env = await claimEnv()
-  if (!env.DB) throw new Error('D1 binding DB is required for claims.')
+  if (!env.DB) throw new CodedError('d1_binding_missing', 'D1 binding DB is required for claims.')
   if (!runtimeEnvironments.has(env.D1_RUNTIME_ENV ?? '')) {
-    throw new Error('A valid D1_RUNTIME_ENV is required for claims.')
+    throw new CodedError('d1_runtime_env_invalid', 'A valid D1_RUNTIME_ENV is required for claims.')
   }
   const flags = claimFlags(env, siteFeatures)
   return {

@@ -13,6 +13,7 @@ import {
   type SubmissionVerificationResult,
   type UrlAvailability
 } from '@/db/submissions'
+import { CodedError } from '@/lib/telemetry/coded-error'
 
 /**
  * Server-only adapter for native submissions (serpcompany/best.serp.co#63): it validates the
@@ -41,9 +42,14 @@ function optionalMediaBaseUrl(env: CloudflareEnv): string | undefined {
 async function operations() {
   const { env } = await getCloudflareContext({ async: true })
   const workerEnv = env as CloudflareEnv
-  if (!workerEnv.DB) throw new Error('D1 binding DB is required for submissions.')
+  if (!workerEnv.DB) {
+    throw new CodedError('d1_binding_missing', 'D1 binding DB is required for submissions.')
+  }
   if (!runtimeEnvironments.has(workerEnv.D1_RUNTIME_ENV)) {
-    throw new Error('A valid D1_RUNTIME_ENV is required for submissions.')
+    throw new CodedError(
+      'd1_runtime_env_invalid',
+      'A valid D1_RUNTIME_ENV is required for submissions.'
+    )
   }
   return createSubmissionOperations({
     // Logos must be https, except on a local Worker, whose e2e fixture sites are http.

@@ -2,6 +2,7 @@ import { createBadgeProgramOperations } from '@/db/badge-program'
 import { createBillingOperations } from '@/db/billing'
 import { createDatabase } from '@/db/client'
 import { site } from '@/lib/site'
+import { CodedError } from '@/lib/telemetry/coded-error'
 import { checkBadgeAtRefund } from '../badge-program/refund'
 import { EMAIL_ADMIN_RECIPIENT } from '../email/config'
 import { emailEventKey } from '../email/service'
@@ -33,9 +34,12 @@ export function createBillingDependencies(input: {
   notify: Notify
 }): BillingDependencies {
   const { env } = input
-  if (!env.DB) throw new Error('D1 binding DB is required for billing.')
+  if (!env.DB) throw new CodedError('d1_binding_missing', 'D1 binding DB is required for billing.')
   if (!runtimeEnvironments.has(env.D1_RUNTIME_ENV ?? '')) {
-    throw new Error('A valid D1_RUNTIME_ENV is required for billing.')
+    throw new CodedError(
+      'd1_runtime_env_invalid',
+      'A valid D1_RUNTIME_ENV is required for billing.'
+    )
   }
   const provider = createConfiguredProvider(env)
   const client = createDatabase(env.DB)
