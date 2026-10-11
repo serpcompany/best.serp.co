@@ -243,9 +243,20 @@ export async function runBadgeProgram(input: {
     limit: checkLimit,
     now: at
   })
+  // Sites are checked a few at a time, but rechecks are recorded one at a time: a confirmed
+  // miss publishes, which compares and swaps on the catalog version, so of three recorded at
+  // once one could lose the race twice and wait for the next run (#389).
+  let recording: Promise<unknown> = Promise.resolve()
+  const recordConfirmation = (
+    confirmation: Parameters<BadgeProgramOperations['recordConfirmation']>[0]
+  ): ReturnType<BadgeProgramOperations['recordConfirmation']> => {
+    const recorded = recording.then(() => operations.recordConfirmation(confirmation))
+    recording = recorded.catch(() => undefined)
+    return recorded
+  }
   await eachLimited(confirmations, concurrency, async listing => {
     const record = await verify(listing)
-    const recorded = await operations.recordConfirmation({
+    const recorded = await recordConfirmation({
       attemptSince: badgeDailyStart(now).toISOString(),
       listing,
       now: at,

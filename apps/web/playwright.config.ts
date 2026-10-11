@@ -137,6 +137,10 @@ export default defineConfig({
             NEXT_PUBLIC_SENTRY_DSN: '',
             SENTRY_AUTH_TOKEN: '',
             LOG_LEVEL: process.env.LOG_LEVEL || 'error',
+            // `executeLocalD1` (e2e/submit-fixture.ts) reaches this Worker's D1 through
+            // Wrangler's Local Explorer API, as the suite Workers' helpers do (LOCAL_EXPLORER_ENV).
+            X_LOCAL_EXPLORER: 'true',
+            WRANGLER_SEND_METRICS: 'false',
             // Faster builds
             NEXT_TELEMETRY_DISABLED: '1',
             FORCE_COLOR: '0'

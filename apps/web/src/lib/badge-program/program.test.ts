@@ -1,11 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
-import type {
-  BadgeCheckRecord,
-  BadgeProgramListing,
-  BadgeProgramOperations,
-  PendingConfirmation,
-  RecordedBadgeCheck
+import {
+  type BadgeCheckRecord,
+  type BadgeProgramListing,
+  type BadgeProgramOperations,
+  createBadgeProgramOperations,
+  type PendingConfirmation,
+  type RecordedBadgeCheck
 } from '@/db/badge-program'
+import { createDatabase } from '@/db/client'
+import { seedLiveListing } from '@/db/plan-test-support'
+import { SqliteD1 } from '@/db/test-support'
 import type { BadgeVerificationResult } from '../submissions/badge-verifier'
 import {
   BADGE_CHECK_LIMIT,
@@ -356,5 +360,58 @@ describe('badge program run', () => {
     expect((calls.weeklyDue as { limit: number }).limit).toBe(8)
     expect(peak).toBe(3)
     expect(result).toMatchObject({ confirmations: 2, more: true, weekly: 8 })
+  })
+
+  it('acts on every confirmed miss of a run, though each one moves the catalog version (#389)', async () => {
+    const sqlite = new SqliteD1()
+    const db = sqlite.database
+    db.exec(`
+      INSERT INTO categories (slug, name, description, sort_order, is_active)
+        VALUES ('tools', 'Tools', 'Tools', 0, 1);
+      INSERT INTO publication_state (id, version, checksum, published_at)
+        VALUES (1, 1, 'before', '2026-01-01T00:00:00.000Z');
+      INSERT INTO users (id, name, email, email_verified) VALUES
+        ('user_free', 'Free', 'free@example.com', 1),
+        ('user_gone', 'Gone', 'gone@example.com', 1),
+        ('user_claim', 'Claim', 'claim@example.com', 1);
+    `)
+    for (const id of ['lst_free', 'lst_gone', 'lst_claim']) seedLiveListing(db, id)
+    db.exec(`
+      UPDATE listings SET source='submission' WHERE id IN ('lst_free','lst_gone');
+      INSERT INTO listing_submissions (id,slug,name,description,website,content,category_slug,
+        logo_url,status,plan,listing_id,owner_user_id) VALUES
+        ('sub_free','lst_free.example','Free','d','https://lst_free.example/','c','tools','l',
+          'approved','free','lst_free','user_free'),
+        ('sub_gone','lst_gone.example','Gone','d','https://lst_gone.example/','c','tools','l',
+          'approved','free','lst_gone','user_gone');
+      INSERT INTO listing_owners (listing_id,user_id,verified_via,verified_at) VALUES
+        ('lst_free','user_free','submission','2026-09-01T00:00:00.000Z'),
+        ('lst_gone','user_gone','submission','2026-09-01T00:00:00.000Z'),
+        ('lst_claim','user_claim','badge_claim','2026-09-01T00:00:00.000Z');
+    `)
+    const operations = createBadgeProgramOperations({
+      client: createDatabase(sqlite.asD1Database())
+    })
+    const run = (now: Date) =>
+      runBadgeProgram({
+        now,
+        operations,
+        priceCents: 4900,
+        send: sender().send,
+        verify: async () => missing
+      })
+    // Monday's weekly pass warns all three; Tuesday's daily pass confirms all three at once.
+    expect(await run(new Date('2026-10-05T03:15:00.000Z'))).toMatchObject({ warned: 3 })
+    expect(await run(NOW)).toMatchObject({
+      confirmations: 3,
+      revoked: 1,
+      skipped: 0,
+      unpublished: 2
+    })
+    const version = db.prepare('SELECT version FROM publication_state WHERE id = 1').get()
+    expect(version).toEqual({ version: 4 })
+    expect(
+      db.prepare("SELECT revoked_reason FROM listing_owners WHERE listing_id = 'lst_claim'").get()
+    ).toEqual({ revoked_reason: 'badge_removed' })
   })
 })
