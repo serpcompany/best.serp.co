@@ -104,8 +104,8 @@ export function sharedCatalogEpoch(
 
 /**
  * What the Worker entry keyed a request's edge cache on (#382): the catalog epoch, and the D1
- * bookmark of the read that returned it (null when unknown, such as an epoch an older Worker
- * version shared through the Cache API).
+ * bookmark of the read that returned it (null when unknown, such as an epoch a Worker version with
+ * #397 but not #382 shared through the Cache API).
  */
 export interface CatalogRead {
   bookmark: string | null

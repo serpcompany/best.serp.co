@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { CodedError } from './lib/telemetry/coded-error'
 import { startServerSentryFor } from './lib/telemetry/server-errors'
 
 const sentry = vi.hoisted(() => ({
@@ -87,11 +88,10 @@ describe('instrumentation (#48, #355)', () => {
   it('logs an admin render error with the digest the browser shows, Sentry or not (#204)', async () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
     const { onRequestError } = await import('./instrumentation')
-    // What `requireAdmin()` throws when D1 can't answer; Next.js sets the digest before it
-    // reports the error, and sends the same digest to the browser (React #441).
-    const error = Object.assign(new Error('Accounts are unavailable.'), {
-      digest: '2913577842',
-      name: 'AuthConfigurationError'
+    // What `requireAdmin()` throws when D1 can't answer (#389); Next.js sets the digest before
+    // it reports the error, and sends the same digest to the browser (React #441).
+    const error = Object.assign(new CodedError('auth_guard_failed', 'Accounts are unavailable.'), {
+      digest: '2913577842'
     })
     await onRequestError(
       error,
@@ -110,10 +110,10 @@ describe('instrumentation (#48, #355)', () => {
     expect(logged).toHaveBeenCalledTimes(1)
     const line = String(logged.mock.calls[0]?.[0])
     expect(JSON.parse(line)).toMatchObject({
-      code: 'UNKNOWN',
+      code: 'auth_guard_failed',
       digest: '2913577842',
       event: 'request_error',
-      name: 'AuthConfigurationError',
+      name: 'Error',
       path: '/admin/listings/fixture-studio/',
       renderSource: 'react-server-components-payload',
       route: '/(dashboard)/admin/listings/[slug]',

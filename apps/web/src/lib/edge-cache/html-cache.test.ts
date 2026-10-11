@@ -81,6 +81,9 @@ function harness(options: { deploymentId?: string; epoch?: string | null } = {})
   }
 }
 
+/** The shared epoch's key before #397, which named no environment. */
+const UNSCOPED_EPOCH_KEY = 'https://html-cache.invalid/catalog-epoch'
+
 const page = (path = '/products/', init?: RequestInit) =>
   new Request(`https://best.serp.co${path}`, init)
 
@@ -184,6 +187,23 @@ describe('edge HTML cache', () => {
     expect((await edge.serve(page(), undefined, 'version-b')).headers.get(EDGE_CACHE_HEADER)).toBe(
       'HIT'
     )
+  })
+
+  // #397: staging and production share the serp.co zone's cache, and each Worker answers only
+  // its own hosts, so the host in every key keeps their pages apart, even under one deployment
+  // and epoch token.
+  it("never serves one environment's page to another through the zone's cache", async () => {
+    const edge = harness()
+    const staging = new Request('https://staging.best.serp.co/products/')
+    await edge.serve(staging, () => new Response('staging catalog'))
+    const production = await edge.serve(
+      page('/products/'),
+      () => new Response('production catalog')
+    )
+    expect(production.headers.get(EDGE_CACHE_HEADER)).toBe('MISS')
+    expect(await production.text()).toBe('production catalog')
+    expect(await (await edge.serve(staging)).text()).toBe('staging catalog')
+    expect(edge.renders).toBe(2)
   })
 
   it('answers a stored redirect only for the exact URL that produced it', async () => {
@@ -443,30 +463,73 @@ describe('catalog epoch memo', () => {
     const cache = new MemoryCache()
     const load = vi.fn(async () => ({ bookmark: '00000042-abc', token: '4.2026-05-16' }))
     const shared = { bookmark: '00000042-abc', token: '4.2026-05-16' }
-    expect(await loadSharedEpoch(cache as unknown as Cache, load)).toEqual(shared)
-    expect(await loadSharedEpoch(cache as unknown as Cache, load)).toEqual(shared)
+    expect(await loadSharedEpoch(cache as unknown as Cache, 'production', load)).toEqual(shared)
+    expect(await loadSharedEpoch(cache as unknown as Cache, 'production', load)).toEqual(shared)
     expect(load).toHaveBeenCalledTimes(1)
-    // The body stays the bare token, which a Worker version from before #382 reads unchanged.
+    // The body stays the bare token, which a Worker version without #382 reads unchanged.
     const [entry] = [...cache.entries.values()]
     expect(new TextDecoder().decode(entry?.body)).toBe('4.2026-05-16')
   })
 
-  it('reads an entry without a bookmark (an older Worker version’s) as no bookmark', async () => {
+  it('reads an entry without a bookmark (a version with #397 but not #382) as no bookmark', async () => {
     const cache = new MemoryCache()
     await cache.put(
-      'https://html-cache.invalid/catalog-epoch',
+      `${UNSCOPED_EPOCH_KEY}/production`,
       new Response('4.2026-05-16', { headers: { 'cache-control': 'public, max-age=30' } })
     )
     const load = vi.fn(async () => ({ bookmark: 'unused', token: 'unused' }))
-    expect(await loadSharedEpoch(cache as unknown as Cache, load)).toEqual(read('4.2026-05-16'))
+    expect(await loadSharedEpoch(cache as unknown as Cache, 'production', load)).toEqual(
+      read('4.2026-05-16')
+    )
     expect(load).not.toHaveBeenCalled()
   })
 
   it('shares an epoch read without a bookmark as one', async () => {
     const cache = new MemoryCache()
     const load = vi.fn(async () => read('4.2026-05-16'))
-    await loadSharedEpoch(cache as unknown as Cache, load)
-    expect(await loadSharedEpoch(cache as unknown as Cache, load)).toEqual(read('4.2026-05-16'))
+    await loadSharedEpoch(cache as unknown as Cache, 'production', load)
+    expect(await loadSharedEpoch(cache as unknown as Cache, 'production', load)).toEqual(
+      read('4.2026-05-16')
+    )
     expect(load).toHaveBeenCalledTimes(1)
+  })
+
+  // #397: staging and production share the serp.co zone's cache.
+  it("never shares one environment's epoch with another", async () => {
+    const zone = new MemoryCache()
+    const cache = zone as unknown as Cache
+    // A Worker version from before #397 shared its epoch under one key for every environment.
+    await zone.put(UNSCOPED_EPOCH_KEY, new Response('21.2026-10-10'))
+    const staging = vi.fn(async () => ({ bookmark: 'staging-b', token: '21.2026-10-10' }))
+    const production = vi.fn(async () => ({ bookmark: 'production-b', token: '18.2026-10-01' }))
+
+    for (let round = 0; round < 2; round += 1) {
+      expect(await loadSharedEpoch(cache, 'staging', staging)).toEqual({
+        bookmark: 'staging-b',
+        token: '21.2026-10-10'
+      })
+      expect(await loadSharedEpoch(cache, 'production', production)).toEqual({
+        bookmark: 'production-b',
+        token: '18.2026-10-01'
+      })
+    }
+    expect(staging).toHaveBeenCalledTimes(1)
+    expect(production).toHaveBeenCalledTimes(1)
+    expect([...zone.entries.keys()].sort()).toEqual([
+      UNSCOPED_EPOCH_KEY,
+      `${UNSCOPED_EPOCH_KEY}/production`,
+      `${UNSCOPED_EPOCH_KEY}/staging`
+    ])
+  })
+
+  it('shares no epoch without an environment, and reads none', async () => {
+    const zone = new MemoryCache()
+    await zone.put(UNSCOPED_EPOCH_KEY, new Response('21.2026-10-10'))
+    const load = vi.fn(async () => read('18.2026-10-01'))
+    await expect(loadSharedEpoch(zone as unknown as Cache, '', load)).rejects.toMatchObject({
+      code: 'd1_runtime_env_invalid'
+    })
+    expect(load).not.toHaveBeenCalled()
+    expect([...zone.entries.keys()]).toEqual([UNSCOPED_EPOCH_KEY])
   })
 })

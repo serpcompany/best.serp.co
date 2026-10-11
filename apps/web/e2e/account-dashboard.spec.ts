@@ -15,13 +15,13 @@ import {
   adminOrigin,
   adminSuiteEnabled,
   client,
+  localD1,
   q,
   removeAdmin,
   removeLeftoverAdmins,
   runStatements,
   seedAdminCatalog,
   signInAsNewAdmin,
-  localD1 as suiteD1,
   unique
 } from './admin-fixture'
 import { insert, listingStatements, type SeedStatement } from './fixture-seed'
@@ -54,8 +54,8 @@ test.describe.configure({ mode: 'serial' })
 test.use({ baseURL: adminOrigin(accountServer) })
 
 /** SQL on this suite's own local D1 (`accountServer`). */
-function localD1<T = Record<string, unknown>>(sql: string): T[] {
-  return suiteD1<T>(sql, accountServer)
+function accountD1<T = Record<string, unknown>>(sql: string): T[] {
+  return localD1<T>(sql, accountServer)
 }
 
 /**
@@ -199,7 +199,7 @@ function row(page: Page, name: string) {
 }
 
 function submissionRow(id: string) {
-  return localD1<{ content_version: number; listing_id: string | null; status: string }>(
+  return accountD1<{ content_version: number; listing_id: string | null; status: string }>(
     `SELECT status, listing_id, content_version FROM listing_submissions WHERE id = ${q(id)}`
   )[0]
 }
@@ -324,7 +324,7 @@ test('a submission moves through its statuses, is resubmitted after a change req
   await expect(page.getByText('Resubmitted')).toBeVisible()
   expect(submissionRow(id)).toMatchObject({ content_version: 3, status: 'verified' })
   expect(
-    localD1(`SELECT url FROM listing_submission_resource_links WHERE submission_id = ${q(id)}`)
+    accountD1(`SELECT url FROM listing_submission_resource_links WHERE submission_id = ${q(id)}`)
   ).toEqual([{ url: 'https://ledgerly.example/plans' }])
   // The FAQs added in review are kept, and the admin hears it's back.
   await expect(page.getByText('Does it file my taxes?')).toBeVisible()
@@ -340,7 +340,7 @@ test('a submission moves through its statuses, is resubmitted after a change req
   // Approved: the listing is live, with the FAQs and links, and owned by the submitter. The
   // approval sends back the hosted logo and featured image the review screen shows (#96).
   const reviewed = Object.fromEntries(
-    localD1<{ kind: string; media_key: string }>(
+    accountD1<{ kind: string; media_key: string }>(
       `SELECT j.kind, j.media_key FROM media_ingestions j
         JOIN listing_submissions s ON s.id = j.submission_id
         WHERE s.id = ${q(id)} AND j.sort_order = 0 AND j.status = 'hosted'
@@ -417,7 +417,7 @@ test('a submission moves through its statuses, is resubmitted after a change req
   await expect(page.getByText('Your edits are waiting for review', { exact: true })).toBeVisible()
   await expect(page.getByText('2 changes in this revision')).toBeVisible()
   await capture(page, '07-pending')
-  const [revision] = localD1<{ content_version: number; id: string; status: string }>(
+  const [revision] = accountD1<{ content_version: number; id: string; status: string }>(
     `SELECT id, status, content_version FROM listing_revisions
       WHERE listing_id = ${q(`submission_${id}`)} ORDER BY created_at DESC LIMIT 1`
   )
@@ -446,7 +446,7 @@ test('a submission moves through its statuses, is resubmitted after a change req
   )
   expect(saves.map(response => response.status()).sort()).toEqual([200, 409, 409])
   expect(
-    localD1<{ content_version: number }>(
+    accountD1<{ content_version: number }>(
       `SELECT content_version FROM listing_revisions WHERE id = ${q(revision?.id ?? '')}`
     )[0]?.content_version
   ).toBe((revision?.content_version ?? 0) + 1)
@@ -476,7 +476,7 @@ test('a submission moves through its statuses, is resubmitted after a change req
   await expect
     .poll(
       () =>
-        localD1<{ status: string }>(
+        accountD1<{ status: string }>(
           `SELECT status FROM listing_revisions WHERE id = ${q(revision?.id ?? '')}`
         )[0]?.status
     )
@@ -494,7 +494,7 @@ test('a submission moves through its statuses, is resubmitted after a change req
   }
   // The FAQs are the listing's now (the public page doesn't render listing FAQs yet).
   expect(
-    localD1<{ question: string }>(
+    accountD1<{ question: string }>(
       `SELECT question FROM listing_faqs WHERE listing_id = ${q(`submission_${id}`)} ORDER BY sort_order`
     ).map(faq => faq.question)
   ).toEqual(['Does it file my taxes?', 'Which banks can I connect?'])
@@ -587,7 +587,7 @@ test('shows and acts on the user’s own records only, never cached or indexed',
   // A live listing the owner owns, as an approval leaves it.
   const listingId = `e2e-owned-${unique()}`
   const listingSlug = `${listingId}.example`
-  const [ownerUser] = localD1<{ id: string }>(
+  const [ownerUser] = accountD1<{ id: string }>(
     `SELECT id FROM users WHERE email = ${q(owner.email)}`
   )
   insertOwnedListing({
@@ -650,7 +650,9 @@ test('shows and acts on the user’s own records only, never cached or indexed',
     expect(response.headers()['cache-control']).toContain('no-store')
   }
   expect(submissionRow(id)?.status).toBe('pending_badge')
-  expect(localD1(`SELECT id FROM listing_revisions WHERE listing_id = ${q(listingId)}`)).toEqual([])
+  expect(accountD1(`SELECT id FROM listing_revisions WHERE listing_id = ${q(listingId)}`)).toEqual(
+    []
+  )
 
   // The owner's own write without this site's Origin is refused (CSRF), and so is no session.
   const crossSite = await owner.context.request.post(`/api/account/submissions/${id}/withdraw`, {
@@ -702,7 +704,7 @@ function seedOwnedListing(
 ) {
   const id = `e2e-faqs-${label}-${unique()}`
   const slug = `${id}.example`
-  const [owner] = localD1<{ id: string }>(`SELECT id FROM users WHERE email = ${q(ownerEmail)}`)
+  const [owner] = accountD1<{ id: string }>(`SELECT id FROM users WHERE email = ${q(ownerEmail)}`)
   insertOwnedListing({
     content,
     description: 'A listing for the FAQ section.',

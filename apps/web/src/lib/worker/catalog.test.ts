@@ -107,6 +107,35 @@ describe('catalogEpochReader (#165)', () => {
     expect(first.match).not.toHaveBeenCalled()
   })
 
+  // #397: staging and production are custom domains in one zone, whose cache both Workers share.
+  it("keys the data center's share of the epoch on the environment", async () => {
+    const entries = new Map<string, string>()
+    const zone = {
+      match: async (key: string) => {
+        const token = entries.get(key)
+        return token === undefined ? undefined : new Response(token)
+      },
+      put: async (key: string, response: Response) => {
+        entries.set(key, await response.text())
+      }
+    } as unknown as Cache
+    const staging = { D1_RUNTIME_ENV: 'staging', DB: binding('staging-db') }
+    const production = { D1_RUNTIME_ENV: 'production', DB: binding('production-db') }
+
+    expect(await catalogEpochReader(staging, zone, observe)(context)).toEqual({
+      bookmark: 'bookmark-of-staging-db',
+      token: 'epoch-of-staging-db'
+    })
+    expect(await catalogEpochReader(production, zone, observe)(context)).toEqual({
+      bookmark: 'bookmark-of-production-db',
+      token: 'epoch-of-production-db'
+    })
+    expect(Object.fromEntries(entries)).toEqual({
+      'https://html-cache.invalid/catalog-epoch/production': 'epoch-of-production-db',
+      'https://html-cache.invalid/catalog-epoch/staging': 'epoch-of-staging-db'
+    })
+  })
+
   it.each([
     { D1_RUNTIME_ENV: 'local' },
     { D1_RUNTIME_ENV: 'preview', DB: binding('a') },

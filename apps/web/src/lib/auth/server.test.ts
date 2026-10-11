@@ -8,6 +8,8 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { SqliteD1 } from '@/db/test-support'
+import { CodedError } from '@/lib/telemetry/coded-error'
+import { errorFields } from '@/lib/telemetry/error-fields'
 import { hasSessionCookie } from './cookies'
 import { clearDevOtpOutbox } from './otp-sender'
 import { authorizeAdminRequest, handleAuthRequest, requireAdmin } from './server'
@@ -133,5 +135,25 @@ describe('admin adapters re-check the allowlist on every request', () => {
     expect(await authorizeAdminRequest(adminApiRequest(second))).toMatchObject({ ok: true })
     expect(await adminPage(second)).toBe('second@example.com')
     expect(await adminPage('')).toBe('NEXT_UNAUTHORIZED')
+  })
+
+  it('fails a page closed with a code that names the guard, when D1 cannot answer (#389)', async () => {
+    const sqlite = localWorker()
+    const owner = await signIn('devin@serp.co', '192.0.2.13')
+    sqlite.database.exec('ALTER TABLE admin_allowlist RENAME TO admin_allowlist_unreadable')
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    requestHeaders.current = new Headers({ cookie: owner, host: HOST })
+    const failure = await requireAdmin().then(
+      () => null,
+      (error: unknown) => error
+    )
+    expect(failure).toBeInstanceOf(CodedError)
+    expect(errorFields(failure)).toEqual({ code: 'auth_guard_failed', name: 'Error' })
+    // The cause is on the guard's own line.
+    expect(JSON.parse(String(logged.mock.calls[0]?.[0]))).toMatchObject({
+      event: 'auth_guard_error',
+      reason: 'admin_status'
+    })
+    logged.mockRestore()
   })
 })

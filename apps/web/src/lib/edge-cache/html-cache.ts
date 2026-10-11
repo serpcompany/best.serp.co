@@ -12,6 +12,7 @@
  * server is loaded, and every dependency (cache, epoch reader, clock) is injected.
  */
 import { hasAuthCookie } from '../auth/cookies'
+import { CodedError } from '../telemetry/coded-error'
 
 /** How long a stored response may be reused under the same epoch and deployment. */
 export const HTML_CACHE_TTL_SECONDS = 24 * 60 * 60
@@ -79,7 +80,10 @@ export interface EpochRead {
 }
 
 export interface EdgeCacheOptions {
-  /** Worker-local Cache API namespace for stored responses. */
+  /**
+   * Cache API namespace for stored responses: the zone's cache, which staging's and production's
+   * Workers share in each data center, so every key names the host and deployment (#397).
+   */
   cache: Cache
   /** Identifies the deployed build (Worker version); markup and asset URLs change with it. */
   deploymentId: string
@@ -295,11 +299,22 @@ export class EpochMemo {
   }
 }
 
-const EPOCH_CACHE_KEY = 'https://html-cache.invalid/catalog-epoch'
 /**
- * The shared entry's body is the bare token, so a Worker version from before #382 still reads
- * it; the bookmark travels beside it in this header, and an entry without one (stored by such a
- * version) reads as no bookmark, so its renders read the primary.
+ * The shared epoch's key names the environment (`D1_RUNTIME_ENV`): staging and production are
+ * custom domains in one zone, whose cache their Workers share, so an unscoped key would let one
+ * read the other's epoch (#397). Without an environment there is no key, and the share fails.
+ */
+function epochCacheKey(environment: string): string {
+  if (!environment) {
+    throw new CodedError('d1_runtime_env_invalid', 'The shared catalog epoch needs an environment.')
+  }
+  return `${CACHE_KEY_ORIGIN}/catalog-epoch/${encodeURIComponent(environment)}`
+}
+/**
+ * The shared entry's body is the bare token; the bookmark travels beside it in this header
+ * (#382). An entry without one (stored by a Worker version with #397's scoped key but not #382)
+ * reads as no bookmark, so its renders read the primary, and such a version reads a newer entry's
+ * token unchanged.
  */
 const EPOCH_BOOKMARK_HEADER = 'x-d1-bookmark'
 
@@ -309,10 +324,12 @@ const EPOCH_BOOKMARK_HEADER = 'x-d1-bookmark'
  */
 export async function loadSharedEpoch(
   cache: Cache,
+  environment: string,
   read: () => Promise<EpochRead>,
   freshSeconds = EPOCH_FRESH_MS / 1000
 ): Promise<EpochRead> {
-  const cached = await cache.match(EPOCH_CACHE_KEY).catch(() => undefined)
+  const key = epochCacheKey(environment)
+  const cached = await cache.match(key).catch(() => undefined)
   if (cached) {
     const token = await cached.text()
     if (token) return { bookmark: cached.headers.get(EPOCH_BOOKMARK_HEADER) || null, token }
@@ -320,6 +337,6 @@ export async function loadSharedEpoch(
   const epoch = await read()
   const headers = new Headers({ 'cache-control': `public, max-age=${freshSeconds}` })
   if (epoch.bookmark) headers.set(EPOCH_BOOKMARK_HEADER, epoch.bookmark)
-  await cache.put(EPOCH_CACHE_KEY, new Response(epoch.token, { headers })).catch(() => undefined)
+  await cache.put(key, new Response(epoch.token, { headers })).catch(() => undefined)
   return epoch
 }

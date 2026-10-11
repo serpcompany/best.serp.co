@@ -256,10 +256,11 @@ describe('D1 read replication (#382)', () => {
     expect(served.every(copy => copy === 'primary')).toBe(true)
   })
 
-  it('reads the primary when the shared epoch has no bookmark (an older Worker version’s)', async () => {
+  it('reads the primary when the shared epoch has no bookmark (a version without #382)', async () => {
     db.write(PUBLICATION)
+    // A Worker version with #397's environment-scoped key but not #382 stores the bare token.
     await caches.edge.put(
-      'https://html-cache.invalid/catalog-epoch',
+      'https://html-cache.invalid/catalog-epoch/local',
       new Response('2.2026-07-05T00:00:00.000Z', {
         headers: { 'cache-control': 'public, max-age=30' }
       })

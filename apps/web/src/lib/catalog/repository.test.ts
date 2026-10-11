@@ -85,3 +85,76 @@ describe('the catalog adapter’s listing detail (#334)', () => {
     expect(contentEvents()).toEqual([])
   })
 })
+
+// #397: staging and production are custom domains in one zone, whose cache both Workers share.
+describe('the catalog adapter’s data cache scope (#397)', () => {
+  let sqlite: SqliteD1
+  let zone: MemoryCache
+  const logs: Array<Record<string, unknown>> = []
+
+  beforeEach(() => {
+    sqlite = new SqliteD1()
+    seedContractFixture(sqlite)
+    zone = new MemoryCache()
+    vi.stubGlobal('caches', { open: async () => zone })
+    logs.length = 0
+    vi.spyOn(console, 'info').mockImplementation((line: unknown) => {
+      logs.push(JSON.parse(String(line)))
+    })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  /** Serves the next renders as `name`'s Worker, over the same catalog (so the same keys). */
+  const servedAs = (name: string | undefined) =>
+    getCloudflareContext.mockResolvedValue({
+      env: {
+        D1_RUNTIME_ENV: name,
+        DB: sqlite.asD1Database(),
+        MEDIA_BASE_URL: 'https://cdn.serp.co'
+      }
+    })
+  const detailStates = () =>
+    logs
+      .filter(log => log.event === 'catalog_cache' && log.operation === 'listing-detail')
+      .map(log => log.state)
+  const keysIn = (environment: string) =>
+    [...zone.entries.keys()]
+      .filter(url => url.startsWith(`https://catalog-data-ops.invalid/${environment}/`))
+      .map(url => url.slice(`https://catalog-data-ops.invalid/${environment}/`.length))
+      .sort()
+
+  it('never reads an entry another environment wrote under the same epoch and key', async () => {
+    servedAs('staging')
+    await getListingBySlug('charlie')
+    expect(detailStates()).toEqual(['miss', 'written'])
+
+    logs.length = 0
+    servedAs('production')
+    await getListingBySlug('charlie')
+    expect(detailStates()).toEqual(['miss', 'written'])
+    logs.length = 0
+    await getListingBySlug('charlie')
+    expect(detailStates()).toEqual(['hit'])
+
+    // Each environment holds the same keys, and no entry sits outside an environment.
+    expect(keysIn('staging').length).toBeGreaterThan(0)
+    expect(keysIn('production')).toEqual(keysIn('staging'))
+    expect(zone.entries.size).toBe(keysIn('staging').length * 2)
+  })
+
+  it.each([undefined, '', 'preview'])(
+    'reads and writes no entry with environment %o',
+    async name => {
+      servedAs(name)
+      await expect(getListingBySlug('charlie')).rejects.toMatchObject({
+        code: 'd1_runtime_env_invalid'
+      })
+      expect(zone.entries.size).toBe(0)
+      expect(logs.filter(log => log.event === 'catalog_cache')).toEqual([])
+    }
+  )
+})

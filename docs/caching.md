@@ -71,6 +71,17 @@ From the edge inward:
    because the data cache survives deployments.
 4. React `cache()` deduplicates reads within a request.
 
+**Environments never share an entry** (#397). The Cache API works on the zone's cache, and
+staging (`staging.best.serp.co`) and production (`best.serp.co`) are custom domains in one zone
+(`serp.co`), so in a data center both Workers read and write one cache. Every key tells them
+apart: an edge HTML key names the host and Worker version, and the shared epoch's key
+(`https://html-cache.invalid/catalog-epoch/<environment>`) and every data-cache key
+(`https://catalog-data-ops.invalid/<environment>/<key>`) name the environment,
+`D1_RUNTIME_ENV`, which each request validates. There is no unscoped fallback: without a valid
+environment the edge cache is bypassed and catalog reads fail closed. Cloudflare doesn't document
+whether the caches `caches.open(name)` returns are split per Worker; the environment-scoped keys
+don't depend on it.
+
 Both Cache API layers are per data center and populate on demand. A deployment gets a new
 Worker version and therefore a cold HTML cache; the data cache survives deployments. Confirming
 it after a deploy is in the [Deploy runbook](./deploy-runbook.md#after-a-deploy).
@@ -97,7 +108,9 @@ itself always reads the primary.
   never keys it on a lagging replica's older one (#382 review). The nearest replica answers a
   render at the epoch read's bookmark; only a render in the moments after an epoch read (once per
   data center per 30 seconds) can find it still behind and wait for its lag. An epoch shared
-  without a bookmark (by a Worker version from before #382) renders from the primary.
+  without a bookmark renders from the primary: under the environment-scoped key (#397), only a
+  Worker version with #397 but not #382 stores one, and older versions' unscoped entries are never
+  read.
 - **Without replication** every statement runs on the primary: the same rows, round trips (the
   epoch read, then one batch per uncached listing) and latency as through the binding.
 - **Telemetry:** `d1_query` events carry `servedByPrimary` and `servedByRegion` where remote D1
