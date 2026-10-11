@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { type ReactNode, useState } from 'react'
 import { toast } from 'sonner'
+import { CategorySuggestionFields } from '@/components/submit/category-suggestion'
 import { ProductLogo, ToneAlert } from '@/components/submit/submit-ui'
 import { type TagChoice, TagsCombobox } from '@/components/submit/tags-combobox'
 import {
@@ -23,7 +24,7 @@ import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field
 import { Separator } from '@/components/ui/separator'
 import { Spinner } from '@/components/ui/spinner'
 import { formatDay, formatStamp } from '@/lib/account/format'
-import { hostOf, SUBMISSION_TAG_LIMIT } from '@/lib/submissions/contract'
+import { categorySuggestionErrors, hostOf, SUBMISSION_TAG_LIMIT } from '@/lib/submissions/contract'
 import { discardRevision, saveRevision } from './account-api'
 import {
   type CategoryChoice,
@@ -78,6 +79,9 @@ export interface ListingEditView extends Extras {
         reviewedAt: string | null
         reviewerNote: string | null
         status: 'approved' | 'changes_requested' | 'pending_review' | 'rejected' | 'withdrawn'
+        /** A category the owner suggests (#406), and its note, or null. */
+        suggestedCategory: string | null
+        suggestedCategoryNote: string | null
         /** The revision's tags, or null when it leaves the listing's as they are (#341). */
         tagSlugs: string[] | null
         updatedAt: string
@@ -255,8 +259,19 @@ export function ListingEdit({
   const [extras, setExtras] = useState<ExtrasValue>(() => extrasValue(source))
   const originalTags = open?.tagSlugs ?? view.tags
   const [tagSlugs, setTagSlugs] = useState<string[]>(originalTags)
+  const originalSuggestion = {
+    name: open?.suggestedCategory ?? '',
+    note: open?.suggestedCategoryNote ?? ''
+  }
+  const [suggestion, setSuggestion] = useState(originalSuggestion)
   const tagLabel = (slug: string) => tags.find(tag => tag.slug === slug)?.label ?? slug
-  const [errors, setErrors] = useState<ContentErrors & { tagSlugs?: string }>({})
+  const [errors, setErrors] = useState<
+    ContentErrors & {
+      suggestedCategory?: string
+      suggestedCategoryNote?: string
+      tagSlugs?: string
+    }
+  >({})
   const [extrasProblems, setExtrasProblems] = useState<ExtrasErrors | null>(null)
   const [busy, setBusy] = useState(false)
   const [discarding, setDiscarding] = useState(false)
@@ -264,13 +279,20 @@ export function ListingEdit({
   function reset() {
     setValue(original)
     setTagSlugs(originalTags)
+    setSuggestion(originalSuggestion)
     setExtras(extrasValue(source))
     setErrors({})
     setExtrasProblems(null)
   }
 
   async function submit() {
-    const found = contentErrors(value, false)
+    const found = {
+      ...contentErrors(value, false),
+      ...categorySuggestionErrors({
+        suggestedCategory: suggestion.name,
+        suggestedCategoryNote: suggestion.note
+      })
+    }
     const foundExtras = extrasErrors(extras)
     setErrors(found)
     setExtrasProblems(foundExtras)
@@ -287,6 +309,8 @@ export function ListingEdit({
       logoUrl: value.logoUrl,
       // The listing's own tags are left out: the revision then leaves them as they are.
       ...(tagSlugs.join(',') === view.tags.join(',') ? {} : { tagSlugs }),
+      suggestedCategory: suggestion.name,
+      suggestedCategoryNote: suggestion.note,
       ...extrasInput(extras)
     })
     setBusy(false)
@@ -445,21 +469,40 @@ export function ListingEdit({
               onChange={setValue}
               original={original}
               tags={
-                <Field data-invalid={errors.tagSlugs ? true : undefined}>
-                  <FieldLabel htmlFor="listing-tags">
-                    Tags <span className="font-normal text-muted-foreground">(optional)</span>
-                  </FieldLabel>
-                  <TagsCombobox
-                    id="listing-tags"
-                    choices={tags}
-                    firstCategory={value.categorySlug || undefined}
-                    invalid={Boolean(errors.tagSlugs)}
-                    max={SUBMISSION_TAG_LIMIT}
-                    value={tagSlugs}
-                    onValueChange={setTagSlugs}
+                <>
+                  <Field data-invalid={errors.tagSlugs ? true : undefined}>
+                    <FieldLabel htmlFor="listing-tags">
+                      Tags <span className="font-normal text-muted-foreground">(optional)</span>
+                    </FieldLabel>
+                    <TagsCombobox
+                      id="listing-tags"
+                      choices={tags}
+                      firstCategory={value.categorySlug || undefined}
+                      invalid={Boolean(errors.tagSlugs)}
+                      max={SUBMISSION_TAG_LIMIT}
+                      value={tagSlugs}
+                      onValueChange={setTagSlugs}
+                    />
+                    {errors.tagSlugs ? <FieldError>{errors.tagSlugs}</FieldError> : null}
+                  </Field>
+                  <CategorySuggestionFields
+                    id="listing-suggestion"
+                    errors={{
+                      name: errors.suggestedCategory,
+                      note: errors.suggestedCategoryNote
+                    }}
+                    name={suggestion.name}
+                    note={suggestion.note}
+                    onChange={next => {
+                      setSuggestion(next)
+                      setErrors(current => ({
+                        ...current,
+                        suggestedCategory: undefined,
+                        suggestedCategoryNote: undefined
+                      }))
+                    }}
                   />
-                  {errors.tagSlugs ? <FieldError>{errors.tagSlugs}</FieldError> : null}
-                </Field>
+                </>
               }
               tallContent
               value={value}

@@ -61,3 +61,45 @@ export function prefill<K extends string>(
     })
   ) as Partial<Record<K, string>>
 }
+
+/** Open category suggestions grouped by name (#406), so repeats show as one row. */
+export interface SuggestionGroup {
+  /** How many open submissions and revisions suggest it. */
+  count: number
+  key: string
+  /** The spelling it was first suggested with. */
+  name: string
+  records: Array<{
+    categoryName: string | null
+    href: string
+    listingName: string
+    note: string | null
+  }>
+}
+
+/** Groups suggestions by their name, ignoring case and spacing, most suggested first. */
+export function groupSuggestions(
+  rows: ReadonlyArray<{
+    categoryName: string | null
+    id: string
+    kind: 'revision' | 'submission'
+    listingName: string
+    name: string
+    note: string | null
+  }>
+): SuggestionGroup[] {
+  const groups = new Map<string, SuggestionGroup>()
+  for (const row of rows) {
+    const key = row.name.trim().replace(/\s+/gu, ' ').toLowerCase()
+    const group = groups.get(key) ?? { count: 0, key, name: row.name.trim(), records: [] }
+    group.count += 1
+    group.records.push({
+      categoryName: row.categoryName,
+      href: `/admin/${row.kind === 'revision' ? 'revisions' : 'submissions'}/${encodeURIComponent(row.id)}/`,
+      listingName: row.listingName,
+      note: row.note
+    })
+    groups.set(key, group)
+  }
+  return [...groups.values()].sort((a, b) => b.count - a.count || a.key.localeCompare(b.key, 'en'))
+}

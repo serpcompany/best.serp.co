@@ -114,6 +114,23 @@ const tagSlugsCheck = (column: { name: string }) => {
   return sql`${value} IS NULL OR (json_valid(${value}) AND json_type(${value}) = 'array' AND json_array_length(${value}) <= ${sql.raw(String(MAX_SUGGESTED_TAGS))})`
 }
 
+/**
+ * A category a Creator suggests on a submission or revision (#406) when none fits: a short name
+ * and an optional note, both single values an admin reads at review. The name is at most
+ * `name` characters and the note at most `note`; a note needs a name.
+ */
+export const CATEGORY_SUGGESTION_LIMITS = { name: 60, note: 300 } as const
+
+const suggestedCategoryCheck = (column: { name: string }) => {
+  const value = sql.identifier(column.name)
+  return sql`${value} IS NULL OR length(${value}) BETWEEN 1 AND ${sql.raw(String(CATEGORY_SUGGESTION_LIMITS.name))}`
+}
+
+const suggestedCategoryNoteCheck = (note: { name: string }, name: { name: string }) => {
+  const value = sql.identifier(note.name)
+  return sql`${value} IS NULL OR (${sql.identifier(name.name)} IS NOT NULL AND length(${value}) BETWEEN 1 AND ${sql.raw(String(CATEGORY_SUGGESTION_LIMITS.note))})`
+}
+
 export const listingOwnerRoles = ['owner'] as const
 /**
  * How a listing's owner was established: their approved submission, a badge or paid claim (#67),
@@ -823,7 +840,11 @@ export const listingSubmissions = sqliteTable(
     /** Increments on every edit of the staged content; approval compares and swaps on it. */
     contentVersion: integer('content_version').notNull().default(1),
     /** The Creator's suggested tags (#341): a JSON array of tag slugs, or null when not given. */
-    tagSlugs: text('tag_slugs')
+    tagSlugs: text('tag_slugs'),
+    /** A category the Creator suggests (#406), or null; it never replaces `category_slug`. */
+    suggestedCategory: text('suggested_category'),
+    /** The Creator's optional note on `suggested_category`. */
+    suggestedCategoryNote: text('suggested_category_note')
   },
   table => [
     check(
@@ -929,6 +950,14 @@ export const listingSubmissions = sqliteTable(
       sql`(${table.status} = 'withdrawn') = (${table.withdrawalReason} IS NOT NULL)`
     ),
     check('listing_submissions_tag_slugs_valid', tagSlugsCheck(table.tagSlugs)),
+    check(
+      'listing_submissions_suggested_category_valid',
+      suggestedCategoryCheck(table.suggestedCategory)
+    ),
+    check(
+      'listing_submissions_suggested_category_note_valid',
+      suggestedCategoryNoteCheck(table.suggestedCategoryNote, table.suggestedCategory)
+    ),
     uniqueIndex('listing_submissions_active_slug_idx')
       .on(table.slug)
       .where(sql`${table.status} IN (${sqlList(activeSubmissionStatuses)})`),
@@ -1314,7 +1343,10 @@ export const listingRevisions = sqliteTable(
     /** Increments on every edit; approval compares and swaps on the version the reviewer saw. */
     contentVersion: integer('content_version').notNull().default(1),
     /** The owner's tags (#341), as on a submission; null leaves the listing's tags unchanged. */
-    tagSlugs: text('tag_slugs')
+    tagSlugs: text('tag_slugs'),
+    /** A category the owner suggests (#406), as on a submission; it changes nothing on approval. */
+    suggestedCategory: text('suggested_category'),
+    suggestedCategoryNote: text('suggested_category_note')
   },
   table => [
     check('listing_revisions_status_valid', sql`${table.status} IN (${sqlList(revisionStatuses)})`),
@@ -1324,6 +1356,14 @@ export const listingRevisions = sqliteTable(
       sql`${table.rejectionReason} IS NULL OR ${table.status} = 'rejected'`
     ),
     check('listing_revisions_tag_slugs_valid', tagSlugsCheck(table.tagSlugs)),
+    check(
+      'listing_revisions_suggested_category_valid',
+      suggestedCategoryCheck(table.suggestedCategory)
+    ),
+    check(
+      'listing_revisions_suggested_category_note_valid',
+      suggestedCategoryNoteCheck(table.suggestedCategoryNote, table.suggestedCategory)
+    ),
     uniqueIndex('listing_revisions_open_idx')
       .on(table.listingId)
       .where(sql`${table.status} IN (${sqlList(openRevisionStatuses)})`),

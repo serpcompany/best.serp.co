@@ -11,6 +11,11 @@ import { z } from 'zod'
 export const SUBMISSION_FIELD_LIMITS = { content: 5000, description: 160, name: 120 } as const
 /** Suggested tags per submission or revision (#341): `MAX_SUGGESTED_TAGS` in `@/db/schema`. */
 export const SUBMISSION_TAG_LIMIT = 3
+/**
+ * A suggested category (#406): a name and an optional note, at most these many characters
+ * (`CATEGORY_SUGGESTION_LIMITS` in `@/db/schema`).
+ */
+export const CATEGORY_SUGGESTION_FIELD_LIMITS = { name: 60, note: 300 } as const
 export const VERIFICATION_ATTEMPT_LIMIT = 10
 export const VERIFICATION_COOLDOWN_SECONDS = 30
 
@@ -19,6 +24,8 @@ export const FIELD_MESSAGES = {
   description: 'Add a short description.',
   logoUrl: 'Add a logo. Use the one from your site or paste an image link.',
   name: 'Enter the product name.',
+  suggestedCategory: `Name the category you suggest, in ${CATEGORY_SUGGESTION_FIELD_LIMITS.name} characters or fewer.`,
+  suggestedCategoryNote: `Keep the note to ${CATEGORY_SUGGESTION_FIELD_LIMITS.note} characters or fewer.`,
   tagSlugs: `Choose up to ${SUBMISSION_TAG_LIMIT} tags from the list.`,
   website: 'Enter your website address, starting with https://.'
 } as const
@@ -41,6 +48,40 @@ const httpUrl = (message: string) =>
 
 export function descriptionLengthMessage(length: number): string {
   return `Keep it to ${SUBMISSION_FIELD_LIMITS.description} characters or fewer. It’s ${length} now.`
+}
+
+/** No control characters; a note may break lines. */
+const SINGLE_LINE = /^[^\p{Cc}]*$/u
+const MULTI_LINE = /^(?:[^\p{Cc}]|\r|\n)*$/u
+
+/**
+ * A suggested category's two fields (#406), each optional: left out, an edit keeps the stored
+ * suggestion; empty, it clears it. A note needs a name (`categorySuggestionErrors`). They never
+ * replace the primary category.
+ */
+export const categorySuggestionFields = {
+  suggestedCategory: z
+    .string()
+    .trim()
+    .max(CATEGORY_SUGGESTION_FIELD_LIMITS.name, FIELD_MESSAGES.suggestedCategory)
+    .regex(SINGLE_LINE, FIELD_MESSAGES.suggestedCategory)
+    .optional(),
+  suggestedCategoryNote: z
+    .string()
+    .trim()
+    .max(CATEGORY_SUGGESTION_FIELD_LIMITS.note, FIELD_MESSAGES.suggestedCategoryNote)
+    .regex(MULTI_LINE, FIELD_MESSAGES.suggestedCategoryNote)
+    .optional()
+}
+
+/** A note without a name, the one rule the two fields' schemas can't check alone. */
+export function categorySuggestionErrors(input: {
+  suggestedCategory?: string
+  suggestedCategoryNote?: string
+}): Partial<Record<'suggestedCategory', string>> {
+  return input.suggestedCategoryNote?.trim() && !input.suggestedCategory?.trim()
+    ? { suggestedCategory: FIELD_MESSAGES.suggestedCategory }
+    : {}
 }
 
 export const draftContentSchema = z.object({
@@ -70,7 +111,8 @@ export const draftContentSchema = z.object({
     .array(z.string().trim().min(1).max(100))
     .max(SUBMISSION_TAG_LIMIT, FIELD_MESSAGES.tagSlugs)
     .refine(tags => new Set(tags).size === tags.length, FIELD_MESSAGES.tagSlugs)
-    .optional()
+    .optional(),
+  ...categorySuggestionFields
 })
 
 export const newDraftSchema = draftContentSchema.extend({
@@ -173,6 +215,9 @@ export interface SubmissionSummary {
   plan: 'free' | 'paid' | null
   slug: string
   status: SubmissionStatusName
+  /** A category the Creator suggests (#406), and its note; empty when none. */
+  suggestedCategory: string
+  suggestedCategoryNote: string
   /** The Creator's suggested tags (#341), in order. */
   tagSlugs: string[]
   verificationAttempts: number

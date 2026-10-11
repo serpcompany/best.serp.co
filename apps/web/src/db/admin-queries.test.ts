@@ -223,6 +223,37 @@ describe('admin review queue reads', () => {
   })
 })
 
+describe('category suggestions (#406)', () => {
+  it('reads a review’s suggestion and lists the open ones, decided and drafts left out', async () => {
+    const reads = fixture(`
+      UPDATE listing_submissions SET suggested_category = 'Mind maps',
+        suggested_category_note = 'Maps of ideas.' WHERE id = 'sub_quill';
+      UPDATE listing_submissions SET suggested_category = 'mind  maps' WHERE id = 'sub_old';
+      UPDATE listing_submissions SET suggested_category = 'Key shops' WHERE id = 'sub_keyb';
+      UPDATE listing_revisions SET suggested_category = 'Briefs' WHERE id = 'rev_brief';
+    `)
+    expect((await reads.getSubmissionReview('sub_quill'))?.suggestion).toEqual({
+      name: 'Mind maps',
+      note: 'Maps of ideas.'
+    })
+    expect((await reads.getSubmissionReview('sub_old'))?.suggestion).toEqual({
+      name: 'mind  maps',
+      note: null
+    })
+    expect((await reads.getRevisionReview('rev_brief'))?.suggestion).toEqual({
+      name: 'Briefs',
+      note: null
+    })
+    expect(
+      (await reads.listCategorySuggestions()).map(row => [row.kind, row.id, row.name, row.note])
+    ).toEqual([
+      ['revision', 'rev_brief', 'Briefs', null],
+      ['submission', 'sub_old', 'mind  maps', null],
+      ['submission', 'sub_quill', 'Mind maps', 'Maps of ideas.']
+    ])
+  })
+})
+
 describe('admin listing reads', () => {
   it('searches by name or slug, filters by derived state, and counts facets', async () => {
     const reads = fixture()

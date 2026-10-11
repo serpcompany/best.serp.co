@@ -99,6 +99,13 @@
       "when": 1791617836459,
       "tag": "0013_taxonomy_triggers",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1791741474675,
+      "tag": "0014_category_suggestions",
+      "breakpoints": true
     }
   ]
 }

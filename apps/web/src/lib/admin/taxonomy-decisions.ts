@@ -755,8 +755,8 @@ async function pinsOutsidePool(
     409,
     'pins_outside_pool',
     tag
-      ? 'Some pinned listings don’t carry the new tag. Unpin them first, then change the tag.'
-      : 'Some pinned listings aren’t in this page’s category. Unpin them first, then remove the tag.'
+      ? 'Some pinned listings aren’t live listings with the new tag. Unpin them first, then change the tag.'
+      : 'Some pinned listings aren’t live listings in this page’s category. Unpin them first, then remove the tag.'
   )
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_SUGGESTED_TAGS } from '@/db/schema'
+import { CATEGORY_SUGGESTION_LIMITS, MAX_SUGGESTED_TAGS } from '@/db/schema'
 import {
   VERIFICATION_COOLDOWN_SECONDS as DATA_COOLDOWN,
   SUBMISSION_LIMITS,
@@ -7,6 +7,8 @@ import {
 } from '@/db/submissions'
 import { parseLocalDraft } from '../../components/submit/draft-storage'
 import {
+  CATEGORY_SUGGESTION_FIELD_LIMITS,
+  categorySuggestionErrors,
   checksLeft,
   checksPaused,
   descriptionLengthMessage,
@@ -97,6 +99,47 @@ describe('the Tags limit (#341)', () => {
   })
 })
 
+describe('a suggested category (#406)', () => {
+  it('has the schema’s limits', () => {
+    expect(CATEGORY_SUGGESTION_FIELD_LIMITS).toEqual(CATEGORY_SUGGESTION_LIMITS)
+  })
+
+  it('is optional and bounded, one line for the name, and a note needs a name', () => {
+    expect(newDraftSchema.safeParse(valid).success).toBe(true)
+    const parsed = newDraftSchema.safeParse({
+      ...valid,
+      suggestedCategory: '  Mind maps ',
+      suggestedCategoryNote: 'For tools that map\nideas.'
+    })
+    expect(parsed.success && parsed.data.suggestedCategory).toBe('Mind maps')
+    for (const [field, value] of [
+      ['suggestedCategory', 'x'.repeat(61)],
+      ['suggestedCategory', 'Mind\nmaps'],
+      ['suggestedCategoryNote', 'x'.repeat(301)],
+      ['suggestedCategoryNote', 'bell\u0007']
+    ] as const) {
+      const result = newDraftSchema.safeParse({
+        ...valid,
+        suggestedCategory: 'Maps',
+        [field]: value
+      })
+      expect(result.success, `${field} ${JSON.stringify(value)}`).toBe(false)
+      if (!result.success) {
+        const errors = fieldErrors(result.error)
+        expect(Object.keys(errors)).toEqual([field])
+        // Messages never repeat the input (#211).
+        expect(errors[field]).not.toContain(value)
+      }
+    }
+    expect(categorySuggestionErrors({ suggestedCategoryNote: 'Why' })).toEqual({
+      suggestedCategory: 'Name the category you suggest, in 60 characters or fewer.'
+    })
+    expect(
+      categorySuggestionErrors({ suggestedCategory: 'Maps', suggestedCategoryNote: 'Why' })
+    ).toEqual({})
+  })
+})
+
 describe('local submit draft', () => {
   it('restores only well-formed, recent drafts and never more than the form holds', () => {
     const now = Date.parse('2026-10-06T12:00:00.000Z')
@@ -111,6 +154,8 @@ describe('local submit draft', () => {
       savedAt: now - 1000,
       siteIcon: 'https://example.com/i.png',
       socialImage: 'javascript:alert(1)',
+      suggestedCategory: 'Mind maps',
+      suggestedCategoryNote: 7,
       tagSlugs: ['note-taking', 7, 'whiteboards', 'mockup-tools', 'developer-apis'],
       website: 'https://example.com'
     })
@@ -125,6 +170,8 @@ describe('local submit draft', () => {
       savedAt: now - 1000,
       siteIcon: 'https://example.com/i.png',
       socialImage: null,
+      suggestedCategory: 'Mind maps',
+      suggestedCategoryNote: '',
       // Strings only, and no more than the Tags field holds (#341).
       tagSlugs: ['note-taking', 'whiteboards', 'mockup-tools'],
       website: 'https://example.com'

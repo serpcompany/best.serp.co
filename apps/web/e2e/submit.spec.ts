@@ -310,6 +310,44 @@ test.describe('submit v2', () => {
     await context.close()
   })
 
+  test('suggests a category beside the chosen one, and saves it with its note (#406)', async ({
+    baseURL,
+    browser
+  }) => {
+    test.setTimeout(90_000)
+    const label = `suggest-${unique()}`
+    fixture.set(label, {
+      badge: 'missing',
+      description: 'Maps ideas into tidy outlines.',
+      name: `Mapwise ${label.slice(-5)}`
+    })
+    const context = await newClient(browser)
+    await signInContext(context, baseURL ?? '', `e2e-submit-suggest-${unique()}@example.com`)
+    const page = await context.newPage()
+    await page.goto('/submit/')
+    await typeWebsite(page, fixture.website(label))
+    await expect(page.getByText(`We filled in 3 fields from ${fixture.slug(label)}`)).toBeVisible()
+    await chooseCategory(page, seedCategories.design.name)
+
+    const suggestion = page.getByLabel('Can’t find a category? Suggest one')
+    // The note shows once there is a name.
+    await expect(page.getByLabel('Note')).toHaveCount(0)
+    await suggestion.fill('Mind maps')
+    await page.getByLabel('Note').fill('Tools that map ideas.')
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await page.waitForURL(/\/submit\/[0-9a-f-]{36}\/choose\/\?saved=1$/u)
+    const submissionId = new URL(page.url()).pathname.split('/')[2] as string
+
+    await page.goto(`/submit/?edit=${submissionId}`)
+    await expect(suggestion).toHaveValue('Mind maps')
+    await expect(page.getByLabel('Note')).toHaveValue('Tools that map ideas.')
+    // A suggestion never replaces the primary category.
+    await expect(page.getByRole('combobox', { name: 'Primary category' })).toContainText(
+      seedCategories.design.name
+    )
+    await context.close()
+  })
+
   test('shows every missing field before saving', async ({ baseURL, browser }) => {
     const context = await newClient(browser)
     await signInContext(context, baseURL ?? '', `e2e-submit-empty-${unique()}@example.com`)

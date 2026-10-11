@@ -8,9 +8,10 @@ import type { ListingDetail } from './contracts'
 import { toInstant } from './instants'
 import { listingIdsWithWebsite } from './listing-plans'
 import { isMediaKey, mediaUrl } from './media-keys'
-import { parseTagSlugs } from './plan-support'
+import { type CategorySuggestion, parseTagSlugs, suggestionColumns } from './plan-support'
 import { validatePublicHttpUrl } from './public-url'
 import {
+  CATEGORY_SUGGESTION_LIMITS,
   categories,
   listingSubmissionRateLimits,
   MAX_SUGGESTED_TAGS,
@@ -97,6 +98,13 @@ export interface DraftContent {
    * the stored ones; an empty list is stored as null ("not given").
    */
   tagSlugs?: string[]
+  /**
+   * A category the Creator suggests (#406) when none fits, and an optional note. Left out (the
+   * name undefined), an edit keeps the stored suggestion; an empty name clears it. It never
+   * replaces `categorySlug`.
+   */
+  suggestedCategory?: string
+  suggestedCategoryNote?: string
 }
 
 export interface NewDraftInput extends DraftContent {
@@ -143,6 +151,9 @@ export interface OwnSubmission {
   plan: SubmissionPlan | null
   slug: string
   status: SubmissionStatus
+  /** A category the Creator suggests (#406), and its note, or null. */
+  suggestedCategory: string | null
+  suggestedCategoryNote: string | null
   /** The Creator's suggested tags (#341), in order; empty when none were given. */
   tagSlugs: string[]
   verificationAttempts: number
@@ -204,6 +215,8 @@ interface OwnSubmissionRow {
   plan: SubmissionPlan | null
   slug: string
   status: SubmissionStatus
+  suggested_category: string | null
+  suggested_category_note: string | null
   tag_slugs: string | null
   verification_attempts: number
   website: string
@@ -252,7 +265,7 @@ async function sha256(value: string): Promise<string> {
 const OWN_SUBMISSION_COLUMNS = `s.id,s.slug,s.name,s.description,s.website,s.content,s.category_slug,
   c.name AS category_name,s.logo_url,s.status,s.plan,s.draft_saved_at,s.badge_verified_at,
   s.verification_attempts,s.last_verification_at,s.last_verification_error,s.content_version,
-  s.created_at,s.tag_slugs`
+  s.created_at,s.tag_slugs,s.suggested_category,s.suggested_category_note`
 
 function toOwnSubmission(row: OwnSubmissionRow): OwnSubmission {
   return {
@@ -272,6 +285,8 @@ function toOwnSubmission(row: OwnSubmissionRow): OwnSubmission {
     plan: row.plan,
     slug: row.slug,
     status: row.status,
+    suggestedCategory: row.suggested_category,
+    suggestedCategoryNote: row.suggested_category_note,
     tagSlugs: parseTagSlugs(row.tag_slugs) ?? [],
     verificationAttempts: row.verification_attempts,
     website: row.website
@@ -450,7 +465,38 @@ export function validateDraftContent(
     }
     checked.tagSlugs = tags
   }
+  const suggestion = checkedSuggestion(content)
+  if (suggestion !== undefined) {
+    checked.suggestedCategory = suggestion?.name ?? ''
+    checked.suggestedCategoryNote = suggestion?.note ?? ''
+  }
   return checked
+}
+
+const SUGGESTION_MESSAGE = `Name the category you suggest, in ${CATEGORY_SUGGESTION_LIMITS.name} characters or fewer.`
+const NOTE_MESSAGE = `Keep the note to ${CATEGORY_SUGGESTION_LIMITS.note} characters or fewer.`
+
+/**
+ * A suggested category (#406) as stored, checked: undefined when the content leaves it out, null
+ * when it clears it. The name is one line of at most 60 characters, the note at most 300, and a
+ * note needs a name. Messages never repeat the input (#211).
+ */
+export function checkedSuggestion(content: {
+  suggestedCategory?: string
+  suggestedCategoryNote?: string
+}): CategorySuggestion | null | undefined {
+  if (content.suggestedCategory === undefined && content.suggestedCategoryNote === undefined) {
+    return undefined
+  }
+  const name = (content.suggestedCategory ?? '').trim()
+  const note = (content.suggestedCategoryNote ?? '').trim()
+  if (name.length > CATEGORY_SUGGESTION_LIMITS.name || /\p{Cc}/u.test(name) || (note && !name)) {
+    throw new SubmissionError('invalid_suggestion', SUGGESTION_MESSAGE)
+  }
+  if (note.length > CATEGORY_SUGGESTION_LIMITS.note || /[^\P{Cc}\r\n]/u.test(note)) {
+    throw new SubmissionError('invalid_suggestion_note', NOTE_MESSAGE)
+  }
+  return name ? { name, note: note || null } : null
 }
 
 const TAGS_MESSAGE = `Choose up to ${MAX_SUGGESTED_TAGS} tags from the list.`
@@ -651,9 +697,10 @@ export function createSubmissionOperations(config: {
           // A draft is native (#62 contract): owner, block key and scope, no plan, and the
           // draft clock from this first save, which edits never reset.
           sql: `INSERT INTO listing_submissions
-            (id,slug,name,description,website,content,category_slug,logo_url,tag_slugs,status,
-              plan,owner_user_id,draft_saved_at,block_key,block_covers_subdomains)
-            VALUES (?,?,?,?,?,?,?,?,?,'draft',NULL,?,?,?,?)`,
+            (id,slug,name,description,website,content,category_slug,logo_url,tag_slugs,
+              suggested_category,suggested_category_note,status,plan,owner_user_id,
+              draft_saved_at,block_key,block_covers_subdomains)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,'draft',NULL,?,?,?,?)`,
           params: [
             id,
             key.hostKey,
@@ -664,6 +711,7 @@ export function createSubmissionOperations(config: {
             content.categorySlug,
             content.logoUrl,
             storedTagSlugs(content.tagSlugs),
+            ...suggestionColumns(checkedSuggestion(content) ?? null),
             ownerUserId,
             now,
             key.blockKey,
@@ -723,7 +771,10 @@ export function createSubmissionOperations(config: {
             resourceLinks: [],
             ...(checked.tagSlugs === undefined
               ? {}
-              : { tagSlugs: checked.tagSlugs.length > 0 ? checked.tagSlugs : null })
+              : { tagSlugs: checked.tagSlugs.length > 0 ? checked.tagSlugs : null }),
+            ...(checked.suggestedCategory === undefined
+              ? {}
+              : { suggestedCategory: checkedSuggestion(checked) ?? null })
           },
           expectedContentVersion,
           expectedStatuses: [current.status],

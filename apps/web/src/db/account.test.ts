@@ -482,6 +482,50 @@ describe('account operations', () => {
     }
   })
 
+  it('stages a suggested category with a revision beside its chosen category (#406)', async () => {
+    const slug = seedOwnedListing('lst_suggest')
+    const listing = await operations().listing(OWNER, slug)
+    const edit = {
+      categorySlug: 'tools',
+      content: 'Live content',
+      description: 'Live description',
+      faqs: [],
+      logoUrl: listing?.logoUrl ?? '',
+      resourceLinks: []
+    }
+    const save = (
+      suggestion: { suggestedCategory?: string; suggestedCategoryNote?: string },
+      expectedRevisionVersion: number | null
+    ) =>
+      operations().saveRevision({
+        content: { ...edit, ...suggestion },
+        expectedRevisionVersion,
+        listingId: 'lst_suggest',
+        newRevisionId: 'rev_suggest',
+        userId: OWNER
+      })
+    const stored = () =>
+      row(
+        "SELECT category_slug, suggested_category, suggested_category_note FROM listing_revisions WHERE id='rev_suggest'"
+      )
+    await save({ suggestedCategory: 'Mind maps', suggestedCategoryNote: 'Maps of ideas.' }, null)
+    expect(stored()).toEqual({
+      category_slug: 'tools',
+      suggested_category: 'Mind maps',
+      suggested_category_note: 'Maps of ideas.'
+    })
+    expect((await operations().listing(OWNER, slug))?.revision).toMatchObject({
+      suggestedCategory: 'Mind maps',
+      suggestedCategoryNote: 'Maps of ideas.'
+    })
+    // The form sends it each time: left out or empty, the revision has none.
+    await save({}, 1)
+    expect(stored()).toMatchObject({ suggested_category: null, suggested_category_note: null })
+    await expect(save({ suggestedCategoryNote: 'A note alone' }, 2)).rejects.toMatchObject({
+      code: 'invalid_suggestion'
+    })
+  })
+
   it('checks a live free listing’s badge with its own cooldown and 24-hour budget', async () => {
     seedOwnedListing('lst_badge')
     seedOwnedListing('lst_paid', { paid: true })

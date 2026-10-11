@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import {
+  categorySuggestionFields,
   draftContentSchema,
   FIELD_MESSAGES,
   SUBMISSION_FIELD_LIMITS,
@@ -92,7 +93,9 @@ export const revisionRequestSchema = extrasSchema.extend({
     .array(z.string().trim().min(1).max(100))
     .max(SUBMISSION_TAG_LIMIT, FIELD_MESSAGES.tagSlugs)
     .refine(tags => new Set(tags).size === tags.length, FIELD_MESSAGES.tagSlugs)
-    .optional()
+    .optional(),
+  /** A suggested category (#406); left out or empty, the revision has none. */
+  ...categorySuggestionFields
 })
 
 export type RevisionRequest = z.input<typeof revisionRequestSchema>

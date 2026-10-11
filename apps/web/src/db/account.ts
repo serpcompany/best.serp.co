@@ -32,6 +32,7 @@ import {
 import {
   activeTags,
   CONCLUSIVE_VERIFICATION_FAILURES,
+  checkedSuggestion,
   type DraftContent,
   SUBMISSION_LIMITS,
   SubmissionError,
@@ -168,6 +169,9 @@ export interface AccountRevisionDetail extends AccountRevision, AccountExtras {
   name: string
   /** The owner's tags (#341), or null when the revision leaves the listing's as they are. */
   tagSlugs: string[] | null
+  /** A category the owner suggests (#406), and its note, or null. */
+  suggestedCategory: string | null
+  suggestedCategoryNote: string | null
 }
 
 export interface AccountListing {
@@ -222,6 +226,9 @@ export interface RevisionContent extends AccountExtras {
    * the listing's tags as they are.
    */
   tagSlugs?: string[]
+  /** A category the owner suggests (#406) and its note; left out or empty, the revision has none. */
+  suggestedCategory?: string
+  suggestedCategoryNote?: string
 }
 
 type Row = Record<string, unknown>
@@ -398,7 +405,8 @@ export function selectAccountListingPlans(userId: string, slug: string): Stateme
     },
     {
       sql: `SELECT r.name,r.description,r.content,r.category_slug,c.name AS category_name,
-          r.logo_url,r.tag_slugs FROM listing_revisions r
+          r.logo_url,r.tag_slugs,r.suggested_category,r.suggested_category_note
+          FROM listing_revisions r
           LEFT JOIN categories c ON c.slug=r.category_slug
         WHERE r.id=(${revision})`,
       params: [userId, slug]
@@ -736,6 +744,8 @@ export function createAccountOperations(config: {
               logoUrl: text(staged.logo_url),
               name: text(staged.name),
               resourceLinks: links(revisionLinks ?? []),
+              suggestedCategory: optional(staged.suggested_category),
+              suggestedCategoryNote: optional(staged.suggested_category_note),
               tagSlugs: parseTagSlugs(staged.tag_slugs)
             }
           : null,
@@ -893,7 +903,11 @@ export function createAccountOperations(config: {
           409
         )
       }
-      const checked = validateDraftContent(content, config.allowInsecureLogos === true)
+      const { suggestedCategory, suggestedCategoryNote, ...checked } = validateDraftContent(
+        content,
+        config.allowInsecureLogos === true
+      )
+      const suggestion = checkedSuggestion({ suggestedCategory, suggestedCategoryNote })
       if (!(await activeCategory(checked.categorySlug))) {
         throw new SubmissionError('invalid_category', 'Choose a primary category.')
       }
@@ -925,6 +939,8 @@ export function createAccountOperations(config: {
             ...(checked.tagSlugs === undefined
               ? {}
               : { tagSlugs: checked.tagSlugs.length > 0 ? checked.tagSlugs : null }),
+            // Left out, the suggested category stays as stored (#406).
+            ...(suggestion === undefined ? {} : { suggestedCategory: suggestion }),
             videoUrl: current.videoUrl
           },
           eventDetail: JSON.stringify({ fields: edited }),
@@ -1021,6 +1037,7 @@ export function createAccountOperations(config: {
           )
         }
       }
+      const suggestion = checkedSuggestion(content) ?? null
       const staged = {
         categorySlug,
         content: body,
@@ -1029,6 +1046,7 @@ export function createAccountOperations(config: {
         logoUrl,
         name: current.name,
         resourceLinks: extras.resourceLinks,
+        suggestedCategory: suggestion,
         tagSlugs: tags && JSON.stringify(tags) !== JSON.stringify(current.tags) ? tags : null,
         videoUrl: current.videoUrl
       }

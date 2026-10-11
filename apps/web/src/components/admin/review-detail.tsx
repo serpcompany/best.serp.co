@@ -7,6 +7,7 @@ import {
   Info,
   MessageSquare,
   Pencil,
+  Plus,
   TriangleAlert,
   Undo2
 } from 'lucide-react'
@@ -76,6 +77,7 @@ import { Kv } from './kv'
 import { LogoPreview } from './logo-preview'
 import { RecordHeader } from './record-header'
 import { PlanBadge, StatusBadge, type StatusKind } from './status-badge'
+import { CategoryForm, TagForm } from './taxonomy-forms'
 
 /**
  * The review page of one submission or owner revision (#64 screen 11): the page head with the
@@ -187,6 +189,30 @@ export function ReviewDetail({
   const close = () => {
     setDialog(null)
     setError(null)
+  }
+
+  // A suggested category (#406): created here from the suggestion, then, while the submission
+  // can still be edited before approval, put in the edits (a tag among its tags, a category as
+  // its primary one). A paid submission already live and a revision take no edits at review.
+  const [creating, setCreating] = useState<'category' | 'tag' | null>(null)
+  const reviewOpen = queued || rejectable
+  const assignable = queued && isSubmission && !paidLive
+  function created(kind: 'category' | 'tag', slug: string) {
+    setCreating(null)
+    if (assignable) {
+      setEditing(true)
+      if (kind === 'tag') {
+        setTagSlugs(current =>
+          current.includes(slug) || current.length >= SUBMISSION_TAG_LIMIT
+            ? current
+            : [...current, slug]
+        )
+      } else {
+        setEdits(current => ({ ...current, categorySlug: slug }))
+      }
+    }
+    // The new tag or category joins the options.
+    router.refresh()
   }
 
   async function send(action: string, body: unknown, done: string): Promise<void> {
@@ -529,10 +555,37 @@ export function ReviewDetail({
               ...(view.tagSlugs
                 ? ([['Tags', tagNames(view.tagSlugs)]] as Array<[string, ReactNode]>)
                 : []),
+              ...(view.suggestion
+                ? ([
+                    [
+                      'Suggested',
+                      <span key="s" className="flex flex-col gap-1">
+                        <span>{view.suggestion.name}</span>
+                        {view.suggestion.note ? (
+                          <span className="whitespace-pre-wrap font-normal text-muted-foreground">
+                            {view.suggestion.note}
+                          </span>
+                        ) : null}
+                      </span>
+                    ]
+                  ] as Array<[string, ReactNode]>)
+                : []),
               ['Plan', view.paid ? `Paid · ${amount}` : 'Free (badge)'],
               ['Logo', `From ${hostOf(view.logoUrl)}`]
             ]}
           />
+          {view.suggestion && reviewOpen ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => setCreating('tag')}>
+                <Plus />
+                Create tag
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setCreating('category')}>
+                <Plus />
+                Create category
+              </Button>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
       {isSubmission ? (
@@ -756,6 +809,40 @@ export function ReviewDetail({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {view.suggestion ? (
+        <Dialog open={creating !== null} onOpenChange={open => !open && setCreating(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{creating === 'tag' ? 'Create a tag' : 'Create a category'}</DialogTitle>
+              <DialogDescription>
+                {assignable
+                  ? 'It’s added to your edits, to approve with the listing.'
+                  : 'Assign it on the listing page after approving.'}
+              </DialogDescription>
+            </DialogHeader>
+            {creating === 'tag' ? (
+              <TagForm
+                embedded
+                categories={categories}
+                initial={{
+                  category: edits.categorySlug || view.categorySlug,
+                  name: view.suggestion.name
+                }}
+                mode="create"
+                onSaved={slug => created('tag', slug)}
+              />
+            ) : (
+              <CategoryForm
+                embedded
+                initial={{ name: view.suggestion.name }}
+                mode="create"
+                onSaved={slug => created('category', slug)}
+              />
+            )}
+          </DialogContent>
+        </Dialog>
+      ) : null}
 
       <Dialog open={dialog === 'changes'} onOpenChange={open => !open && close()}>
         <DialogContent>

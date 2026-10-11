@@ -18,6 +18,7 @@ and top bar since #261); pages set their breadcrumb with `AdminCrumbs`.
 | Categories (#405) | `/admin/categories/`, `/admin/categories/<slug>/` | `selectAdminCategoriesPlan` |
 | Tags (#405) | `/admin/tags/`, `/admin/tags/<slug>/` | `selectAdminTagsPlan`, `selectActiveCategoriesPlan` |
 | Best pages (#405) | `/admin/best-pages/`, `/admin/best-pages/<slug>/` | `selectAdminBestPagesPlan`, `selectAdminBestPagePlans`, `selectActiveTagsPlan` |
+| Category suggestions (#406) | `/admin/suggestions/` | `selectCategorySuggestionsPlan` |
 | Orders (#68) | `/admin/orders/` | `selectAdminOrdersPlan` (`src/db/billing.ts`) |
 
 The reads are statement plans in `apps/web/src/db/admin-queries.ts`; `apps/web/src/lib/admin/`
@@ -206,6 +207,21 @@ it lacks: `category-edit` (compared and swapped), `category-retire`, `taxonomy-r
   keeps its blurb; its exclusions stay as manifests set them. Pins join a page's pool, so its tag
   changes only while every pin is in the new pool; otherwise the admin unpins those first. Both
   batches end with `best-page-pins-check`, which refuses a pin outside the pool.
+
+## Category suggestions (#406)
+
+A category a Creator suggests ([Submission categories](./submission-taxonomy.md#suggested-categories-406))
+shows on the submission's or revision's review screen beside its category and tags, with its
+note. While the review is open, "Create tag" and "Create category" open the #405 form in a
+dialog (`embedded`), filled in with the suggested name (a tag also with the record's category).
+Saving creates it as any create does. On a submission the reviewer can still edit before
+approving, the new tag joins its tags (up to three), or the new category becomes its primary
+category, in "Edit, then approve", and approving files the listing there. A paid submission
+already live and a revision take no edits at review (#368): assign the new tag or category on the
+listing page after approving. `/admin/suggestions/` lists every open suggestion (on a submission
+from `pending_badge` until its decision, or an open revision), grouped by name regardless of case
+and spacing so repeats show as one row, each linking its reviews and opening the tag or category
+list page's create form with the name filled in (`?name=`).
 
 ## Unpublished listings answer 410
 

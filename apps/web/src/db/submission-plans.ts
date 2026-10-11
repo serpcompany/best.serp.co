@@ -18,6 +18,7 @@ import {
   type StatementPlan,
   stagedTagsPlans,
   submissionContentSource,
+  suggestionColumns,
   tagSlugsJson
 } from './plan-support'
 import {
@@ -937,13 +938,18 @@ export function buildReplaceSubmissionContentPlans(input: {
   }
   const owner = input.ownerUserId === undefined ? '' : ' AND owner_user_id=?'
   const version = input.expectedContentVersion === undefined ? '' : ' AND content_version=?'
-  // Tags the content leaves out (undefined) stay as stored (#341).
+  // Tags and a suggested category the content leaves out (undefined) stay as stored (#341, #406).
   const tags = input.content.tagSlugs === undefined ? null : tagSlugsJson(input.content.tagSlugs)
+  const suggestion =
+    input.content.suggestedCategory === undefined
+      ? []
+      : suggestionColumns(input.content.suggestedCategory)
   return [
     {
       sql: `UPDATE listing_submissions
         SET name=?,description=?,content=?,category_slug=?,logo_url=?,video_url=?,updated_at=?,
           ${input.content.tagSlugs === undefined ? '' : 'tag_slugs=?,'}
+          ${suggestion.length === 0 ? '' : 'suggested_category=?,suggested_category_note=?,'}
           content_version=content_version+1
         WHERE id=? AND status IN (${statusList(input.expectedStatuses)})${owner}${version}`,
       params: [
@@ -955,6 +961,7 @@ export function buildReplaceSubmissionContentPlans(input: {
         input.content.videoUrl ?? null,
         input.now,
         ...(input.content.tagSlugs === undefined ? [] : [tags]),
+        ...suggestion,
         input.submissionId,
         ...(input.ownerUserId === undefined ? [] : [input.ownerUserId]),
         ...(input.expectedContentVersion === undefined
