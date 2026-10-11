@@ -46,9 +46,13 @@ From the edge inward:
    background for up to 5 minutes; isolates in one data center share it through the Cache
    API for 30 seconds. D1 therefore sees about one one-row epoch read per data center per
    30 seconds, and a publication reaches cached pages within about a minute. Nothing is
-   purged: old keys stop matching and expire. The entry shares the epoch with the renders in
-   its isolate (`shareCatalogEpochToken`, a global, never a request header), so a render
-   reuses it for up to 30 seconds instead of reading it again.
+   purged: old keys stop matching and expire. The epoch travels with the D1 bookmark of the
+   read that returned it, in the memo and in the share (beside the bare token, in an
+   `x-d1-bookmark` header; see [Read replication](#read-replication)). The render of a miss gets
+   both for its own request (`runWithCatalogRead`, an async context like OpenNext's, never a
+   global or a request header), so it keys the data cache on its edge key's epoch without
+   reading it again. Other renders reuse the isolate's last epoch (`shareCatalogEpochToken`, a
+   global) for up to 30 seconds.
 3. **Data cache** (Workers Cache API, `apps/web/src/db/cache.ts`). Shell counts, tag counts,
    the best index, name order and name pages (keyed by scope: `*`, `c:<category>` or
    `t:<tag>`, so a tag and a category with one slug never share an entry), a best page's
@@ -70,6 +74,31 @@ From the edge inward:
 Both Cache API layers are per data center and populate on demand. A deployment gets a new
 Worker version and therefore a cold HTML cache; the data cache survives deployments. Confirming
 it after a deploy is in the [Deploy runbook](./deploy-runbook.md#after-a-deploy).
+
+## Read replication
+
+D1 read replication is a setting on each database, off until the owner enables it (#382). It adds
+read-only copies in other regions, which only reads through the Sessions API use; the binding
+itself always reads the primary.
+
+- **Only public catalog reads for an edge cache miss use a session:** the Worker entry's epoch
+  read (`withSession('first-unconstrained')`, `lib/worker/catalog.ts`) and the render of the miss
+  (`withSession(<bookmark>)`, `lib/catalog/repository.ts`). Writes, the admin panel, accounts,
+  submissions, claims, billing, auth, the cron jobs, the entry's redirect and gone-listing seeks,
+  and every bypassed render (signed in, `/search`, `/api`) read the primary;
+  `architecture-guard.test.ts` keeps `withSession(` to those two files.
+- **A render never reads rows older than the epoch it keys the caches on.** Its session starts at
+  the bookmark of the read that returned that epoch, and D1 answers each statement from a copy at
+  least that new (the primary while the nearest replica lags). Rows newer than the epoch can be
+  read, as without replicas when a publication lands mid-render, and the next epoch replaces them.
+- **What can lag is the epoch:** a replica may answer its read, so a publication reaches pages
+  after that replica's lag plus the memo's age. An epoch shared without a bookmark (by a Worker
+  version from before #382) renders from the primary.
+- **Without replication** every statement runs on the primary: the same rows, round trips (the
+  epoch read, then one batch per uncached listing) and latency as through the binding.
+- **Telemetry:** `d1_query` events carry `servedByPrimary` and `servedByRegion` where remote D1
+  reports them. `read-replication.test.ts` runs the path against a lagging replica
+  (`ReplicatedD1`), and the workerd suite runs the catalog through a real session.
 
 ## Why this design
 

@@ -60,7 +60,11 @@ function worker(env: WorkerRequestEnv) {
         withEdgeCache(
           request,
           { waitUntil: promise => pending.push(promise) },
-          { cache: cache as unknown as Cache, deploymentId: 'v1', epoch: async () => 'e1' },
+          {
+            cache: cache as unknown as Cache,
+            deploymentId: 'v1',
+            epoch: async () => ({ bookmark: null, token: 'e1' })
+          },
           async rendered => {
             // What OpenNext hands the root layout: the Worker's env and the forwarded headers.
             runtime.env = env as Record<string, string | undefined>

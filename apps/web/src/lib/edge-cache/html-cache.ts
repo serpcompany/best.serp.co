@@ -67,13 +67,24 @@ export interface EdgeCacheContext {
   waitUntil(promise: Promise<unknown>): void
 }
 
+/**
+ * The catalog epoch a response is keyed on (`token`), and the D1 bookmark of the read that
+ * returned it (#382), or null when unknown. A render of a miss gets both: its catalog reads start
+ * at the bookmark, so nothing it stores under the epoch is older than the epoch. The bookmark is
+ * never part of a key: every D1 write moves it.
+ */
+export interface EpochRead {
+  bookmark: string | null
+  token: string
+}
+
 export interface EdgeCacheOptions {
   /** Worker-local Cache API namespace for stored responses. */
   cache: Cache
   /** Identifies the deployed build (Worker version); markup and asset URLs change with it. */
   deploymentId: string
-  /** Current catalog epoch token, or null when it cannot be read (the cache is bypassed). */
-  epoch: (context: EdgeCacheContext) => Promise<string | null>
+  /** Current catalog epoch, or null when it cannot be read (the cache is bypassed). */
+  epoch: (context: EdgeCacheContext) => Promise<EpochRead | null>
   observe?: (event: EdgeCacheEvent) => void
 }
 
@@ -190,13 +201,14 @@ function servedCopy(cached: Response, method: string): Response {
  * Serves `request` from the edge cache when possible, otherwise from `render`, storing
  * cacheable responses in the background. A cacheable request is rendered from
  * `renderRequestFor(request)`, so what is stored depends only on the cache key; a bypassed
- * request is rendered as sent.
+ * request is rendered as sent. Only the render of a miss gets the epoch its key names (#382); a
+ * bypassed render (signed in, private paths, no epoch) gets none.
  */
 export async function withEdgeCache(
   request: Request,
   context: EdgeCacheContext,
   options: EdgeCacheOptions,
-  render: (request: Request) => Promise<Response>
+  render: (request: Request, epoch?: EpochRead) => Promise<Response>
 ): Promise<Response> {
   const observe = options.observe ?? (() => {})
   if (!isCacheableRequest(request)) {
@@ -205,7 +217,7 @@ export async function withEdgeCache(
   }
   const renderRequest = renderRequestFor(request)
 
-  let epoch: string | null = null
+  let epoch: EpochRead | null = null
   try {
     epoch = await options.epoch(context)
   } catch {
@@ -216,14 +228,14 @@ export async function withEdgeCache(
     return withState(await render(renderRequest), 'BYPASS')
   }
 
-  const key = await cacheKeyFor(request, options.deploymentId, epoch)
+  const key = await cacheKeyFor(request, options.deploymentId, epoch.token)
   const cached = await options.cache.match(key).catch(() => undefined)
   if (cached) {
     observe({ event: 'edge_cache', state: 'HIT', status: cached.status })
     return servedCopy(cached, request.method)
   }
 
-  const response = await render(renderRequest)
+  const response = await render(renderRequest, epoch)
   observe({ event: 'edge_cache', state: 'MISS', status: response.status })
   if (request.method !== 'GET' || !isCacheableResponse(response)) {
     return withState(response, 'MISS')
@@ -237,44 +249,44 @@ export async function withEdgeCache(
   return withState(response, 'MISS')
 }
 
-interface EpochValue {
+interface MemoEntry {
   fetchedAt: number
-  token: string
+  read: EpochRead
 }
 
 /**
- * Per-isolate memo of the catalog epoch with stale-while-revalidate: requests inside
- * `freshMs` reuse it, requests inside `maxStaleMs` reuse it while one background refresh
- * runs, and older values are refreshed before answering. Concurrent refreshes share one
+ * Per-isolate memo of the catalog epoch (with its bookmark, #382) with stale-while-revalidate:
+ * requests inside `freshMs` reuse it, requests inside `maxStaleMs` reuse it while one background
+ * refresh runs, and older values are refreshed before answering. Concurrent refreshes share one
  * load, so a busy isolate reads the epoch at most once per `freshMs`.
  */
 export class EpochMemo {
-  private inflight: Promise<string> | undefined
-  private value: EpochValue | undefined
+  private inflight: Promise<EpochRead> | undefined
+  private value: MemoEntry | undefined
 
   constructor(
-    private readonly load: () => Promise<string>,
+    private readonly load: () => Promise<EpochRead>,
     private readonly now: () => number = Date.now,
     private readonly freshMs = EPOCH_FRESH_MS,
     private readonly maxStaleMs = EPOCH_MAX_STALE_MS
   ) {}
 
-  async current(context: EdgeCacheContext): Promise<string> {
+  async current(context: EdgeCacheContext): Promise<EpochRead> {
     const value = this.value
     const age = value ? this.now() - value.fetchedAt : Number.POSITIVE_INFINITY
-    if (value && age < this.freshMs) return value.token
+    if (value && age < this.freshMs) return value.read
     if (value && age < this.maxStaleMs) {
       context.waitUntil(this.refresh().catch(() => undefined))
-      return value.token
+      return value.read
     }
     return this.refresh()
   }
 
-  private refresh(): Promise<string> {
+  private refresh(): Promise<EpochRead> {
     this.inflight ||= this.load()
-      .then(token => {
-        this.value = { fetchedAt: this.now(), token }
-        return token
+      .then(read => {
+        this.value = { fetchedAt: this.now(), read }
+        return read
       })
       .finally(() => {
         this.inflight = undefined
@@ -284,27 +296,30 @@ export class EpochMemo {
 }
 
 const EPOCH_CACHE_KEY = 'https://html-cache.invalid/catalog-epoch'
+/**
+ * The shared entry's body is the bare token, so a Worker version from before #382 still reads
+ * it; the bookmark travels beside it in this header, and an entry without one (stored by such a
+ * version) reads as no bookmark, so its renders read the primary.
+ */
+const EPOCH_BOOKMARK_HEADER = 'x-d1-bookmark'
 
 /**
- * Shares the epoch between the isolates of one data center for `freshSeconds`, so the
- * data center reads it from D1 at most that often.
+ * Shares the epoch, and the bookmark it was read at, between the isolates of one data center
+ * for `freshSeconds`, so the data center reads it from D1 at most that often.
  */
 export async function loadSharedEpoch(
   cache: Cache,
-  read: () => Promise<string>,
+  read: () => Promise<EpochRead>,
   freshSeconds = EPOCH_FRESH_MS / 1000
-): Promise<string> {
+): Promise<EpochRead> {
   const cached = await cache.match(EPOCH_CACHE_KEY).catch(() => undefined)
   if (cached) {
     const token = await cached.text()
-    if (token) return token
+    if (token) return { bookmark: cached.headers.get(EPOCH_BOOKMARK_HEADER) || null, token }
   }
-  const token = await read()
-  await cache
-    .put(
-      EPOCH_CACHE_KEY,
-      new Response(token, { headers: { 'cache-control': `public, max-age=${freshSeconds}` } })
-    )
-    .catch(() => undefined)
-  return token
+  const epoch = await read()
+  const headers = new Headers({ 'cache-control': `public, max-age=${freshSeconds}` })
+  if (epoch.bookmark) headers.set(EPOCH_BOOKMARK_HEADER, epoch.bookmark)
+  await cache.put(EPOCH_CACHE_KEY, new Response(epoch.token, { headers })).catch(() => undefined)
+  return epoch
 }

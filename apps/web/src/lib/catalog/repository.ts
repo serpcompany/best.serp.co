@@ -4,8 +4,8 @@ import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { cache } from 'react'
 import { createCacheApiDataCache, noCatalogDataCache } from '@/db/cache'
 import { createCatalogOperations, MAX_SEARCH_LIMIT } from '@/db/catalog'
-import { sharedCatalogEpoch } from '@/db/catalog-epoch'
-import { createDatabase } from '@/db/client'
+import { currentCatalogRead, sharedCatalogEpoch } from '@/db/catalog-epoch'
+import { createDatabase, createSessionDatabase } from '@/db/client'
 import type {
   BestPageItem,
   CatalogObserver,
@@ -74,13 +74,21 @@ const getOperations = cache(async () => {
     typeof caches === 'undefined'
       ? noCatalogDataCache
       : createCacheApiDataCache(await caches.open('catalog-data-ops'))
+  const binding = assertCatalogBinding(cloudflareEnv)
+  // Only a render the Worker entry started for a request the edge cache missed has a catalog read
+  // (#382): it reads through a D1 session at the bookmark its epoch was read at, which a replica
+  // may answer, and keys the data cache on that epoch. Every other render (signed in, bypassed, or
+  // an epoch with no bookmark) reads the primary, as writes do.
+  const read = currentCatalogRead()
   return createCatalogOperations({
     cache: dataCache,
-    client: createDatabase(assertCatalogBinding(cloudflareEnv)),
+    client: read?.bookmark
+      ? createSessionDatabase(binding.withSession(read.bookmark))
+      : createDatabase(binding),
     clock: () => new Date(),
     observe,
     // The Worker entry just read the epoch for the edge cache key; reuse it (#77).
-    reuseEpoch: () => sharedCatalogEpoch()
+    reuseEpoch: () => read?.epoch ?? sharedCatalogEpoch()
   })
 })
 

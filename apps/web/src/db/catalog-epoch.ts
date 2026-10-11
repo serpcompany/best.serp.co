@@ -1,5 +1,6 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { type SQL, sql } from 'drizzle-orm'
-import { type Database, d1ErrorCode, runQuery } from './client'
+import { type Database, d1ErrorCode, runQuery, servedBy } from './client'
 import type { CatalogObserver, TaxonomyTarget } from './contracts'
 import { listingInRetiredCategory } from './plan-support'
 
@@ -99,6 +100,55 @@ export function sharedCatalogEpoch(
   if (!shared) return null
   const age = now - shared.sharedAt
   return age >= 0 && age < maxAgeMs ? { ...shared.epoch } : null
+}
+
+/**
+ * What the Worker entry keyed a request's edge cache on (#382): the catalog epoch, and the D1
+ * bookmark of the read that returned it (null when unknown, such as an epoch an older Worker
+ * version shared through the Cache API).
+ */
+export interface CatalogRead {
+  bookmark: string | null
+  epoch: CatalogEpoch
+}
+
+/**
+ * The Worker entry and the Next.js server share one store per isolate, as they share the epoch
+ * (`SHARED_EPOCH`); each request's value lives in its own async context, so it reaches only the
+ * render the entry started for that request. OpenNext hands the render its Cloudflare context the
+ * same way.
+ */
+const CATALOG_READ = Symbol.for('serpdirectory.catalog-read')
+
+function catalogReadStorage(): AsyncLocalStorage<CatalogRead> {
+  const scope = globalThis as Record<symbol, unknown>
+  const existing = scope[CATALOG_READ] as AsyncLocalStorage<CatalogRead> | undefined
+  if (existing) return existing
+  const storage = new AsyncLocalStorage<CatalogRead>()
+  scope[CATALOG_READ] = storage
+  return storage
+}
+
+/**
+ * Runs the render of a request the edge cache missed with the epoch its key names and the bookmark
+ * that epoch was read at (#382), so the render keys the data cache on the same epoch and its D1
+ * session starts at that bookmark: no row it reads, and so none it caches under the epoch, is older
+ * than the epoch. Renders started any other way (a signed-in or bypassed request, or a token this
+ * module does not recognize) run without it and read the primary.
+ */
+export function runWithCatalogRead<T>(
+  read: { bookmark: string | null; token: string },
+  render: () => T
+): T {
+  const epoch = parseCatalogEpochToken(read.token)
+  if (!epoch) return render()
+  return catalogReadStorage().run({ bookmark: read.bookmark || null, epoch }, render)
+}
+
+/** The catalog read of the render in progress (`runWithCatalogRead`), or null. */
+export function currentCatalogRead(): CatalogRead | null {
+  const read = catalogReadStorage().getStore()
+  return read ? { bookmark: read.bookmark, epoch: { ...read.epoch } } : null
 }
 
 /**
@@ -365,11 +415,13 @@ export async function readCatalogEpoch(input: {
   let resultRows = 0
   let success = false
   let errorCode: string | undefined
+  let served: ReturnType<typeof servedBy> = {}
   try {
     const result = await runQuery<CatalogEpochRow>(input.client, catalogEpochStatement(input.asOf))
     const meta = result.meta as { duration?: number; rows_read?: number } | undefined
     rowsRead = typeof meta?.rows_read === 'number' ? meta.rows_read : null
     d1DurationMs = typeof meta?.duration === 'number' ? meta.duration : null
+    served = servedBy(meta)
     resultRows = result.results.length
     success = result.success
     if (!result.success) throw new Error('D1 catalog epoch query failed.')
@@ -387,6 +439,7 @@ export async function readCatalogEpoch(input: {
       resultRows,
       rowsRead,
       rowsWritten: 0,
+      ...served,
       success,
       wallDurationMs: performance.now() - startedAt
     })

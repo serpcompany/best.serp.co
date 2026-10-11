@@ -299,7 +299,11 @@ describe('single-site D1-only repository architecture', () => {
     expect(repository).toContain('env.DB')
     expect(repository).toContain('@/db/catalog')
     expect(repository).toContain("from '@/db/client'")
-    expect(repository).toContain('createDatabase(assertCatalogBinding(cloudflareEnv))')
+    // The fail-closed binding check, then the primary or, for a public render, a D1 session of the
+    // same binding at its epoch's bookmark (#382).
+    expect(repository).toContain('const binding = assertCatalogBinding(cloudflareEnv)')
+    expect(repository).toContain('createSessionDatabase(binding.withSession(read.bookmark))')
+    expect(repository).toContain('createDatabase(binding)')
     expect(repository).toContain('readListingBySlug = cache(')
     expect(repository).not.toMatch(/\b(?:SELECT|WITH)\b/u)
     expect(repository).not.toMatch(/node:fs|readFile|writeFile/u)
@@ -317,6 +321,23 @@ describe('single-site D1-only repository architecture', () => {
     expect(sharedOperations).not.toContain('.prepare(')
     expect(sharedOperations).not.toContain('getCloudflareContext')
     expect(sharedOperations).not.toContain('process.env')
+  })
+
+  // #382: a D1 session may read a replica, so only the public catalog opens one: the Worker
+  // entry's epoch read and the catalog adapter. Writes, the admin panel, accounts, submissions,
+  // claims, billing, auth and the cron jobs use the binding itself, which always reads the primary.
+  it('opens D1 sessions only for public catalog reads', () => {
+    const opening = trackedFiles().filter(
+      file =>
+        /\.(?:ts|tsx)$/u.test(file) &&
+        !/\.test\.tsx?$|test-support\.ts$|\.d\.ts$/u.test(file) &&
+        existsSync(resolve(file)) &&
+        readFileSync(resolve(file), 'utf8').includes('withSession(')
+    )
+    expect(opening.sort()).toEqual([
+      `${project.sourceDirectory}/lib/catalog/repository.ts`,
+      `${project.sourceDirectory}/lib/worker/catalog.ts`
+    ])
   })
 
   it('keeps shared data operations free of tenant scoping', () => {

@@ -463,7 +463,7 @@ describe('Worker request pipeline and the edge cache', () => {
               {
                 cache: cache as unknown as Cache,
                 deploymentId: version.id,
-                epoch: async () => 'e'
+                epoch: async () => ({ bookmark: null, token: 'e' })
               },
               async forwarded => {
                 rendered.push(forwarded)
@@ -517,7 +517,11 @@ describe('Worker request pipeline and the edge cache', () => {
           withEdgeCache(
             request,
             context,
-            { cache: cache as unknown as Cache, deploymentId: version.id, epoch: async () => 'e' },
+            {
+              cache: cache as unknown as Cache,
+              deploymentId: version.id,
+              epoch: async () => ({ bookmark: null, token: 'e' })
+            },
             async forwarded => {
               rendered.push(forwarded)
               // What OpenNext renders: the same page whichever side of the gate asked.

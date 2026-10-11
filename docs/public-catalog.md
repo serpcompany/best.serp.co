@@ -42,7 +42,9 @@ The catalog epoch is `publication_state.version` plus the newest public `publish
 (`apps/web/src/db/catalog-epoch.ts`), so it also changes when a listing scheduled for the future
 becomes due. The data cache and the edge HTML cache are both keyed by it, so a write that changes
 public output advances the version in the same batch, and a write outside the catalog (a badge
-check, for example) never touches it.
+check, for example) never touches it. A render of an edge cache miss reads through a D1 session at
+the bookmark its epoch was read at, which a read replica may answer once replication is on
+([Caching](./caching.md#read-replication), #382).
 
 ## Reads
 
