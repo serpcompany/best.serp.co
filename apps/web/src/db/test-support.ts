@@ -43,11 +43,19 @@ export interface RecordedStatement {
   sql: string
 }
 
+/** One call that reached the database: a statement on its own, or a batch of `size` (#378). */
+export type RecordedRoundTrip = { kind: 'batch'; size: number } | { kind: 'statement'; sql: string }
+
+/** Runs a prepared statement inside a batch, which is one round trip, not one per statement. */
+const runInBatch = new WeakMap<object, () => unknown>()
+
 export { findSelfComparison } from './sql-limits'
 
 export class SqliteD1 {
   readonly database: DatabaseSync
   readonly statements: RecordedStatement[] = []
+  /** Every round trip, in order: how many sequential waits on D1 a read makes (#378). */
+  readonly roundTrips: RecordedRoundTrip[] = []
   private batches: Promise<unknown> = Promise.resolve()
 
   constructor(path = ':memory:') {
@@ -86,39 +94,50 @@ export class SqliteD1 {
             }
           }
         }
-        return {
+        const roundTrip = () => owner.roundTrips.push({ kind: 'statement', sql })
+        const prepared = {
           bind(...values: unknown[]) {
             assertD1StatementLimits(sql, values)
             bindings = values
             return this
           },
           async all<T>() {
+            roundTrip()
             return execute<T>()
           },
           async first<T>() {
+            roundTrip()
             return execute<T>().results[0] ?? null
           },
           /** Rows as value arrays in column order, as D1's `raw()` returns them to Drizzle. */
           async raw<T>() {
+            roundTrip()
             owner.statements.push({ bindings, sql })
             const statement = owner.database.prepare(sql)
             statement.setReturnArrays(true)
             return statement.all(...(bindings as SQLInputValue[])) as T[]
           },
           async run<T>() {
+            roundTrip()
             return execute<T>()
           }
-        } as unknown as D1PreparedStatement
+        }
+        runInBatch.set(prepared, () => execute())
+        return prepared as unknown as D1PreparedStatement
       },
       // D1 runs one batch at a time, so overlapping callers (the badge program checks several
       // sites at once) queue here instead of opening a transaction inside another.
       batch<T>(statements: D1PreparedStatement[]) {
+        owner.roundTrips.push({ kind: 'batch', size: statements.length })
         const run = async () => {
           owner.database.exec('BEGIN')
           try {
             const results: D1Result<T>[] = []
-            // The app's generated Worker types make run() non-generic; the rows are T here.
-            for (const statement of statements) results.push((await statement.run()) as D1Result<T>)
+            for (const statement of statements) {
+              const inBatch = runInBatch.get(statement)
+              // The app's generated Worker types make run() non-generic; the rows are T here.
+              results.push((inBatch ? inBatch() : await statement.run()) as D1Result<T>)
+            }
             owner.database.exec('COMMIT')
             return results
           } catch (error) {

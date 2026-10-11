@@ -6,6 +6,7 @@ import { listingContentTree } from '../../lib/markdown/listing-content-tree'
 import { DetailPageLayout } from '../layout/detail-page-layout'
 import { BestPageCards } from '../taxonomy/best-page'
 import { WebsiteContentSection } from '../website/website-content-section'
+import { WebsiteRelatedProjects } from '../website/website-related-projects'
 import { listingCategoryNames, WebsiteDetailRoutePage } from './detail-page'
 
 function findElement(node: ReactNode, type: unknown): { props: Record<string, unknown> } | null {
@@ -45,6 +46,35 @@ describe('the listing detail page (#334)', () => {
     const section = findElement(WebsiteDetailRoutePage({ project }), WebsiteContentSection)
     expect(section?.props.contentTree).toBe(contentTree)
     expect(section?.props.website).toBe(project)
+  })
+
+  it('renders a listing with nothing related, without the related section (#378 review)', () => {
+    const project: WebsiteDetailMetadata = {
+      category: 'fixture-tools',
+      description: 'A fixture listing alone in its category.',
+      name: 'Fixture',
+      nextWebsite: null,
+      previousWebsite: null,
+      publishedAt: '2026-07-04T00:00:00.000Z',
+      relatedWebsites: [],
+      slug: 'fixture.test',
+      website: 'https://fixture.test/'
+    }
+    const page = WebsiteDetailRoutePage({ project })
+    expect(findElement(page, DetailPageLayout)).not.toBeNull()
+    expect(findElement(page, WebsiteRelatedProjects)).toBeNull()
+    const related = {
+      description: 'Another.',
+      name: 'Other',
+      slug: 'other.test',
+      website: 'https://other.test/'
+    }
+    expect(
+      findElement(
+        WebsiteDetailRoutePage({ project: { ...project, relatedWebsites: [related] } }),
+        WebsiteRelatedProjects
+      )
+    ).not.toBeNull()
   })
 })
 

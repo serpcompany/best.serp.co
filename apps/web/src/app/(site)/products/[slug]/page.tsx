@@ -62,6 +62,11 @@ async function goneListing(slug: string) {
 export default async function ProjectPage({ params }: ProjectPageProps) {
   const { slug } = await params
 
+  // Category names and "Featured in" come from the cached shell stats and best index (#347).
+  // Started with the listing, so a cold data cache waits on D1 once, not twice (#378); awaited
+  // only where they're used, so a failure surfaces there, as before.
+  const shell = Promise.all([getActiveCategories(), getBestPages()])
+  shell.catch(() => undefined)
   const project = await getWebsiteBySlug(slug)
 
   if (!project) {
@@ -81,8 +86,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     !project.verifiedOwner && (await currentClaimFlags()).enabled
       ? claimLink(project.name, project.slug, await currentClaimCopy())
       : undefined
-  // Category names and "Featured in" come from the cached shell stats and best index (#347).
-  const [categories, bestPages] = await Promise.all([getActiveCategories(), getBestPages()])
+  const [categories, bestPages] = await shell
   return (
     <WebsiteDetailRoutePage
       categoryNames={new Map(categories.map(category => [category.slug, category.name]))}
