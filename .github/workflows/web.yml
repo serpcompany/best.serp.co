@@ -175,8 +175,8 @@ jobs:
 
       - name: Run Playwright tests
         if: steps.receipt.outputs.skip != 'true'
-        # The resource probe (#393) prints memory, swap, memory pressure, OOM kills, disk and the
-        # preview Workers' process totals into this step's log every 15 s. A runner shutdown skips
+        # The resource probe (#393) prints memory, swap, memory pressure, OOM kills, disk and the six
+        # processes holding the most memory into this step's log every 15 s. A runner shutdown skips
         # every later step, `always()` ones included, but the log keeps what it printed.
         run: |
           bash scripts/e2e-resource-probe.sh "$RUNNER_TEMP/resource-probe" &
@@ -184,8 +184,10 @@ jobs:
           trap 'kill "$probe" 2>/dev/null || true' EXIT
           pnpm test:e2e
 
+      # The probe's report and upload are diagnostics: neither fails e2e nor withholds the receipt.
       - name: Report runner resources
         if: always() && steps.receipt.outcome == 'success' && steps.receipt.outputs.skip != 'true'
+        continue-on-error: true
         run: bash scripts/e2e-resource-probe.sh --report "$RUNNER_TEMP/resource-probe"
 
       - name: Upload test results
@@ -198,6 +200,7 @@ jobs:
 
       - name: Upload the resource probe
         if: always() && steps.receipt.outcome == 'success' && steps.receipt.outputs.skip != 'true'
+        continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: e2e-resource-probe-${{ github.run_attempt }}

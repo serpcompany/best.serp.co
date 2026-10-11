@@ -19,13 +19,19 @@ its samples.
 ## Commands
 
 ```bash
-pnpm test:e2e         # all three runs; to filter specs, run one config with `pnpm --filter web`:
-                      # test:e2e (public), test:e2e:suites, or test:e2e:staging-access
+pnpm test:e2e         # all three runs, as CI does; the first one builds the Worker
+pnpm --filter web test:e2e e2e/home.spec.ts                             # one public spec
+pnpm build && pnpm --filter web test:e2e:suites e2e/admin-panel.spec.ts  # one suite spec
+pnpm build && pnpm --filter web test:e2e:staging-access
 pnpm test:e2e:smoke   # e2e/smoke.spec.ts + e2e/public-parity.spec.ts
 pnpm test:e2e:visual  # opt-in; no committed baselines yet (see Notes)
 pnpm test:e2e:ui
 pnpm test:e2e:debug
 ```
+
+Only the main run builds the Worker (`pnpm preview`). The suites and staging-access runs serve
+the last build in `apps/web/.open-next/` and refuse to start without one, so run `pnpm build`
+before running either on its own, or they test the build from before your edit.
 
 ## What belongs here
 
@@ -52,13 +58,14 @@ The local suite runs on the fixture seed, never the real catalog (#311, #313):
 - The seed's clock is fixed (`SEED_NOW`), but the app reads the real one: never assert a relative
   time ("expires in 3 days", "2 days ago") on a seeded row. Assert one only on a row the spec
   writes itself, at the real time.
-- The suites with their own Worker (admin, account, badge program, claims, orders, media,
+- The specs with a Worker of their own (admin, account, badge program, claims, orders, media,
   Access lock, staging access; `e2e/*-fixture.ts`) each start on a fresh D1 and seed their own
   rows with the seed's builders (`listingStatements`, `suiteCatalogStatements`), so they run in
   parallel without counting each other's rows. The media server's D1 is the seed plus a queued
   logo. The staging-access Worker runs with `LOCAL_STAGING_ACCESS=on` and a test password, so
-  it serves as staging does behind its password (#359). The suites run after the public specs,
-  and the staging-access one last, each in its own run.
+  it serves as staging does behind its password (#359). The media and Access-lock Workers run
+  with the public specs in the main run; the admin, account, orders, badge program and claims
+  suites run next, in the suites run; staging access runs last, alone.
 - Specs read and write a Worker's local D1 only through `localD1`, `runStatements` and
   `workerD1` (`e2e/admin-fixture.ts`), a suite Worker's or the main preview's (`executeLocalD1`
   in `e2e/submit-fixture.ts`, #389). They go through that Worker's own D1 (Wrangler's Local

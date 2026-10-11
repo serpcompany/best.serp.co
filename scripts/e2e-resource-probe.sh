@@ -45,8 +45,15 @@ if [ "${1:-}" = "--report" ]; then
   } | tee -a "$summary"
   # The kernel's OOM killer, if it fired: the process it chose and its memory then.
   if kills="$(sudo -n dmesg 2>/dev/null | grep -iE 'out of memory|oom-kill|killed process')" && [ -n "$kills" ]; then
-    echo "Kernel OOM events:"
-    echo "$kills" | tee "$directory/oom.txt"
+    echo "$kills" >"$directory/oom.txt"
+    {
+      echo
+      echo "Kernel OOM events:"
+      echo
+      echo '```'
+      echo "$kills"
+      echo '```'
+    } | tee -a "$summary"
   fi
   exit 0
 fi
