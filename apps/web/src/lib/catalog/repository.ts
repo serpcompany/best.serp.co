@@ -4,8 +4,8 @@ import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { cache } from 'react'
 import { createCacheApiDataCache, noCatalogDataCache } from '@/db/cache'
 import { createCatalogOperations, MAX_SEARCH_LIMIT } from '@/db/catalog'
-import { sharedCatalogEpoch } from '@/db/catalog-epoch'
-import { createDatabase } from '@/db/client'
+import { currentCatalogRead, sharedCatalogEpoch } from '@/db/catalog-epoch'
+import { createDatabase, createSessionDatabase } from '@/db/client'
 import type {
   BestPageItem,
   CatalogObserver,
@@ -70,19 +70,28 @@ const observe: CatalogObserver = event => {
 const getOperations = cache(async () => {
   const { env } = await getCloudflareContext({ async: true })
   const cloudflareEnv = env as CloudflareEnv
-  // Keyed on the environment: staging and production share the zone's cache (#397). Without one
-  // it throws, and an invalid one fails `assertCatalogBinding` before any read.
+  // Checked first, so a missing `DB` reports `d1_binding_missing` and the data cache is keyed
+  // only on a validated `D1_RUNTIME_ENV` (#400 review).
+  const binding = assertCatalogBinding(cloudflareEnv)
+  // Keyed on the environment: staging and production share the zone's cache (#397).
   const dataCache =
     typeof caches === 'undefined'
       ? noCatalogDataCache
       : createCacheApiDataCache(await caches.open('catalog-data-ops'), cloudflareEnv.D1_RUNTIME_ENV)
+  // Only a render the Worker entry started for a request the edge cache missed has a catalog read
+  // (#382): it reads through a D1 session at the bookmark its epoch was read at, which a replica
+  // may answer, and keys the data cache on that epoch. Every other render (signed in, bypassed, or
+  // an epoch with no bookmark) reads the primary, as writes do.
+  const read = currentCatalogRead()
   return createCatalogOperations({
     cache: dataCache,
-    client: createDatabase(assertCatalogBinding(cloudflareEnv)),
+    client: read?.bookmark
+      ? createSessionDatabase(binding.withSession(read.bookmark))
+      : createDatabase(binding),
     clock: () => new Date(),
     observe,
     // The Worker entry just read the epoch for the edge cache key; reuse it (#77).
-    reuseEpoch: () => sharedCatalogEpoch()
+    reuseEpoch: () => read?.epoch ?? sharedCatalogEpoch()
   })
 })
 

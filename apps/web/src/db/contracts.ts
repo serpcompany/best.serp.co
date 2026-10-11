@@ -61,6 +61,13 @@ export interface CatalogQueryEvent {
   resultRows: number
   rowsRead: number | null
   rowsWritten: number | null
+  /**
+   * Whether the primary ran the statement, and the D1 region of the copy that did (`WNAM`,
+   * `ENAM`, ...), as remote D1 reports them (#382): with read replication on, a public read the
+   * nearest replica answered says so. Absent locally.
+   */
+  servedByPrimary?: boolean
+  servedByRegion?: string
   success: boolean
   wallDurationMs: number
 }
@@ -391,12 +398,17 @@ export interface CatalogOperations {
 
 export interface CatalogOperationsConfig {
   cache: CatalogDataCache
+  /**
+   * Where every read runs. A public render's is a D1 session at the bookmark its reused epoch
+   * was read at (`createSessionDatabase`, #382), so nothing it caches under that epoch is older.
+   */
   client: Database
   clock: () => Date
   observe: CatalogObserver
   /**
-   * An epoch this isolate read moments ago (the Worker entry's, `sharedCatalogEpoch()`), so a
-   * render reuses it instead of reading the epoch again; null falls back to D1.
+   * An epoch this isolate read moments ago (the Worker entry's: `currentCatalogRead()` or
+   * `sharedCatalogEpoch()`), so a render reuses it instead of reading the epoch again; null falls
+   * back to D1.
    */
   reuseEpoch?: () => CatalogEpoch | null
 }

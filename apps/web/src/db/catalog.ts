@@ -11,7 +11,7 @@ import {
   TAXONOMY_TARGET_JOINS,
   TAXONOMY_TARGET_SLUG
 } from './catalog-epoch'
-import { type CompiledQuery, d1ErrorCode, runBatch, runQuery } from './client'
+import { type CompiledQuery, d1ErrorCode, runBatch, runQuery, servedBy } from './client'
 import type {
   BestPageItem,
   CatalogCacheEvent,
@@ -289,6 +289,7 @@ function queryEvent(
     resultRows: result.results.length,
     rowsRead: finiteMetric(meta?.rows_read),
     rowsWritten: finiteMetric(meta?.rows_written),
+    ...servedBy(meta),
     success: result.success,
     wallDurationMs
   }

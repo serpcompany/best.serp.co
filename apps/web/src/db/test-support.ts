@@ -154,6 +154,100 @@ export class SqliteD1 {
   }
 }
 
+/** A copy of a replicated database: its primary or its replica. */
+export type D1Copy = 'primary' | 'replica'
+
+/**
+ * D1 with read replication on (#382), for tests of what a lagging replica can do: a primary and
+ * one replica, each a SQLite database (`SqliteD1`) with its own version. `write` applies SQL to
+ * the primary as a new version and to the replica only when it catches up (`catchUp`).
+ *
+ * As on D1, the binding itself (`prepare`, `batch`) always reads the primary. A session
+ * (`withSession`) sends each statement to the binding's nearest copy; the session's floor starts
+ * at the bookmark it was given (0 for `first-unconstrained`; `first-primary` sends its first
+ * statement to the primary) and rises to each version a statement read, so the session reads
+ * sequentially. A replica behind the floor waits until it has caught up before it answers, as
+ * Cloudflare documents (`waits` counts each time), so it never serves older rows. Bookmarks are
+ * versions, zero-padded so they order as strings, as D1's do. A batch runs on the copy its
+ * statements were prepared on.
+ */
+export class ReplicatedD1 {
+  readonly primary = new SqliteD1()
+  readonly replica = new SqliteD1()
+  readonly versions: Record<D1Copy, number> = { primary: 1, replica: 1 }
+  /** The copy each statement was sent to, in order. */
+  readonly served: D1Copy[] = []
+  /** Every `withSession` argument, in order. */
+  readonly sessions: string[] = []
+  /** How many statements a replica held until it had caught up to their session's floor. */
+  waits = 0
+  private readonly lagging: string[] = []
+
+  /** Seeds both copies alike, at version 1. */
+  seed(apply: (copy: SqliteD1) => void): void {
+    apply(this.primary)
+    apply(this.replica)
+  }
+
+  /** Applies `sql` to the primary as a new version; the replica gets it on `catchUp`. */
+  write(sql: string): void {
+    this.primary.database.exec(sql)
+    this.versions.primary += 1
+    this.lagging.push(sql)
+  }
+
+  /** The replica applies every write it lacks. */
+  catchUp(): void {
+    for (const sql of this.lagging.splice(0)) this.replica.database.exec(sql)
+    this.versions.replica = this.versions.primary
+  }
+
+  /** The `DB` binding of a Worker whose nearest copy is `nearest`. */
+  binding(nearest: D1Copy): D1Database {
+    const owner = this
+    const primary = this.primary.asD1Database()
+    return {
+      batch: (statements: D1PreparedStatement[]) => primary.batch(statements),
+      prepare(sql: string) {
+        owner.served.push('primary')
+        return primary.prepare(sql)
+      },
+      withSession(constraint = 'first-unconstrained') {
+        owner.sessions.push(constraint)
+        return owner.session(constraint, nearest)
+      }
+    } as unknown as D1Database
+  }
+
+  private session(constraint: string, nearest: D1Copy): D1DatabaseSession {
+    const owner = this
+    const copies = { primary: this.primary.asD1Database(), replica: this.replica.asD1Database() }
+    let floor =
+      constraint === 'first-primary'
+        ? Number.POSITIVE_INFINITY
+        : constraint === 'first-unconstrained'
+          ? 0
+          : Number(constraint)
+    let seen: number | null = null
+    let last: D1Copy = 'primary'
+    return {
+      batch: (statements: D1PreparedStatement[]) => copies[last].batch(statements),
+      getBookmark: () => (seen === null ? null : String(seen).padStart(8, '0')),
+      prepare(sql: string) {
+        last = nearest === 'replica' && floor !== Number.POSITIVE_INFINITY ? 'replica' : 'primary'
+        if (last === 'replica' && owner.versions.replica < floor) {
+          owner.waits += 1
+          owner.catchUp()
+        }
+        seen = owner.versions[last]
+        floor = seen
+        owner.served.push(last)
+        return copies[last].prepare(sql)
+      }
+    } as unknown as D1DatabaseSession
+  }
+}
+
 export interface FixtureListing {
   /** Category ids in listing order; the first entry becomes the primary category. */
   categoryIds: number[]

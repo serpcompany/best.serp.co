@@ -11,8 +11,8 @@ import {
   MAX_SEARCH_LIMIT,
   normalizeSearchQuery
 } from '../apps/web/src/db/catalog'
-import { legacyRootTarget } from '../apps/web/src/db/catalog-epoch'
-import { createDatabase } from '../apps/web/src/db/client'
+import { legacyRootTarget, readCatalogEpoch } from '../apps/web/src/db/catalog-epoch'
+import { createDatabase, createSessionDatabase } from '../apps/web/src/db/client'
 import type {
   CatalogCacheEvent,
   CatalogQueryEvent,
@@ -487,10 +487,17 @@ function tracked<T extends object>(prefix: string, operations: T): T {
   })
 }
 
-/** The D1 binding with every statement checked against D1's limits before it reaches D1. */
-function checked(binding: D1Database): D1Database {
+/**
+ * The D1 binding, or a session of it (#382), with every statement checked against D1's limits
+ * before it reaches D1.
+ */
+function checked<T extends D1Database | D1DatabaseSession>(binding: T): T {
   return new Proxy(binding, {
     get(target, property) {
+      if (property === 'withSession') {
+        return (constraintOrBookmark?: string) =>
+          checked((target as D1Database).withSession(constraintOrBookmark))
+      }
       if (property === 'prepare') {
         return (sql: string) => {
           assertD1StatementLimits(sql)
@@ -1061,6 +1068,44 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
         db.prepare("DELETE FROM categories WHERE slug = 'workerd-sparse'")
       ])
     }
+  }, 120_000)
+
+  // #382: workerd's own Sessions API under the catalog: the Worker entry's epoch read through a
+  // session that starts on the primary, then a render's reads through a session at its bookmark,
+  // Drizzle queries and the listing batch included. Local D1 has no replicas, so this checks the
+  // API and the rows, not the routing (`read-replication.test.ts` covers that).
+  it('reads the catalog through a D1 session at the epoch read’s bookmark (#382)', async () => {
+    const epochSession = checked(db).withSession('first-primary')
+    expect(epochSession.getBookmark()).toBeNull()
+    const epoch = await readCatalogEpoch({
+      asOf: NOW.toISOString(),
+      client: createSessionDatabase(epochSession),
+      observe: event => events.push(event)
+    })
+    const bookmark = epochSession.getBookmark()
+    expect(bookmark).toEqual(expect.any(String))
+    const seen: CatalogQueryEvent[] = []
+    const atBookmark = createCatalogOperations({
+      cache: noCatalogDataCache,
+      client: createSessionDatabase(checked(db).withSession(bookmark as string)),
+      clock: () => NOW,
+      observe: event => {
+        events.push(event)
+        if (event.event === 'd1_query') seen.push(event)
+      },
+      reuseEpoch: () => epoch
+    })
+    const primary = catalog()
+    for (const slug of [widest.slug, dense.slug, unpublished.slug, 'does-not-exist.test']) {
+      expect(await atBookmark.getListingBySlug(slug), slug).toEqual(
+        await primary.getListingBySlug(slug)
+      )
+    }
+    expect(await atBookmark.getCanonicalSlugForRedirect(redirect.oldSlug)).toBe(redirect.newSlug)
+    expect(await atBookmark.getPublicationVersion()).toBe(epoch.version)
+    // The epoch was reused, never read again; every listing read was one batch.
+    expect(seen.some(event => event.queryShape === 'publication-version')).toBe(false)
+    expect(seen.filter(event => event.queryShape === 'listing-detail')).toHaveLength(4)
   }, 120_000)
 
   it('answers every root-level URL with one bounded statement (#168, #356, #341)', async () => {

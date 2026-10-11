@@ -4,6 +4,7 @@ import {
   EDGE_CACHE_HEADER,
   type EdgeCacheContext,
   EpochMemo,
+  type EpochRead,
   isCacheableRequest,
   loadSharedEpoch,
   renderRequestFor,
@@ -31,6 +32,9 @@ class MemoryCache {
   }
 }
 
+/** An epoch read with no bookmark, as the edge cache sees it. */
+const read = (token: string): EpochRead => ({ bookmark: null, token })
+
 function harness(options: { deploymentId?: string; epoch?: string | null } = {}) {
   const cache = new MemoryCache()
   const pending: Promise<unknown>[] = []
@@ -52,7 +56,11 @@ function harness(options: { deploymentId?: string; epoch?: string | null } = {})
     const result = await withEdgeCache(
       request,
       context,
-      { cache: cache as unknown as Cache, deploymentId, epoch: async () => epoch },
+      {
+        cache: cache as unknown as Cache,
+        deploymentId,
+        epoch: async () => (epoch === null ? null : read(epoch))
+      },
       async () => {
         renders += 1
         return response()
@@ -310,7 +318,7 @@ describe('edge HTML cache', () => {
     const poisoned = await withEdgeCache(
       page('/products/', { headers: { 'x-nonce': 'ATTACKER' } }),
       { waitUntil: promise => void promise },
-      { cache: edge.cache as unknown as Cache, deploymentId: 'v', epoch: async () => 'e' },
+      { cache: edge.cache as unknown as Cache, deploymentId: 'v', epoch: async () => read('e') },
       async request => reflect(request)
     )
     expect(poisoned.headers.get(EDGE_CACHE_HEADER)).toBe('MISS')
@@ -326,7 +334,7 @@ describe('edge HTML cache', () => {
     await withEdgeCache(
       page('/search/?q=x', { headers: { 'x-nonce': 'n', cookie: 'better-auth.session_token=a' } }),
       { waitUntil: () => {} },
-      { cache: edge.cache as unknown as Cache, deploymentId: 'v', epoch: async () => 'e' },
+      { cache: edge.cache as unknown as Cache, deploymentId: 'v', epoch: async () => read('e') },
       async request => {
         seen.push(request)
         return new Response('results')
@@ -356,56 +364,134 @@ describe('edge HTML cache', () => {
     expect(failing.headers.get(EDGE_CACHE_HEADER)).toBe('BYPASS')
     expect(await failing.text()).toBe('rendered')
   })
+
+  // #382: only a miss's render learns the epoch (and bookmark) its key names, so only it may read
+  // a replica; a signed-in, private or epoch-less request renders without one.
+  it('hands a miss its epoch and bookmark, and a bypassed render neither', async () => {
+    const epoch: EpochRead = { bookmark: '00000042-bookmark', token: '7.2026-05-16' }
+    const options = {
+      cache: new MemoryCache() as unknown as Cache,
+      deploymentId: 'v',
+      epoch: vi.fn(async () => epoch)
+    }
+    const seen: Array<EpochRead | undefined> = []
+    const render = async (_request: Request, given?: EpochRead) => {
+      seen.push(given)
+      return new Response('page')
+    }
+    const context = { waitUntil: () => {} }
+    await withEdgeCache(page('/products/alpha/'), context, options, render)
+    await withEdgeCache(
+      page('/products/alpha/', { headers: { cookie: 'better-auth.session_token=a.b' } }),
+      context,
+      options,
+      render
+    )
+    await withEdgeCache(page('/account/'), context, options, render)
+    await withEdgeCache(
+      page('/products/alpha/'),
+      context,
+      { ...options, epoch: vi.fn(async () => null) },
+      render
+    )
+    expect(seen).toEqual([epoch, undefined, undefined, undefined])
+    // A bypassed request never reads the epoch at all.
+    expect(options.epoch).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('catalog epoch memo', () => {
   it('reuses a fresh epoch, revalidates a stale one in the background, and reloads old ones', async () => {
     let clock = 0
     let version = 1
-    const load = vi.fn(async () => `epoch-${version}`)
+    const load = vi.fn(async () => read(`epoch-${version}`))
     const memo = new EpochMemo(load, () => clock, 1_000, 10_000)
     const background: Promise<unknown>[] = []
     const context = { waitUntil: (promise: Promise<unknown>) => background.push(promise) }
 
-    expect(await memo.current(context)).toBe('epoch-1')
+    expect(await memo.current(context)).toEqual(read('epoch-1'))
     version = 2
     clock = 500
-    expect(await memo.current(context)).toBe('epoch-1')
+    expect(await memo.current(context)).toEqual(read('epoch-1'))
     expect(load).toHaveBeenCalledTimes(1)
 
     clock = 2_000
-    expect(await memo.current(context)).toBe('epoch-1')
+    expect(await memo.current(context)).toEqual(read('epoch-1'))
     await Promise.all(background)
-    expect(await memo.current(context)).toBe('epoch-2')
+    expect(await memo.current(context)).toEqual(read('epoch-2'))
     expect(load).toHaveBeenCalledTimes(2)
 
     version = 3
     clock = 20_000
-    expect(await memo.current(context)).toBe('epoch-3')
+    expect(await memo.current(context)).toEqual(read('epoch-3'))
+  })
+
+  it('keeps each epoch with the bookmark it was read at (#382)', async () => {
+    let clock = 0
+    let version = 1
+    const load = vi.fn(async () => ({ bookmark: `bookmark-${version}`, token: `epoch-${version}` }))
+    const memo = new EpochMemo(load, () => clock, 1_000, 10_000)
+    const background: Promise<unknown>[] = []
+    const context = { waitUntil: (promise: Promise<unknown>) => background.push(promise) }
+
+    expect(await memo.current(context)).toEqual({ bookmark: 'bookmark-1', token: 'epoch-1' })
+    version = 2
+    clock = 2_000
+    // The stale epoch is served with its own bookmark while the refresh runs, never mixed.
+    expect(await memo.current(context)).toEqual({ bookmark: 'bookmark-1', token: 'epoch-1' })
+    await Promise.all(background)
+    expect(await memo.current(context)).toEqual({ bookmark: 'bookmark-2', token: 'epoch-2' })
   })
 
   it('shares one load between concurrent requests', async () => {
-    let resolve: (token: string) => void = () => {}
+    let resolve: (value: EpochRead) => void = () => {}
     const load = vi.fn(
       () =>
-        new Promise<string>(done => {
+        new Promise<EpochRead>(done => {
           resolve = done
         })
     )
     const memo = new EpochMemo(load)
     const context = { waitUntil: () => {} }
     const both = Promise.all([memo.current(context), memo.current(context)])
-    resolve('epoch-1')
-    expect(await both).toEqual(['epoch-1', 'epoch-1'])
+    resolve(read('epoch-1'))
+    expect(await both).toEqual([read('epoch-1'), read('epoch-1')])
     expect(load).toHaveBeenCalledTimes(1)
   })
 
-  it('shares the epoch through the data-center cache', async () => {
-    const cache = new MemoryCache() as unknown as Cache
-    const read = vi.fn(async () => '4.2026-05-16')
-    expect(await loadSharedEpoch(cache, 'production', read)).toBe('4.2026-05-16')
-    expect(await loadSharedEpoch(cache, 'production', read)).toBe('4.2026-05-16')
-    expect(read).toHaveBeenCalledTimes(1)
+  it('shares the epoch and its bookmark through the data-center cache', async () => {
+    const cache = new MemoryCache()
+    const load = vi.fn(async () => ({ bookmark: '00000042-abc', token: '4.2026-05-16' }))
+    const shared = { bookmark: '00000042-abc', token: '4.2026-05-16' }
+    expect(await loadSharedEpoch(cache as unknown as Cache, 'production', load)).toEqual(shared)
+    expect(await loadSharedEpoch(cache as unknown as Cache, 'production', load)).toEqual(shared)
+    expect(load).toHaveBeenCalledTimes(1)
+    // The body stays the bare token, which a Worker version without #382 reads unchanged.
+    const [entry] = [...cache.entries.values()]
+    expect(new TextDecoder().decode(entry?.body)).toBe('4.2026-05-16')
+  })
+
+  it('reads an entry without a bookmark (a version with #397 but not #382) as no bookmark', async () => {
+    const cache = new MemoryCache()
+    await cache.put(
+      `${UNSCOPED_EPOCH_KEY}/production`,
+      new Response('4.2026-05-16', { headers: { 'cache-control': 'public, max-age=30' } })
+    )
+    const load = vi.fn(async () => ({ bookmark: 'unused', token: 'unused' }))
+    expect(await loadSharedEpoch(cache as unknown as Cache, 'production', load)).toEqual(
+      read('4.2026-05-16')
+    )
+    expect(load).not.toHaveBeenCalled()
+  })
+
+  it('shares an epoch read without a bookmark as one', async () => {
+    const cache = new MemoryCache()
+    const load = vi.fn(async () => read('4.2026-05-16'))
+    await loadSharedEpoch(cache as unknown as Cache, 'production', load)
+    expect(await loadSharedEpoch(cache as unknown as Cache, 'production', load)).toEqual(
+      read('4.2026-05-16')
+    )
+    expect(load).toHaveBeenCalledTimes(1)
   })
 
   // #397: staging and production share the serp.co zone's cache.
@@ -414,13 +500,19 @@ describe('catalog epoch memo', () => {
     const cache = zone as unknown as Cache
     // A Worker version from before #397 shared its epoch under one key for every environment.
     await zone.put(UNSCOPED_EPOCH_KEY, new Response('21.2026-10-10'))
-    const staging = vi.fn(async () => '21.2026-10-10')
-    const production = vi.fn(async () => '18.2026-10-01')
+    const staging = vi.fn(async () => ({ bookmark: 'staging-b', token: '21.2026-10-10' }))
+    const production = vi.fn(async () => ({ bookmark: 'production-b', token: '18.2026-10-01' }))
 
-    expect(await loadSharedEpoch(cache, 'staging', staging)).toBe('21.2026-10-10')
-    expect(await loadSharedEpoch(cache, 'production', production)).toBe('18.2026-10-01')
-    expect(await loadSharedEpoch(cache, 'staging', staging)).toBe('21.2026-10-10')
-    expect(await loadSharedEpoch(cache, 'production', production)).toBe('18.2026-10-01')
+    for (let round = 0; round < 2; round += 1) {
+      expect(await loadSharedEpoch(cache, 'staging', staging)).toEqual({
+        bookmark: 'staging-b',
+        token: '21.2026-10-10'
+      })
+      expect(await loadSharedEpoch(cache, 'production', production)).toEqual({
+        bookmark: 'production-b',
+        token: '18.2026-10-01'
+      })
+    }
     expect(staging).toHaveBeenCalledTimes(1)
     expect(production).toHaveBeenCalledTimes(1)
     expect([...zone.entries.keys()].sort()).toEqual([
@@ -433,11 +525,11 @@ describe('catalog epoch memo', () => {
   it('shares no epoch without an environment, and reads none', async () => {
     const zone = new MemoryCache()
     await zone.put(UNSCOPED_EPOCH_KEY, new Response('21.2026-10-10'))
-    const read = vi.fn(async () => '18.2026-10-01')
-    await expect(loadSharedEpoch(zone as unknown as Cache, '', read)).rejects.toMatchObject({
+    const load = vi.fn(async () => read('18.2026-10-01'))
+    await expect(loadSharedEpoch(zone as unknown as Cache, '', load)).rejects.toMatchObject({
       code: 'd1_runtime_env_invalid'
     })
-    expect(read).not.toHaveBeenCalled()
+    expect(load).not.toHaveBeenCalled()
     expect([...zone.entries.keys()]).toEqual([UNSCOPED_EPOCH_KEY])
   })
 })
