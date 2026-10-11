@@ -432,11 +432,12 @@ describe('representative D1 query benchmark', () => {
       expect(optimizedAdjacentRows as number).toBeLessThanOrEqual(100)
       expect(optimizedRelatedRows as number).toBeLessThanOrEqual(2 * sharedMemberships + 50)
       expect(taggedRows as number).toBeLessThanOrEqual(2 * sharedTagMemberships + 50)
-      // The hub-size probe reads at most 129 entries of the category index; the walk is bounded
-      // like the single-category seek above.
-      expect(soloRows as number).toBeLessThanOrEqual(129 + 100)
+      // The hub-size probe counts at most 129 public members, each a category index entry and its
+      // listing row (#378 review: public members, as the shell statistics count them); the walk is
+      // bounded like the single-category seek above.
+      expect(soloRows as number).toBeLessThanOrEqual(2 * 129 + 100)
       // The same probe picks a single category's plan since #378 (it needs no shell statistics).
-      expect(singleCategoryRows as number).toBeLessThanOrEqual(129 + 100)
+      expect(singleCategoryRows as number).toBeLessThanOrEqual(2 * 129 + 100)
       expect(legacyShell.rows as number).toBeGreaterThan(coldShellRows as number)
       expect(warmShellRows as number).toBeLessThanOrEqual(10)
       expect(oneColdPlus99WarmAverage as number).toBeLessThanOrEqual(25)

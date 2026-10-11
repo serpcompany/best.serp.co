@@ -60,9 +60,9 @@ categories, and previous/next from one `COALESCE` over three keyset branches.
 
 A listing page's detail, related listings and previous/next are one D1 batch of four statements,
 each finding the listing by its slug, so an uncached listing page waits on D1 once after the
-catalog epoch (#378). The related statement picks its plan itself, with the hub-size probe the tag
-fill uses, instead of reading the shell counts first; the page reads the shell counts and the best
-index alongside the listing.
+catalog epoch (#378). The related statement picks its plan itself, counting the hub's public
+members (as the shell counts do) up to the member-scan limit, instead of reading the shell counts
+first; the page reads the shell counts and the best index alongside the listing.
 
 The taxonomy (#341) reads only active tags, active best pages whose tag and category are active,
 and public listings:

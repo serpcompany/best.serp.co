@@ -91,9 +91,12 @@ async function sha256Hex(value: string): Promise<string> {
 }
 /**
  * A hub's related candidates (an untagged listing in one category, or a tagged listing whose tags
- * yield fewer than four) are read from its members when it has at most this many memberships;
- * larger (dense) hubs walk the name index instead, which finds four members after a handful of
- * rows. Both plans return the same rows; this only picks the cheaper one (see `relatedStatement`).
+ * yield fewer than four) are read from its members when it has at most this many public members,
+ * the count the shell statistics give; larger (dense) hubs walk the name index instead, which
+ * finds four members after a handful of rows. Both plans return the same rows; this only picks the
+ * cheaper one (see `relatedStatement`). Counting public members, not memberships, keeps a hub with
+ * many unpublished or draft memberships but few public members off the walk, which would visit
+ * most of the name index to find them (#378 review).
  */
 const RELATED_MEMBER_SCAN_LIMIT = 128
 /**
@@ -969,11 +972,11 @@ function detailStatement(slug: string, asOf: string): CompiledQuery {
  * - No tags, one category, and a tagged listing whose tags yield fewer than four: its hub (primary
  *   category) fills the rest with score 0 and the same keyset (design 3.2, #331), so two listings
  *   in one large category (the catch-all `other`) link onward to different neighbours. `fill.plan`
- *   picks how: through the hub's members when it has at most `RELATED_MEMBER_SCAN_LIMIT`
- *   memberships (a probe of at most that many index entries plus one), else by walking the public
- *   name index from the listing's own name, where a dense category yields four members almost
- *   immediately, then from the start only for as many as that walk lacked. Both plans return the
- *   same rows; the probe only picks the cheaper one.
+ *   picks how: through the hub's members when it has at most `RELATED_MEMBER_SCAN_LIMIT` public
+ *   members (a probe that stops at one more), else by walking the public name index from the
+ *   listing's own name, where a dense category yields four members almost immediately, then from
+ *   the start only for as many as that walk lacked. Both plans return the same rows; the probe
+ *   only picks the cheaper one.
  *
  * The branches that don't apply have `LIMIT 0`, which SQLite checks before reading a row. The
  * first row always carries the ranking (`kind`) and the fill's plan (`fill_plan`), which name the
@@ -1051,8 +1054,10 @@ function relatedStatement(slug: string, asOf: string): CompiledQuery {
         WHEN (SELECT kind FROM ranking) = 'categories' THEN 'none'
         WHEN (SELECT COUNT(*) FROM tagged) >= 4 THEN 'none'
         WHEN NOT EXISTS (
-          SELECT 1 FROM listing_categories sized INDEXED BY listing_categories_category_idx
-          WHERE sized.category_id = hub.category_id
+          SELECT 1
+          FROM listing_categories sized INDEXED BY listing_categories_category_idx
+          CROSS JOIN listings p ON p.id = sized.listing_id
+          WHERE sized.category_id = hub.category_id AND ${eligibleAt('p')}
           LIMIT 1 OFFSET ${RELATED_MEMBER_SCAN_LIMIT}
         ) THEN 'members'
         ELSE 'walk'
@@ -1109,8 +1114,12 @@ ORDER BY related.score DESC, related.wrap ASC, related.name ASC, related.slug AS
   )
 }
 
-/** The query shape a related statement ran as, named by its first row (`relatedStatement`). */
-function relatedQueryShape(row: RelatedRow | undefined): CatalogQueryShape {
+/**
+ * The query shape a related statement ran as, named by its first row (`relatedStatement`), or
+ * null when the rows name none (a public listing without a primary category, which the baseline
+ * triggers prevent).
+ */
+function relatedQueryShape(row: RelatedRow | undefined): CatalogQueryShape | null {
   switch (row?.kind) {
     case 'tags':
       return 'related-shared-tags'
@@ -1120,7 +1129,7 @@ function relatedQueryShape(row: RelatedRow | undefined): CatalogQueryShape {
       if (row.fill_plan === 'members') return 'related-single-category-members'
       if (row.fill_plan === 'walk') return 'related-single-category-seek'
   }
-  throw new Error('Invalid D1 related listings plan.')
+  return null
 }
 
 /**
@@ -1504,21 +1513,25 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
       if (!results.every(result => result.success)) throw new Error('D1 catalog query failed.')
       return null
     }
-    const shapes: CatalogQueryShape[] = [
-      'listing-detail',
-      relatedQueryShape(relatedResult.results[0]),
-      'navigation-previous',
-      'navigation-next'
-    ]
-    for (const [index, result] of results.entries()) {
-      observe(
-        queryEvent('listing-detail', shapes[index] ?? 'listing-detail', result, wallDurationMs)
-      )
+    // Every statement is reported before anything can refuse the rows. The related statement's
+    // placeholder row (nothing related) is not a result row.
+    const relatedShape = relatedQueryShape(relatedResult.results[0])
+    observe(queryEvent('listing-detail', 'listing-detail', detailResult, wallDurationMs))
+    if (relatedShape) {
+      observe({
+        ...queryEvent('listing-detail', relatedShape, relatedResult, wallDurationMs),
+        resultRows: relatedResult.results.filter(related => related.id !== null).length
+      })
     }
+    observe(queryEvent('listing-detail', 'navigation-previous', previousResult, wallDurationMs))
+    observe(queryEvent('listing-detail', 'navigation-next', nextResult, wallDurationMs))
     if (!results.every(result => result.success)) throw new Error('D1 catalog query failed.')
 
+    // A listing without its primary category fails here, as it did before the batch.
+    const detail = mapDetail(row)
+    if (!relatedShape) throw new Error('Invalid D1 related listings plan.')
     return {
-      ...mapDetail(row),
+      ...detail,
       nextWebsite: mapNavigation(nextResult.results[0]),
       previousWebsite: mapNavigation(previousResult.results[0]),
       relatedWebsites: mapRelated(relatedResult.results)

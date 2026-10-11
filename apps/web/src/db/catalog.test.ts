@@ -154,6 +154,46 @@ describe('shared catalog data operations', () => {
     expect(sqlite.roundTrips.slice(start)).toEqual([{ kind: 'batch', size: 4 }])
   })
 
+  it('reports the batch before refusing a listing without a primary category, with that error', async () => {
+    // The baseline triggers keep a published listing on exactly one primary category, so the
+    // rows are altered after D1 returns them: no primary category, so no hub for the fill.
+    const binding = sqlite.asD1Database()
+    const altered = {
+      ...binding,
+      batch: async (statements: D1PreparedStatement[]) => {
+        const results = (await binding.batch(statements)) as Array<
+          D1Result<Record<string, unknown>>
+        >
+        const detail = results[0]?.results[0]
+        if (detail) detail.category = null
+        const related = results[1]
+        if (related) {
+          related.results = [{ fill_plan: null, id: null, kind: 'hub' }]
+        }
+        return results
+      }
+    } as unknown as D1Database
+    const events: Array<CatalogCacheEvent | CatalogQueryEvent> = []
+    const catalog = createCatalogOperations({
+      cache: new MemoryCatalogCache(),
+      client: createDatabase(altered),
+      clock: now,
+      observe: event => events.push(event)
+    })
+    await expect(catalog.getListingBySlug('bravo')).rejects.toThrow('Invalid D1 primary category.')
+    expect(
+      events.flatMap(event =>
+        event.event === 'd1_query' && event.operation === 'listing-detail'
+          ? [[event.queryShape, event.success]]
+          : []
+      )
+    ).toEqual([
+      ['listing-detail', true],
+      ['navigation-previous', true],
+      ['navigation-next', true]
+    ])
+  })
+
   it('reports a failed listing batch once, as its detail, without its SQL', async () => {
     const failing = {
       ...sqlite.asD1Database(),
@@ -1060,6 +1100,23 @@ describe('related listings of untagged listings in one category (#331)', () => {
     expect(await relatedOf('other-139')).toEqual(related('other', [0, 1, 2, 3]))
     expect(await relatedOf('small-001')).toEqual(related('small', [2, 3, 4, 5]))
     expect(await relatedOf('small-004')).toEqual(related('small', [5, 0, 1, 2]))
+    // Alone in its category: nothing related. The statement's one placeholder row carries the
+    // plan and no listing, which is no related listing and no result row (#378 review).
+    seedCategory(sqlite, 'alone', 1)
+    const before = events.length
+    expect(await catalog.getListingBySlug('alone-000')).toMatchObject({
+      relatedWebsites: [],
+      slug: 'alone-000'
+    })
+    expect(
+      events
+        .slice(before)
+        .filter(
+          (event): event is CatalogQueryEvent =>
+            event.event === 'd1_query' && event.queryShape.startsWith('related-')
+        )
+        .map(event => [event.queryShape, event.resultRows])
+    ).toEqual([['related-single-category-members', 0]])
 
     const shapes = new Set(
       events.flatMap(event => (event.event === 'd1_query' ? [event.queryShape] : []))

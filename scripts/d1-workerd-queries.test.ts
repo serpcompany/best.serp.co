@@ -82,14 +82,18 @@ const ROWS_READ_BUDGET: Record<CatalogQueryShape, number> = {
   // small hub's members.
   'related-shared-tags': 3_000,
   // Onward from the listing's own name, wrapping round to the start (#331). Since #378 the
-  // statement picks its plan itself, with the hub-size probe the tag fill already used (at most
-  // 129 entries of the category index), instead of reading the shell statistics first, so a
-  // listing page's reads are one batch; the probe and the slug lookup add about 60 rows to the
-  // members plan and 164 to the seek. Members: 138 at worst (77 before #378, 78 from the start
-  // before #331). Seek: 248 on its longest walk (`longestWalk`, 62 name-index entries at the
-  // widest gap between a large category's names; 84 before #378, 79 from the start before #331),
-  // so its budget rose from 200 to 400 with #378.
-  'related-single-category-members': 500,
+  // statement picks its plan itself, instead of reading the shell statistics first, so a listing
+  // page's reads are one batch: a probe counts the hub's public members (as the shell statistics
+  // do) up to 129, each a category index entry and its listing row.
+  // - Members: 161 at worst on the generated catalog (77 before #378, 78 from the start before
+  //   #331), and 570 for a hub of 133 memberships with 3 public members (the sparse-hub test),
+  //   which reads its memberships twice, once to count and once to rank; counting memberships
+  //   instead sent that hub to the walk, 3,595 rows. So the budget rose from 500 to 700 (#378).
+  // - Seek: 377 on its longest walk (`longestWalk`, 62 name-index entries at the widest gap
+  //   between a large category's names; 84 before #378, 79 from the start before #331), of which
+  //   about 260 are the probe, so its budget rose from 200 to 400 (#378). Materializing the
+  //   members to count them once would read 320 for the sparse hub but 895 here, the common case.
+  'related-single-category-members': 700,
   'related-single-category-seek': 400,
   // worst: a term in the catch-all's name (`other`, `the`): 10,826; 15,520 before #345's
   // uncorrelated category and tag subqueries. The widest searches have their own budget below.
@@ -986,6 +990,76 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
         related?.map(item => item.slug),
         listing.slug
       ).toEqual(expectedRelatedByTags(listing))
+    }
+  }, 120_000)
+
+  it('reads a hub with many memberships but few public members through its members (#378 review)', async () => {
+    // Three untagged listings, each only in a new category that also holds 130 memberships of
+    // listings that aren't public (unpublished, drafts, held in review, rejected): more than
+    // `RELATED_MEMBER_SCAN_LIMIT` memberships, three public members. Counted by memberships, the
+    // hub would take the walk of the public name index, which visits most of it to find two
+    // members; counted by public members, as the shell statistics count them, it reads its members.
+    const lonely = untagged.filter(listing => listing.categories.length === 1).slice(0, 3)
+    const hidden = scale.listings.filter(listing => !isLive.has(listing)).slice(0, 130)
+    expect(lonely).toHaveLength(3)
+    expect(hidden).toHaveLength(130)
+    const sparse = "(SELECT id FROM categories WHERE slug = 'workerd-sparse')"
+    await db.batch([
+      db.prepare(
+        "INSERT INTO categories (slug, name, description, sort_order) VALUES ('workerd-sparse', 'Workerd Sparse', '', 0)"
+      ),
+      ...lonely.map(listing =>
+        db
+          .prepare(`UPDATE listing_categories SET category_id = ${sparse} WHERE listing_id = ?`)
+          .bind(listing.id)
+      ),
+      ...hidden.map(listing =>
+        db
+          .prepare(
+            `INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
+             SELECT ?, id, 9, 0 FROM categories WHERE slug = 'workerd-sparse'`
+          )
+          .bind(listing.id)
+      )
+    ])
+    const sparseRows: Array<number | null> = []
+    try {
+      const byName = [...lonely].sort(
+        (left, right) => binary(left.name, right.name) || binary(left.slug, right.slug)
+      )
+      for (const [index, listing] of byName.entries()) {
+        const seen: CatalogQueryEvent[] = []
+        const detail = await createCatalogOperations({
+          cache: noCatalogDataCache,
+          client: createDatabase(checked(db)),
+          clock: () => NOW,
+          observe: event => {
+            events.push(event)
+            if (event.event === 'd1_query') seen.push(event)
+          }
+        }).getListingBySlug(listing.slug)
+        // The other two, onward from its own name, wrapping round to the start.
+        expect(
+          detail?.relatedWebsites.map(item => item.slug),
+          listing.slug
+        ).toEqual([...byName.slice(index + 1), ...byName.slice(0, index)].map(other => other.slug))
+        const related = seen.find(event => event.queryShape === 'related-single-category-members')
+        expect(related, listing.slug).toBeDefined()
+        sparseRows.push(related?.rowsRead ?? null)
+      }
+      console.info(JSON.stringify({ event: 'workerd_rows_read', sparseHub: sparseRows }))
+    } finally {
+      await db.batch([
+        ...lonely.map(listing =>
+          db
+            .prepare(
+              'UPDATE listing_categories SET category_id = (SELECT id FROM categories WHERE slug = ?) WHERE listing_id = ?'
+            )
+            .bind(listing.categories[0], listing.id)
+        ),
+        db.prepare(`DELETE FROM listing_categories WHERE category_id = ${sparse}`),
+        db.prepare("DELETE FROM categories WHERE slug = 'workerd-sparse'")
+      ])
     }
   }, 120_000)
 
