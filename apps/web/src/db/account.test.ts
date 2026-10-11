@@ -197,8 +197,11 @@ describe('account operations', () => {
     ).rejects.toMatchObject({ code: 'not_withdrawable', status: 409 })
   })
 
-  it('resubmits a changes-requested submission with its edits, keeping its FAQs', async () => {
+  it('resubmits a changes-requested submission with its edits, keeping its FAQs and suggested category', async () => {
     seedSubmission('sub_fix', 'changes_requested')
+    // A suggested category (#406) the resubmit form has no field for: it stays as stored.
+    sqlite.database.exec(`UPDATE listing_submissions SET suggested_category = 'Mind maps',
+      suggested_category_note = 'Maps of ideas.' WHERE id = 'sub_fix'`)
     await expect(
       operations().resubmitSubmission({
         content,
@@ -250,6 +253,11 @@ describe('account operations', () => {
     expect(updated.events.find(event => event.type === 'edited')?.detail).toBe(
       JSON.stringify({ fields: ['description'] })
     )
+    expect(
+      row(
+        "SELECT suggested_category, suggested_category_note FROM listing_submissions WHERE id='sub_fix'"
+      )
+    ).toEqual({ suggested_category: 'Mind maps', suggested_category_note: 'Maps of ideas.' })
     await expect(
       operations().resubmitSubmission({
         content,

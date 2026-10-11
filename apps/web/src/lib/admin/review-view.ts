@@ -234,3 +234,16 @@ export interface ReviewView {
   tagSlugs: string[] | null
   website: string
 }
+
+/**
+ * The edits' tags with a tag just created from a suggested category (#406) added last, or null
+ * when they already hold `limit` and can't take it. A tag they hold already stays where it is.
+ */
+export function withCreatedTag(
+  tags: readonly string[],
+  slug: string,
+  limit: number
+): string[] | null {
+  if (tags.includes(slug)) return [...tags]
+  return tags.length >= limit ? null : [...tags, slug]
+}

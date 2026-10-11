@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { previewVerifiedOwner, stagedPreview } from './review-view'
+import { previewVerifiedOwner, stagedPreview, withCreatedTag } from './review-view'
 
 const staged = {
   categorySlug: 'tools',
@@ -34,5 +34,13 @@ describe('the admin review preview (#296)', () => {
     // An unpublished submission gets an owner at approval when its submitter is signed in.
     expect(previewVerifiedOwner({ listing: null, submitter })).toBe(true)
     expect(previewVerifiedOwner({ listing: null, submitter: null })).toBe(false)
+  })
+})
+
+describe('a tag created from a suggested category (#406)', () => {
+  it('joins the edits’ tags last, but never past the limit', () => {
+    expect(withCreatedTag(['a'], 'b', 3)).toEqual(['a', 'b'])
+    expect(withCreatedTag(['a', 'b'], 'a', 3)).toEqual(['a', 'b'])
+    expect(withCreatedTag(['a', 'b', 'c'], 'd', 3)).toBeNull()
   })
 })

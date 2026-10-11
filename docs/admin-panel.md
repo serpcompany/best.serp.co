@@ -215,11 +215,13 @@ shows on the submission's or revision's review screen beside its category and ta
 note. While the review is open, "Create tag" and "Create category" open the #405 form in a
 dialog (`embedded`), filled in with the suggested name (a tag also with the record's category).
 Saving creates it as any create does. On a submission the reviewer can still edit before
-approving, the new tag joins its tags (up to three), or the new category becomes its primary
-category, in "Edit, then approve", and approving files the listing there. A paid submission
+approving, the new tag joins its tags, or the new category becomes its primary category, in
+"Edit, then approve", and approving files the listing there. With three tags already, Create tag
+opens the edits instead and asks the reviewer to remove one first. A paid submission
 already live and a revision take no edits at review (#368): assign the new tag or category on the
-listing page after approving. `/admin/suggestions/` lists every open suggestion (on a submission
-from `pending_badge` until its decision, or an open revision), grouped by name regardless of case
+listing page after approving. `/admin/suggestions/` lists the open suggestions (on a submission
+from `pending_badge` until its decision, or an open revision), the first 500 by name as the review
+queue caps its own (the page says when it shows only those), grouped by name regardless of case
 and spacing so repeats show as one row, each linking its reviews and opening the tag or category
 list page's create form with the name filled in (`?name=`).
 

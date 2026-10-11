@@ -11,6 +11,7 @@ import {
   TableHeader,
   TableRow
 } from '@/components/ui/table'
+import { SUGGESTIONS_LIMIT } from '@/db/admin-queries'
 import { getAdminReads } from '@/lib/admin/runtime'
 import { countLabel, groupSuggestions } from '@/lib/admin/taxonomy-view'
 import { requireAdmin } from '@/lib/auth/server'
@@ -25,7 +26,7 @@ export const metadata: Metadata = { title: 'Category suggestions' }
 
 export default async function SuggestionsPage() {
   await requireAdmin()
-  const rows = await (await getAdminReads()).listCategorySuggestions()
+  const { rows, truncated } = await (await getAdminReads()).listCategorySuggestions()
   const groups = groupSuggestions(rows)
   return (
     <>
@@ -35,7 +36,12 @@ export default async function SuggestionsPage() {
 
       <DashboardPageHeader
         title="Category suggestions"
-        description={countLabel(rows.length, 'open suggestion', 'open suggestions')}
+        description={
+          // At most `SUGGESTIONS_LIMIT` are read, in name order, as the review queue caps its own.
+          truncated
+            ? `The first ${SUGGESTIONS_LIMIT} open suggestions, by name`
+            : countLabel(rows.length, 'open suggestion', 'open suggestions')
+        }
       />
       <div className="overflow-hidden rounded-lg border">
         <Table>

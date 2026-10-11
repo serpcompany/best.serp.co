@@ -1018,7 +1018,7 @@ test.describe('taxonomy (#405)', () => {
 })
 
 test.describe('category suggestions (#406)', () => {
-  test('lists a submitter’s suggestion, creates it as a tag from the review, and approves with it', async ({
+  test('lists a submitter’s suggestion, creates it as a tag from the review (never a fourth), and approves with it', async ({
     baseURL,
     page
   }) => {
@@ -1028,8 +1028,22 @@ test.describe('category suggestions (#406)', () => {
     const key = unique()
     const name = `E2E Maps ${key}`
     const submission = seedVerifiedSubmission('suggest', activeCategory())
-    localD1(`UPDATE listing_submissions SET suggested_category = ${q(name)},
-      suggested_category_note = 'Tools that map ideas.' WHERE id = ${q(submission.id)}`)
+    // It suggests three tags already, the most a submission takes.
+    const tags = ['one', 'two', 'three'].map(label => ({
+      name: `E2E ${label} ${key}`,
+      slug: `e2e-${label}-${key}`
+    }))
+    localD1(`
+      ${tags
+        .map(
+          tag => `INSERT INTO tags (slug, name, category_id) SELECT ${q(tag.slug)}, ${q(tag.name)}, id
+            FROM categories WHERE slug = ${q(activeCategory())};`
+        )
+        .join('\n')}
+      UPDATE listing_submissions SET suggested_category = ${q(name)},
+        suggested_category_note = 'Tools that map ideas.',
+        tag_slugs = ${q(JSON.stringify(tags.map(tag => tag.slug)))} WHERE id = ${q(submission.id)};
+    `)
 
     // One admin page lists the open suggestions, each with its review.
     await page.goto('/admin/suggestions/')
@@ -1040,6 +1054,11 @@ test.describe('category suggestions (#406)', () => {
     await row.getByRole('link', { name: submission.name }).click()
     await expect(page.getByText(name, { exact: true })).toBeVisible()
     await expect(page.getByText('Tools that map ideas.')).toBeVisible()
+    // With three tags, the reviewer drops one first: nothing is created that the edits can't take.
+    await page.getByRole('button', { name: 'Create tag' }).click()
+    await expect(page.getByText('It has 3 tags, the most it takes.')).toBeVisible()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await page.getByRole('button', { name: `Remove ${tags[1]?.name}`, exact: true }).click()
     await page.getByRole('button', { name: 'Create tag' }).click()
     const dialog = page.getByRole('dialog')
     await expect(dialog.getByLabel('Name', { exact: true })).toHaveValue(name)
@@ -1056,8 +1075,8 @@ test.describe('category suggestions (#406)', () => {
     await expect(page.getByText(`Approved. ${submission.name} is published.`)).toBeVisible()
     expect(
       localD1(`SELECT t.slug FROM listing_tags lt JOIN tags t ON t.id = lt.tag_id
-        WHERE lt.listing_id = ${q(`submission_${submission.id}`)}`)
-    ).toEqual([{ slug: `e2e-maps-${key}` }])
+        WHERE lt.listing_id = ${q(`submission_${submission.id}`)} ORDER BY lt.sort_order`)
+    ).toEqual([tags[0], tags[2], { slug: `e2e-maps-${key}` }].map(tag => ({ slug: tag?.slug })))
   })
 })
 

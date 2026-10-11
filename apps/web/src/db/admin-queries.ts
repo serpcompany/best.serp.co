@@ -626,12 +626,16 @@ export function selectAdminBestPagePlans(slug: string): StatementPlan[] {
   ]
 }
 
+/** The most open category suggestions the admin page reads (#406), as the review queue's. */
+export const SUGGESTIONS_LIMIT = QUEUE_LIMIT
+
 /**
  * Open category suggestions (#406): each submission or revision still on its way to a decision
- * that suggests a category, with the record it came with, so repeats show side by side. Drafts
- * aren't submitted yet, and decided ones are closed.
+ * that suggests a category, with the record it came with, so repeats show side by side, at most
+ * `limit` of them in name order. Drafts aren't submitted yet, and decided ones are closed.
  */
-export function selectCategorySuggestionsPlan(): StatementPlan {
+export function selectCategorySuggestionsPlan(limit = SUGGESTIONS_LIMIT): StatementPlan {
+  if (!Number.isSafeInteger(limit) || limit < 1) throw new Error('A limit is a positive integer.')
   return {
     sql: `SELECT 'submission' AS kind,s.id AS id,s.name AS listing_name,s.status AS status,
         s.suggested_category AS name,s.suggested_category_note AS note,
@@ -645,8 +649,8 @@ export function selectCategorySuggestionsPlan(): StatementPlan {
       FROM listing_revisions r JOIN listings l ON l.id=r.listing_id
         LEFT JOIN categories c ON c.slug=r.category_slug
       WHERE r.suggested_category IS NOT NULL AND r.status IN ('pending_review','changes_requested')
-      ORDER BY name COLLATE NOCASE,created_at,id`,
-    params: []
+      ORDER BY name COLLATE NOCASE,created_at,id LIMIT ?`,
+    params: [limit]
   }
 }
 
@@ -1124,7 +1128,10 @@ export interface AdminReadOperations {
   listAdminBestPages(asOf: string): Promise<AdminBestPageRow[]>
   listAdminCategories(asOf: string): Promise<AdminCategory[]>
   listAdminTags(asOf: string): Promise<AdminTag[]>
-  listCategorySuggestions(): Promise<CategorySuggestionRow[]>
+  /** Up to `limit` (500) open suggestions, and whether there are more. */
+  listCategorySuggestions(
+    limit?: number
+  ): Promise<{ rows: CategorySuggestionRow[]; truncated: boolean }>
   listReviewQueue(view: ReviewQueueView): Promise<ReviewQueueItem[]>
   reviewQueueCounts(): Promise<ReviewQueueCounts>
   searchListings(
@@ -1426,18 +1433,22 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
       return result.results.map(tagRow)
     },
 
-    async listCategorySuggestions() {
-      const result = await statement(selectCategorySuggestionsPlan()).all<Row>()
-      return result.results.map(row => ({
-        categoryName: optionalText(row.category_name),
-        createdAt: toInstant(row.created_at),
-        id: text(row.id),
-        kind: text(row.kind) === 'revision' ? 'revision' : 'submission',
-        listingName: text(row.listing_name),
-        name: text(row.name),
-        note: optionalText(row.note),
-        status: text(row.status)
-      }))
+    async listCategorySuggestions(limit = SUGGESTIONS_LIMIT) {
+      // One more than shown says whether there are more.
+      const result = await statement(selectCategorySuggestionsPlan(limit + 1)).all<Row>()
+      const rows = result.results.slice(0, limit).map(
+        (row): CategorySuggestionRow => ({
+          categoryName: optionalText(row.category_name),
+          createdAt: toInstant(row.created_at),
+          id: text(row.id),
+          kind: text(row.kind) === 'revision' ? 'revision' : 'submission',
+          listingName: text(row.listing_name),
+          name: text(row.name),
+          note: optionalText(row.note),
+          status: text(row.status)
+        })
+      )
+      return { rows, truncated: result.results.length > limit }
     },
 
     async listActiveCategories() {

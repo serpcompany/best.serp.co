@@ -69,7 +69,7 @@ import {
   listingPath
 } from '@/lib/admin/format'
 import type { LinkRel } from '@/lib/admin/listing-view'
-import type { ReviewView } from '@/lib/admin/review-view'
+import { type ReviewView, withCreatedTag } from '@/lib/admin/review-view'
 import { SUBMISSION_TAG_LIMIT } from '@/lib/submissions/contract'
 import { cn } from '@/lib/utils'
 import { adminRequest } from './api'
@@ -197,16 +197,25 @@ export function ReviewDetail({
   const [creating, setCreating] = useState<'category' | 'tag' | null>(null)
   const reviewOpen = queued || rejectable
   const assignable = queued && isSubmission && !paidLive
+  // A submission takes up to three tags: with three, the reviewer drops one before creating a
+  // tag to add, rather than creating one the edits can't take.
+  const [tagsFull, setTagsFull] = useState(false)
+  function createTag() {
+    if (assignable && tagSlugs.length >= SUBMISSION_TAG_LIMIT) {
+      setEditing(true)
+      setTagsFull(true)
+      return
+    }
+    setCreating('tag')
+  }
   function created(kind: 'category' | 'tag', slug: string) {
     setCreating(null)
     if (assignable) {
       setEditing(true)
       if (kind === 'tag') {
-        setTagSlugs(current =>
-          current.includes(slug) || current.length >= SUBMISSION_TAG_LIMIT
-            ? current
-            : [...current, slug]
-        )
+        const next = withCreatedTag(tagSlugs, slug, SUBMISSION_TAG_LIMIT)
+        if (next) setTagSlugs(next)
+        else setTagsFull(true)
       } else {
         setEdits(current => ({ ...current, categorySlug: slug }))
       }
@@ -385,16 +394,26 @@ export function ReviewDetail({
               </Select>
             </Field>
           </div>
-          <Field>
+          <Field data-invalid={tagsFull || undefined}>
             <FieldLabel htmlFor="edit-tags">Tags</FieldLabel>
             <TagsCombobox
               id="edit-tags"
               choices={tags}
               firstCategory={edits.categorySlug || undefined}
+              invalid={tagsFull}
               max={SUBMISSION_TAG_LIMIT}
               value={tagSlugs}
-              onValueChange={setTagSlugs}
+              onValueChange={next => {
+                setTagSlugs(next)
+                setTagsFull(false)
+              }}
             />
+            {tagsFull ? (
+              <FieldError>
+                It has {SUBMISSION_TAG_LIMIT} tags, the most it takes. Remove one, then create the
+                new tag.
+              </FieldError>
+            ) : null}
           </Field>
           <Field data-invalid={edits.description.length > DESCRIPTION_MAX || undefined}>
             <div className="flex items-center gap-2">
@@ -576,7 +595,7 @@ export function ReviewDetail({
           />
           {view.suggestion && reviewOpen ? (
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={() => setCreating('tag')}>
+              <Button variant="outline" size="sm" onClick={createTag}>
                 <Plus />
                 Create tag
               </Button>

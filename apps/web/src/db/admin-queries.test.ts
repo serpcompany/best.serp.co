@@ -244,13 +244,18 @@ describe('category suggestions (#406)', () => {
       name: 'Briefs',
       note: null
     })
-    expect(
-      (await reads.listCategorySuggestions()).map(row => [row.kind, row.id, row.name, row.note])
-    ).toEqual([
+    const open = await reads.listCategorySuggestions()
+    expect(open.truncated).toBe(false)
+    expect(open.rows.map(row => [row.kind, row.id, row.name, row.note])).toEqual([
       ['revision', 'rev_brief', 'Briefs', null],
       ['submission', 'sub_old', 'mind  maps', null],
       ['submission', 'sub_quill', 'Mind maps', 'Maps of ideas.']
     ])
+    // Capped like the review queue (500), saying when there are more.
+    const capped = await reads.listCategorySuggestions(2)
+    expect(capped.rows.map(row => row.id)).toEqual(['rev_brief', 'sub_old'])
+    expect(capped.truncated).toBe(true)
+    expect((await reads.listCategorySuggestions(3)).truncated).toBe(false)
   })
 })
 
