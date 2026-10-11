@@ -541,7 +541,14 @@ describe('single-site D1-only repository architecture', () => {
         `${project.sourceDirectory}/app/(dashboard)/admin/layout.tsx`,
         `${project.sourceDirectory}/app/(dashboard)/admin/page.tsx`,
         `${project.sourceDirectory}/app/(dashboard)/admin/[...path]/page.tsx`,
-        `${project.sourceDirectory}/app/api/admin/[[...path]]/route.ts`
+        `${project.sourceDirectory}/app/api/admin/[[...path]]/route.ts`,
+        // #405's taxonomy routes, which staging's admin key (#408) reaches through the guard.
+        `${project.sourceDirectory}/app/api/admin/categories/route.ts`,
+        `${project.sourceDirectory}/app/api/admin/categories/[id]/[action]/route.ts`,
+        `${project.sourceDirectory}/app/api/admin/tags/route.ts`,
+        `${project.sourceDirectory}/app/api/admin/tags/[id]/[action]/route.ts`,
+        `${project.sourceDirectory}/app/api/admin/best-pages/route.ts`,
+        `${project.sourceDirectory}/app/api/admin/best-pages/[id]/[action]/route.ts`
       ])
     )
     for (const file of adminRoutes) {

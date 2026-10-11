@@ -10,6 +10,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DELETE as adminsDelete, POST as adminsPost } from '@/app/api/admin/admins/route'
 import { POST as submissionPost } from '@/app/api/admin/submissions/[id]/[action]/route'
+import { POST as tagsPost } from '@/app/api/admin/tags/route'
 import { SqliteD1 } from '@/db/test-support'
 import { STAGING_ADMIN_KEY_HEADER } from '@/lib/auth/staging-admin-key'
 
@@ -142,6 +143,24 @@ describe('the staging admin key through the admin API', () => {
       'listing-approved',
       expect.objectContaining({ to: 'maya@example.com' })
     )
+  })
+
+  it('creates a tag on staging as staging-agent (#405 routes take the key too)', async () => {
+    const sqlite = worker('staging')
+    const tag = {
+      category: 'education',
+      description: '',
+      name: 'Language Learning',
+      slug: 'language-learning'
+    }
+    const response = await tagsPost(keyed('/api/admin/tags', tag))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ ok: true, replayed: false, slug: 'language-learning' })
+    expect(response.headers.get('set-cookie')).toBeNull()
+    expect(
+      sqlite.database.prepare("SELECT name FROM tags WHERE slug = 'language-learning'").get()
+    ).toEqual({ name: 'Language Learning' })
+    expect(actors(sqlite).publications).toEqual(['staging-agent'])
   })
 
   it('keeps the plans’ guards: a stale version is a 409 and writes nothing', async () => {

@@ -154,6 +154,17 @@ describe('staging admin key', () => {
     ).toBe(true)
   })
 
+  it('matches a secret stored with a trailing newline, as Fetch trims the header', async () => {
+    // `wrangler secret put` from a file can keep the file's final newline.
+    for (const secret of [`${KEY}\n`, `${KEY}\r\n`, ` ${KEY}\n`]) {
+      const env = { ...staging, STAGING_ADMIN_TOKEN: secret }
+      expect(await stagingAdminKeyMatches(keyed('/api/admin/listings/lst_1/tags'), env)).toBe(true)
+      expect(
+        await stagingAdminKeyMatches(keyed('/api/admin/listings/lst_1/tags', `${KEY}x`), env)
+      ).toBe(false)
+    }
+  })
+
   it('refuses any key in production and locally, even with the secret set (fail closed)', async () => {
     const elsewhere = [
       { ...staging, D1_RUNTIME_ENV: 'production', SITE_ENVIRONMENT: 'production' },

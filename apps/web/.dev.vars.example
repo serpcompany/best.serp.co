@@ -12,6 +12,6 @@ BETTER_AUTH_SECRET=
 # or `--env production`). Local development never sends email, so it does not need one.
 USESEND_API_KEY=
 #
-# STAGING_ADMIN_TOKEN: staging's admin key for agents (docs/admin-panel.md). A Worker secret on
-# staging only; local and production Workers refuse every key, so never set it here.
+# STAGING_ADMIN_TOKEN: staging's admin key for agents (docs/staging-admin-key.md). A Worker
+# secret on staging only; local and production Workers refuse every key, so never set it here.
 # STAGING_ADMIN_TOKEN=

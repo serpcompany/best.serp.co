@@ -55,7 +55,7 @@ Every request passes, in order: the Worker's Cloudflare Access and session-cooki
 ([Accounts](./accounts.md#admin-gate)); `authorizeAdminRequest()`, which re-checks the session
 and the allowlist and, for any write, requires an `Origin` among the Worker's trusted origins
 (the CSRF check: every `*.serp.co` site is same-site, so `SameSite=Lax` alone is not enough), or
-on staging takes the agents' key instead ([below](#staging-admin-key-for-agents-408));
+on staging takes the agents' key instead ([Staging admin key](./staging-admin-key.md));
 a JSON body (`application/json`, at most 64 KB) parsed by its schema (`lib/admin/schemas.ts`);
 then the decision (`lib/admin/decisions.ts`). Answers are JSON with `cache-control: private,
 no-store`: `200 {ok: true, replayed}`, or `{ok: false, error, message}` with 404, 409 (the state
@@ -247,66 +247,12 @@ taxonomy's included since #405. Its guards instead:
 
 Recovery is D1 Time Travel, run by the owner ([D1 recovery](./d1-recovery.md)). Nothing else in
 the app writes production data, and agents never use the production admin panel. The staging
-admin key (below) is refused on production.
+admin key ([Staging admin key](./staging-admin-key.md)) is refused on production.
 
 ## Staging admin key for agents (#408)
 
-Agents can't type a sign-in code into `/login`, so on staging they use the admin API with a key
-instead of a session (`apps/web/src/lib/auth/staging-admin-key.ts`, checked by the Worker's admin
-gate and again by `authorizeAdminRequest()`):
-
-- **Where it works:** `/api/admin/*` on the staging Worker only (`SITE_ENVIRONMENT` and
-  `D1_RUNTIME_ENV` both `staging`), on a request that gave staging's password
-  ([Architecture](./architecture.md#environments-and-hosts)). Production and local refuse any key,
-  even with the secret set, and the smoke-test exemption doesn't carry it. It opens no `/admin`
-  page, and never creates a session or sets a cookie.
-- **Never the allowlist:** the right key on `/api/admin/admins` (adding or removing an admin) is
-  403 `admin_key_forbidden`, from the Worker gate, `authorizeAdminRequest()`, and the route
-  itself, which refuses any request without a session. Only a person changes who is an admin.
-- **The key** is the Worker secret `STAGING_ADMIN_TOKEN`, at least 32 characters (without it,
-  every key is refused), sent as `X-Staging-Admin-Token` and compared in constant time. A
-  request with the header is judged by the key alone: a wrong key is 401 even with a session.
-- **Identity:** the fixed actor `staging-agent` (no email can equal it) on every decision, event
-  and `publication_runs` row. The plans' compare-and-swap guards hold as for any admin. Only a
-  valid key skips the `Origin` check: no browser sends the header on its own, so it can't be
-  forged cross-site. Session requests keep the check.
-- **Never logged:** no log line, answer or error carries it, Sentry never receives request
-  headers, and Cloudflare's tail events redact any header whose name contains `token`.
-
-**Where it lives:** the staging Worker secret (set since 2026-10-12), and one copy per machine
-outside the repository, `~/.config/best.serp.co/staging-admin-token` (directory 700, file 600),
-which every checkout and worktree on that machine shares. Never put the value in the repository,
-a log, an issue or a pull request, and never set it on production.
-
-**Use it.** Every call names staging's password (`staging:stagingpassword`,
-[Architecture](./architecture.md#environments-and-hosts)) and reads the key from that file:
-
-```bash
-curl -u staging:stagingpassword \
-  -H "X-Staging-Admin-Token: $(cat ~/.config/best.serp.co/staging-admin-token)" \
-  https://staging.best.serp.co/api/admin/...
-```
-
-For example, `-H 'content-type: application/json' -d '{"expectedContentVersion": 1}'` on
-`…/api/admin/submissions/<id>/approve`. The key opens no read screen, so take ids and
-`content_version` from staging D1 with a read-only query. An unknown path such as `/api/admin/`
-answers 404 to a valid key and 401 to any other.
-
-**A machine without the file** rotates the key itself, from `apps/web`: generate a new
-48-character key, write it to that path, and put it on staging. That replaces the secret at once,
-so every other machine's copy stops working until someone copies the new file there or rotates
-again.
-
-```bash
-mkdir -p ~/.config/best.serp.co && chmod 700 ~/.config/best.serp.co
-(umask 077 && openssl rand -hex 24 | tr -d '\n' > ~/.config/best.serp.co/staging-admin-token)
-pnpm exec wrangler secret put STAGING_ADMIN_TOKEN --env staging \
-  < ~/.config/best.serp.co/staging-admin-token
-```
-
-**Revoke** with `pnpm exec wrangler secret delete STAGING_ADMIN_TOKEN --env staging`: every key is
-refused. Decisions made with a key stay in the audit trail as `staging-agent`; after a suspected
-leak, rotate or revoke.
+On staging only, agents call `/api/admin/*` with a key instead of a session, as the fixed actor
+`staging-agent`, never to change the allowlist: [Staging admin key](./staging-admin-key.md).
 
 ## Tests
 
