@@ -1,6 +1,7 @@
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { type APIRequestContext, expect } from '@playwright/test'
+import { rateLimitBucket, rateLimitBucketKey } from '../src/db/rate-limit-buckets'
 import { deriveKey, RATE_LIMIT_KEY_LABEL } from '../src/lib/auth/keys'
 import { claimRecipientRateLimitRules } from '../src/lib/claims/limits'
 import { adminSuiteEnabled, q, type SuiteServer, workerD1 } from './admin-fixture'
@@ -45,7 +46,8 @@ export function claimsServerCommand(): string {
     `rm -rf "${state}"`,
     `mkdir -p "${state}"`,
     `HARNESS_D1_STATE_DIRECTORY="${state}" pnpm db:migrate:local`,
-    `HARNESS_D1_STATE_DIRECTORY="${state}" LOCAL_PREVIEW_VARS=BETTER_AUTH_SECRET=${CLAIMS_AUTH_SECRET} PORT=${claimsServer.port} pnpm tsx scripts/d1-local-preview.ts`
+    // `workerD1` needs Wrangler's Local Explorer API: on by default, pinned on here.
+    `HARNESS_D1_STATE_DIRECTORY="${state}" LOCAL_PREVIEW_VARS=BETTER_AUTH_SECRET=${CLAIMS_AUTH_SECRET} X_LOCAL_EXPLORER=true WRANGLER_SEND_METRICS=false PORT=${claimsServer.port} pnpm tsx scripts/d1-local-preview.ts`
   ].join(' && ')
 }
 
@@ -96,19 +98,6 @@ export async function seedClaimsListing(listing: {
 /** The registrable domain of every fixture website (`submit-fixture.ts`), so of every claim. */
 const FIXTURE_DOMAIN = 'localtest.me'
 
-async function hmacHex(key: string, value: string): Promise<string> {
-  const encoder = new TextEncoder()
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(key),
-    { hash: 'SHA-256', name: 'HMAC' },
-    false,
-    ['sign']
-  )
-  const digest = await crypto.subtle.sign('HMAC', cryptoKey, encoder.encode(value))
-  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
-}
-
 /**
  * Empties the hourly cap on codes to the fixture websites' domain. Every claim in both suites
  * mails an address on `localtest.me`, so they all share one domain cap
@@ -123,10 +112,11 @@ export async function resetClaimDomainBudget(): Promise<void> {
     listingId: 'unused'
   }).find(candidate => candidate.key === FIXTURE_DOMAIN)
   if (!rule) throw new Error('The claim caps no longer count codes per domain.')
-  // `auth_rate_limit_hits.bucket`: HMAC-SHA256 of `<scope>\0<key>` under the rate-limit key
-  // derived from the auth secret (`createAuthOperations` in src/db/auth.ts).
-  const key = await deriveKey(CLAIMS_AUTH_SECRET, RATE_LIMIT_KEY_LABEL)
-  const bucket = await hmacHex(key, `${rule.scope}\0${rule.key}`)
+  // Named as `createAuthOperations` names it, under the key the app derives from the secret.
+  const bucketKey = await rateLimitBucketKey(
+    await deriveKey(CLAIMS_AUTH_SECRET, RATE_LIMIT_KEY_LABEL)
+  )
+  const bucket = await rateLimitBucket(bucketKey, rule)
   await claimsD1(`DELETE FROM auth_rate_limit_hits WHERE bucket = ${q(bucket)}`)
 }
 

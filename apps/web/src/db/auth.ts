@@ -8,6 +8,7 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle'
 import { and, eq, type SQL, sql } from 'drizzle-orm'
 import { SQLiteAsyncDialect } from 'drizzle-orm/sqlite-core'
 import { type Database, runQuery } from './client'
+import { rateLimitBucket, rateLimitBucketKey } from './rate-limit-buckets'
 import {
   accounts,
   adminAllowlist,
@@ -119,24 +120,6 @@ export function createAuthDatabaseAdapter(client: Database) {
   return drizzleAdapter(client.database, { provider: 'sqlite', schema: authSchema })
 }
 
-const encoder = new TextEncoder()
-
-async function hmacKey(secret: string): Promise<CryptoKey> {
-  if (secret.length < 32) throw new Error('Auth rate limits need an HMAC key of 32+ characters.')
-  return crypto.subtle.importKey(
-    'raw',
-    encoder.encode(secret),
-    { hash: 'SHA-256', name: 'HMAC' },
-    false,
-    ['sign']
-  )
-}
-
-async function hmacHex(key: CryptoKey, value: string): Promise<string> {
-  const digest = await crypto.subtle.sign('HMAC', key, encoder.encode(value))
-  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
-}
-
 function prepareSql(client: Database, query: SQL): D1PreparedStatement {
   const compiled = dialect.sqlToQuery(query)
   return client.binding.prepare(compiled.sql).bind(...compiled.params)
@@ -161,7 +144,7 @@ export function createAuthOperations({
   clock = () => new Date(),
   rateLimitKey
 }: AuthOperationsOptions): AuthOperations {
-  const bucketKey = hmacKey(rateLimitKey)
+  const bucketKey = rateLimitBucketKey(rateLimitKey)
   bucketKey.catch(() => undefined)
   const hits = authRateLimitHits
   const bucketColumn = sql.identifier('bucket')
@@ -209,9 +192,7 @@ export function createAuthOperations({
       const now = clock().getTime()
       if (!Number.isFinite(now)) throw new Error('Auth rate limit clock is invalid.')
       const key = await bucketKey
-      const buckets = await Promise.all(
-        rules.map(rule => hmacHex(key, `${rule.scope}\0${rule.key}`))
-      )
+      const buckets = await Promise.all(rules.map(rule => rateLimitBucket(key, rule)))
       // One JSON binding instead of a UNION per bucket: D1 allows five compound SELECT terms.
       const candidates = sql`SELECT DISTINCT value AS bucket FROM json_each(${JSON.stringify(buckets)})`
       const underEveryLimit = sql.join(

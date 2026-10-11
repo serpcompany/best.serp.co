@@ -155,22 +155,43 @@ export function runStatements(
 /** The id of the local D1 database every preview Worker binds as `DB` (`wrangler.jsonc`). */
 const LOCAL_D1_DATABASE_ID = 'local-only-do-not-deploy'
 
-/** A seed statement with its values written in as SQL literals. */
+/**
+ * A seed statement with its values written in as SQL literals: the Local Explorer binds strings
+ * only. It reads SQL as `fixture-seed.ts`'s builders write it, plain `?` placeholders and
+ * single-quoted strings, and refuses anything it could misread (a comment, a quoted identifier,
+ * a numbered or named parameter) rather than guess.
+ */
 function inlined(statement: SeedStatement): string {
+  const refuse = (problem: string): never => {
+    throw new Error(`workerD1 can't inline ${problem}: ${statement.sql}`)
+  }
   const values = [...statement.params]
   let quoted = false
   let sql = ''
-  for (const char of statement.sql) {
+  for (let index = 0; index < statement.sql.length; index += 1) {
+    const char = statement.sql[index] as string
+    const next = statement.sql[index + 1] ?? ''
     if (char === "'") quoted = !quoted
-    if (char !== '?' || quoted) {
+    if (quoted || char === "'") {
       sql += char
       continue
     }
-    if (values.length === 0) throw new Error(`Too few values for: ${statement.sql}`)
+    if (char === '"' || char === '`' || char === '[') refuse('a quoted identifier')
+    if ((char === '-' && next === '-') || (char === '/' && next === '*')) refuse('a comment')
+    if ((char === '?' && /\d/u.test(next)) || (/[:@$]/u.test(char) && /\w/u.test(next))) {
+      refuse('a numbered or named parameter')
+    }
+    if (char !== '?') {
+      sql += char
+      continue
+    }
+    if (values.length === 0) refuse('more placeholders than values')
     const value = values.shift() as SeedValue
+    if (typeof value === 'number' && !Number.isFinite(value)) refuse(`the number ${value}`)
     sql += value === null ? 'NULL' : typeof value === 'number' ? String(value) : q(value)
   }
-  if (values.length > 0) throw new Error(`Too many values for: ${statement.sql}`)
+  if (quoted) refuse('an unterminated string')
+  if (values.length > 0) refuse('more values than placeholders')
   return sql
 }
 
@@ -204,7 +225,13 @@ export async function workerD1<T = Record<string, unknown>>(
   } | null
   if (!response.ok || !body?.success) {
     const message = body?.errors?.map(error => error.message).join('; ') || response.statusText
-    throw new Error(`Local D1 query failed (${response.status}): ${message}`)
+    const hint =
+      response.status === 404
+        ? " Is Wrangler's Local Explorer API on for this Worker (X_LOCAL_EXPLORER=true)?"
+        : ''
+    throw new Error(
+      `Local D1 query through Wrangler's Local Explorer API failed (${response.status}): ${message}.${hint}`
+    )
   }
   const { columns = [], rows = [] } = body.result?.at(-1)?.results ?? {}
   return rows.map(row => Object.fromEntries(columns.map((column, i) => [column, row[i]])) as T)
