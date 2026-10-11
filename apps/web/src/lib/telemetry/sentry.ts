@@ -1,9 +1,9 @@
 /**
  * Shared Sentry settings for the Worker and the browser (#48; serp
- * docs/engineering/technology/telemetry.md). A report carries the error, its stack, the page
- * path, the release, and the environment, never user data: no IP, cookies, headers, query
- * strings, request bodies, console output, or user identity. Replay, tracing, and profiling stay
- * off.
+ * docs/engineering/technology/telemetry.md). A report carries the error's type, its stable code,
+ * its stack, the page path, the release, and the environment, never user data: no free-text
+ * error messages (#211), IP, cookies, headers, query strings, request bodies, console output, or
+ * user identity. Replay, tracing, and profiling stay off.
  *
  * The DSN is public and baked in at build time (`NEXT_PUBLIC_SENTRY_DSN`). Without it, as in
  * local runs or before the project exists, Sentry stays off: telemetry never breaks the site.
@@ -15,8 +15,10 @@ type ScrubbableEvent = {
   breadcrumbs?: Array<{ category?: string; data?: Record<string, unknown>; [key: string]: unknown }>
   contexts?: Record<string, unknown>
   environment?: string
-  exception?: { values?: Array<{ stacktrace?: { frames?: StackFrame[] } }> }
+  exception?: { values?: Array<{ stacktrace?: { frames?: StackFrame[] }; value?: unknown }> }
   extra?: unknown
+  logentry?: { message?: unknown; params?: unknown }
+  message?: unknown
   request?: { method?: string; url?: string; [key: string]: unknown }
   tags?: Record<string, unknown>
   transaction?: unknown
@@ -41,6 +43,37 @@ const ALLOWED_CONTEXTS = new Set([
 /** Tags the SDK adds; the logger's own tags are dropped like its data. */
 const ALLOWED_TAGS = new Set(['runtime', 'turbopack'])
 
+/**
+ * The stable error codes a report's message may carry (#211; serp telemetry standard, Required
+ * Defaults item 3). Each is a fixed string thrown or logged as the message, such as the shared
+ * logger's `logger.error('search_failed')`. Kept here, beside the scrubber that holds every
+ * other message to it, so this module stays import-free.
+ */
+export const ERROR_CODES = [
+  'search_entry_check_failed',
+  'search_entry_transform_failed',
+  'search_failed',
+  'search_lenient_processing_failed',
+  'search_query_match_failed'
+] as const
+
+export type ErrorCode = (typeof ERROR_CODES)[number]
+
+const STABLE_MESSAGES: ReadonlySet<unknown> = new Set(ERROR_CODES)
+
+/** What replaces any other message: the error's type and stack still say what failed. */
+export const REDACTED_MESSAGE = '[redacted]'
+
+/**
+ * A message that is an allowlisted code, as it is; any other text, redacted. A thrown error's
+ * message can hold what a visitor typed, a validation error can echo a field, and Drizzle adds a
+ * failed statement's bound values to its message, so no free text leaves.
+ */
+function stableMessage(message: unknown): unknown {
+  if (typeof message !== 'string' || message === '') return message
+  return STABLE_MESSAGES.has(message) ? message : REDACTED_MESSAGE
+}
+
 export type SiteEnvironment = 'local' | 'production' | 'staging'
 
 export function stripQuery(url: string): string {
@@ -52,6 +85,8 @@ export function scrubEvent<E>(input: E): E {
   const event = input as ScrubbableEvent
   delete event.user
   delete event.extra
+  if (event.message !== undefined) event.message = stableMessage(event.message)
+  if (event.logentry) event.logentry = { message: stableMessage(event.logentry.message) }
   if (event.request) {
     const { method, url } = event.request
     event.request = { ...(url ? { url: stripQuery(url) } : {}), ...(method ? { method } : {}) }
@@ -71,8 +106,10 @@ export function scrubEvent<E>(input: E): E {
       if (!ALLOWED_TAGS.has(key)) delete event.tags[key]
     }
   }
-  // The browser names a frame after the page URL, query string included.
   for (const exception of event.exception?.values ?? []) {
+    // Every exception in the chain: the SDK adds an error's `cause` as one more.
+    if (exception.value !== undefined) exception.value = stableMessage(exception.value)
+    // The browser names a frame after the page URL, query string included.
     for (const frame of exception.stacktrace?.frames ?? []) {
       if (typeof frame.filename === 'string') frame.filename = stripQuery(frame.filename)
       if (typeof frame.abs_path === 'string') frame.abs_path = stripQuery(frame.abs_path)

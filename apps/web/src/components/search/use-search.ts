@@ -43,7 +43,8 @@ export function useSearch(query: string) {
         const results = transformAndSanitizeEntries(valid)
         if (isMounted) setResults(results)
       } catch (error) {
-        logger.error('Error fetching or processing search results:', {
+        logger.error('search_failed', {
+          cause: error,
           data: error,
           tags: { type: 'component' }
         })

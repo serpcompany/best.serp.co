@@ -15,6 +15,7 @@ import { billing } from '../billing/runtime'
 import { previewRefund, refundOrder, refundRejectedSubmission } from '../billing/service'
 import { emailEventKey, enqueueEmail } from '../email/server'
 import { createMediaHost } from '../media/worker-media'
+import { CodedError } from '../telemetry/coded-error'
 import type { AdminContext } from './decisions'
 
 const runtimeEnvironments = new Set(['local', 'staging', 'production'])
@@ -22,9 +23,14 @@ const runtimeEnvironments = new Set(['local', 'staging', 'production'])
 async function adminDatabase(): Promise<Database> {
   const { env } = await getCloudflareContext({ async: true })
   const workerEnv = env as CloudflareEnv
-  if (!workerEnv.DB) throw new Error('D1 binding DB is required for the admin panel.')
+  if (!workerEnv.DB) {
+    throw new CodedError('d1_binding_missing', 'D1 binding DB is required for the admin panel.')
+  }
   if (!runtimeEnvironments.has(workerEnv.D1_RUNTIME_ENV)) {
-    throw new Error('A valid D1_RUNTIME_ENV is required for the admin panel.')
+    throw new CodedError(
+      'd1_runtime_env_invalid',
+      'A valid D1_RUNTIME_ENV is required for the admin panel.'
+    )
   }
   return createDatabase(workerEnv.DB)
 }

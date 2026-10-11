@@ -50,12 +50,14 @@ describe('instrumentation (#48, #355)', () => {
     expect(sentry.captureRequestError).not.toHaveBeenCalled()
     const line = String(logged.mock.calls[0]?.[0])
     expect(JSON.parse(line)).toMatchObject({
+      code: 'UNKNOWN',
       event: 'request_error',
-      message: 'render failed',
+      name: 'Error',
       path: '/products/fixture-studio/',
       route: '/(site)/products/[slug]'
     })
     expect(line).not.toContain('session=1')
+    expect(line).not.toContain('render failed')
   })
 
   it('reports a signed-in or operational surface error to Sentry', async () => {
@@ -89,8 +91,8 @@ describe('instrumentation (#48, #355)', () => {
     ).resolves.toBeUndefined()
     expect(sentry.captureRequestError).not.toHaveBeenCalled()
     expect(JSON.parse(String(logged.mock.calls[0]?.[0]))).toMatchObject({
+      code: 'UNKNOWN',
       event: 'request_error',
-      message: 'admin render failed',
       path: '/admin/listings/'
     })
   })

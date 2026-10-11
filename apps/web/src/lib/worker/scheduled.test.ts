@@ -174,12 +174,16 @@ describe('scheduled handler', () => {
     await expect(run(12, {})).rejects.toThrow(AggregateError)
     expect(status('waiting')).toMatchObject({ draft_reminders_sent: 1, status: 'draft' })
     expect(errors.mock.calls.map(([line]) => JSON.parse(String(line)))).toEqual([
-      expect.objectContaining({
+      {
+        code: 'billing_secrets_missing',
+        cron: DRAFT_JOBS_CRON,
         event: 'scheduled_job_failed',
         job: 'billing-sweep',
-        message: MISSING_PROVIDER_SECRETS
-      })
+        name: 'Error'
+      }
     ])
+    // The failure's code, never its message (#211): another job's message can hold user input.
+    expect(String(errors.mock.calls[0]?.[0])).not.toContain(MISSING_PROVIDER_SECRETS)
   })
 
   it('ignores an unknown trigger and fails closed without a database', async () => {
@@ -200,7 +204,13 @@ describe('scheduled handler', () => {
         { waitUntil: () => undefined }
       )
     ).rejects.toThrow(/scheduled job\(s\) failed/u)
-    expect(String(errors.mock.calls[0]?.[0])).toContain('D1 binding DB is required')
+    expect(JSON.parse(String(errors.mock.calls[0]?.[0]))).toEqual({
+      code: 'd1_binding_missing',
+      cron: DRAFT_JOBS_CRON,
+      event: 'scheduled_job_failed',
+      job: 'draft-reminders-and-expiry',
+      name: 'Error'
+    })
   })
 
   it('runs every job of a trigger even when one fails', async () => {

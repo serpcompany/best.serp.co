@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CANONICAL_HOST, STAGING_CANONICAL_HOST } from '../environment/site-environment'
 import {
   browserEnvironment,
+  ERROR_CODES,
+  REDACTED_MESSAGE,
   scrubEvent,
   sentryOptions,
   sentryRelease,
@@ -113,6 +115,63 @@ describe('Sentry settings (#48)', () => {
       { abs_path: 'app:///products/', filename: 'app:///products/' },
       { filename: 'app:///_next/static/chunks/a.js', function: 'f' }
     ])
+  })
+
+  it('redacts every message that is not an allowlisted code (#211)', () => {
+    const event = scrubEvent({
+      exception: {
+        values: [
+          // A cause the SDK adds to the chain, then the error itself.
+          { type: 'Error', value: 'D1_ERROR: SQLITE_CONSTRAINT (typed@example.com)' },
+          { type: 'TypeError', value: 'Failed query: insert into submissions\nparams: My Startup' },
+          { type: 'Error', value: '' },
+          { type: 'Error' }
+        ]
+      },
+      logentry: { message: 'Search for %s failed', params: ['private search'] },
+      message: 'Non-Error promise rejection captured with value: typed@example.com'
+    })
+    expect(event).toEqual({
+      exception: {
+        values: [
+          { type: 'Error', value: REDACTED_MESSAGE },
+          { type: 'TypeError', value: REDACTED_MESSAGE },
+          { type: 'Error', value: '' },
+          { type: 'Error' }
+        ]
+      },
+      logentry: { message: REDACTED_MESSAGE },
+      message: REDACTED_MESSAGE
+    })
+  })
+
+  it('passes each allowlisted code through unchanged', () => {
+    expect(ERROR_CODES.length).toBeGreaterThan(0)
+    for (const code of ERROR_CODES) {
+      const event = scrubEvent({
+        exception: { values: [{ type: 'Error', value: code }] },
+        message: code
+      })
+      expect(event).toEqual({
+        exception: { values: [{ type: 'Error', value: code }] },
+        message: code
+      })
+    }
+    // Only the exact code: no prefix, suffix or case change.
+    const near = scrubEvent({
+      exception: {
+        values: [{ value: 'search_failed: private search' }, { value: 'SEARCH_FAILED' }]
+      }
+    })
+    expect(near.exception.values).toEqual([
+      { value: REDACTED_MESSAGE },
+      { value: REDACTED_MESSAGE }
+    ])
+  })
+
+  it('keeps the allowlist to stable codes', () => {
+    for (const code of ERROR_CODES) expect(code).toMatch(/^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/u)
+    expect(new Set(ERROR_CODES).size).toBe(ERROR_CODES.length)
   })
 
   it('sends no sessions from the browser or the Worker', () => {

@@ -170,9 +170,15 @@ describe('starting the Worker Sentry SDK (#355)', () => {
 })
 
 describe('a public page error in the Worker logs (#355)', () => {
-  it('is one JSON line with the route and the error, without the query string', () => {
+  it('is one JSON line with the route and the error’s code, never its message or the query string (#211)', () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const error = Object.assign(new Error('D1 unavailable'), { digest: '2817' })
+    // Drizzle puts a failed statement's bound values in its message, over several lines.
+    const error = Object.assign(
+      new Error('Failed query: select * from listings where slug = ?\nparams: private-slug', {
+        cause: new Error('D1_ERROR: no such table: listings: SQLITE_ERROR')
+      }),
+      { digest: '2817' }
+    )
     logRequestError(
       error,
       { method: 'GET', path: '/search/?q=private' },
@@ -186,9 +192,9 @@ describe('a public page error in the Worker logs (#355)', () => {
     expect(logged).toHaveBeenCalledTimes(1)
     const line = JSON.parse(String(logged.mock.calls[0]?.[0]))
     expect(line).toMatchObject({
+      code: 'SQLITE_ERROR:missing_table',
       digest: '2817',
       event: 'request_error',
-      message: 'D1 unavailable',
       method: 'GET',
       name: 'Error',
       path: '/search/',
@@ -196,7 +202,10 @@ describe('a public page error in the Worker logs (#355)', () => {
       route: '/(site)/search',
       routeType: 'render'
     })
-    expect(line.stack).toContain('D1 unavailable')
+    expect(line).not.toHaveProperty('message')
+    // The stack keeps its frames and drops the header that repeats the message.
+    expect(line.stack).toMatch(/^\s+at /u)
+    expect(line.stack).not.toContain('Failed query')
     expect(String(logged.mock.calls[0]?.[0])).not.toContain('private')
   })
 
@@ -210,13 +219,18 @@ describe('a public page error in the Worker logs (#355)', () => {
     expect(logged).toHaveBeenCalledTimes(2)
   })
 
-  it('logs a thrown non-error as its message', () => {
+  it('logs a thrown non-error as a code, never its text', () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
-    logRequestError('boom', { method: 'GET', path: '/' }, { routePath: '/', routeType: 'render' })
+    logRequestError(
+      'typed@example.com',
+      { method: 'GET', path: '/' },
+      { routePath: '/', routeType: 'render' }
+    )
     expect(JSON.parse(String(logged.mock.calls[0]?.[0]))).toMatchObject({
-      message: 'boom',
+      code: 'UNKNOWN',
       path: '/'
     })
+    expect(String(logged.mock.calls[0]?.[0])).not.toContain('typed@example.com')
   })
 })
 

@@ -4,6 +4,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { cache } from 'react'
 import { type AccountOperations, createAccountOperations } from '@/db/account'
 import { createDatabase } from '@/db/client'
+import { CodedError } from '@/lib/telemetry/coded-error'
 
 /**
  * Server-only adapter for the submitter dashboard (serpcompany/best.serp.co#65): it validates
@@ -17,9 +18,14 @@ const runtimeEnvironments = new Set(['local', 'staging', 'production'])
 export const accountOperations = cache(async (): Promise<AccountOperations> => {
   const { env } = await getCloudflareContext({ async: true })
   const workerEnv = env as CloudflareEnv
-  if (!workerEnv.DB) throw new Error('D1 binding DB is required for the account.')
+  if (!workerEnv.DB) {
+    throw new CodedError('d1_binding_missing', 'D1 binding DB is required for the account.')
+  }
   if (!runtimeEnvironments.has(workerEnv.D1_RUNTIME_ENV)) {
-    throw new Error('A valid D1_RUNTIME_ENV is required for the account.')
+    throw new CodedError(
+      'd1_runtime_env_invalid',
+      'A valid D1_RUNTIME_ENV is required for the account.'
+    )
   }
   return createAccountOperations({
     // Logos must be https, except on a local Worker, whose e2e fixture sites are http.
