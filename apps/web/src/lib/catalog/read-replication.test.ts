@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { noCatalogDataCache } from '@/db/cache'
 import { createCatalogOperations } from '@/db/catalog'
+import { shareCatalogEpochToken } from '@/db/catalog-epoch'
 import { createSessionDatabase } from '@/db/client'
 import { type D1Copy, ReplicatedD1, seedContractFixture } from '@/db/test-support'
 import { EDGE_CACHE_HEADER, withEdgeCache } from '@/lib/edge-cache/html-cache'
@@ -61,12 +62,14 @@ const observe = () => {}
 /**
  * One isolate's Worker: the edge cache in front of a page that renders a listing's name, or (on
  * `/account/`, as the account pages do) the active categories, through the catalog adapter.
+ * `beforeRead` runs as the page starts, before it reads the catalog.
  */
-function isolate(nearest: D1Copy) {
+function isolate(nearest: D1Copy, beforeRead: () => void = () => {}) {
   const env = { D1_RUNTIME_ENV: 'local', DB: db.binding(nearest), MEDIA_BASE_URL: '/_media' }
   const render = catalogRenderer(
     env,
     async rendered => {
+      beforeRead()
       const { pathname } = new URL(rendered.url)
       if (pathname === '/account/') {
         return new Response((await getActiveCategories()).map(category => category.slug).join())
@@ -129,18 +132,18 @@ describe('D1 read replication (#382)', () => {
     db.write(PUBLICATION)
     // A Worker whose nearest copy is a replica that still lacks the publication. Its epoch read
     // starts on the primary (epoch 2), and its render at that read's bookmark, so the replica
-    // (older than the bookmark) is passed over for the primary.
+    // (older than the bookmark) waits until it has caught up before it answers.
     const nearReplica = isolate('replica')
     const served = await servedDuring(async () => {
       expect(await nearReplica('/products/charlie/')).toEqual({ state: 'MISS', text: RENAMED })
     })
     expect(db.sessions).toEqual(['first-primary', '00000002'])
-    expect(served.length).toBeGreaterThan(0)
-    expect(served.every(copy => copy === 'primary')).toBe(true)
+    expect(served).toEqual(['primary', 'replica', 'replica', 'replica', 'replica'])
+    expect(db.waits).toBe(1)
     expect(cachedDetailNames('charlie')).toEqual({ '2': RENAMED })
 
     // Another isolate in that data center reuses the shared epoch and its bookmark: no epoch
-    // read, and its render starts at the same bookmark.
+    // read, and its render starts at the same bookmark, which the replica has now reached.
     const sameDataCenter = isolate('replica')
     const sharedServed = await servedDuring(async () => {
       expect(await sameDataCenter('/products/delta/')).toEqual({
@@ -149,7 +152,28 @@ describe('D1 read replication (#382)', () => {
       })
     })
     expect(db.sessions).toEqual(['first-primary', '00000002', '00000002'])
-    expect(sharedServed.every(copy => copy === 'primary')).toBe(true)
+    expect(sharedServed.every(copy => copy === 'replica')).toBe(true)
+    expect(db.waits).toBe(1)
+  })
+
+  // #390 review: a background refresh can move the isolate's shared epoch mid-render; the render
+  // must still key the data cache on its own epoch, the one its bookmark was read with.
+  it('keys the data cache on the render’s own epoch, not a newer shared one', async () => {
+    let refreshLandsMidRender = false
+    const nearReplica = isolate('replica', () => {
+      if (refreshLandsMidRender) shareCatalogEpochToken('2.2026-07-05T00:00:00.000Z')
+    })
+    // The edge memo holds epoch 1 (and its bookmark) for 30 seconds.
+    expect((await nearReplica('/products/alpha/')).state).toBe('MISS')
+    db.write(PUBLICATION)
+    refreshLandsMidRender = true
+    // The render of this miss runs at epoch 1's bookmark, which the lagging replica has, so it
+    // reads charlie from before the publication: that belongs under epoch 1, never epoch 2.
+    expect(await nearReplica('/products/charlie/')).toEqual({
+      state: 'MISS',
+      text: 'charlie listing'
+    })
+    expect(cachedDetailNames('charlie')).toEqual({ '1': 'charlie listing' })
   })
 
   it('would cache the replica’s older rows under that epoch without the bookmark', async () => {
@@ -175,6 +199,7 @@ describe('D1 read replication (#382)', () => {
     })
     // The epoch read on the primary, then the listing's one batch (#378) on the replica.
     expect(served).toEqual(['primary', 'replica', 'replica', 'replica', 'replica'])
+    expect(db.waits).toBe(0)
     expect(db.primary.roundTrips).toEqual([
       { kind: 'statement', sql: expect.stringContaining('publication_state') }
     ])

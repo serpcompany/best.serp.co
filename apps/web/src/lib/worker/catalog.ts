@@ -54,9 +54,10 @@ const epochSources = new WeakMap<D1Database, EpochSource>()
  * (`first-primary`), so every epoch the edge cache, the data center's share and this isolate's
  * renders key on is the primary's, as before #382: a bypassed render, which reuses it and reads the
  * primary, never keys the data cache on a lagging replica's older epoch (#382 review). The render
- * of a miss then reads at the read's bookmark or newer (`catalogRenderer`): from the nearest replica
- * once it has caught up to that bookmark, which the epoch's 30-second reuse leaves time for, and
- * from the primary until then. Without replication the primary answers everything, as before.
+ * of a miss then reads at the read's bookmark or newer (`catalogRenderer`): the nearest replica
+ * answers, and one still behind that bookmark waits until it has caught up, which only a render in
+ * the moments after an epoch read (reused for 30 seconds) can meet. Without replication the
+ * primary answers everything, as before.
  */
 export function catalogEpochReader(
   env: CatalogWorkerEnv,

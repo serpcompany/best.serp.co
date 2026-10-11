@@ -163,10 +163,11 @@ export type D1Copy = 'primary' | 'replica'
  * the primary as a new version and to the replica only when it catches up (`catchUp`).
  *
  * As on D1, the binding itself (`prepare`, `batch`) always reads the primary. A session
- * (`withSession`) sends each statement to the binding's nearest copy when that copy is at least as
- * new as the session's floor, otherwise to the primary; the floor starts at the bookmark it was
- * given (0 for `first-unconstrained`; `first-primary` sends its first statement to the primary)
- * and rises to each version a statement read, so the session reads sequentially. Bookmarks are
+ * (`withSession`) sends each statement to the binding's nearest copy; the session's floor starts
+ * at the bookmark it was given (0 for `first-unconstrained`; `first-primary` sends its first
+ * statement to the primary) and rises to each version a statement read, so the session reads
+ * sequentially. A replica behind the floor waits until it has caught up before it answers, as
+ * Cloudflare documents (`waits` counts each time), so it never serves older rows. Bookmarks are
  * versions, zero-padded so they order as strings, as D1's do. A batch runs on the copy its
  * statements were prepared on.
  */
@@ -178,6 +179,8 @@ export class ReplicatedD1 {
   readonly served: D1Copy[] = []
   /** Every `withSession` argument, in order. */
   readonly sessions: string[] = []
+  /** How many statements a replica held until it had caught up to their session's floor. */
+  waits = 0
   private readonly lagging: string[] = []
 
   /** Seeds both copies alike, at version 1. */
@@ -231,7 +234,11 @@ export class ReplicatedD1 {
       batch: (statements: D1PreparedStatement[]) => copies[last].batch(statements),
       getBookmark: () => (seen === null ? null : String(seen).padStart(8, '0')),
       prepare(sql: string) {
-        last = nearest === 'replica' && owner.versions.replica >= floor ? 'replica' : 'primary'
+        last = nearest === 'replica' && floor !== Number.POSITIVE_INFINITY ? 'replica' : 'primary'
+        if (last === 'replica' && owner.versions.replica < floor) {
+          owner.waits += 1
+          owner.catchUp()
+        }
         seen = owner.versions[last]
         floor = seen
         owner.served.push(last)

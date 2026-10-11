@@ -89,14 +89,15 @@ itself always reads the primary.
   `architecture-guard.test.ts` keeps `withSession(` to those two files.
 - **A render never reads rows older than the epoch it keys the caches on.** Its session starts at
   the bookmark of the read that returned that epoch, and D1 answers each statement from a copy at
-  least that new (the primary while the nearest replica lags). Rows newer than the epoch can be
-  read, as without replicas when a publication lands mid-render, and the next epoch replaces them.
+  least that new: a replica behind the bookmark waits until it has caught up. Rows newer than the
+  epoch can be read, as without replicas when a publication lands mid-render, and the next epoch
+  replaces them.
 - **Every epoch is the primary's:** its read starts on the primary, so a publication reaches pages
   as fast as before, and a bypassed render, which reuses the isolate's epoch for the data cache,
-  never keys it on a lagging replica's older one (#382 review). A render reads the nearest replica
-  once that replica has caught up to the epoch read's bookmark, which the 30-second reuse leaves
-  time for, and the primary until then. An epoch shared without a bookmark (by a Worker version
-  from before #382) renders from the primary.
+  never keys it on a lagging replica's older one (#382 review). The nearest replica answers a
+  render at the epoch read's bookmark; only a render in the moments after an epoch read (once per
+  data center per 30 seconds) can find it still behind and wait for its lag. An epoch shared
+  without a bookmark (by a Worker version from before #382) renders from the primary.
 - **Without replication** every statement runs on the primary: the same rows, round trips (the
   epoch read, then one batch per uncached listing) and latency as through the binding.
 - **Telemetry:** `d1_query` events carry `servedByPrimary` and `servedByRegion` where remote D1
