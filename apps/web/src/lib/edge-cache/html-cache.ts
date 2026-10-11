@@ -12,6 +12,7 @@
  * server is loaded, and every dependency (cache, epoch reader, clock) is injected.
  */
 import { hasAuthCookie } from '../auth/cookies'
+import { CodedError } from '../telemetry/coded-error'
 
 /** How long a stored response may be reused under the same epoch and deployment. */
 export const HTML_CACHE_TTL_SECONDS = 24 * 60 * 60
@@ -283,7 +284,17 @@ export class EpochMemo {
   }
 }
 
-const EPOCH_CACHE_KEY = 'https://html-cache.invalid/catalog-epoch'
+/**
+ * The shared epoch's key names the environment (`D1_RUNTIME_ENV`): staging and production are
+ * custom domains in one zone, whose cache their Workers share, so an unscoped key would let one
+ * read the other's epoch (#397). Without an environment there is no key, and the share fails.
+ */
+function epochCacheKey(environment: string): string {
+  if (!environment) {
+    throw new CodedError('d1_runtime_env_invalid', 'The shared catalog epoch needs an environment.')
+  }
+  return `${CACHE_KEY_ORIGIN}/catalog-epoch/${encodeURIComponent(environment)}`
+}
 
 /**
  * Shares the epoch between the isolates of one data center for `freshSeconds`, so the
@@ -291,10 +302,12 @@ const EPOCH_CACHE_KEY = 'https://html-cache.invalid/catalog-epoch'
  */
 export async function loadSharedEpoch(
   cache: Cache,
+  environment: string,
   read: () => Promise<string>,
   freshSeconds = EPOCH_FRESH_MS / 1000
 ): Promise<string> {
-  const cached = await cache.match(EPOCH_CACHE_KEY).catch(() => undefined)
+  const key = epochCacheKey(environment)
+  const cached = await cache.match(key).catch(() => undefined)
   if (cached) {
     const token = await cached.text()
     if (token) return token
@@ -302,7 +315,7 @@ export async function loadSharedEpoch(
   const token = await read()
   await cache
     .put(
-      EPOCH_CACHE_KEY,
+      key,
       new Response(token, { headers: { 'cache-control': `public, max-age=${freshSeconds}` } })
     )
     .catch(() => undefined)
