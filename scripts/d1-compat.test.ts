@@ -72,6 +72,9 @@ describe('D1 compatibility of generated statements (#95 release blocker, SQLITE_
       expect(plan.statements.some(statement => statement.query.includes(GUARD_FAILURE))).toBe(true)
     }
     expect([...actions].sort()).toEqual([
+      'best-page-create',
+      'best-page-listings-set',
+      'category-create',
       'category-unpublish',
       'listing-categories-add',
       'listing-categories-remove',
@@ -82,7 +85,10 @@ describe('D1 compatibility of generated statements (#95 release blocker, SQLITE_
       'listing-details-set',
       'listing-media-update',
       'listing-slug-redirect',
-      'listing-unpublish'
+      'listing-tags-set',
+      'listing-unpublish',
+      'tag-create',
+      'taxonomy-redirect-set'
     ])
   })
 })

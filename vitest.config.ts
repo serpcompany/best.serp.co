@@ -25,7 +25,8 @@ export const D1_TESTS = [
   'scripts/other-categories-manifest.test.ts',
   'scripts/r2-objects.test.ts',
   'scripts/release-promote.test.ts',
-  'scripts/staging-verification.test.ts'
+  'scripts/staging-verification.test.ts',
+  'scripts/taxonomy-manifest.test.ts'
 ]
 
 /**
