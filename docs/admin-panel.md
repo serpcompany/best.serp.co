@@ -215,31 +215,40 @@ gate and again by `authorizeAdminRequest()`):
 - **Never logged:** no log line, answer or error carries it, Sentry never receives request
   headers, and Cloudflare's tail events redact any header whose name contains `token`.
 
-The key opens no read screen, so take ids and `content_version` from staging D1 with a read-only
-query, then call the endpoint (an unknown path such as `/api/admin/` answers 404 to a valid key):
+**Where it lives:** the staging Worker secret (set since 2026-10-12), and one copy per machine
+outside the repository, `~/.config/best.serp.co/staging-admin-token` (directory 700, file 600),
+which every checkout and worktree on that machine shares. Never put the value in the repository,
+a log, an issue or a pull request, and never set it on production.
+
+**Use it.** Every call names staging's password (`staging:stagingpassword`,
+[Architecture](./architecture.md#environments-and-hosts)) and reads the key from that file:
 
 ```bash
-curl -sS -u "staging:<staging password>" \
+curl -u staging:stagingpassword \
   -H "X-Staging-Admin-Token: $(cat ~/.config/best.serp.co/staging-admin-token)" \
-  -H 'content-type: application/json' -d '{"expectedContentVersion": 1}' \
-  https://staging.best.serp.co/api/admin/submissions/<id>/approve
+  https://staging.best.serp.co/api/admin/...
 ```
 
-**Where it lives:** the staging Worker secret, and one local file outside the repository,
-`~/.config/best.serp.co/staging-admin-token` (mode 600). Never commit it, paste it into an issue
-or a log, or set it on production. Only the owner, or an agent the owner authorized, sets it.
+For example, `-H 'content-type: application/json' -d '{"expectedContentVersion": 1}'` on
+`…/api/admin/submissions/<id>/approve`. The key opens no read screen, so take ids and
+`content_version` from staging D1 with a read-only query. An unknown path such as `/api/admin/`
+answers 404 to a valid key and 401 to any other.
 
-**Rotate or revoke** from `apps/web`. A new secret replaces the old one at once; deleting it
-refuses every key. Decisions made with a key stay in the audit trail as `staging-agent`; after a
-suspected leak, also check `admin_allowlist` for rows `added_by = 'staging-agent'`.
+**A machine without the file** rotates the key itself, from `apps/web`: generate a new
+48-character key, write it to that path, and put it on staging. That replaces the secret at once,
+so every other machine's copy stops working until someone copies the new file there or rotates
+again.
 
 ```bash
-(umask 077 && mkdir -p ~/.config/best.serp.co && openssl rand -hex 24 | tr -d '\n' \
-  > ~/.config/best.serp.co/staging-admin-token)
+mkdir -p ~/.config/best.serp.co && chmod 700 ~/.config/best.serp.co
+(umask 077 && openssl rand -hex 24 | tr -d '\n' > ~/.config/best.serp.co/staging-admin-token)
 pnpm exec wrangler secret put STAGING_ADMIN_TOKEN --env staging \
   < ~/.config/best.serp.co/staging-admin-token
-pnpm exec wrangler secret delete STAGING_ADMIN_TOKEN --env staging  # revoke
 ```
+
+**Revoke** with `pnpm exec wrangler secret delete STAGING_ADMIN_TOKEN --env staging`: every key is
+refused. Decisions made with a key stay in the audit trail as `staging-agent`; after a suspected
+leak, rotate or revoke, then check `admin_allowlist` for rows `added_by = 'staging-agent'`.
 
 ## Tests
 
