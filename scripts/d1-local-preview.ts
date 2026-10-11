@@ -20,10 +20,13 @@ import { project } from './project'
  * and refuses a live key outside production), and staging's password (#359):
  * `LOCAL_STAGING_ACCESS=on` makes the local Worker serve as staging behind
  * `STAGING_BASIC_AUTH_PASSWORD` (apps/web/e2e/staging-access-fixture.ts;
- * `lib/environment/site-environment.ts` ignores the switch anywhere but local). Identity and
+ * `lib/environment/site-environment.ts` ignores the switch anywhere but local), and
+ * `BETTER_AUTH_SECRET`, a fixed test value in place of the ephemeral local one, so a suite can
+ * name a rate-limit bucket on its Worker (apps/web/e2e/claims-fixture.ts, #200). Identity and
  * environment vars (`SITE_ENVIRONMENT`, `D1_RUNTIME_ENV`) can never be overridden here.
  */
 export const LOCAL_PREVIEW_OVERRIDABLE_VARS = [
+  'BETTER_AUTH_SECRET',
   'CF_ACCESS_AUD',
   'CF_ACCESS_REQUIRED',
   'CF_ACCESS_TEAM_DOMAIN',

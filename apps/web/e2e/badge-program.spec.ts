@@ -62,6 +62,11 @@ interface Seeded {
 
 let fixture: FixtureSite
 const seeded = new Map<Kind, Seeded>()
+/**
+ * The catalog version before this attempt's passes. A retry runs on the D1 the failed attempt
+ * left, whose passes may have moved it already (#200).
+ */
+let startVersion = 0
 
 function seed(kind: Kind, product: FixtureProduct): Seeded {
   const key = `${kind}-${unique()}`
@@ -154,6 +159,7 @@ test.beforeAll(async () => {
   seed('gone', { ...product('Gone product', 'valid'), status: 404 })
   seed('curated', product('Curated product', 'missing'))
   seed('paid', product('Paid product', 'missing'))
+  startVersion = version()
 })
 
 test.afterAll(async () => {
@@ -202,16 +208,17 @@ test('the weekly pass warns on conclusive misses only, and checks no curated or 
   expect(checks('free')).toHaveLength(1)
   expect(await emailsTo(request, get('free').email)).toHaveLength(1)
   // Writing checks never moves the catalog.
-  expect(version()).toBe(0)
+  expect(version()).toBe(startVersion)
 })
 
 test('the daily pass rechecks each warning and unpublishes or revokes on a confirmed miss', async ({
   request
 }) => {
-  // The warnings were sent two days ago, so today's window rechecks them.
+  // The warnings were sent two days ago, so today's window rechecks them: this attempt's only, as
+  // a retry's D1 still holds the failed attempt's listings.
   badgeD1(`
     UPDATE badge_checks SET checked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-2 days')
-      WHERE kind = 'weekly'
+      WHERE kind = 'weekly' AND listing_id IN (${[...seeded.values()].map(row => q(row.id)).join(', ')})
   `)
   fixture.update(get('fixed').label, { badge: 'valid' })
   const page = await request.get(`/products/${get('free').slug}/`)
@@ -256,7 +263,7 @@ test('the daily pass rechecks each warning and unpublishes or revokes on a confi
   expect(badgeD1(`SELECT is_active FROM listings WHERE id = ${q(get('gone').id)}`)).toEqual([
     { is_active: 0 }
   ])
-  expect(version()).toBe(3)
+  expect(version()).toBe(startVersion + 3)
   // The fixed listing and the unreachable one stay as they were.
   expect(
     badgeD1(
@@ -277,7 +284,7 @@ test('the daily pass rechecks each warning and unpublishes or revokes on a confi
   // Replayed: no second unpublish, revocation, or email.
   await trigger(request, DAILY)
   await trigger(request, HOURLY)
-  expect(version()).toBe(3)
+  expect(version()).toBe(startVersion + 3)
   expect(await emailsTo(request, get('free').email)).toHaveLength(2)
   expect(await emailsTo(request, get('claim').email)).toHaveLength(2)
   for (const kind of ['curated', 'paid'] as const) {

@@ -47,6 +47,11 @@ The local suite runs on the fixture seed, never the real catalog (#311, #313):
   parallel without counting each other's rows. The media server's D1 is the seed plus a queued
   logo. The staging-access Worker runs with `LOCAL_STAGING_ACCESS=on` and a test password, so
   it serves as staging does behind its password (#359), in its own run after the others.
+- Most suites write their Worker's D1 file directly (`localD1`, `runStatements`). workerd waits
+  for no SQLite lock, so a Worker query that meets such a write fails with a 500 "internal
+  error". The claims suites share their Worker between tests running in parallel, so they write
+  through the Worker's own D1 instead (`workerD1`, Wrangler's Local Explorer API), and start each
+  test with the shared `localtest.me` code cap empty, on a fixed test auth secret (#200).
 - `smoke.spec.ts` and `public-parity.spec.ts` also run against staging after each deploy
   (`pnpm test:e2e:smoke`), on its workers.dev host: `playwright.config.ts` then sends the
   smoke-test header on every request, and one smoke test checks that a request without it gets

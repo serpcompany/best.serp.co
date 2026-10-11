@@ -14,6 +14,7 @@ import {
   normalizeEmail
 } from './auth'
 import { createDatabase } from './client'
+import { rateLimitBucket, rateLimitBucketKey } from './rate-limit-buckets'
 import { SqliteD1 } from './test-support'
 
 function setup(start = Date.parse('2026-10-06T12:00:00.000Z')) {
@@ -216,6 +217,9 @@ describe('auth data operations', () => {
       .digest('hex')
     expect(buckets).not.toContain(unkeyed)
     expect(buckets).toContain(keyed)
+    // The shared helper names the same bucket: the claims E2E suite empties one with it (#200).
+    const bucketKey = await rateLimitBucketKey(RATE_LIMIT_KEY)
+    expect(await rateLimitBucket(bucketKey, { key: '203.0.113.9', scope: 'otp-ip' })).toBe(keyed)
     for (const bucket of buckets) expect(bucket).toMatch(/^[a-f0-9]{64}$/u)
     await expect(
       createAuthOperations({
