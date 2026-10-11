@@ -4,8 +4,9 @@
  * The Sentry server SDK costs about 110 ms of CPU in each fresh isolate (#334), and search
  * crawlers mostly see uncached public pages in fresh isolates. So only the signed-in and
  * operational surfaces start it: `/admin`, `/account`, `/submit`, `/login`, `/claims` and
- * `/api`. Every other path is a public page whose request errors go to the Worker's logs as
- * one JSON line (`logRequestError`), which Workers Observability keeps.
+ * `/api`. Every other path is a public page. Request errors from every path also go to the
+ * Worker's logs as one JSON line with their digest (`logRequestError`, #204), which Workers
+ * Observability keeps.
  *
  * Starting the SDK takes both halves of the isolate, which share only `globalThis`:
  * - the Worker entry (`worker.ts`, bundled by Wrangler) sees every request first, and calls
@@ -102,10 +103,11 @@ interface RequestErrorContext {
 const loggedErrors = new WeakSet<object>()
 
 /**
- * A public page's request error, as one JSON line on `console.error` for Workers Observability.
- * Like a Sentry report it carries the error and the route, never user data: the path without
- * its query string, no headers, and the error's code, name and stack frames but not its message
- * (#211).
+ * A request error, as one JSON line on `console.error` for Workers Observability: `event` is
+ * always `request_error`, and `digest` is the id the browser's error carries (React's "error
+ * in the Server Components render", #204). Like a Sentry report it carries the error and the
+ * route, never user data: the path without its query string, no headers, and the error's code,
+ * name and stack frames but not its message (#211).
  */
 export function logRequestError(
   error: unknown,

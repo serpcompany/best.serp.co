@@ -1,7 +1,6 @@
-import { readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
+import { MessageChannel, type MessagePort, receiveMessageOnPort, Worker } from 'node:worker_threads'
 import { type APIRequestContext, expect } from '@playwright/test'
 import {
   insert,
@@ -49,6 +48,12 @@ export const accountServer: SuiteServer = {
   stateDirectory: resolve(tmpdir(), `best-serp-co-e2e-account-${playwrightPort + 5}`)
 }
 
+/**
+ * What a suite Worker's preview needs for `suiteD1`: Wrangler's Local Explorer API on (its
+ * default today, set so a change of default can't switch it off), and no Wrangler metrics.
+ */
+export const LOCAL_EXPLORER_ENV = 'X_LOCAL_EXPLORER=true WRANGLER_SEND_METRICS=false'
+
 export function adminOrigin(server: SuiteServer = adminServer): string {
   return `http://127.0.0.1:${server.port}`
 }
@@ -68,12 +73,8 @@ export function adminServerCommand(server: SuiteServer = adminServer): string {
     `rm -rf "${state}"`,
     `mkdir -p "${state}"`,
     `HARNESS_D1_STATE_DIRECTORY="${state}" pnpm db:migrate:local`,
-    `HARNESS_D1_STATE_DIRECTORY="${state}" ${previewVars}PORT=${server.port} pnpm tsx scripts/d1-local-preview.ts`
+    `HARNESS_D1_STATE_DIRECTORY="${state}" ${previewVars}${LOCAL_EXPLORER_ENV} PORT=${server.port} pnpm tsx scripts/d1-local-preview.ts`
   ].join(' && ')
-}
-
-function stateRoot(server: SuiteServer): string {
-  return resolve(server.stateDirectory, 'drizzle', 'best-serp-co')
 }
 
 /** The category the admin and account suites' submissions and listings use. */
@@ -88,72 +89,89 @@ export function seedAdminCatalog(server: SuiteServer = adminServer): void {
   runStatements(suiteCatalogStatements({ category: adminCategory, checksum: 'e2e-admin' }), server)
 }
 
-/**
- * The admin Worker's D1 file. Miniflare keeps each local D1 database as one SQLite file in WAL
- * mode, which this process can open beside workerd. workerd waits for no lock, though: while
- * this process writes the file, every query the Worker makes fails at once (`SQLITE_BUSY`,
- * answered as a 500 "internal error"). A suite whose Worker serves another test meanwhile
- * writes through `workerD1` instead (#200).
- */
-function databaseFile(server: SuiteServer): string {
-  const directory = resolve(stateRoot(server), 'v3', 'd1', 'miniflare-D1DatabaseObject')
-  const files = readdirSync(directory).filter(
-    name => name.endsWith('.sqlite') && name !== 'metadata.sqlite'
-  )
-  if (files.length !== 1) {
-    throw new Error(`Expected one local D1 database in ${directory}; found ${files.length}.`)
-  }
-  return resolve(directory, files[0] as string)
-}
-
-/**
- * Runs SQL on the admin Worker's local D1 and returns the rows of a single query. It opens the
- * SQLite file directly: `wrangler d1 execute` would start a second Miniflare per call, which
- * takes seconds each. Rows built from values go through `runStatements` instead.
- */
-export function localD1<T = Record<string, unknown>>(
-  sql: string,
-  server: SuiteServer = adminServer
-): T[] {
-  const database = new DatabaseSync(databaseFile(server))
-  try {
-    database.exec('PRAGMA busy_timeout = 10000; PRAGMA foreign_keys = ON;')
-    const trimmed = sql.trim()
-    if (/^(?:SELECT|WITH)\b/iu.test(trimmed) && !trimmed.replace(/;\s*$/u, '').includes(';')) {
-      return database.prepare(trimmed).all() as T[]
-    }
-    database.exec(trimmed)
-    return []
-  } finally {
-    database.close()
-  }
-}
-
-/**
- * Runs bound statements (`fixture-seed.ts`'s builders) on a suite Worker's local D1, in one
- * transaction, the way `localD1` reaches it.
- */
-export function runStatements(
-  statements: readonly SeedStatement[],
-  server: SuiteServer = adminServer
-): void {
-  const database = new DatabaseSync(databaseFile(server))
-  try {
-    database.exec('PRAGMA busy_timeout = 10000; PRAGMA foreign_keys = ON; BEGIN IMMEDIATE;')
-    try {
-      for (const statement of statements) database.prepare(statement.sql).run(...statement.params)
-      database.exec('COMMIT')
-    } catch (error) {
-      database.exec('ROLLBACK')
-      throw error
-    }
-  } finally {
-    database.close()
-  }
-}
-
-/** The id of the local D1 database every preview Worker binds as `DB` (`wrangler.jsonc`). */
+/** The suite Workers' local D1 (`d1_databases` in `wrangler.jsonc`, `project.local.databaseId`). */
 const LOCAL_D1_DATABASE_ID = 'local-only-do-not-deploy'
+
+/** The thread that makes `postSync`'s requests, and the count of replies it has posted. */
+interface Requester {
+  port: MessagePort
+  replies: Int32Array
+}
+
+interface Reply {
+  error?: string
+  id: number
+  status?: number
+  text?: string
+}
+
+let requester: Requester | undefined
+let requests = 0
+
+/** Posts JSON, replies with the status and body text or the error, then counts the reply. */
+const REQUESTER_SOURCE = `
+const { workerData } = require('node:worker_threads')
+const { port, replies } = workerData
+port.on('message', async ({ body, id, url }) => {
+  let reply
+  try {
+    const response = await fetch(url, {
+      body,
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    })
+    reply = { id, status: response.status, text: await response.text() }
+  } catch (error) {
+    reply = { error: String(error), id }
+  }
+  port.postMessage(reply)
+  Atomics.add(replies, 0, 1)
+  Atomics.notify(replies, 0)
+})`
+
+function startRequester(): Requester {
+  const replies = new Int32Array(new SharedArrayBuffer(4))
+  const { port1, port2 } = new MessageChannel()
+  new Worker(REQUESTER_SOURCE, {
+    eval: true,
+    transferList: [port2],
+    workerData: { port: port2, replies }
+  }).unref()
+  port1.unref()
+  return { port: port1, replies }
+}
+
+/**
+ * POSTs JSON synchronously, as the helpers here are synchronous: one worker thread per test
+ * process makes each request while this thread waits for its reply.
+ */
+function postSync(url: string, body: string): { status: number; text: string } {
+  requester ??= startRequester()
+  const { port, replies } = requester
+  const id = ++requests
+  port.postMessage({ body, id, url })
+  const deadline = Date.now() + 30_000
+  for (;;) {
+    const seen = Atomics.load(replies, 0)
+    const received = receiveMessageOnPort(port)
+    if (received) {
+      const reply = received.message as Reply
+      // A late reply to a request that timed out.
+      if (reply.id !== id) continue
+      if (reply.text === undefined) throw new Error(`${url} failed: ${reply.error}`)
+      return { status: reply.status ?? 0, text: reply.text }
+    }
+    const remaining = deadline - Date.now()
+    if (remaining <= 0) throw new Error(`No answer from ${url} in 30 seconds.`)
+    Atomics.wait(replies, 0, seen, remaining)
+  }
+}
+
+interface D1QueryAnswer {
+  errors?: { message?: string }[]
+  result?: { results?: { columns?: string[]; rows?: unknown[][] } }[] | null
+  success?: boolean
+}
 
 /**
  * A seed statement with its values written in as SQL literals: the Local Explorer binds strings
@@ -163,7 +181,7 @@ const LOCAL_D1_DATABASE_ID = 'local-only-do-not-deploy'
  */
 function inlined(statement: SeedStatement): string {
   const refuse = (problem: string): never => {
-    throw new Error(`workerD1 can't inline ${problem}: ${statement.sql}`)
+    throw new Error(`Local D1 can't inline ${problem}: ${statement.sql}`)
   }
   const values = [...statement.params]
   let quoted = false
@@ -198,43 +216,69 @@ function inlined(statement: SeedStatement): string {
 /**
  * Runs SQL on a suite Worker's local D1 through the Worker's own D1 Durable Object, the one its
  * `DB` binding queries: Wrangler's Local Explorer API (`/cdn-cgi/local/explorer/api`), which
- * every local preview serves. Its statements queue behind the Worker's instead of locking the
- * SQLite file under them, as `localD1` does (#200). A string may hold several statements; an
- * array runs as one batch, in one transaction. Returns the last statement's rows.
+ * every local preview serves, so this process's queries queue behind the Worker's. Never the
+ * SQLite file: workerd waits for no lock, so a Worker query that met a write from this process
+ * failed at once with a 500 "internal error", which the admin pages showed as React #441 (#200,
+ * #204). A string may hold several statements; an array runs as one batch, in one transaction.
+ * Returns the last statement's rows. Synchronous, so `localD1` and `runStatements` stay so.
  */
+function suiteD1<T>(server: SuiteServer, statements: string | readonly SeedStatement[]): T[] {
+  const queries =
+    typeof statements === 'string'
+      ? [{ sql: statements.trim() }]
+      : statements.map(statement => ({ sql: inlined(statement) }))
+  const { status, text } = postSync(
+    `${adminOrigin(server)}/cdn-cgi/local/explorer/api/d1/database/${LOCAL_D1_DATABASE_ID}/raw`,
+    JSON.stringify(queries.length === 1 ? queries[0] : { batch: queries })
+  )
+  let answer: D1QueryAnswer | null = null
+  try {
+    answer = JSON.parse(text) as D1QueryAnswer
+  } catch {
+    // Reported below with the status.
+  }
+  if (status !== 200 || !answer?.success) {
+    const reasons = answer?.errors?.map(error => error.message).join('; ') || text.slice(0, 200)
+    const hint =
+      status === 404
+        ? " Is Wrangler's Local Explorer API on for this Worker (X_LOCAL_EXPLORER=true)?"
+        : ''
+    throw new Error(
+      `Local D1 query through Wrangler's Local Explorer API on port ${server.port} failed (${status}): ${reasons}.${hint}`
+    )
+  }
+  const { columns = [], rows = [] } = answer.result?.at(-1)?.results ?? {}
+  return rows.map(row => Object.fromEntries(columns.map((column, i) => [column, row[i]])) as T)
+}
+
+/** `suiteD1` for specs that await it (the claims suites, #200). */
 export async function workerD1<T = Record<string, unknown>>(
   server: SuiteServer,
   statements: string | readonly SeedStatement[]
 ): Promise<T[]> {
-  const queries =
-    typeof statements === 'string'
-      ? [{ sql: statements }]
-      : statements.map(s => ({ sql: inlined(s) }))
-  const response = await fetch(
-    `${adminOrigin(server)}/cdn-cgi/local/explorer/api/d1/database/${LOCAL_D1_DATABASE_ID}/raw`,
-    {
-      body: JSON.stringify(queries.length === 1 ? queries[0] : { batch: queries }),
-      headers: { 'content-type': 'application/json' },
-      method: 'POST'
-    }
-  )
-  const body = (await response.json().catch(() => null)) as {
-    errors?: Array<{ message: string }>
-    result?: Array<{ results?: { columns?: string[]; rows?: unknown[][] } }>
-    success?: boolean
-  } | null
-  if (!response.ok || !body?.success) {
-    const message = body?.errors?.map(error => error.message).join('; ') || response.statusText
-    const hint =
-      response.status === 404
-        ? " Is Wrangler's Local Explorer API on for this Worker (X_LOCAL_EXPLORER=true)?"
-        : ''
-    throw new Error(
-      `Local D1 query through Wrangler's Local Explorer API failed (${response.status}): ${message}.${hint}`
-    )
-  }
-  const { columns = [], rows = [] } = body.result?.at(-1)?.results ?? {}
-  return rows.map(row => Object.fromEntries(columns.map((column, i) => [column, row[i]])) as T)
+  return suiteD1<T>(server, statements)
+}
+
+/**
+ * Runs SQL on a suite Worker's local D1 (the admin Worker's by default), through `suiteD1`, and
+ * returns the last statement's rows. Rows built from values go through `runStatements` instead.
+ */
+export function localD1<T = Record<string, unknown>>(
+  sql: string,
+  server: SuiteServer = adminServer
+): T[] {
+  return suiteD1<T>(server, sql)
+}
+
+/**
+ * Runs bound statements (`fixture-seed.ts`'s builders) on a suite Worker's local D1, in one
+ * transaction, through `suiteD1`.
+ */
+export function runStatements(
+  statements: readonly SeedStatement[],
+  server: SuiteServer = adminServer
+): void {
+  if (statements.length > 0) suiteD1(server, statements)
 }
 
 /** SQL string literal. */

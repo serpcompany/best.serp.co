@@ -71,7 +71,9 @@ values to its message. So:
   `SubmissionError`, and `CodedError` (`lib/telemetry/coded-error.ts`), which the fixed
   configuration and billing-invariant failures throw with one of `FAILURE_CODES`
   (`d1_binding_missing`, `billing_secrets_missing`, `refund_paid_order_missing`, and so on). A
-  code never holds an id. That covers `request_error`, `claim_failed`,
+  code never holds an id. A `CodedError`'s code is for Worker logs only: on a surface that
+  reports to Sentry, an uncaught `CodedError` arrives as `Error: [redacted]` with its stack.
+  That covers `request_error`, `claim_failed`,
   `submission_request_failed`, `admin_decision_failed`, `admin_refund_failed`,
   `auth_guard_error`, `billing_webhook_failed`, the billing service's failures,
   `legacy_root_lookup_failed`, `scheduled_job_failed`, and the media failures
@@ -90,15 +92,29 @@ sitemaps and RSS, the other public pages, and unknown paths. This is the owner's
 #355: the SDK cost about 110 ms of CPU in each fresh isolate (#334), and search crawlers mostly
 see uncached public pages in fresh isolates.
 
-A server error on a public page is one JSON line on `console.error`, which Workers Observability
-keeps. Find it by filtering the Worker's logs on `request_error`. The line has:
+### Every request error is in the Worker logs
+
+A server error on any path, a public page or a surface Sentry reports, is one JSON line on
+`console.error`, which Workers Observability keeps (#204). Find it by filtering the Worker's logs
+on `request_error`. The line has:
 - the method, the path without its query string, the route, the route type and the render
   source;
 - the error's code, name, stack frames and digest, but not its message (#211): the stack drops
   the header that repeats the message, however many lines it spans.
 
+The digest is the id a browser's "error occurred in the Server Components render" (React #441)
+carries, so a browser error leads to its cause. The line is written before Sentry is tried, so
+it is there with no DSN (local, E2E) or an SDK that fails to load.
+
 Next.js can report one error twice, when a page and its metadata await the same failed read; it
 is logged once, as Sentry captures it once. Next.js also prints the error itself, as before.
+
+Locally the line doesn't print: `opennextjs-cloudflare preview` runs Wrangler under `spawnSync`
+and holds its stderr, where the Worker's `console.error` and `console.warn` go, until it exits.
+Wrangler keeps them in its local observability store; read the errors there with
+`curl -X POST <preview origin>/cdn-cgi/local/explorer/api/local/observability/query -H
+'content-type: application/json' -d '{"sql":"SELECT ts_ms, message FROM logs WHERE level =
+\"error\""}'`.
 
 ### How the split works on the Worker
 
@@ -127,9 +143,9 @@ is made per request, at run time, by which modules the isolate evaluates.
 
   So a reporting request always renders with Sentry started, as before (#48), and a public
   request never starts it.
-- **`onRequestError` routes by path.** A reporting path goes to `Sentry.captureRequestError`.
-  Any other path, or a reporting one whose SDK failed to load or start, is logged as
-  `request_error`. Only the first segment of the pathname counts, even in an absolute URL.
+- **`onRequestError` routes by path.** Every error is logged as `request_error` first; a
+  reporting path also goes to `Sentry.captureRequestError`, and one whose SDK fails to load or
+  start is only logged. Only the first segment of the pathname counts, even in an absolute URL.
   `server-errors.test.ts` walks the top-level routes in `apps/web/src/app` and fails on one that
   is neither a surface (`SERVER_SENTRY_SURFACES`) nor in its list of public segments.
 - **`global-error.tsx` imports `captureException` when it shows**
@@ -147,8 +163,8 @@ is made per request, at run time, by which modules the isolate evaluates.
   the same way, and a local build with no DSN runs the same code with Sentry off.
 
 **Once an isolate has started the SDK** for a signed-in or operational request, it stays
-started. A later public request in that isolate still logs its request errors rather than
-reporting them, because `onRequestError` routes by path.
+started. A later public request in that isolate still only logs its request errors, because
+`onRequestError` routes by path.
 
 **The Worker entry outside `openNextWorker.fetch` and `scheduled()`** still report to no Sentry
 at all, as before (#210). A wrapper there, such as `@sentry/cloudflare`'s `withSentry`, would load

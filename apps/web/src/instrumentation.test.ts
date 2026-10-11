@@ -60,7 +60,7 @@ describe('instrumentation (#48, #355)', () => {
     expect(line).not.toContain('render failed')
   })
 
-  it('reports a signed-in or operational surface error to Sentry', async () => {
+  it('reports a signed-in or operational surface error to Sentry, and logs it', async () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
     const { onRequestError } = await import('./instrumentation')
     const error = new Error('webhook failed')
@@ -73,7 +73,53 @@ describe('instrumentation (#48, #355)', () => {
     await onRequestError(error, request, routeContext)
     expect(sentry.startServerSentry).toHaveBeenCalled()
     expect(sentry.captureRequestError).toHaveBeenCalledWith(error, request, routeContext)
-    expect(logged).not.toHaveBeenCalled()
+    expect(logged).toHaveBeenCalledTimes(1)
+    const line = String(logged.mock.calls[0]?.[0])
+    expect(JSON.parse(line)).toMatchObject({
+      code: 'UNKNOWN',
+      event: 'request_error',
+      name: 'Error',
+      path: '/api/billing/webhook/'
+    })
+    expect(line).not.toContain('webhook failed')
+  })
+
+  it('logs an admin render error with the digest the browser shows, Sentry or not (#204)', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { onRequestError } = await import('./instrumentation')
+    // What `requireAdmin()` throws when D1 can't answer; Next.js sets the digest before it
+    // reports the error, and sends the same digest to the browser (React #441).
+    const error = Object.assign(new Error('Accounts are unavailable.'), {
+      digest: '2913577842',
+      name: 'AuthConfigurationError'
+    })
+    await onRequestError(
+      error,
+      { headers: {}, method: 'GET', path: '/admin/listings/fixture-studio/?_rsc=1' },
+      {
+        ...context,
+        renderSource: 'react-server-components-payload',
+        routePath: '/(dashboard)/admin/listings/[slug]'
+      }
+    )
+    expect(sentry.captureRequestError).toHaveBeenCalledWith(
+      error,
+      expect.anything(),
+      expect.anything()
+    )
+    expect(logged).toHaveBeenCalledTimes(1)
+    const line = String(logged.mock.calls[0]?.[0])
+    expect(JSON.parse(line)).toMatchObject({
+      code: 'UNKNOWN',
+      digest: '2913577842',
+      event: 'request_error',
+      name: 'AuthConfigurationError',
+      path: '/admin/listings/fixture-studio/',
+      renderSource: 'react-server-components-payload',
+      route: '/(dashboard)/admin/listings/[slug]',
+      routeType: 'render'
+    })
+    expect(line).not.toContain('Accounts are unavailable.')
   })
 
   it('logs a surface error whose Sentry SDK fails to start', async () => {
@@ -90,6 +136,7 @@ describe('instrumentation (#48, #355)', () => {
       )
     ).resolves.toBeUndefined()
     expect(sentry.captureRequestError).not.toHaveBeenCalled()
+    expect(logged).toHaveBeenCalledTimes(1)
     expect(JSON.parse(String(logged.mock.calls[0]?.[0]))).toMatchObject({
       code: 'UNKNOWN',
       event: 'request_error',

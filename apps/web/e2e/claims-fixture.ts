@@ -4,7 +4,13 @@ import { type APIRequestContext, expect } from '@playwright/test'
 import { rateLimitBucket, rateLimitBucketKey } from '../src/db/rate-limit-buckets'
 import { deriveKey, RATE_LIMIT_KEY_LABEL } from '../src/lib/auth/keys'
 import { claimRecipientRateLimitRules } from '../src/lib/claims/limits'
-import { adminSuiteEnabled, q, type SuiteServer, workerD1 } from './admin-fixture'
+import {
+  adminSuiteEnabled,
+  LOCAL_EXPLORER_ENV,
+  q,
+  type SuiteServer,
+  workerD1
+} from './admin-fixture'
 import { listingStatements, suiteCatalogStatements } from './fixture-seed'
 
 /**
@@ -47,7 +53,7 @@ export function claimsServerCommand(): string {
     `mkdir -p "${state}"`,
     `HARNESS_D1_STATE_DIRECTORY="${state}" pnpm db:migrate:local`,
     // `workerD1` needs Wrangler's Local Explorer API: on by default, pinned on here.
-    `HARNESS_D1_STATE_DIRECTORY="${state}" LOCAL_PREVIEW_VARS=BETTER_AUTH_SECRET=${CLAIMS_AUTH_SECRET} X_LOCAL_EXPLORER=true WRANGLER_SEND_METRICS=false PORT=${claimsServer.port} pnpm tsx scripts/d1-local-preview.ts`
+    `HARNESS_D1_STATE_DIRECTORY="${state}" LOCAL_PREVIEW_VARS=BETTER_AUTH_SECRET=${CLAIMS_AUTH_SECRET} ${LOCAL_EXPLORER_ENV} PORT=${claimsServer.port} pnpm tsx scripts/d1-local-preview.ts`
   ].join(' && ')
 }
 

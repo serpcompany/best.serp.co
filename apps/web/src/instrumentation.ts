@@ -23,19 +23,18 @@ export async function register(): Promise<void> {
 }
 
 /**
- * Errors from server rendering, route handlers, and server actions: to Sentry from the
- * signed-in and operational surfaces, to the Worker's logs from public pages (#355). An error
- * whose Sentry SDK fails to load goes to the logs too, so it is never lost.
+ * Errors from server rendering, route handlers, and server actions: every one to the Worker's
+ * logs with its digest, the id a browser's Server Components error carries (#204), and those
+ * from the signed-in and operational surfaces to Sentry as well (#355). The log never waits on
+ * Sentry, so an error is there even with no DSN or an SDK that fails to load.
  */
 export const onRequestError: Instrumentation.onRequestError = async (error, request, context) => {
-  if (reportsToServerSentry(request.path)) {
-    try {
-      const sentry = await serverSentry()
-      sentry.captureRequestError(error, request, context)
-      return
-    } catch {
-      // Logged below instead.
-    }
-  }
   logRequestError(error, request, context)
+  if (!reportsToServerSentry(request.path)) return
+  try {
+    const sentry = await serverSentry()
+    sentry.captureRequestError(error, request, context)
+  } catch {
+    // Already in the logs.
+  }
 }
