@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import yaml from 'js-yaml'
@@ -12,6 +12,7 @@ import { hotfixBranch } from './staging-verification'
 const repository = project.repository
 
 interface WorkflowStep {
+  'continue-on-error'?: boolean
   env?: Record<string, string>
   id?: string
   if?: string
@@ -120,8 +121,15 @@ describe('web workflow', () => {
     expect(draft.if).toBe('github.event.pull_request.draft == true')
     expect(runStep(String(draft.run), '', {}).status).toBe(1)
     expect(draft.run).toContain('draft: mark ready to run e2e')
-    // continue-on-error would let the failed step leave the job green.
-    expect(source).not.toContain('continue-on-error')
+    // continue-on-error would let a failed step leave the job green: only the resource probe's
+    // diagnostics carry it (#393), never a job or any other step.
+    const tolerant = Object.entries(workflow.jobs).flatMap(([job, definition]) => [
+      ...('continue-on-error' in definition ? [job] : []),
+      ...(definition.steps ?? [])
+        .filter(candidate => 'continue-on-error' in candidate)
+        .map(candidate => `${job}: ${candidate.name}`)
+    ])
+    expect(tolerant).toEqual(['e2e: Report runner resources', 'e2e: Upload the resource probe'])
     // Every later step either needs the earlier ones to succeed or checks the receipt step ran.
     for (const later of steps.slice(1)) {
       if (/always\(\)|failure\(\)|cancelled\(\)/u.test(later.if ?? '')) {
@@ -372,7 +380,89 @@ describe('web workflow', () => {
   it('installs Playwright browsers without sudo-only system dependency escalation', () => {
     const runs = (workflow.jobs.e2e?.steps ?? []).map(candidate => candidate.run).filter(Boolean)
     expect(runs).toContain('pnpm --filter web test:install')
-    expect(runs).toContain('pnpm test:e2e')
+    expect(step('e2e', 'Run Playwright tests').run?.trim().split('\n').at(-1)).toBe('pnpm test:e2e')
     expect(source).not.toContain('--with-deps')
+  })
+
+  it('probes the runner beside the suite and keeps the probe when the suite fails (#393)', () => {
+    // In the suite's own step, so its lines reach the log a runner shutdown keeps; stopped when
+    // the step ends, and the suite's exit status is the step's.
+    const run = String(step('e2e', 'Run Playwright tests').run)
+    expect(run).toContain('bash scripts/e2e-resource-probe.sh "$RUNNER_TEMP/resource-probe" &')
+    expect(run).toContain(`trap 'kill "$probe" 2>/dev/null || true' EXIT`)
+    expect(run.indexOf('e2e-resource-probe.sh')).toBeLessThan(run.indexOf('pnpm test:e2e'))
+    const afterSuite =
+      "always() && steps.receipt.outcome == 'success' && steps.receipt.outputs.skip != 'true'"
+    expect(step('e2e', 'Upload test results').if).toBe(afterSuite)
+    expect(step('e2e', 'Report runner resources')).toMatchObject({
+      if: afterSuite,
+      run: 'bash scripts/e2e-resource-probe.sh --report "$RUNNER_TEMP/resource-probe"'
+    })
+    // Diagnostics only: neither fails e2e nor withholds the receipt when every test passed.
+    for (const name of ['Report runner resources', 'Upload the resource probe']) {
+      expect(step('e2e', name)['continue-on-error'], name).toBe(true)
+    }
+    expect(step('e2e', 'Upload the resource probe')).toMatchObject({
+      if: afterSuite,
+      uses: 'actions/upload-artifact@v7',
+      with: {
+        name: `e2e-resource-probe-${expression('github.run_attempt')}`,
+        path: `${expression('runner.temp')}/resource-probe/`
+      }
+    })
+  })
+
+  it('runs all three Playwright configs, each even when an earlier one fails (#393)', async () => {
+    // e2e runs the root script; the web package's scripts pick the configs.
+    const scripts = (path: string) =>
+      (JSON.parse(readFileSync(resolve(path), 'utf8')) as { scripts: Record<string, string> })
+        .scripts
+    const web = scripts('apps/web/package.json')
+    expect(web['test:e2e']).toBe('playwright test')
+    expect(web['test:e2e:suites']).toBe('playwright test --config playwright.suites.config.ts')
+    expect(web['test:e2e:staging-access']).toBe(
+      'playwright test --config playwright.staging-access.config.ts'
+    )
+    // The root script with `pnpm` stubbed: every run starts, in order, and the status fails
+    // when any run fails.
+    const directory = mkdtempSync(join(tmpdir(), 'e2e-runs-'))
+    try {
+      const calls = join(directory, 'calls')
+      const pnpm = join(directory, 'pnpm')
+      writeFileSync(
+        pnpm,
+        `#!/bin/sh\necho "$*" >> "${calls}"\ncase "$3" in "$FAIL") exit 7 ;; esac\nexit 0\n`
+      )
+      chmodSync(pnpm, 0o755)
+      const run = (fail: string) => {
+        rmSync(calls, { force: true })
+        // A bare environment, typed as Node's own (see runStep).
+        const env: NodeJS.Dict<string> = { FAIL: fail, PATH: `${directory}:${process.env.PATH}` }
+        const result = spawnSync('sh', ['-c', scripts('package.json')['test:e2e'] as string], {
+          encoding: 'utf8',
+          env: env as NodeJS.ProcessEnv
+        })
+        return { calls: readFileSync(calls, 'utf8').trim().split('\n'), status: result.status }
+      }
+      const runs = [
+        '--filter web test:e2e',
+        '--filter web test:e2e:suites',
+        '--filter web test:e2e:staging-access'
+      ]
+      expect(run('none')).toEqual({ calls: runs, status: 0 })
+      expect(run('test:e2e')).toEqual({ calls: runs, status: 1 })
+      expect(run('test:e2e:suites')).toEqual({ calls: runs, status: 1 })
+      expect(run('test:e2e:staging-access')).toEqual({ calls: runs, status: 7 })
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
+    // The three configs split the specs: each spec runs in exactly one of them.
+    const main = (await import('../apps/web/playwright.config')).default
+    const { suiteSpecs } = await import('../apps/web/playwright.config')
+    const suites = (await import('../apps/web/playwright.suites.config')).default
+    const staging = (await import('../apps/web/playwright.staging-access.config')).default
+    expect(suites.testMatch).toEqual(suiteSpecs)
+    expect(staging.testMatch).toBe('**/staging-access.spec.ts')
+    expect(main.testIgnore).toEqual(expect.arrayContaining([...suiteSpecs, staging.testMatch]))
   })
 })

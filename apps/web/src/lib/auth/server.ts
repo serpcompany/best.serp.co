@@ -19,6 +19,7 @@ import { cache } from 'react'
 import { type AuthRateLimitDecision, type AuthRateLimitRule, createAuthOperations } from '@/db/auth'
 import { createDatabase } from '@/db/client'
 import { pruneEmailDeliveries } from '@/db/email-deliveries'
+import { CodedError } from '@/lib/telemetry/coded-error'
 import { type Auth, createAuth } from './config'
 import {
   type Authorization,
@@ -168,11 +169,16 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   return result.ok ? result.user : null
 }
 
+/**
+ * Next.js's 401 or 403, or, when the guard could not decide (the session or the allowlist could
+ * not be read, `auth_guard_error` says why), an error that fails the page closed. Its code names
+ * that cause in the page's `request_error` line, not a misconfiguration (#389).
+ */
 function interrupt(result: Authorization): SessionUser {
   if (result.ok) return result.user
   if (result.status === 401) unauthorized()
   if (result.status === 403) forbidden()
-  throw new AuthConfigurationError('Accounts are unavailable.')
+  throw new CodedError('auth_guard_failed', 'Accounts are unavailable.')
 }
 
 /** The signed-in user; otherwise 401 (Next.js `unauthorized()`). */

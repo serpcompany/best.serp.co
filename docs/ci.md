@@ -22,6 +22,11 @@ One workflow, `web.yml` (#182), checks pull requests into `staging` (the base br
   the surviving `synchronize` run skipped it (#246). The step reads the run's event, so a re-run
   of a run that started on a draft fails again; push a commit, or convert the pull request to
   draft and mark it ready again.
+- `e2e` runs a resource probe beside Playwright (`scripts/e2e-resource-probe.sh`, #393): every
+  15 s it prints memory, swap, memory pressure, OOM kills, disk and the processes holding the most
+  memory into the Playwright step's log, which keeps them even when GitHub shuts the runner down and
+  skips the later steps. The job then reports the peaks (and any kernel OOM kills) in its summary
+  and uploads the samples as `e2e-resource-probe-<attempt>`; neither step can fail `e2e`.
 - `tip` runs on a push or dispatch on `staging` once `check` and `e2e` pass, and starts
   `deploy-staging` only if the commit is still the `staging` head, so an older commit (a re-run)
   doesn't build for nothing. A failed lookup fails the job.

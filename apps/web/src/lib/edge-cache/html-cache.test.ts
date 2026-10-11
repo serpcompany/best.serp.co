@@ -73,6 +73,9 @@ function harness(options: { deploymentId?: string; epoch?: string | null } = {})
   }
 }
 
+/** The shared epoch's key before #397, which named no environment. */
+const UNSCOPED_EPOCH_KEY = 'https://html-cache.invalid/catalog-epoch'
+
 const page = (path = '/products/', init?: RequestInit) =>
   new Request(`https://best.serp.co${path}`, init)
 
@@ -176,6 +179,23 @@ describe('edge HTML cache', () => {
     expect((await edge.serve(page(), undefined, 'version-b')).headers.get(EDGE_CACHE_HEADER)).toBe(
       'HIT'
     )
+  })
+
+  // #397: staging and production share the serp.co zone's cache, and each Worker answers only
+  // its own hosts, so the host in every key keeps their pages apart, even under one deployment
+  // and epoch token.
+  it("never serves one environment's page to another through the zone's cache", async () => {
+    const edge = harness()
+    const staging = new Request('https://staging.best.serp.co/products/')
+    await edge.serve(staging, () => new Response('staging catalog'))
+    const production = await edge.serve(
+      page('/products/'),
+      () => new Response('production catalog')
+    )
+    expect(production.headers.get(EDGE_CACHE_HEADER)).toBe('MISS')
+    expect(await production.text()).toBe('production catalog')
+    expect(await (await edge.serve(staging)).text()).toBe('staging catalog')
+    expect(edge.renders).toBe(2)
   })
 
   it('answers a stored redirect only for the exact URL that produced it', async () => {
@@ -383,8 +403,41 @@ describe('catalog epoch memo', () => {
   it('shares the epoch through the data-center cache', async () => {
     const cache = new MemoryCache() as unknown as Cache
     const read = vi.fn(async () => '4.2026-05-16')
-    expect(await loadSharedEpoch(cache, read)).toBe('4.2026-05-16')
-    expect(await loadSharedEpoch(cache, read)).toBe('4.2026-05-16')
+    expect(await loadSharedEpoch(cache, 'production', read)).toBe('4.2026-05-16')
+    expect(await loadSharedEpoch(cache, 'production', read)).toBe('4.2026-05-16')
     expect(read).toHaveBeenCalledTimes(1)
+  })
+
+  // #397: staging and production share the serp.co zone's cache.
+  it("never shares one environment's epoch with another", async () => {
+    const zone = new MemoryCache()
+    const cache = zone as unknown as Cache
+    // A Worker version from before #397 shared its epoch under one key for every environment.
+    await zone.put(UNSCOPED_EPOCH_KEY, new Response('21.2026-10-10'))
+    const staging = vi.fn(async () => '21.2026-10-10')
+    const production = vi.fn(async () => '18.2026-10-01')
+
+    expect(await loadSharedEpoch(cache, 'staging', staging)).toBe('21.2026-10-10')
+    expect(await loadSharedEpoch(cache, 'production', production)).toBe('18.2026-10-01')
+    expect(await loadSharedEpoch(cache, 'staging', staging)).toBe('21.2026-10-10')
+    expect(await loadSharedEpoch(cache, 'production', production)).toBe('18.2026-10-01')
+    expect(staging).toHaveBeenCalledTimes(1)
+    expect(production).toHaveBeenCalledTimes(1)
+    expect([...zone.entries.keys()].sort()).toEqual([
+      UNSCOPED_EPOCH_KEY,
+      `${UNSCOPED_EPOCH_KEY}/production`,
+      `${UNSCOPED_EPOCH_KEY}/staging`
+    ])
+  })
+
+  it('shares no epoch without an environment, and reads none', async () => {
+    const zone = new MemoryCache()
+    await zone.put(UNSCOPED_EPOCH_KEY, new Response('21.2026-10-10'))
+    const read = vi.fn(async () => '18.2026-10-01')
+    await expect(loadSharedEpoch(zone as unknown as Cache, '', read)).rejects.toMatchObject({
+      code: 'd1_runtime_env_invalid'
+    })
+    expect(read).not.toHaveBeenCalled()
+    expect([...zone.entries.keys()]).toEqual([UNSCOPED_EPOCH_KEY])
   })
 })

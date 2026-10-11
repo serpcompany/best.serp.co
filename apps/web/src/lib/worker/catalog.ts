@@ -51,13 +51,16 @@ export function catalogEpochReader(
 ): (context: EdgeCacheContext) => Promise<string | null> {
   const database = catalogDatabase(env)
   if (!database) return async () => null
+  // Validated with the binding, and fixed for the binding's Worker: the data center's share of
+  // the epoch is keyed on it, so staging and production never read each other's (#397).
+  const environment = env.D1_RUNTIME_ENV ?? ''
   let source = epochSources.get(database)
   if (!source) {
     const created: EpochSource = {
       latest: { cache, observe },
       memo: new EpochMemo(async () => {
         const { cache: latestCache, observe: latestObserve } = created.latest
-        const token = await loadSharedEpoch(latestCache, async () =>
+        const token = await loadSharedEpoch(latestCache, environment, async () =>
           catalogEpochToken(
             await readCatalogEpoch({
               asOf: new Date().toISOString(),

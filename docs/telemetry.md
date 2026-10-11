@@ -71,10 +71,11 @@ values to its message. So:
   `UNKNOWN`; `name` is the error's class. Errors with their own code are `BillingProviderError`,
   `SubmissionError`, and `CodedError` (`lib/telemetry/coded-error.ts`), which the fixed
   configuration and billing-invariant failures throw with one of `FAILURE_CODES`
-  (`d1_binding_missing`, `billing_secrets_missing`, `refund_paid_order_missing`, and so on). A
-  code never holds an id. A `CodedError`'s code is for Worker logs only: on a surface that
-  reports to Sentry, an uncaught `CodedError` arrives as `Error: [redacted]` with its stack.
-  That covers `request_error`, `claim_failed`,
+  (`d1_binding_missing`, `billing_secrets_missing`, `refund_paid_order_missing`, and so on), as
+  does a page's account guard that could not read D1 (`auth_guard_failed`, #389). A code never
+  holds an id. A `CodedError`'s code is for Worker logs only: on a surface that reports to
+  Sentry, an uncaught `CodedError` arrives as `Error: [redacted]` with its stack. The lines that
+  spread in `errorFields` are `request_error`, `claim_failed`,
   `submission_request_failed`, `admin_decision_failed`, `admin_refund_failed`,
   `auth_guard_error`, `billing_webhook_failed`, the billing service's failures,
   `legacy_root_lookup_failed`, `scheduled_job_failed`, and the media failures

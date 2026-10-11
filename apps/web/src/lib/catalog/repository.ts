@@ -70,10 +70,12 @@ const observe: CatalogObserver = event => {
 const getOperations = cache(async () => {
   const { env } = await getCloudflareContext({ async: true })
   const cloudflareEnv = env as CloudflareEnv
+  // Keyed on the environment: staging and production share the zone's cache (#397). Without one
+  // it throws, and an invalid one fails `assertCatalogBinding` before any read.
   const dataCache =
     typeof caches === 'undefined'
       ? noCatalogDataCache
-      : createCacheApiDataCache(await caches.open('catalog-data-ops'))
+      : createCacheApiDataCache(await caches.open('catalog-data-ops'), cloudflareEnv.D1_RUNTIME_ENV)
   return createCatalogOperations({
     cache: dataCache,
     client: createDatabase(assertCatalogBinding(cloudflareEnv)),

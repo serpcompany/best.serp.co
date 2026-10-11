@@ -38,7 +38,7 @@ import { test } from './test'
  * - a paid submission rejected as `other` is refunded automatically.
  */
 
-test.skip(!billingSuiteEnabled, 'needs the local orders Worker from playwright.config.ts')
+test.skip(!billingSuiteEnabled, 'needs the local orders Worker from playwright.suites.config.ts')
 test.describe.configure({ mode: 'serial' })
 test.use({ baseURL: billingOrigin(), channel: 'chromium' })
 
@@ -177,6 +177,16 @@ function completedEvent(sessionId: string, eventId = `evt_e2e_${unique()}`): str
   })
 }
 
+/**
+ * Opens the checkout handoff (4a), which sends the browser on to the provider by itself once it
+ * hydrates. That can be before `load`, which then never comes for this page and fails the visit
+ * with `net::ERR_ABORTED` (#389), so the visit waits only for the handoff's response.
+ */
+async function openHandoff(page: Page, draftId: string): Promise<void> {
+  await page.goto(`/submit/${draftId}/checkout/`, { waitUntil: 'commit' })
+  await expect(page).toHaveURL(/127\.0\.0\.1:\d+\/pay\/cs_test_/u)
+}
+
 /** Opens a checkout through the Worker without a browser, and returns the mock session id. */
 async function openCheckout(request: APIRequestContext, path: string): Promise<string> {
   const response = await request.get(path, { maxRedirects: 0 })
@@ -191,15 +201,24 @@ test('checkout success: paid at checkout, live at once and in the review queue',
 }) => {
   const submitter = await signInSubmitter(page, 'success')
   const draft = seedDraft(submitter.id, 'success')
-  // 4a stays on screen while the start route is held back (a 204 keeps the browser there).
-  await page.route('**/checkout/start/', route => route.fulfill({ status: 204 }))
+  // 4a stays on screen while the start route is held back (a 204 keeps the browser there). The
+  // hold is released only after 4a asked for the start route: it asks once it hydrates, which
+  // can be after `load`, and a request that met the unroute hung it for the test's timeout
+  // (#389).
+  let held = () => {}
+  const startHeld = new Promise<void>(resolve => {
+    held = resolve
+  })
+  await page.route('**/checkout/start/', async route => {
+    await route.fulfill({ status: 204 })
+    held()
+  })
   await page.goto(`/submit/${draft.id}/checkout/`)
+  await startHeld
   await expect(page.getByText('Taking you to secure checkout')).toBeVisible()
   await capture(page, '4a-handoff')
   await page.unroute('**/checkout/start/')
-  // The handoff (4a) sends the browser on to the provider's checkout by itself.
-  await page.goto(`/submit/${draft.id}/checkout/`)
-  await expect(page).toHaveURL(/127\.0\.0\.1:\d+\/pay\/cs_test_/u)
+  await openHandoff(page, draft.id)
   await page.getByRole('button', { name: 'Pay' }).click()
   await expect(page).toHaveURL(new RegExp(`/submit/${draft.id}/checkout/return/\\?order=`, 'u'))
   await expect(page.getByRole('heading', { name: /is live on SERP$/u })).toBeVisible()
@@ -353,8 +372,7 @@ test('checks failed: paid, then held for review instead of going live', async ({
   const submitter = await signInSubmitter(page, 'held')
   const draft = seedDraft(submitter.id, 'held')
   site.update(draft.key, { status: 503 })
-  await page.goto(`/submit/${draft.id}/checkout/`)
-  await expect(page).toHaveURL(/\/pay\/cs_test_/u)
+  await openHandoff(page, draft.id)
   await page.getByRole('button', { name: 'Pay' }).click()
   await expect(page.getByRole('heading', { name: /goes live after review$/u })).toBeVisible()
   await expect(page.getByText('Payment received, waiting for review')).toBeVisible()
@@ -392,8 +410,7 @@ test('checkout cancel: back to the plan choice, the draft kept, the checkout reu
 }) => {
   const submitter = await signInSubmitter(page, 'cancel')
   const draft = seedDraft(submitter.id, 'cancel')
-  await page.goto(`/submit/${draft.id}/checkout/`)
-  await expect(page).toHaveURL(/\/pay\/cs_test_/u)
+  await openHandoff(page, draft.id)
   const first = page.url().split('/').pop()
   await page.getByRole('link', { name: 'Cancel' }).click()
   await expect(page).toHaveURL(new RegExp(`/submit/${draft.id}/checkout/cancelled/$`, 'u'))

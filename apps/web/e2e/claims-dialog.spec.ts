@@ -37,7 +37,7 @@ test.use({
  * run emulates: CLAIM_SCREENSHOT_SCHEME=dark for dark).
  */
 
-test.skip(!claimsSuiteEnabled, 'needs the local claims Worker from playwright.config.ts')
+test.skip(!claimsSuiteEnabled, 'needs the local claims Worker from playwright.suites.config.ts')
 test.use({ baseURL: claimsOrigin() })
 
 const baseURL = claimsOrigin()

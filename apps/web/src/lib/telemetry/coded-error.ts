@@ -1,11 +1,12 @@
 /**
  * Failures whose message is fixed and holds no user input, each with a stable code for logs
- * (#211): configuration (a missing binding or secret) and billing invariants (a refund with no
- * paid order). A Worker log line spreads in only `errorFields(error)`, which prefers an error's
+ * (#211): configuration (a missing binding or secret), billing invariants (a refund with no
+ * paid order), and a page's account guard that could not decide (#389). A Worker log line spreads in only `errorFields(error)`, which prefers an error's
  * own `code`, so the line names the failure without its message. A code never carries an
  * identifier: an id stays in the message, or in the log line's own fields.
  */
 export const FAILURE_CODES = [
+  'auth_guard_failed',
   'billing_mock_port_invalid',
   'billing_mock_port_not_local',
   'billing_secret_key_wrong_mode',

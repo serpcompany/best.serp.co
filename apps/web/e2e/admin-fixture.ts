@@ -1,6 +1,5 @@
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
-import { MessageChannel, type MessagePort, receiveMessageOnPort, Worker } from 'node:worker_threads'
 import { type APIRequestContext, expect } from '@playwright/test'
 import {
   insert,
@@ -10,13 +9,14 @@ import {
   suiteCatalogStatements
 } from './fixture-seed'
 import { BILLING_PREVIEW_VARS } from './orders-worker'
+import { type SyncPoster, startSyncPoster } from './sync-post'
 
 /**
  * The admin panel suite (serpcompany/best.serp.co#64) runs on its own local Worker with its own
- * D1, which `playwright.config.ts` starts from the already-built Worker: the suite publishes and
- * unpublishes listings, which would change the seeded catalog the smoke suite counts exactly.
- * Helpers here run SQL on that D1, seed fixture submissions, and sign in a fresh admin. Never
- * used against a deployed Worker.
+ * D1, which `playwright.suites.config.ts` starts from the already-built Worker: the suite
+ * publishes and unpublishes listings, which would change the seeded catalog the smoke suite
+ * counts exactly. Helpers here run SQL on that D1, seed fixture submissions, and sign in a fresh
+ * admin. Never used against a deployed Worker.
  */
 
 const playwrightPort = Number(process.env.PLAYWRIGHT_PORT ?? 3100)
@@ -31,6 +31,9 @@ export interface SuiteServer {
   port: number
   stateDirectory: string
 }
+
+/** A local preview Worker the D1 helpers reach, by its port: a suite's, or the main preview. */
+export type LocalWorker = Pick<SuiteServer, 'port'>
 
 export const adminServer: SuiteServer = {
   port: playwrightPort + 3,
@@ -54,7 +57,7 @@ export const accountServer: SuiteServer = {
  */
 export const LOCAL_EXPLORER_ENV = 'X_LOCAL_EXPLORER=true WRANGLER_SEND_METRICS=false'
 
-export function adminOrigin(server: SuiteServer = adminServer): string {
+export function adminOrigin(server: LocalWorker = adminServer): string {
   return `http://127.0.0.1:${server.port}`
 }
 
@@ -89,82 +92,15 @@ export function seedAdminCatalog(server: SuiteServer = adminServer): void {
   runStatements(suiteCatalogStatements({ category: adminCategory, checksum: 'e2e-admin' }), server)
 }
 
-/** The suite Workers' local D1 (`d1_databases` in `wrangler.jsonc`, `project.local.databaseId`). */
+/** Every local preview's D1 (`d1_databases` in `wrangler.jsonc`, `project.local.databaseId`). */
 const LOCAL_D1_DATABASE_ID = 'local-only-do-not-deploy'
 
-/** The thread that makes `postSync`'s requests, and the count of replies it has posted. */
-interface Requester {
-  port: MessagePort
-  replies: Int32Array
-}
+let poster: SyncPoster | undefined
 
-interface Reply {
-  error?: string
-  id: number
-  status?: number
-  text?: string
-}
-
-let requester: Requester | undefined
-let requests = 0
-
-/** Posts JSON, replies with the status and body text or the error, then counts the reply. */
-const REQUESTER_SOURCE = `
-const { workerData } = require('node:worker_threads')
-const { port, replies } = workerData
-port.on('message', async ({ body, id, url }) => {
-  let reply
-  try {
-    const response = await fetch(url, {
-      body,
-      headers: { 'content-type': 'application/json' },
-      method: 'POST'
-    })
-    reply = { id, status: response.status, text: await response.text() }
-  } catch (error) {
-    reply = { error: String(error), id }
-  }
-  port.postMessage(reply)
-  Atomics.add(replies, 0, 1)
-  Atomics.notify(replies, 0)
-})`
-
-function startRequester(): Requester {
-  const replies = new Int32Array(new SharedArrayBuffer(4))
-  const { port1, port2 } = new MessageChannel()
-  new Worker(REQUESTER_SOURCE, {
-    eval: true,
-    transferList: [port2],
-    workerData: { port: port2, replies }
-  }).unref()
-  port1.unref()
-  return { port: port1, replies }
-}
-
-/**
- * POSTs JSON synchronously, as the helpers here are synchronous: one worker thread per test
- * process makes each request while this thread waits for its reply.
- */
+/** POSTs JSON synchronously (`sync-post.ts`), as the helpers here are synchronous. */
 function postSync(url: string, body: string): { status: number; text: string } {
-  requester ??= startRequester()
-  const { port, replies } = requester
-  const id = ++requests
-  port.postMessage({ body, id, url })
-  const deadline = Date.now() + 30_000
-  for (;;) {
-    const seen = Atomics.load(replies, 0)
-    const received = receiveMessageOnPort(port)
-    if (received) {
-      const reply = received.message as Reply
-      // A late reply to a request that timed out.
-      if (reply.id !== id) continue
-      if (reply.text === undefined) throw new Error(`${url} failed: ${reply.error}`)
-      return { status: reply.status ?? 0, text: reply.text }
-    }
-    const remaining = deadline - Date.now()
-    if (remaining <= 0) throw new Error(`No answer from ${url} in 30 seconds.`)
-    Atomics.wait(replies, 0, seen, remaining)
-  }
+  poster ??= startSyncPoster()
+  return poster.post(url, body)
 }
 
 interface D1QueryAnswer {
@@ -214,7 +150,7 @@ function inlined(statement: SeedStatement): string {
 }
 
 /**
- * Runs SQL on a suite Worker's local D1 through the Worker's own D1 Durable Object, the one its
+ * Runs SQL on a local Worker's D1 through the Worker's own D1 Durable Object, the one its
  * `DB` binding queries: Wrangler's Local Explorer API (`/cdn-cgi/local/explorer/api`), which
  * every local preview serves, so this process's queries queue behind the Worker's. Never the
  * SQLite file: workerd waits for no lock, so a Worker query that met a write from this process
@@ -222,7 +158,7 @@ function inlined(statement: SeedStatement): string {
  * #204). A string may hold several statements; an array runs as one batch, in one transaction.
  * Returns the last statement's rows. Synchronous, so `localD1` and `runStatements` stay so.
  */
-function suiteD1<T>(server: SuiteServer, statements: string | readonly SeedStatement[]): T[] {
+function suiteD1<T>(server: LocalWorker, statements: string | readonly SeedStatement[]): T[] {
   const queries =
     typeof statements === 'string'
       ? [{ sql: statements.trim() }]
@@ -253,19 +189,19 @@ function suiteD1<T>(server: SuiteServer, statements: string | readonly SeedState
 
 /** `suiteD1` for specs that await it (the claims suites, #200). */
 export async function workerD1<T = Record<string, unknown>>(
-  server: SuiteServer,
+  server: LocalWorker,
   statements: string | readonly SeedStatement[]
 ): Promise<T[]> {
   return suiteD1<T>(server, statements)
 }
 
 /**
- * Runs SQL on a suite Worker's local D1 (the admin Worker's by default), through `suiteD1`, and
+ * Runs SQL on a local Worker's D1 (the admin suite's by default), through `suiteD1`, and
  * returns the last statement's rows. Rows built from values go through `runStatements` instead.
  */
 export function localD1<T = Record<string, unknown>>(
   sql: string,
-  server: SuiteServer = adminServer
+  server: LocalWorker = adminServer
 ): T[] {
   return suiteD1<T>(server, sql)
 }
@@ -276,7 +212,7 @@ export function localD1<T = Record<string, unknown>>(
  */
 export function runStatements(
   statements: readonly SeedStatement[],
-  server: SuiteServer = adminServer
+  server: LocalWorker = adminServer
 ): void {
   if (statements.length > 0) suiteD1(server, statements)
 }

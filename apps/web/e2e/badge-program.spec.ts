@@ -25,7 +25,10 @@ import { test } from './test'
  * - Every trigger replayed, and the hourly continuation, change nothing and send nothing twice.
  */
 
-test.skip(!badgeSuiteEnabled, 'needs the local badge program Worker from playwright.config.ts')
+test.skip(
+  !badgeSuiteEnabled,
+  'needs the local badge program Worker from playwright.suites.config.ts'
+)
 test.describe.configure({ mode: 'serial' })
 test.use({ baseURL: badgeOrigin() })
 
@@ -214,6 +217,9 @@ test('the weekly pass warns on conclusive misses only, and checks no curated or 
 test('the daily pass rechecks each warning and unpublishes or revokes on a confirmed miss', async ({
   request
 }) => {
+  // The 410 below can take about a minute, longer than the default test timeout, which cut its
+  // 90-second wait short (#389).
+  test.setTimeout(150_000)
   // The warnings were sent two days ago, so today's window rechecks them: this attempt's only, as
   // a retry's D1 still holds the failed attempt's listings.
   badgeD1(`
@@ -239,7 +245,8 @@ test('the daily pass rechecks each warning and unpublishes or revokes on a confi
     reason: null
   })
   // The free listing is unpublished through the reviewed path: 410, logged, version bumped.
-  // Pages turn over with the catalog epoch, which the Worker re-reads within seconds.
+  // Pages turn over with the catalog epoch: the Worker reuses its copy for 30 seconds, and the
+  // copy it rereads can itself be up to 30 seconds old (`EPOCH_FRESH_MS`), so about a minute.
   await expect(async () => {
     const gone = await request.get(`/products/${get('free').slug}/`)
     expect(gone.status()).toBe(410)

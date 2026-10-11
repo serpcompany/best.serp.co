@@ -23,7 +23,7 @@ import { test } from './test'
  * `claims-dialog.spec.ts`'s.
  */
 
-test.skip(!claimsSuiteEnabled, 'needs the local claims Worker from playwright.config.ts')
+test.skip(!claimsSuiteEnabled, 'needs the local claims Worker from playwright.suites.config.ts')
 test.describe.configure({ mode: 'serial' })
 test.use({ baseURL: claimsOrigin() })
 
