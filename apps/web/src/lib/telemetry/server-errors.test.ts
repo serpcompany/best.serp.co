@@ -289,9 +289,12 @@ describe('where the Sentry SDK is imported (#355)', () => {
     // `server-sentry.ts` (Next.js, #355) and `worker-sentry.ts` (the Worker entry, #210): a static
     // import of either evaluates the SDK with the module that holds it. `import type` is erased.
     const STATIC_GATED_IMPORT =
-      /(?:^|[\s;])(?:import(?!\s+type\b)|export)\b[^'"();]*?['"][^'"]*\/(?:server|worker)-sentry['"]/mu
+      /(?:^|[\s;])(?:import(?!\s+type\b)|export)\b[^'"();]*?['"][^'"]*\/(?:server|worker)-sentry(?:\.[cm]?[jt]sx?)?['"]/mu
     expect(STATIC_GATED_IMPORT.test("import { x } from './worker-sentry'")).toBe(true)
+    expect(STATIC_GATED_IMPORT.test("import { x } from './worker-sentry.js'")).toBe(true)
+    expect(STATIC_GATED_IMPORT.test("import '../telemetry/server-sentry.ts'")).toBe(true)
     expect(STATIC_GATED_IMPORT.test("export * from '../telemetry/server-sentry'")).toBe(true)
+    expect(STATIC_GATED_IMPORT.test("import { x } from './worker-sentry-other'")).toBe(false)
     expect(STATIC_GATED_IMPORT.test("await import('./worker-sentry')")).toBe(false)
     expect(STATIC_GATED_IMPORT.test("import type { X } from './worker-sentry'")).toBe(false)
     const importers = sourceFiles().filter(file =>
