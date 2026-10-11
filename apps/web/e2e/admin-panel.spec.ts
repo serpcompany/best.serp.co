@@ -35,7 +35,8 @@ test.use({
  * The admin panel (serpcompany/best.serp.co#64) against the local Worker and local D1: the
  * gate, approving (the listing page and the sitemap after the epoch bump), requesting changes,
  * rejecting, allowing resubmission, unpublishing (410, out of the sitemap and search) and
- * republishing, a listing's tags (#341), and the allowlist. Each decision (approve, request changes, reject, allow
+ * republishing, a listing's tags (#341), creating, renaming, and retiring categories, tags, and best
+ * pages (#405), and the allowlist. Each decision (approve, request changes, reject, allow
  * resubmission, unpublish, republish, add and remove an admin) is replayed once to prove it is a
  * no-op. The gate is probed on every admin page and API action.
  *
@@ -94,12 +95,18 @@ test.afterAll(() => {
 const ADMIN_PAGES = [
   '/admin/',
   '/admin/admins/',
+  '/admin/best-pages/',
+  '/admin/best-pages/e2e-missing/',
+  '/admin/categories/',
+  '/admin/categories/e2e-missing/',
   '/admin/listings/',
   '/admin/listings/e2e-missing/',
   '/admin/orders/',
   '/admin/revisions/e2e-missing/',
   '/admin/submissions/',
   '/admin/submissions/e2e-missing/',
+  '/admin/tags/',
+  '/admin/tags/e2e-missing/',
   '/admin/not-a-page/'
 ]
 /** Every admin API action, by method; the authorization runs before any action dispatch. */
@@ -107,6 +114,21 @@ const ADMIN_ACTIONS: Array<['DELETE' | 'POST', string]> = [
   ['POST', '/api/admin/admins'],
   ['DELETE', '/api/admin/admins'],
   ['POST', '/api/admin/not-an-action'],
+  // The taxonomy (#405): create, then each item's actions by its slug.
+  ...['best-pages', 'categories', 'tags'].map((kind): ['POST', string] => [
+    'POST',
+    `/api/admin/${kind}`
+  ]),
+  ...['pins', 'retire', 'update'].map((action): ['POST', string] => [
+    'POST',
+    `/api/admin/best-pages/e2e-missing/${action}`
+  ]),
+  ...['categories', 'tags'].flatMap(kind =>
+    ['retire', 'update'].map((action): ['POST', string] => [
+      'POST',
+      `/api/admin/${kind}/e2e-missing/${action}`
+    ])
+  ),
   ...[
     'allow-resubmission',
     'details',
@@ -778,6 +800,183 @@ test.describe('listings', () => {
       headers: admin.headers
     })
     expect(await removeReplay.json()).toMatchObject({ ok: true, replayed: true })
+  })
+})
+
+test.describe('taxonomy (#405)', () => {
+  test('creates a category and a tag under it; a rename answers 308, and a category with a live listing can’t retire (#405)', async ({
+    baseURL,
+    page
+  }) => {
+    const admin = client(page.request, baseURL)
+    admins.push(await signInAsNewAdmin(admin, ADMIN_EMAIL_PREFIXES.adminPanel))
+    const key = unique()
+    const hub = { name: `E2E Hub ${key}`, slug: `e2e-hub-${key}` }
+    const tag = { name: `E2E Tag ${key}`, slug: `e2e-tag-${key}` }
+
+    await page.goto('/admin/categories/')
+    await page.getByLabel('Name', { exact: true }).fill(hub.name)
+    await expect(page.getByLabel('Slug', { exact: true })).toHaveValue(hub.slug)
+    await page.getByRole('button', { name: 'Add category' }).click()
+    await expect(page.getByRole('link', { name: hub.name })).toBeVisible()
+    await capture(page, '15-categories')
+
+    await page.goto('/admin/tags/')
+    await page.getByLabel('Name', { exact: true }).fill(tag.name)
+    await page.getByRole('combobox', { name: 'Category' }).click()
+    await page.getByRole('option', { name: hub.name, exact: true }).click()
+    await page.getByRole('button', { name: 'Add tag' }).click()
+    await expect(page.getByRole('link', { name: tag.name })).toBeVisible()
+    expect(
+      localD1(
+        `SELECT c.slug FROM tags t JOIN categories c ON c.id = t.category_id WHERE t.slug = ${q(tag.slug)}`
+      )
+    ).toEqual([{ slug: hub.slug }])
+
+    // A listing filed under the new category and tagged: both pages show, the category in its
+    // sitemap.
+    const listing = seedImportedListing('taxonomy', hub.slug, null)
+    const tagged = await page.request.post(`/api/admin/listings/${listing.id}/tags`, {
+      data: { expectedTags: [], tags: [tag.slug] },
+      headers: admin.headers
+    })
+    expect(await tagged.json()).toMatchObject({ ok: true })
+    for (const path of [`/products/categories/${hub.slug}/`, `/products/tags/${tag.slug}/`]) {
+      const response = await page.request.get(path)
+      expect(response.status(), path).toBe(200)
+      expect(await response.text(), path).toContain(listing.name)
+    }
+    expect(await (await page.request.get('/sitemap-categories.xml')).text()).toContain(
+      `/products/categories/${hub.slug}/`
+    )
+
+    // Renaming the tag keeps the old URL working: one 308 to the new one.
+    const renamed = `${tag.slug}-renamed`
+    await page.goto(`/admin/tags/${tag.slug}/`)
+    await page.getByLabel('Slug', { exact: true }).fill(renamed)
+    await page.getByRole('button', { name: 'Save changes' }).click()
+    await page.waitForURL(`**/admin/tags/${renamed}/`)
+    const moved = await page.request.get(`/products/tags/${tag.slug}/`, { maxRedirects: 0 })
+    expect(moved.status()).toBe(308)
+    expect(moved.headers().location).toMatch(new RegExp(`/products/tags/${renamed}/$`, 'u'))
+
+    // The category can't retire while a live listing is filed under it.
+    const refused = await page.request.post(`/api/admin/categories/${hub.slug}/retire`, {
+      data: { redirect: { kind: 'directory' } },
+      headers: admin.headers
+    })
+    expect(refused.status()).toBe(409)
+    expect(await refused.json()).toMatchObject({ error: 'category_has_listings' })
+    expect(localD1(`SELECT is_active FROM categories WHERE slug = ${q(hub.slug)}`)).toEqual([
+      { is_active: 1 }
+    ])
+
+    // Retiring the tag sends its URL, and the URL it was renamed from, to its category.
+    await page.getByRole('button', { name: 'Retire' }).click()
+    await expect(page.getByRole('combobox', { name: 'Redirect to' })).toContainText(hub.name)
+    await capture(page, '16-tag-retire')
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Retire' }).click()
+    await page.waitForURL('**/admin/tags/')
+    for (const path of [`/products/tags/${renamed}/`, `/products/tags/${tag.slug}/`]) {
+      const response = await page.request.get(path, { maxRedirects: 0 })
+      expect(response.status(), path).toBe(308)
+      expect(response.headers().location, path).toMatch(
+        new RegExp(`/products/categories/${hub.slug}/$`, 'u')
+      )
+    }
+  })
+
+  test('creates a best page on a tag, pins a listing of its pool, and its old URLs answer 308 (#405)', async ({
+    baseURL,
+    page
+  }) => {
+    const admin = client(page.request, baseURL)
+    admins.push(await signInAsNewAdmin(admin, ADMIN_EMAIL_PREFIXES.adminPanel))
+    const key = unique()
+    const tag = { name: `E2E Best Tag ${key}`, slug: `e2e-best-tag-${key}` }
+    const created = await page.request.post('/api/admin/tags', {
+      data: { category: activeCategory(), description: '', name: tag.name, slug: tag.slug },
+      headers: admin.headers
+    })
+    expect(await created.json()).toMatchObject({ ok: true })
+    // Five live listings with the tag: the page is indexable (BEST_PAGE_INDEX_MIN_ENTRIES).
+    const listings = [1, 2, 3, 4, 5].map(() => seedImportedListing('best', activeCategory(), null))
+    localD1(
+      listings
+        .map(
+          listing => `INSERT INTO listing_tags (listing_id, tag_id, sort_order)
+            SELECT ${q(listing.id)}, id, 0 FROM tags WHERE slug = ${q(tag.slug)};`
+        )
+        .join('\n')
+    )
+    const pinned = listings[3] as (typeof listings)[number]
+    const best = { keyword: `e2e best ${key}`, slug: `e2e-best-${key}`, title: `Best E2E ${key}` }
+
+    await page.goto('/admin/best-pages/')
+    await page.getByLabel('Keyword', { exact: true }).fill(best.keyword)
+    await expect(page.getByLabel('Slug', { exact: true })).toHaveValue(best.slug)
+    await page.getByLabel('Title', { exact: true }).fill(best.title)
+    await page.getByRole('combobox', { name: 'Tag' }).click()
+    await page.getByRole('option', { name: tag.name, exact: true }).click()
+    await page.getByLabel('Intro', { exact: true }).fill('Tools the admin panel suite ranks.')
+    await page.getByRole('button', { name: 'Add best page' }).click()
+    await page.getByRole('link', { name: best.title }).click()
+    await page.waitForURL(`**/admin/best-pages/${best.slug}/`)
+
+    await page.getByLabel('Add a listing', { exact: true }).fill(pinned.name)
+    await page.getByRole('option', { name: pinned.name, exact: true }).click()
+    await expect(page.getByText(`1. ${pinned.name}`)).toBeVisible()
+    await capture(page, '17-best-page')
+    await page.getByRole('button', { name: 'Save pins' }).click()
+    await expect(page.getByText('Saved.')).toBeVisible()
+    expect(
+      localD1(
+        `SELECT p.listing_id, p.position FROM best_page_listings p JOIN best_pages b
+          ON b.id = p.best_page_id WHERE b.slug = ${q(best.slug)}`
+      )
+    ).toEqual([{ listing_id: pinned.id, position: 1 }])
+
+    // The page ranks the pin first, is indexed, and is in its sitemap.
+    const live = await page.request.get(`/best/${best.slug}/`)
+    expect(live.status()).toBe(200)
+    const html = await live.text()
+    const places = listings.map(listing => html.indexOf(listing.name))
+    expect(Math.min(...places)).toBeGreaterThan(-1)
+    expect(html.indexOf(pinned.name)).toBe(Math.min(...places))
+    expect(html).toMatch(/<meta name="robots" content="index, follow/u)
+    expect(await (await page.request.get('/sitemap-best.xml')).text()).toContain(
+      `/best/${best.slug}/`
+    )
+
+    // A rename answers 308 from the old URL; retiring sends both URLs to the tag.
+    const renamed = `${best.slug}-renamed`
+    const fields = {
+      intro: 'Tools the admin panel suite ranks.',
+      keyword: best.keyword,
+      tag: tag.slug,
+      title: best.title
+    }
+    const update = await page.request.post(`/api/admin/best-pages/${best.slug}/update`, {
+      data: { expected: { ...fields, slug: best.slug }, page: { ...fields, slug: renamed } },
+      headers: admin.headers
+    })
+    expect(await update.json()).toMatchObject({ ok: true, replayed: false, slug: renamed })
+    const moved = await page.request.get(`/best/${best.slug}/`, { maxRedirects: 0 })
+    expect(moved.status()).toBe(308)
+    expect(moved.headers().location).toMatch(new RegExp(`/best/${renamed}/$`, 'u'))
+
+    await page.goto(`/admin/best-pages/${renamed}/`)
+    await page.getByRole('button', { name: 'Retire' }).click()
+    await expect(page.getByRole('combobox', { name: 'Redirect to' })).toContainText(tag.name)
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Retire' }).click()
+    await page.waitForURL('**/admin/best-pages/')
+    for (const path of [`/best/${renamed}/`, `/best/${best.slug}/`]) {
+      const response = await page.request.get(path, { maxRedirects: 0 })
+      expect(response.status(), path).toBe(308)
+      expect(response.headers().location, path).toMatch(
+        new RegExp(`/products/tags/${tag.slug}/$`, 'u')
+      )
+    }
   })
 })
 

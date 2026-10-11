@@ -163,7 +163,10 @@ unpublished. `pnpm catalog:downloader-links` writes #376's manifest from the lin
 
 These operations write #341's taxonomy: tags, best pages, and redirects of old taxonomy URLs
 (#344). All are row-level, so one manifest fits staging and production. Each refusal names its
-operation and reason, and D1 reports it as `bad JSON path: '<operation> <slug>: <reason>'`.
+operation and reason, and D1 reports it as `bad JSON path: '<operation> <slug>: <reason>'`. Their
+statements, with `category-create`'s and `category-unpublish`'s, are in
+`apps/web/src/db/taxonomy-plans.ts`, which the admin panel builds too
+([Admin panel](./admin-panel.md#categories-tags-and-best-pages-405), #405).
 
 | Operation | What it does | Refused, with nothing written, when |
 |---|---|---|

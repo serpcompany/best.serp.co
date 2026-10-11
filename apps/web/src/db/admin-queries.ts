@@ -17,11 +17,12 @@ import type {
 /**
  * Reads for the admin panel (serpcompany/best.serp.co#64): the review queue, one submission or
  * revision under review, the listing search, one listing with its owner, badge checks, and
- * activity, and the category options. Every statement is a plan builder (`select…Plan`), so
+ * activity, the category and tag options, and the taxonomy screens' categories, tags, and best
+ * pages (#405). Every statement is a plan builder (`select…Plan`), so
  * `scripts/d1-workerd-plans.test.ts` runs each one on Wrangler-local D1, and
  * `createAdminReadOperations` maps the rows to the DTOs the admin pages render. Nothing here
  * writes; the decisions are the statement plans in `submission-plans.ts`, `revision-plans.ts`,
- * `listing-plans.ts`, and `admin-plans.ts`.
+ * `listing-plans.ts`, `admin-plans.ts`, and `taxonomy-plans.ts`.
  */
 
 /** Queue tabs: waiting for a decision, waiting on the submitter, or everything recent. */
@@ -494,6 +495,101 @@ export function selectActiveTagsPlan(): StatementPlan {
   }
 }
 
+/** A listing anonymous visitors can see, at any publication time. */
+const LIVE_LISTING = "l.status='approved' AND l.is_active=1 AND l.published_at IS NOT NULL"
+
+/**
+ * Active categories (hubs) for the Categories screen (#405), or the one with `slug`, with how
+ * many active tags and live listings (filed under it as their primary) each has.
+ */
+export function selectAdminCategoriesPlan(slug?: string): StatementPlan {
+  return {
+    sql: `SELECT c.slug,c.name,c.description,c.sort_order,
+        (SELECT COUNT(*) FROM tags t WHERE t.category_id=c.id AND t.is_active=1) AS tag_count,
+        (SELECT COUNT(*) FROM listing_categories lc JOIN listings l ON l.id=lc.listing_id
+          WHERE lc.category_id=c.id AND lc.is_primary=1 AND ${LIVE_LISTING}) AS listing_count
+      FROM categories c WHERE c.is_active=1${slug === undefined ? '' : ' AND c.slug=?'}
+      ORDER BY c.sort_order,c.name`,
+    params: slug === undefined ? [] : [slug]
+  }
+}
+
+/**
+ * Active tags for the Tags screen (#405), or the one with `slug`, with their hubs and how many
+ * live listings carry each, in the hubs' display order and then the tags' own.
+ */
+export function selectAdminTagsPlan(slug?: string): StatementPlan {
+  return {
+    sql: `SELECT t.slug,t.name,t.description,t.sort_order,c.slug AS category,
+        c.name AS category_name,
+        (SELECT COUNT(*) FROM listing_tags lt JOIN listings l ON l.id=lt.listing_id
+          WHERE lt.tag_id=t.id AND ${LIVE_LISTING}) AS listing_count
+      FROM tags t JOIN categories c ON c.id=t.category_id
+      WHERE t.is_active=1${slug === undefined ? '' : ' AND t.slug=?'}
+      ORDER BY c.sort_order,c.name,t.sort_order,t.name`,
+    params: slug === undefined ? [] : [slug]
+  }
+}
+
+/** Active best pages for the Best pages screen (#405), with their pool and how many pins. */
+export function selectAdminBestPagesPlan(): StatementPlan {
+  return {
+    sql: `SELECT b.slug,b.keyword,b.title,t.slug AS tag,t.name AS tag_name,c.slug AS category,
+        c.name AS category_name,
+        (SELECT COUNT(*) FROM best_page_listings p
+          WHERE p.best_page_id=b.id AND p.excluded=0) AS pin_count
+      FROM best_pages b LEFT JOIN tags t ON t.id=b.tag_id
+      LEFT JOIN categories c ON c.id=b.category_id
+      WHERE b.is_active=1 ORDER BY b.sort_order,b.keyword,b.slug`,
+    params: []
+  }
+}
+
+/**
+ * One active best page (#405): its fields, its pins in position order (each with whether it is
+ * live), its exclusions, and its live pool, the listings its pins are chosen from: those with its
+ * tag (or, on a page without one, in its category), in its category when it names one too, less
+ * its exclusions, by name.
+ */
+export function selectAdminBestPagePlans(slug: string): StatementPlan[] {
+  return [
+    {
+      sql: `SELECT b.slug,b.keyword,b.title,b.heading,b.intro,b.list_size,t.slug AS tag,
+          t.name AS tag_name,c.slug AS category,c.name AS category_name
+        FROM best_pages b LEFT JOIN tags t ON t.id=b.tag_id
+        LEFT JOIN categories c ON c.id=b.category_id WHERE b.slug=? AND b.is_active=1`,
+      params: [slug]
+    },
+    {
+      sql: `SELECT l.id,l.slug,l.name,p.blurb,
+          CASE WHEN ${LIVE_LISTING} THEN 1 ELSE 0 END AS live
+        FROM best_pages b JOIN best_page_listings p ON p.best_page_id=b.id
+        JOIN listings l ON l.id=p.listing_id
+        WHERE b.slug=? AND p.excluded=0 ORDER BY p.position`,
+      params: [slug]
+    },
+    {
+      sql: `SELECT l.id,l.slug,l.name FROM best_pages b
+        JOIN best_page_listings p ON p.best_page_id=b.id JOIN listings l ON l.id=p.listing_id
+        WHERE b.slug=? AND p.excluded=1 ORDER BY l.name,l.slug`,
+      params: [slug]
+    },
+    {
+      sql: `SELECT l.id,l.slug,l.name FROM best_pages b JOIN listings l
+          ON l.id IN (SELECT lt.listing_id FROM listing_tags lt WHERE lt.tag_id=b.tag_id
+            UNION ALL SELECT lc.listing_id FROM listing_categories lc
+              WHERE b.tag_id IS NULL AND lc.category_id=b.category_id)
+        WHERE b.slug=? AND b.is_active=1 AND ${LIVE_LISTING}
+          AND (b.category_id IS NULL OR EXISTS (SELECT 1 FROM listing_categories lc
+            WHERE lc.listing_id=l.id AND lc.category_id=b.category_id))
+          AND NOT EXISTS (SELECT 1 FROM best_page_listings x
+            WHERE x.best_page_id=b.id AND x.listing_id=l.id AND x.excluded=1)
+        ORDER BY l.name,l.slug`,
+      params: [slug]
+    }
+  ]
+}
+
 // ---------------------------------------------------------------------------------------------
 // DTOs and the read operations
 
@@ -779,6 +875,57 @@ export interface TagOption {
   slug: string
 }
 
+/** An active category (hub) on the Categories screen (#405). */
+export interface AdminCategory {
+  description: string
+  /** Live listings filed under it as their primary category. */
+  listingCount: number
+  name: string
+  order: number
+  slug: string
+  tagCount: number
+}
+
+/** An active tag on the Tags screen (#405). */
+export interface AdminTag {
+  category: string
+  categoryName: string
+  description: string
+  listingCount: number
+  name: string
+  order: number
+  slug: string
+}
+
+/** An active best page on the Best pages screen (#405). */
+export interface AdminBestPageRow {
+  category: string | null
+  categoryName: string | null
+  keyword: string
+  pinCount: number
+  slug: string
+  tag: string | null
+  tagName: string | null
+  title: string
+}
+
+/** A listing a best page pins, excludes, or may pin. */
+export interface BestPageListing {
+  id: string
+  name: string
+  slug: string
+}
+
+/** One active best page with its pins, exclusions, and live pool (#405). */
+export interface AdminBestPage extends AdminBestPageRow {
+  exclude: BestPageListing[]
+  heading: string
+  intro: string
+  listSize: number
+  pins: Array<BestPageListing & { blurb: string | null; live: boolean }>
+  pool: BestPageListing[]
+}
+
 type Row = Record<string, unknown>
 
 function parseListingTags(value: unknown): ListingTag[] {
@@ -880,14 +1027,56 @@ export interface AdminReadOperations {
   getAdminListing(slug: string): Promise<AdminListingDetail | null>
   getRevisionReview(revisionId: string): Promise<RevisionReview | null>
   getSubmissionReview(submissionId: string): Promise<SubmissionReview | null>
+  getAdminBestPage(slug: string): Promise<AdminBestPage | null>
+  getAdminCategory(slug: string): Promise<AdminCategory | null>
+  getAdminTag(slug: string): Promise<AdminTag | null>
   listActiveCategories(): Promise<CategoryOption[]>
   listActiveTags(): Promise<TagOption[]>
+  listAdminBestPages(): Promise<AdminBestPageRow[]>
+  listAdminCategories(): Promise<AdminCategory[]>
+  listAdminTags(): Promise<AdminTag[]>
   listReviewQueue(view: ReviewQueueView): Promise<ReviewQueueItem[]>
   reviewQueueCounts(): Promise<ReviewQueueCounts>
   searchListings(
     filter: AdminListingFilter,
     page: { limit: number; offset: number }
   ): Promise<AdminListingSearch>
+}
+
+function categoryRow(row: Row): AdminCategory {
+  return {
+    description: text(row.description),
+    listingCount: Number(row.listing_count),
+    name: text(row.name),
+    order: Number(row.sort_order),
+    slug: text(row.slug),
+    tagCount: Number(row.tag_count)
+  }
+}
+
+function tagRow(row: Row): AdminTag {
+  return {
+    category: text(row.category),
+    categoryName: text(row.category_name),
+    description: text(row.description),
+    listingCount: Number(row.listing_count),
+    name: text(row.name),
+    order: Number(row.sort_order),
+    slug: text(row.slug)
+  }
+}
+
+function bestPageRow(row: Row): AdminBestPageRow {
+  return {
+    category: optionalText(row.category),
+    categoryName: optionalText(row.category_name),
+    keyword: text(row.keyword),
+    pinCount: Number(row.pin_count),
+    slug: text(row.slug),
+    tag: optionalText(row.tag),
+    tagName: optionalText(row.tag_name),
+    title: text(row.title)
+  }
 }
 
 export function createAdminReadOperations({ client }: { client: Database }): AdminReadOperations {
@@ -1085,6 +1274,55 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
         email: text(row.email),
         name: optionalText(row.name)
       }))
+    },
+
+    async getAdminBestPage(slug) {
+      const [rows, pins, exclude, pool] = await batch(selectAdminBestPagePlans(slug))
+      const row = rows?.[0]
+      if (!row) return null
+      const listingRef = (entry: Row): BestPageListing => ({
+        id: text(entry.id),
+        name: text(entry.name),
+        slug: text(entry.slug)
+      })
+      return {
+        ...bestPageRow({ ...row, pin_count: pins?.length ?? 0 }),
+        exclude: (exclude ?? []).map(listingRef),
+        heading: text(row.heading),
+        intro: text(row.intro),
+        listSize: Number(row.list_size),
+        pins: (pins ?? []).map(pin => ({
+          ...listingRef(pin),
+          blurb: optionalText(pin.blurb),
+          live: Number(pin.live) === 1
+        })),
+        pool: (pool ?? []).map(listingRef)
+      }
+    },
+
+    async getAdminCategory(slug) {
+      const row = await statement(selectAdminCategoriesPlan(slug)).first<Row>()
+      return row ? categoryRow(row) : null
+    },
+
+    async getAdminTag(slug) {
+      const row = await statement(selectAdminTagsPlan(slug)).first<Row>()
+      return row ? tagRow(row) : null
+    },
+
+    async listAdminBestPages() {
+      const result = await statement(selectAdminBestPagesPlan()).all<Row>()
+      return result.results.map(bestPageRow)
+    },
+
+    async listAdminCategories() {
+      const result = await statement(selectAdminCategoriesPlan()).all<Row>()
+      return result.results.map(categoryRow)
+    },
+
+    async listAdminTags() {
+      const result = await statement(selectAdminTagsPlan()).all<Row>()
+      return result.results.map(tagRow)
     },
 
     async listActiveCategories() {

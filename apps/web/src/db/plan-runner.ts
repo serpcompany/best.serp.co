@@ -28,12 +28,14 @@ export async function queryPlan<T = Record<string, unknown>>(
 
 /**
  * True when a batch failed because a compare-and-swap guard refused it (the state was not what
- * the caller read) or a constraint or trigger refused the write: the caller re-reads and answers
- * 409, never 500. Any other error (D1 unavailable, a malformed statement) is not a conflict.
+ * the caller read), with or without its reason (`bad JSON path: '<reason>'`, the taxonomy's
+ * guards, #405), or a constraint or trigger refused the write (the retired-category and taxonomy
+ * triggers included): the caller re-reads and answers 409, never 500. Any other error (D1
+ * unavailable, a malformed statement) is not a conflict.
  */
 export function isPlanConflict(error: unknown): boolean {
   const message = error instanceof Error ? `${error.message} ${String(error.cause ?? '')}` : ''
-  return /malformed JSON|constraint failed|UNIQUE constraint|CHECK constraint|FOREIGN KEY constraint|primary category|blocked/iu.test(
+  return /malformed JSON|bad JSON path|constraint failed|UNIQUE constraint|CHECK constraint|FOREIGN KEY constraint|primary category|retired (?:category|tag)|cannot retire|blocked/iu.test(
     message
   )
 }

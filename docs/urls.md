@@ -43,7 +43,8 @@ one of these extensions (`chart.js`), and a test checks the committed import.
   checks that each destination is canonical and each source is matched in both slash forms.
 - **Redirects that need D1** run in their pages (`listing_slug_redirects`: renamed listing slugs,
   and unpublished duplicates sent to the listing they duplicated, #338; `taxonomy_redirects`: a
-  category, tag or best page with nothing to show, #346) or in the Worker (the old
+  category, tag or best page with nothing to show, #346, or one an admin renamed or retired, #405)
+  or in the Worker (the old
   root-level `/<slug>`, before the slash rule, `apps/web/src/lib/routing/legacy-root.ts`) and
   write a canonical destination (`getRoute`). The root-level lookup answers in one hop: a live
   listing, a category with a public listing, a retired listing slug followed through
@@ -108,6 +109,10 @@ publisher's affected routes) build their URLs from it.
   metadata and its sitemap entry; `site-routes.test.tsx` holds them together. The thresholds are
   constants in `apps/web/src/lib/site/taxonomy.ts`, not environment variables. A page that is not
   indexable still renders `noindex, follow`, so its links are crawled.
+- **Admins manage them** in `/admin` (#405), on the publisher's operations: a rename keeps the
+  page's row under its new slug and redirects its old URL there, and a retirement redirects its URL
+  to the page the admin picks, so every old URL keeps answering one 308
+  ([Admin panel](./admin-panel.md#categories-tags-and-best-pages-405)).
 - **Rendering wins over a redirect.** A page answers its 308 only when it has nothing to show, so
   a redirect row published before its listings move takes over the moment the old page empties.
 - **A redirect never leads to a 404.** A moved URL is followed only to a target whose own page

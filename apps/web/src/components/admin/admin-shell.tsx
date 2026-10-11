@@ -1,6 +1,15 @@
 'use client'
 
-import { Box, ExternalLink, Inbox, Receipt, Users } from 'lucide-react'
+import {
+  Box,
+  ExternalLink,
+  FolderTree,
+  Inbox,
+  ListOrdered,
+  Receipt,
+  Tags,
+  Users
+} from 'lucide-react'
 import { usePathname } from 'next/navigation'
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
 import { signOut } from '@/components/auth/sign-in-api'
@@ -19,7 +28,7 @@ import { cn } from '@/lib/utils'
  * with serplists' rows, footer and top bar (#261); the account menu links to the account area.
  * The layout renders it once, so the sidebar keeps its state across admin pages; each page names
  * its breadcrumb with `AdminCrumbs`. Unbuilt areas are hidden: the Inbox arrives with #73 and
- * Orders with #68 (`showOrders`).
+ * Orders with #68 (`showOrders`). Categories, Tags, and Best pages manage the taxonomy (#405).
  */
 
 const CrumbsContext = createContext<{
@@ -33,6 +42,11 @@ function defaultCrumbs(pathname: string): DashboardCrumb[] {
   if (pathname.startsWith('/admin/listings/'))
     return [root, { href: '/admin/listings/', label: 'Listings' }]
   if (pathname.startsWith('/admin/admins/')) return [root, { label: 'Admins' }]
+  if (pathname.startsWith('/admin/categories/'))
+    return [root, { href: '/admin/categories/', label: 'Categories' }]
+  if (pathname.startsWith('/admin/tags/')) return [root, { href: '/admin/tags/', label: 'Tags' }]
+  if (pathname.startsWith('/admin/best-pages/'))
+    return [root, { href: '/admin/best-pages/', label: 'Best pages' }]
   return [root, { href: '/admin/submissions/', label: 'Review queue' }]
 }
 
@@ -93,6 +107,9 @@ export function AdminShell({
       title: 'Review queue'
     },
     { href: '/admin/listings/', icon: Box, title: 'Listings' },
+    { href: '/admin/categories/', icon: FolderTree, title: 'Categories' },
+    { href: '/admin/tags/', icon: Tags, title: 'Tags' },
+    { href: '/admin/best-pages/', icon: ListOrdered, title: 'Best pages' },
     ...(showOrders ? [{ href: '/admin/orders/', icon: Receipt, title: 'Orders' }] : []),
     { href: '/admin/admins/', icon: Users, title: 'Admins' }
   ]
