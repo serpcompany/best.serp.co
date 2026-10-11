@@ -7,7 +7,6 @@ import {
 import {
   bestPageEntryCount,
   isBestPageIndexable,
-  isCategoryIndexable,
   isTagIndexable,
   isTagLinked,
   renderingCategory
@@ -58,11 +57,6 @@ describe('taxonomy robots predicates (#341, design 2.3)', () => {
   it('links a tag from the index at 3 listings', () => {
     expect(isTagLinked({ count: 3 })).toBe(true)
     expect(isTagLinked({ count: 2 })).toBe(false)
-  })
-
-  it('keeps the transitional catch-all hub out of search', () => {
-    expect(isCategoryIndexable({ slug: 'other' })).toBe(false)
-    expect(isCategoryIndexable({ slug: 'video-downloaders' })).toBe(true)
   })
 })
 

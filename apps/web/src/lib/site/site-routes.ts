@@ -72,7 +72,6 @@ export const siteRoutes = [
   { canonicalPath: '/', indexable: true, path: '/products/', sitemapGroup: null },
   { indexable: true, path: '/products/[slug]/', sitemapGroup: 'products' },
   { indexable: true, path: '/products/categories/', sitemapGroup: 'pages' },
-  // A transitional category (`other`) is noindex and left out of its sitemap (`isCategoryIndexable`).
   { indexable: true, path: '/products/categories/[category]/', sitemapGroup: 'categories' },
   // Like the best-page index: indexed and in the pages sitemap once it links a tag (`linkedTags`).
   { indexable: true, path: taxonomyRoutePaths.tagIndex, sitemapGroup: 'pages' },

@@ -98,17 +98,23 @@ publisher's affected routes) build their URLs from it.
 
 | Path | Page | Robots | Sitemap |
 | --- | --- | --- | --- |
-| `/products/categories/<category>/` | A category (hub) with a public listing; else one 308 through `taxonomy_redirects`; else 404 | index; `other` noindex | `sitemap-categories.xml`, without `other` |
+| `/products/categories/<category>/` | A category (hub) with a public listing; else one 308 through `taxonomy_redirects` (the retired `other`: 308 to `/products/`, #351); else 404 | index | `sitemap-categories.xml` |
 | `/products/tags/` | Tags with 3 or more listings, grouped by hub | index; noindex while it lists none | `sitemap-pages.xml`, while it lists one |
 | `/products/tags/<tag>/` | A tag with a public listing, 48 a page (`?page=N`); else one 308; else 404 | index from 10 listings, unless an indexable best page ranks the tag alone | `sitemap-tags.xml` when indexable |
 | `/best/` | Best pages with an entry, grouped by hub | index; noindex while it lists none | `sitemap-pages.xml`, while it lists one |
 | `/best/<keyword>/` | Up to its list size of entries, one page; with none, one 308, else 404 | index from 5 entries | `sitemap-best.xml` when indexable |
 
-- **One predicate, two consumers.** `isTagIndexable`, `isBestPageIndexable` and
-  `isCategoryIndexable` (`apps/web/src/lib/seo/taxonomy-indexing.ts`) decide both a page's robots
-  metadata and its sitemap entry; `site-routes.test.tsx` holds them together. The thresholds are
-  constants in `apps/web/src/lib/site/taxonomy.ts`, not environment variables. A page that is not
-  indexable still renders `noindex, follow`, so its links are crawled.
+- **One predicate, two consumers.** `isTagIndexable` and `isBestPageIndexable`
+  (`apps/web/src/lib/seo/taxonomy-indexing.ts`) decide both a page's robots metadata and its
+  sitemap entry; `site-routes.test.tsx` holds them together. The thresholds are constants in
+  `apps/web/src/lib/site/taxonomy.ts`, not environment variables. A page that is not indexable
+  still renders `noindex, follow`, so its links are crawled. A category page that renders is
+  always indexed.
+- **Names from D1.** Category pages, the hub grid and a listing's header name categories from D1.
+  Where a page has only the slug (search filters, a listing's meta description and JSON-LD), the
+  name is cased from it (`categoryNameFromSlug`). Only the hubs' icons are checked in
+  (`apps/web/src/lib/directory/categories.ts`); the v1 category aliases and presentation map are
+  gone (#350).
 - **Admins manage them** in `/admin` (#405), on the publisher's operations: a rename keeps the
   page's row under its new slug and redirects its old URL there, and a retirement redirects its URL
   to the page the admin picks, so every old URL keeps answering one 308
@@ -146,13 +152,16 @@ publisher's affected routes) build their URLs from it.
   the publisher's manifest schema refuse them, and the Worker's 410 check skips them.
 - **Static redirects.** `/products/best` answers one 308 to `/best/`; the other pre-D1
   `/products/best/<category>` URLs still go to `/products/categories/<category>/`.
+- **Post-deploy gates.** After each deploy, `scripts/d1-preview-http-gates.ts` requests a live
+  tag, a best page, and one retired category's 308 to its best page (`httpGateSamples`, #350),
+  never one a committed manifest retires or points elsewhere.
 
 ## Pagination
 
 The directory (`/`, `/products/`), category and tag pages show 48 listings per page in
 directory order (publication order, then a stable locale sort by name, as the pages
 always rendered). Later pages use a `?page=N` query parameter on the existing URL:
-`/products/?page=2`, `/products/categories/other/?page=3`. The homepage shows page 1 and
+`/products/?page=2`, `/products/categories/writing/?page=3`. The homepage shows page 1 and
 links into `/products/?page=N`. `/products/` itself renders the homepage's content, so its
 canonical is `/`. Page 1 is the bare URL; pages 2+ are linked with plain `<a href>` anchors,
 canonicalize to themselves, carry `noindex, follow` and a "- Page N" title, and a page

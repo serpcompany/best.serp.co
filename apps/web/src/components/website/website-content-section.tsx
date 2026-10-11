@@ -1,6 +1,6 @@
 import { Info } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
-import { getCategoryDisplayName } from '../../lib/directory/category-display'
+import { categoryNameFromSlug } from '../../lib/directory/categories'
 import type { WebsiteMetadata } from '../../lib/directory/content-query'
 import {
   type ListingContentTree,
@@ -32,7 +32,7 @@ export function WebsiteContentSection({ contentTree, website }: WebsiteContentSe
     ...(website.categories || [])
   ]
     .filter((value, index, values) => Boolean(value) && values.indexOf(value) === index)
-    .map(categorySlug => getCategoryDisplayName(categorySlug))
+    .map(categorySlug => categoryNameFromSlug(categorySlug))
   const featuredImageUrl = website.media?.images?.[0]
 
   if (website.content) {

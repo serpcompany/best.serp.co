@@ -2,14 +2,15 @@
  * Which taxonomy pages search engines may index (#341, design 2.3). One predicate per page kind,
  * read by both the page's metadata and its sitemap, so a page is in a sitemap exactly when it
  * renders `index` (`site-routes.test.tsx` holds them to it). A page that is not indexable still
- * renders, `noindex, follow`, so crawlers follow its links; only an empty one is a 404.
+ * renders, `noindex, follow`, so crawlers follow its links; only an empty one is a 404. A
+ * category page that renders is always indexed: the catch-all `other`, the one exception, is
+ * retired (#351).
  */
 import type { PublishedBestPage, PublishedCategory, PublishedTag } from '@/db/contracts'
 import {
   BEST_PAGE_INDEX_MIN_ENTRIES,
   TAG_INDEX_MIN_LISTINGS,
-  TAG_LINK_MIN_LISTINGS,
-  TRANSITIONAL_CATEGORY_SLUGS
+  TAG_LINK_MIN_LISTINGS
 } from '@/lib/site/taxonomy'
 
 type BestPageSize = Pick<PublishedBestPage, 'listSize' | 'poolSize'>
@@ -74,12 +75,4 @@ export function renderingCategory<T extends Pick<PublishedCategory, 'count' | 's
   if (!slug) return null
   const category = categories.find(candidate => candidate.slug === slug)
   return category && category.count > 0 ? category : null
-}
-
-/**
- * A category page with a public listing is indexed, except a transitional catch-all hub
- * (`TRANSITIONAL_CATEGORY_SLUGS`: `other`), which stays crawlable for its links.
- */
-export function isCategoryIndexable(category: Pick<PublishedCategory, 'slug'>): boolean {
-  return !TRANSITIONAL_CATEGORY_SLUGS.has(category.slug)
 }

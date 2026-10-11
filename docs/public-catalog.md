@@ -82,7 +82,7 @@ and public listings:
   tags link to different neighbours. When its tags give fewer than four, its hub fills the rest
   in the same name order, in the same statement. A listing without tags in one category takes
   the members after its own name, wrapping round to the start, so two listings of one large
-  category (the catch-all `other`) link to different neighbours (#331, #347); one in several
+  category link to different neighbours (#331, #347); one in several
   categories is ranked by shared categories, as before.
 - **"Featured in"** on a listing page names up to three best pages that show the listing
   (`featuredInBestPages`, #347), from the cached best index and the detail's pins and exclusions,

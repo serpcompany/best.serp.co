@@ -1,4 +1,4 @@
-import { getCategoryDisplayName } from '../directory/category-display'
+import { categoryNameFromSlug } from '../directory/categories'
 import { shouldUseProvidedListingLogo } from '../directory/listing-logo-presentation'
 import { getCanonicalListingListRoute, getRoute } from '../routing/routes'
 import { siteCopy } from '../site/site-copy'
@@ -134,7 +134,7 @@ export function generateWebsiteDetailSchema(
     slug: website.slug
   })}`
   const categoryFormatted = website.category
-    ? getCategoryDisplayName(website.category)
+    ? categoryNameFromSlug(website.category)
     : 'Developer Tools'
   const listingLabel = siteCopy.listingName.singular
   const listingLabelTitle = siteCopy.listingName.singularTitle

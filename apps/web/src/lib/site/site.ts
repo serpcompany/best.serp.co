@@ -19,7 +19,6 @@ export const site: SiteDefinition = {
   },
   copy: {
     brandsLabel: 'Brands',
-    categoryLabels: {},
     docsLabel: 'Docs',
     listingName: {
       plural: 'products',

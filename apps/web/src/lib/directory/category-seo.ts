@@ -1,6 +1,5 @@
-import { siteConfig } from '../site/site-config'
+import type { PublishedCategory } from '@/db/contracts'
 import { siteCopy } from '../site/site-copy'
-import type { Category } from './categories'
 
 interface CategorySEOConfig {
   metaTitle: string
@@ -20,10 +19,10 @@ function toKeywordValue(value: string): string {
 
 export function getCategorySEO(
   _slug: string,
-  category: Pick<Category, 'description' | 'name' | 'slug'>
+  category: Pick<PublishedCategory, 'description' | 'name'>
 ): CategorySEOConfig {
-  // The category record (from D1) carries the canonical display name.
-  const categoryName = siteConfig.copy.categoryLabels[category.slug] ?? category.name
+  // The category record (from D1) carries the display name.
+  const categoryName = category.name
   const categoryDescription = category.description
 
   return {
