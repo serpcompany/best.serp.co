@@ -30,8 +30,8 @@ describe('listing content trees (#334)', () => {
       )
       .digest('hex')
     expect({ format: LISTING_CONTENT_FORMAT, hash }).toEqual({
-      format: 'gfm-1',
-      hash: '0dfd685898426651fa346be7341d4ecf658a31d5b46ab05592ab2944c2b23b81'
+      format: 'gfm-2',
+      hash: '9da6a293b6c1072fc319792335cae0b8d3c883bec9031543be3a3ce5868d4ef6'
     })
   })
 

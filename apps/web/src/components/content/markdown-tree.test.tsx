@@ -1,6 +1,7 @@
 import React, { isValidElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { stripDuplicateLinksSection } from '../../lib/markdown/listing-content'
 import { KITCHEN_SINK_BODY, REVIEW_BODY } from '../../lib/markdown/listing-content-test-support'
@@ -84,6 +85,78 @@ describe('a cached listing content tree (#334)', () => {
     expect(markup).not.toContain('Repeated in the resource links')
     expect(renderToStaticMarkup(cached(KITCHEN_SINK_BODY, false))).toContain(
       'Repeated in the resource links'
+    )
+  })
+
+  it('renders bare URLs as text with their escapes resolved, and links as links (#377)', () => {
+    const markup = renderToStaticMarkup(cached(KITCHEN_SINK_BODY, false))
+    expect(markup).toContain(
+      'www.literal.test, https://bare.test/x?y=1, an escaped\n' +
+        'https://bare.test/engines/[model]/run?aff=YOUR_CODE and an escaped'
+    )
+    expect(markup).not.toContain('href="http://www.literal.test')
+    expect(markup).not.toContain('href="https://bare.test')
+    expect(markup).not.toContain('%5C')
+    expect(markup).toContain('href="https://auto.test/path">https://auto.test/path</a>')
+    expect(markup).toContain('title="With a title" href="https://studio.test/a">inline</a>')
+    expect(markup).toContain('title="Ref title" href="https://ref.test/page">reference</a>')
+  })
+
+  it('keeps bare emails as mailto links, outside code and links (#377)', () => {
+    const markup = renderToStaticMarkup(cached(KITCHEN_SINK_BODY, false))
+    expect(markup).toContain('href="mailto:hello@studio.test">hello@studio.test</a>')
+    // An escape in a bare email resolves before it is linked.
+    expect(markup).toContain('href="mailto:john_doe@studio.test">john_doe@studio.test</a>')
+    expect(markup).toContain('href="https://studio.test/team">team@studio.test</a>')
+    expect(markup).toContain('ops@studio.test</code>')
+    expect(markup).not.toContain('mailto:team@')
+    expect(markup).not.toContain('mailto:ops@')
+  })
+
+  it('leaves an email in a bare URL, or in a rejected address, as text (#377)', () => {
+    for (const url of [
+      'https://api.example.test/verify?email=foo@bar.test',
+      'https://user:pass@host.example.test/',
+      'www.example.test/contact?to=sales@example.test',
+      'https://api.example.test/v1/users/john.doe@example.test',
+      'path/john.doe@example.test'
+    ]) {
+      const markup = renderToStaticMarkup(cached(`See ${url} for details.`, false))
+      expect(markup).toContain(`See ${url} for details.`)
+      expect(markup).not.toContain('<a ')
+    }
+    const markup = renderToStaticMarkup(
+      cached('Write to hello@example.test, or see https://example.test/ sales@example.test.', false)
+    )
+    expect(markup).toContain('href="mailto:hello@example.test">hello@example.test</a>')
+    expect(markup).toContain('href="mailto:sales@example.test">sales@example.test</a>')
+  })
+
+  it('scans a long bare URL once, so hostile runs stay fast (#379 review)', () => {
+    // Each run, 20 KB without whitespace, is followed by 200 emails. Checking the text before
+    // each email for a URL took about 19 s on this body; one forward scan takes milliseconds.
+    const emails = Array.from({ length: 200 }, (_, index) => `u${index}@example.test`).join(' ')
+    const body = `${'www.'.repeat(5000)} ${emails}\n\n${'http://'.repeat(3000)}?to=sales@example.test ${emails}`
+    const markup = renderToStaticMarkup(cached(body, false))
+    expect(markup).toContain(`>${'www.'.repeat(5000)} <a `)
+    expect(markup).toContain(`>${'http://'.repeat(3000)}?to=sales@example.test <a `)
+    expect(markup.match(/href="mailto:u\d+@example\.test">u\d+@example\.test<\/a>/gu)).toHaveLength(
+      400
+    )
+    expect(markup).not.toContain('mailto:sales@')
+    const started = performance.now()
+    listingContentTree(body, false)
+    // Generous for a slow runner: about 10 ms on Node 24 on an Apple silicon Mac.
+    expect(performance.now() - started).toBeLessThan(1000)
+  })
+
+  it('renders everything else as remark-gfm does (#377)', () => {
+    const withoutBareUrls = KITCHEN_SINK_BODY.replace(/^<https:\/\/auto\.test.*\n.*\n/mu, '')
+    expect(withoutBareUrls).not.toMatch(/bare\.test|john/u)
+    expect(renderToStaticMarkup(direct(withoutBareUrls, false))).toBe(
+      renderToStaticMarkup(
+        ReactMarkdown({ children: withoutBareUrls, components, remarkPlugins: [remarkGfm] })
+      )
     )
   })
 })

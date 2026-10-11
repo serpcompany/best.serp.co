@@ -15,12 +15,12 @@ export type ListingContentTree = Root
 
 /**
  * Names the cached trees' shape. Change it whenever the same Markdown would give another tree:
- * a react-markdown, remark-gfm or remark-rehype upgrade that changes their output, other
+ * a react-markdown, GFM extension or remark-rehype upgrade that changes their output, other
  * `LISTING_MARKDOWN_OPTIONS`, or another `stripDuplicateLinksSection`. `listing-content.test.ts`
  * pins the tree of a sample body, so such a change fails there until this is bumped and the pin
- * updated.
+ * updated. `gfm-2`: bare URLs are text; only bare emails are autolink literals (#377).
  */
-export const LISTING_CONTENT_FORMAT = 'gfm-1'
+export const LISTING_CONTENT_FORMAT = 'gfm-2'
 
 /** A body's trailing "Links" section repeats the resource links the page lists on its own. */
 export function stripDuplicateLinksSection(content: string, hasSupplementalLinks: boolean): string {

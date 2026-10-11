@@ -38,7 +38,7 @@ describe('a listing body (#334)', () => {
   it('parses the body with the shared options when there is no tree', () => {
     const markup = renderToStaticMarkup(<WebsiteContentSection website={website} />)
     expect(markup).toContain('Parsed body')
-    // A GitHub-flavored table: remark-gfm is in LISTING_MARKDOWN_OPTIONS.
+    // A GitHub-flavored table: the GFM extensions are in LISTING_MARKDOWN_OPTIONS.
     expect(markup).toContain('<table class="w-full">')
     expect(markup).toBe(
       renderToStaticMarkup(
