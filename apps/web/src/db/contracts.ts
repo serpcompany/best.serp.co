@@ -219,10 +219,11 @@ export interface ListingDetail extends ListingSummary {
  * category (#260): then it is not found.
  */
 export interface UnpublishedListing {
-  /** Primary category slug when that category is still active. */
+  /**
+   * Primary category slug when that category is still active. The 410 page links it, by its name
+   * in the shell stats, only while its page renders (`renderingCategory`, #347).
+   */
   category: string | null
-  /** That category's display name, for the 410 page's link (#64). */
-  categoryName: string | null
   name: string
   slug: string
 }

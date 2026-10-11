@@ -89,7 +89,9 @@ const ROWS_READ_BUDGET: Record<CatalogQueryShape, number> = {
   'tag-name-order': 1_500, // the 335-listing tag: 994 (3 rows per member)
   'tag-stats': 20_000, // 8,383 (2 rows per membership), cached per epoch
   'taxonomy-redirect': 10, // a best page and its tag and category: 3
-  'unpublished-listing': 10, // a hit, in one category like all of #100's and #104's: 8
+  // A hit, in one category like all of #100's and #104's: 6, 8 before #372 dropped the category
+  // name's subquery. Kept at the 10 the other single-seek shapes have.
+  'unpublished-listing': 10,
   'unpublished-listing-status': 10 // worker-entry slug seek; not run by this suite
 }
 
