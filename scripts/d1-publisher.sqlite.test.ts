@@ -1816,6 +1816,277 @@ describe('listing-details-set in a row-level manifest (#340: a renamed product)'
   })
 })
 
+describe('listing-resources-set in a row-level manifest (#376: dead resource links)', () => {
+  const live = { checksum: beforeChecksum, version: 4 }
+  const rows = (operations: Record<string, unknown>[]) =>
+    manifestSchema.parse({
+      version: 1,
+      id: 'links',
+      concurrency: 'rows',
+      provenance: { actor: 'test@example.com', workflow: 'test/sqlite' },
+      operations
+    })
+  const install = { label: 'Install browser extension', url: 'https://serp.ly/old-slug' }
+  const repository = { label: 'GitHub repository', url: 'https://github.com/serpapps/deleted' }
+  const store = {
+    label: 'Chrome Web Store',
+    url: 'https://chromewebstore.google.com/detail/old-name/abcdefghijklmnopabcdefghijklmnop'
+  }
+  const current = [install, repository, store]
+  const renamedStore = {
+    ...store,
+    url: 'https://chromewebstore.google.com/detail/downloader-for-old/abcdefghijklmnopabcdefghijklmnop'
+  }
+  const fixed = [install, renamedStore]
+  const set = (resources: unknown[], extra: Record<string, unknown> = {}) => ({
+    action: 'listing-resources-set',
+    id: 'lst_sqlite_test',
+    slug: 'old-slug',
+    reason: 'The repository was deleted',
+    expected: current,
+    resources,
+    ...extra
+  })
+  const changedSince =
+    'the listing is not approved, or its slug or links changed since the manifest'
+  /** The seeded listing with `current` as its links. */
+  const linked = (): DatabaseSync => {
+    const db = database()
+    const insert = db.prepare(
+      'INSERT INTO listing_resource_links (listing_id,label,url,sort_order) VALUES (?,?,?,?)'
+    )
+    for (const [order, link] of current.entries())
+      insert.run('lst_sqlite_test', link.label, link.url, order)
+    return db
+  }
+  const links = (db: DatabaseSync, id = 'lst_sqlite_test') =>
+    db
+      .prepare(
+        'SELECT label,url,sort_order FROM listing_resource_links WHERE listing_id=? ORDER BY sort_order'
+      )
+      .all(id)
+  const state = (db: DatabaseSync) => ({
+    listing: db
+      .prepare(
+        "SELECT slug,status,is_active,checksum,updated_at FROM listings WHERE id='lst_sqlite_test'"
+      )
+      .get(),
+    links: links(db)
+  })
+  const publish = (db: DatabaseSync, operations: Record<string, unknown>[]) =>
+    executeInTestTransaction(db, buildPublicationPlan(rows(operations), 'links', now, live))
+  /** Asserts the batch was refused whole: the listing, its links, the version, and the log. */
+  const expectRefused = (db: DatabaseSync, before: ReturnType<typeof state>) => {
+    expect(state(db)).toEqual(before)
+    expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
+      version: 4
+    })
+    expect(db.prepare('SELECT COUNT(*) AS count FROM listing_events').get()).toEqual({ count: 0 })
+  }
+
+  it('replaces the links in order at any version, and logs the edit', () => {
+    const db = linked()
+    const before = state(db)
+    db.prepare('UPDATE publication_state SET version=9').run()
+    const publication = buildPublicationPlan(rows([set(fixed)]), 'links', now, {
+      ...live,
+      version: 9
+    })
+    expect(
+      publication.statements.flatMap(item => item.bindings).filter(b => typeof b === 'boolean')
+    ).toEqual([])
+    expect(publication.statements.flatMap(item => d1CompatViolations(item.query))).toEqual([])
+    executeInTestTransaction(db, publication)
+    // The dead link is gone, the renamed one replaced in place, and the order renumbered.
+    expect(links(db)).toEqual([
+      { ...install, sort_order: 0 },
+      { ...renamedStore, sort_order: 1 }
+    ])
+    // Published as before, with a new checksum (a stale revision is refused) and lastmod.
+    const after = state(db).listing as Record<string, unknown>
+    expect(after).toMatchObject({
+      slug: 'old-slug',
+      status: 'approved',
+      is_active: 1,
+      updated_at: now
+    })
+    expect(after.checksum).not.toBe((before.listing as Record<string, unknown>).checksum)
+    expect(
+      db.prepare('SELECT listing_id,event_type,detail,actor FROM listing_events').all()
+    ).toEqual([
+      {
+        listing_id: 'lst_sqlite_test',
+        event_type: 'edited',
+        detail: JSON.stringify({
+          fields: ['links'],
+          manifest: 'links',
+          reason: 'The repository was deleted'
+        }),
+        actor: 'test@example.com'
+      }
+    ])
+    expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
+      version: 10
+    })
+    expect(publication.affectedRoutes.split('\n')).toContain('/products/old-slug/')
+    // Applied once: the listing no longer has the expected links, so it is refused.
+    const applied = state(db)
+    expect(() =>
+      executeInTestTransaction(
+        db,
+        buildPublicationPlan(rows([set(fixed)]), 'again', now, {
+          checksum: publication.afterChecksum,
+          version: 10
+        })
+      )
+    ).toThrow(`listing-resources-set old-slug: ${changedSince}`)
+    expect(state(db)).toEqual(applied)
+  })
+
+  it('refuses the whole batch when the links changed since generation', () => {
+    const second = 'lst_sqlite_second'
+    for (const changed of [
+      { expected: [install, { ...repository, url: `${repository.url}/` }, store] },
+      { expected: [install, { ...repository, label: 'GitHub' }, store] },
+      { expected: [install, store, repository] },
+      { expected: [install, repository] },
+      { expected: [...current, { label: 'Extra', url: 'https://example.com/extra' }] },
+      { expected: [] },
+      { slug: 'new-slug' },
+      { id: 'lst_sqlite_missing' }
+    ]) {
+      const db = linked()
+      // A second listing's change in the same batch rolls back with it.
+      db.exec(`INSERT INTO listings (id,slug,name,description,website,status,published_at,source_kind,source_identity,checksum)
+        VALUES ('${second}','second','Second','d','https://second.example','draft','${now}','test','fixture','${'d'.repeat(64)}');
+        INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary) VALUES ('${second}',1,0,1);
+        UPDATE listings SET status='approved' WHERE id='${second}';`)
+      const before = state(db)
+      expect(
+        () =>
+          publish(db, [
+            set([install], { id: second, slug: 'second', expected: [] }),
+            set(fixed, changed)
+          ]),
+        JSON.stringify(changed)
+      ).toThrow(
+        `listing-resources-set ${'slug' in changed ? changed.slug : 'old-slug'}: ${changedSince}`
+      )
+      expectRefused(db, before)
+      expect(links(db, second)).toEqual([])
+    }
+  })
+
+  it.each(['paid_pending_review', 'changes_requested'])(
+    'refuses a listing whose own submission is %s',
+    status => {
+      const db = linked()
+      db.exec(`INSERT INTO listing_submissions (id,slug,name,description,website,content,
+        category_slug,logo_url,status,plan,paid_at,listing_id,published_checksum)
+      VALUES ('sub','example.com','Old','d','https://example.com/','c','seo','l',
+        '${status}','paid','${now}','lst_sqlite_test',
+        (SELECT checksum FROM listings WHERE id='lst_sqlite_test'))`)
+      const before = state(db)
+      expect(() => publish(db, [set(fixed)])).toThrow(
+        'listing-resources-set old-slug: its own submission is in review'
+      )
+      expectRefused(db, before)
+    }
+  )
+
+  it('refuses a listing whose own submission was rejected, which stays down and read-only', () => {
+    const db = linked()
+    db.exec(`UPDATE listings SET is_active=0 WHERE id='lst_sqlite_test';
+      INSERT INTO listing_submissions (id,slug,name,description,website,content,category_slug,
+        logo_url,status,plan,paid_at,listing_id,rejection_reason,rejection_category)
+      VALUES ('sub','example.com','Old','d','https://example.com/','c','seo','l','rejected',
+        'paid','${now}','lst_sqlite_test','No','prohibited')`)
+    const before = state(db)
+    expect(() => publish(db, [set(fixed)])).toThrow(
+      'listing-resources-set old-slug: its own submission was rejected'
+    )
+    expectRefused(db, before)
+  })
+
+  it.each(['draft', 'review', 'rejected'])('refuses a listing in %s', status => {
+    const db = linked()
+    db.exec(`UPDATE listings SET status='${status}' WHERE id='lst_sqlite_test'`)
+    const before = state(db)
+    expect(() => publish(db, [set(fixed)])).toThrow(
+      `listing-resources-set old-slug: ${changedSince}`
+    )
+    expectRefused(db, before)
+  })
+
+  it('replaces an unpublished listing’s links and leaves it unpublished', () => {
+    const db = linked()
+    db.exec("UPDATE listings SET is_active=0 WHERE id='lst_sqlite_test'")
+    publish(db, [set(fixed)])
+    expect(state(db).listing).toMatchObject({ status: 'approved', is_active: 0 })
+    expect(links(db)).toEqual(fixed.map((link, sort_order) => ({ ...link, sort_order })))
+  })
+
+  it('removes every link, and gives links to a listing that has none', () => {
+    const db = linked()
+    publish(db, [set([])])
+    expect(links(db)).toEqual([])
+    const published = db.prepare('SELECT version,checksum FROM publication_state WHERE id=1').get()
+    executeInTestTransaction(
+      db,
+      buildPublicationPlan(
+        rows([set(fixed, { expected: [] })]),
+        'relinked',
+        now,
+        published as { checksum: string; version: number }
+      )
+    )
+    expect(links(db)).toEqual(fixed.map((link, sort_order) => ({ ...link, sort_order })))
+  })
+
+  it('refuses no change, a duplicate, and a new link the owner edit would refuse', () => {
+    expect(() => rows([set(current)])).toThrow(/already has exactly these links/u)
+    expect(() => rows([set([install, install])])).toThrow(/Duplicate listing resource/u)
+    for (const url of [
+      'http://example.com/',
+      'https://localhost/',
+      'https://10.0.0.1/',
+      'ftp://example.com/',
+      'not a url',
+      ` https://example.com/`,
+      `https://example.com/${'a'.repeat(2048)}`
+    ])
+      expect(() => rows([set([install, { label: 'New', url }])]), url).toThrow(
+        /A new link needs a trimmed label/u
+      )
+    for (const label of ['L'.repeat(61), ' New', 'New '])
+      expect(() => rows([set([install, { label, url: 'https://example.com/' }])]), label).toThrow(
+        /A new link needs a trimmed label/u
+      )
+    expect(() => rows([set([install, { label: '', url: 'https://example.com/' }])])).toThrow()
+    // A link the listing keeps is compared as stored, even one a new link couldn't be.
+    const legacy = { label: 'L'.repeat(61), url: 'http://legacy.example/' }
+    expect(rows([set([legacy], { expected: [legacy, install] })]).operations[0]).toMatchObject({
+      resources: [legacy]
+    })
+    expect(() => rows([set(fixed, { reason: undefined })])).toThrow()
+    expect(() => rows([set(fixed, { links: fixed })])).toThrow()
+    // A listing is named once per manifest.
+    expect(() =>
+      rows([
+        set(fixed),
+        {
+          action: 'listing-details-set',
+          id: 'lst_sqlite_test',
+          slug: 'old-slug',
+          reason: 'Renamed',
+          expected: { name: 'Old', description: 'Description', website: 'https://example.com' },
+          details: { name: 'New' }
+        }
+      ])
+    ).toThrow(/Duplicate listing/u)
+  })
+})
+
 describe('listing-content-remove-suffix (#105: imported FAQ blocks move to the FAQs section)', () => {
   const body = 'Intro with an emoji 🚀 and more.'
   const suffix = '\n\n## FAQ\n\n### Is it free?\n\nYes.'

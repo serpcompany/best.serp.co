@@ -135,6 +135,30 @@ new checksum, so an admin edit or owner revision read before it is refused as st
 `edited` event, which `/admin` shows as "Details edited: name, description". An unpublished
 listing stays unpublished, its categories stay, and the long description is left as it is.
 
+## Resource links
+
+`listing-resources-set` (#376) replaces a listing's resource links, the "Links" section of its
+page, for links to deleted repositories or removed store items. It is row-level. It names the
+listing's `id` and `slug`, a `reason` for the activity log, `expected` (every current link, `label`
+and `url`, in order), and `resources` (the whole new list, in order; it may be empty).
+
+The batch is refused, with nothing written, when the slug or any link isn't exactly `expected`, in
+the same order, or the listing isn't approved, or its own submission is in review or stands
+rejected, as for [`listing-details-set`](#listing-details). Each refusal names the operation and its
+reason, for example `bad JSON path: 'listing-resources-set udemy-downloader: the listing is not
+approved, or its slug or links changed since the manifest'`.
+
+The manifest itself is refused when `resources` equals `expected` or repeats a link, or when a link
+not in `expected` breaks the owner edit's link rule: a trimmed label of 60 characters or fewer and a
+public https URL. A link the listing keeps is compared as stored, so an imported listing's longer
+list of links can still lose one.
+
+It sets `updated_at` (the sitemap `lastmod`), gives the listing a new checksum, so an owner revision
+or admin edit read before it is refused as stale instead of putting the old links back, and logs an
+`edited` event, which `/admin` shows as "Details edited: links". An unpublished listing stays
+unpublished. `pnpm catalog:downloader-links` writes #376's manifest from the link checks recorded in
+`d1/hygiene/2026-10-11-downloader-links.yaml`.
+
 ## Taxonomy operations
 
 These operations write #341's taxonomy: tags, best pages, and redirects of old taxonomy URLs

@@ -1522,6 +1522,61 @@ operations:
     ).rejects.toThrow(/the slug already redirects, or this would make a chain or a loop/u)
     expect(await live()).toEqual(redirected)
 
+    // #376: a listing's links compared as one JSON array and replaced, on D1 too.
+    await db.batch(
+      [
+        ['Install browser extension', 'https://serp.ly/moved'],
+        ['GitHub repository', 'https://github.com/serpapps/deleted']
+      ].map(([label, url], order) =>
+        db
+          .prepare(
+            'INSERT INTO listing_resource_links (listing_id,label,url,sort_order) VALUES (?,?,?,?)'
+          )
+          .bind('lst_moved_workerd', label, url, order)
+      )
+    )
+    const relink = (id: string) => `version: 1
+id: ${id}
+concurrency: rows
+provenance:
+  actor: test
+  workflow: test/workerd
+operations:
+  - action: listing-resources-set
+    id: lst_moved_workerd
+    slug: moved.example
+    reason: deleted repository
+    expected:
+      - { label: Install browser extension, url: "https://serp.ly/moved" }
+      - { label: GitHub repository, url: "https://github.com/serpapps/deleted" }
+    resources:
+      - { label: Install browser extension, url: "https://serp.ly/moved" }
+`
+    const unlinked = await live()
+    const relinked = relink('workerd-links-moved.example')
+    await executePublicationPlan(
+      db,
+      buildPublicationPlan(parseManifest(relinked), relinked, NOW, unlinked)
+    )
+    expect(
+      await first(
+        'SELECT json_group_array(url) AS urls FROM listing_resource_links WHERE listing_id=?',
+        'lst_moved_workerd'
+      )
+    ).toEqual({ urls: '["https://serp.ly/moved"]' })
+    const linkedAgain = await live()
+    expect(linkedAgain.version).toBe(unlinked.version + 1)
+    const twice = relink('workerd-links-again')
+    await expect(
+      executePublicationPlan(
+        db,
+        buildPublicationPlan(parseManifest(twice), twice, NOW, linkedAgain)
+      )
+    ).rejects.toThrow(
+      /bad JSON path: 'listing-resources-set moved\.example: the listing is not approved, or its slug or links changed since the manifest'/u
+    )
+    expect(await live()).toEqual(linkedAgain)
+
     // A listing whose website moved: the guard's malformed JSON rolls the whole batch back.
     const after = await live()
     const stale = manifest('lst_moved_workerd', 'moved.example', 'https://elsewhere.example/')

@@ -1,0 +1,947 @@
+# serpcompany/best.serp.co#376: every github.com/serpapps, Product Hunt, and Chrome Web Store
+# resource link on a live listing (the page's "Links" section), checked on 2026-10-11, and the live
+# listings that carry one. `pnpm catalog:downloader-links` (scripts/downloader-links-manifest.ts)
+# turns it into d1/publications/2026-10-11-downloader-links.yaml.
+#
+# links: each URL once, however many listings carry it.
+# - status: the first response to an unauthenticated GET with a browser user agent (no redirects
+#   followed); final: where the redirects end, when there are any; title: the store page's title.
+# - githubApi: `gh api repos/serpapps/<name>` as an org member. 404 means the repository is gone,
+#   not private: it isn't among the 91 repositories `gh api orgs/serpapps/repos` lists either, and
+#   no repository of the org has its product's name except the two replacements.
+# - verdict: ok (200, or GitHub's /releases/latest redirecting to the latest release's tag, by
+#   design); dead (404); renamed (the store item 301s to a new URL with the same item id, which
+#   answers 200); removed (the store item redirects to /detail/empty-title/<id>, a generic page
+#   whose title is "Chrome Web Store" and which names no item: inferred removed).
+# - replacement: the live repository a dead link moves to (#376's default: the two live repos).
+#
+# listings: every live listing (approved and active) with one of these links, and all of its links
+# in order, as staging and production both had them on 2026-10-11 (read-only queries; identical,
+# and equal to the v1 import's rows: no publication, admin edit, or revision has changed them).
+# Each manifest operation expects exactly these links, so a listing that changed since refuses
+# its batch with nothing written.
+issue: serpcompany/best.serp.co#376
+checkedAt: "2026-10-11"
+links:
+  - url: "https://chromewebstore.google.com/detail/circle-downloader/afjjgeafaiahjlcgnflgeojbjobglblg"
+    status: 301
+    final: { status: 200, url: "https://chromewebstore.google.com/detail/downloader-for-circle/afjjgeafaiahjlcgnflgeojbjobglblg", title: "Downloader for Circle" }
+    verdict: renamed
+  - url: "https://chromewebstore.google.com/detail/gohighlevel-downloader/lcnajelpdoefgoilcihnpkofabpafjgd"
+    status: 301
+    final: { status: 200, url: "https://chromewebstore.google.com/detail/downloader-for-gohighleve/lcnajelpdoefgoilcihnpkofabpafjgd", title: "Downloader for GoHighLevel" }
+    verdict: renamed
+  - url: "https://chromewebstore.google.com/detail/loom-video-downloader/oopljffmklejoikiemiedeangcchfmlf"
+    status: 301
+    final: { status: 200, url: "https://chromewebstore.google.com/detail/downloader-for-loom/oopljffmklejoikiemiedeangcchfmlf", title: "Downloader for Loom" }
+    verdict: renamed
+  - url: "https://chromewebstore.google.com/detail/skool-video-downloader-by/adjbknblejbhfmcefnhgkdboanoboimj"
+    status: 301
+    final: { status: 200, url: "https://chromewebstore.google.com/detail/downloader-for-skool/adjbknblejbhfmcefnhgkdboanoboimj", title: "Downloader for Skool" }
+    verdict: renamed
+  - url: "https://chromewebstore.google.com/detail/tiktok-downloader/apkldlbgpmenoilgjldmbkipidboplae"
+    status: 301
+    final: { status: 200, url: "https://chromewebstore.google.com/detail/empty-title/apkldlbgpmenoilgjldmbkipidboplae", title: "Chrome Web Store" }
+    verdict: removed
+  - url: "https://chromewebstore.google.com/detail/udemy-downloader/ecbbfcaojpjlnpeabmdmggbffdlghjjk"
+    status: 301
+    final: { status: 200, url: "https://chromewebstore.google.com/detail/empty-title/ecbbfcaojpjlnpeabmdmggbffdlghjjk", title: "Chrome Web Store" }
+    verdict: removed
+  - url: "https://chromewebstore.google.com/detail/vimeo-video-downloader/dhgiccbhamhpghhoaajjiikjlegbfhdj"
+    status: 200
+    title: "Vimeo Video Downloader"
+    verdict: ok
+  - url: "https://chromewebstore.google.com/detail/whop-video-downloader/obiiijgnmblffcopbdfpdlmbdkgmblgf"
+    status: 301
+    final: { status: 200, url: "https://chromewebstore.google.com/detail/downloader-for-whop/obiiijgnmblffcopbdfpdlmbdkgmblgf", title: "Downloader for Whop" }
+    verdict: renamed
+  - url: "https://chromewebstore.google.com/detail/wistia-video-downloader/enlffdifedcjihdhejdgbihipfehgibl"
+    status: 301
+    final: { status: 200, url: "https://chromewebstore.google.com/detail/downloader-for-wistia/enlffdifedcjihdhejdgbihipfehgibl", title: "Downloader for Wistia" }
+    verdict: renamed
+  - url: "https://github.com/serpapps/123movies-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/123movies-downloader/releases/latest"
+    status: 302
+    githubApi: 200
+    final: { status: 200, url: "https://github.com/serpapps/123movies-downloader/releases/tag/v4.0.4" }
+    verdict: ok
+  - url: "https://github.com/serpapps/adobe-stock-downloader"
+    status: 404
+    githubApi: 404
+    verdict: dead
+  - url: "https://github.com/serpapps/alamy-downloader"
+    status: 404
+    githubApi: 404
+    verdict: dead
+  - url: "https://github.com/serpapps/circle-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/circle-downloader/releases/latest"
+    status: 302
+    githubApi: 200
+    final: { status: 200, url: "https://github.com/serpapps/circle-downloader/releases/tag/v4.0.12" }
+    verdict: ok
+  - url: "https://github.com/serpapps/clientclub-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/clientclub-downloader/releases/latest"
+    status: 302
+    githubApi: 200
+    final: { status: 200, url: "https://github.com/serpapps/clientclub-downloader/releases/tag/v4.0.9" }
+    verdict: ok
+  - url: "https://github.com/serpapps/coursera-downloader"
+    status: 404
+    githubApi: 404
+    verdict: dead
+  - url: "https://github.com/serpapps/dailymotion-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/dailymotion-downloader/releases/latest"
+    status: 302
+    githubApi: 200
+    final: { status: 200, url: "https://github.com/serpapps/dailymotion-downloader/releases/tag/v4.0.7" }
+    verdict: ok
+  - url: "https://github.com/serpapps/deviantart-downloader"
+    status: 404
+    githubApi: 404
+    verdict: dead
+  - url: "https://github.com/serpapps/facebook-video-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/fansly-live-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/getty-images-downloader"
+    status: 404
+    githubApi: 404
+    verdict: dead
+  - url: "https://github.com/serpapps/gohighlevel-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/gohighlevel-downloader/releases/latest"
+    status: 302
+    githubApi: 200
+    final: { status: 200, url: "https://github.com/serpapps/gohighlevel-downloader/releases/tag/v4.0.14" }
+    verdict: ok
+  - url: "https://github.com/serpapps/gokollab-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/gokollab-downloader/releases/latest"
+    status: 302
+    githubApi: 200
+    final: { status: 200, url: "https://github.com/serpapps/gokollab-downloader/releases/tag/v4.0.8" }
+    verdict: ok
+  - url: "https://github.com/serpapps/hulu-downloader"
+    status: 404
+    githubApi: 404
+    verdict: dead
+  - url: "https://github.com/serpapps/instagram-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/internet-archive-downloader"
+    status: 404
+    githubApi: 404
+    verdict: dead
+  - url: "https://github.com/serpapps/justforfans-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/justforfans-downloader/releases/latest"
+    status: 302
+    githubApi: 200
+    final: { status: 200, url: "https://github.com/serpapps/justforfans-downloader/releases/tag/v4.0.12" }
+    verdict: ok
+  - url: "https://github.com/serpapps/kajabi-video-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/kajabi-video-downloader/releases/latest"
+    status: 302
+    githubApi: 200
+    final: { status: 200, url: "https://github.com/serpapps/kajabi-video-downloader/releases/tag/v4.0.11" }
+    verdict: ok
+  - url: "https://github.com/serpapps/linkedin-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/loom-video-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/m3u8-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/mindvalley-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/mindvalley-video-downloader/releases/latest"
+    status: 404
+    githubApi: 404
+    verdict: dead
+    replacement: { url: "https://github.com/serpapps/mindvalley-downloader/releases/latest", status: 302, final: { status: 200, url: "https://github.com/serpapps/mindvalley-downloader/releases/tag/v4.0.9" }, githubApi: 200 }
+  - url: "https://github.com/serpapps/moodle-downloader"
+    status: 404
+    githubApi: 404
+    verdict: dead
+  - url: "https://github.com/serpapps/netflix-downloader"
+    status: 404
+    githubApi: 404
+    verdict: dead
+  - url: "https://github.com/serpapps/nicovideo-downloader"
+    status: 404
+    githubApi: 404
+    verdict: dead
+  - url: "https://github.com/serpapps/onlyfans-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/onlyfans-downloader/releases/latest"
+    status: 302
+    githubApi: 200
+    final: { status: 200, url: "https://github.com/serpapps/onlyfans-downloader/releases/tag/v4.0.7" }
+    verdict: ok
+  - url: "https://github.com/serpapps/patreon-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/pexels-video-downloader"
+    status: 404
+    githubApi: 404
+    verdict: dead
+  - url: "https://github.com/serpapps/pinterest-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/podia-downloader"
+    status: 404
+    githubApi: 404
+    verdict: dead
+  - url: "https://github.com/serpapps/rawpixel-downloader"
+    status: 404
+    githubApi: 404
+    verdict: dead
+  - url: "https://github.com/serpapps/reddit-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/serp-video-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/skillshare-downloader"
+    status: 404
+    githubApi: 404
+    verdict: dead
+  - url: "https://github.com/serpapps/skool-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/snapchat-video-downloader"
+    status: 404
+    githubApi: 404
+    verdict: dead
+  - url: "https://github.com/serpapps/soundgasm-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/sprout-video-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/sprout-video-downloader/releases/latest"
+    status: 302
+    githubApi: 200
+    final: { status: 200, url: "https://github.com/serpapps/sprout-video-downloader/releases/tag/v4.0.8" }
+    verdict: ok
+  - url: "https://github.com/serpapps/teachable-video-downloader"
+    status: 404
+    githubApi: 404
+    verdict: dead
+  - url: "https://github.com/serpapps/tellatv-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/tellatv-downloader/releases/latest"
+    status: 302
+    githubApi: 200
+    final: { status: 200, url: "https://github.com/serpapps/tellatv-downloader/releases/tag/v4.0.9" }
+    verdict: ok
+  - url: "https://github.com/serpapps/terabox-downloader"
+    status: 404
+    githubApi: 404
+    verdict: dead
+  - url: "https://github.com/serpapps/thinkific-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/thumbnail-downloader"
+    status: 404
+    githubApi: 404
+    verdict: dead
+  - url: "https://github.com/serpapps/tiktok-video-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/twitch-video-downloader"
+    status: 404
+    githubApi: 404
+    verdict: dead
+  - url: "https://github.com/serpapps/twitter-video-downloader"
+    status: 404
+    githubApi: 404
+    verdict: dead
+    replacement: { url: "https://github.com/serpapps/twitter-x-downloader", status: 200, githubApi: 200 }
+  - url: "https://github.com/serpapps/udemy-video-downloader"
+    status: 404
+    githubApi: 404
+    verdict: dead
+  - url: "https://github.com/serpapps/unsplash-downloader"
+    status: 404
+    githubApi: 404
+    verdict: dead
+  - url: "https://github.com/serpapps/vectorstock-downloader"
+    status: 404
+    githubApi: 404
+    verdict: dead
+  - url: "https://github.com/serpapps/vimeo-video-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/whop-video-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/wistia-video-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://github.com/serpapps/youtube-downloader"
+    status: 200
+    githubApi: 200
+    verdict: ok
+  - url: "https://www.producthunt.com/products/loom-video-downloader"
+    status: 200
+    verdict: ok
+  - url: "https://www.producthunt.com/products/onlyfans-downloader-2"
+    status: 200
+    verdict: ok
+  - url: "https://www.producthunt.com/products/skool-com-downloader"
+    status: 200
+    verdict: ok
+  - url: "https://www.producthunt.com/products/sprout-video-downloader"
+    status: 200
+    verdict: ok
+  - url: "https://www.producthunt.com/products/vimeo-video-downloader"
+    status: 200
+    verdict: ok
+  - url: "https://www.producthunt.com/products/whop-video-downloader"
+    status: 404
+    verdict: dead
+listings:
+  - id: lst_ea0b04831ab8464683de0b48
+    slug: 123movies-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/123movies-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/123movies-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/123movies-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/123movies-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/123movies-Downloader-1258" }
+      - { label: "SERP", url: "https://serp.co/products/123movies-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/123movies-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/123movies-downloader/" }
+      - { label: "Latest Release", url: "https://github.com/serpapps/123movies-downloader/releases/latest" }
+  - id: lst_57c0a099d0d1a0e5a1f8fbe9
+    slug: adobe-stock-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/adobe-stock-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/adobe-stock-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/adobe-stock-downloader" }
+  - id: lst_1983b92989de86df79c41015
+    slug: alamy-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/alamy-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/alamy-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/alamy-downloader" }
+  - id: lst_b6e048caa6225e19e83fd73e
+    slug: circle-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/circle-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/circle-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/circle-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/circle-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Circle-Downloader-887" }
+      - { label: "SERP", url: "https://serp.co/products/circle-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/circle-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/circle-downloader/" }
+      - { label: "Latest Release", url: "https://github.com/serpapps/circle-downloader/releases/latest" }
+      - { label: "Chrome Web Store", url: "https://chromewebstore.google.com/detail/circle-downloader/afjjgeafaiahjlcgnflgeojbjobglblg" }
+  - id: lst_4b0f5192501e08f933de92c2
+    slug: clientclub-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/clientclub-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/clientclub-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/clientclub-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/clientclub-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/ClientClub-Downloader-1257" }
+      - { label: "SERP", url: "https://serp.co/products/clientclub-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/clientclub-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/clientclub-downloader/" }
+      - { label: "Latest Release", url: "https://github.com/serpapps/clientclub-downloader/releases/latest" }
+  - id: lst_144f637b71524d990eecf821
+    slug: coursera-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/coursera-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/coursera-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/coursera-downloader" }
+  - id: lst_d9e04a8dcf78e84867ea926e
+    slug: dailymotion-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/dailymotion-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/dailymotion-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/dailymotion-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/dailymotion-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Dailymotion-Downloader-1267" }
+      - { label: "SERP", url: "https://serp.co/products/dailymotion-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/dailymotion-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/dailymotion-downloader/" }
+      - { label: "Latest Release", url: "https://github.com/serpapps/dailymotion-downloader/releases/latest" }
+  - id: lst_d128222305e11fa10b86f156
+    slug: deviantart-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/deviantart-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/deviantart-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/deviantart-downloader" }
+  - id: lst_6848e48a02324d7854be5396
+    slug: facebook-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/facebook-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/facebook-video-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/facebook-video-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/facebook-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Facebook-Video-Downloader-1273" }
+      - { label: "SERP", url: "https://serp.co/products/facebook-video-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/facebook-video-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/facebook-video-downloader/" }
+  - id: lst_a18091d61a39a387973490b9
+    slug: facebook-video-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/facebook-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/facebook-video-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/facebook-video-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/facebook-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Facebook-Video-Downloader-1273" }
+      - { label: "SERP", url: "https://serp.co/products/facebook-video-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/facebook-video-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/facebook-video-downloader/" }
+  - id: lst_1b86c4f59960269639ff7a40
+    slug: fansly-live-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/fansly-live-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/fansly-live-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/fansly-live-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/fansly-live-downloader/" }
+      - { label: "SERP", url: "https://serp.co/products/fansly-live-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/fansly-live-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/fansly-live-downloader/" }
+  - id: lst_1e8275312d988f3e132ea204
+    slug: getty-images-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/getty-images-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/getty-images-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/getty-images-downloader" }
+  - id: lst_64c5f9c72f119b66d7aa77da
+    slug: gohighlevel-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/gohighlevel-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/gohighlevel-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/gohighlevel-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/gohighlevel-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Gohighlevel-Downloader-1276" }
+      - { label: "SERP", url: "https://serp.co/products/gohighlevel-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/gohighlevel-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/gohighlevel-downloader/" }
+      - { label: "Latest Release", url: "https://github.com/serpapps/gohighlevel-downloader/releases/latest" }
+      - { label: "Chrome Web Store", url: "https://chromewebstore.google.com/detail/gohighlevel-downloader/lcnajelpdoefgoilcihnpkofabpafjgd" }
+  - id: lst_8aca25e8fccf588bdcd53b1d
+    slug: gokollab-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/gokollab-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/gokollab-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/gokollab-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/gokollab-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Gokollab-Downloader-1277" }
+      - { label: "SERP", url: "https://serp.co/products/gokollab-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/gokollab-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/gokollab-downloader/" }
+      - { label: "Latest Release", url: "https://github.com/serpapps/gokollab-downloader/releases/latest" }
+  - id: lst_7916d089511792dc58592e2e
+    slug: hulu-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/hulu-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/hulu-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/hulu-downloader" }
+  - id: lst_093c329a3bf0eef710824272
+    slug: instagram-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/instagram-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/instagram-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/instagram-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/instagram-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Instagram-Video-Downloader-1280" }
+      - { label: "SERP", url: "https://serp.co/products/instagram-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/instagram-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/instagram-downloader/" }
+  - id: lst_0064fcc841ff036c5a8a278b
+    slug: internet-archive-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/internet-archive-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/internet-archive-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/internet-archive-downloader" }
+  - id: lst_3966e02ea1a078b6a092fbfd
+    slug: justforfans-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/justforfans-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/justforfans-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/justforfans-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/justforfans-downloader/" }
+      - { label: "SERP", url: "https://serp.co/products/justforfans-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/justforfans-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/justforfans-downloader/" }
+      - { label: "Latest Release", url: "https://github.com/serpapps/justforfans-downloader/releases/latest" }
+  - id: lst_3601e4f5ecdb41c38f4af867
+    slug: kajabi-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/kajabi-video-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/kajabi-video-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/kajabi-video-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/kajabi-video-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Kajabi-Video-Downloader-1210" }
+      - { label: "SERP", url: "https://serp.co/products/kajabi-video-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/kajabi-video-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/kajabi-video-downloader/" }
+      - { label: "Latest Release", url: "https://github.com/serpapps/kajabi-video-downloader/releases/latest" }
+  - id: lst_74e0e74369d59ac99e0e8ab7
+    slug: kajabi-video-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/kajabi-video-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/kajabi-video-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/kajabi-video-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/kajabi-video-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Kajabi-Video-Downloader-1210" }
+      - { label: "SERP", url: "https://serp.co/products/kajabi-video-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/kajabi-video-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/kajabi-video-downloader/" }
+      - { label: "Latest Release", url: "https://github.com/serpapps/kajabi-video-downloader/releases/latest" }
+  - id: lst_ffeec6e5afe7fd8dbcecce98
+    slug: linkedin-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/linkedin-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/linkedin-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/linkedin-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/linkedin-downloader/" }
+      - { label: "SERP", url: "https://serp.co/products/linkedin-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/linkedin-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/linkedin-downloader/" }
+  - id: lst_b5e8cf522bb20bb82d019ea7
+    slug: loom-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/loom-video-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/loom-video-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/loom-video-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/loom-video-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Loom-Video-Downloader-883" }
+      - { label: "SERP", url: "https://serp.co/products/loom-video-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/loom-video-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/loom-video-downloader/" }
+      - { label: "Product Hunt", url: "https://www.producthunt.com/products/loom-video-downloader" }
+      - { label: "Chrome Web Store", url: "https://chromewebstore.google.com/detail/loom-video-downloader/oopljffmklejoikiemiedeangcchfmlf" }
+  - id: lst_bfa3d572078554563e4b9d6c
+    slug: loom-video-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/loom-video-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/loom-video-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/loom-video-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/loom-video-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Loom-Video-Downloader-883" }
+      - { label: "SERP", url: "https://serp.co/products/loom-video-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/loom-video-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/loom-video-downloader/" }
+      - { label: "Product Hunt", url: "https://www.producthunt.com/products/loom-video-downloader" }
+      - { label: "Chrome Web Store", url: "https://chromewebstore.google.com/detail/loom-video-downloader/oopljffmklejoikiemiedeangcchfmlf" }
+  - id: lst_cef8fce97410ddc48129f680
+    slug: m3u8-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/m3u8-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/m3u8-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/m3u8-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/m3u8-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/M3u8-Downloader-1283" }
+      - { label: "SERP", url: "https://serp.co/products/m3u8-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/m3u8-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/m3u8-downloader/" }
+  - id: lst_3229dac60e335ad34f250181
+    slug: mindvalley-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/mindvalley-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/mindvalley-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/mindvalley-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/mindvalley-downloader/" }
+      - { label: "SERP", url: "https://serp.co/products/mindvalley-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/mindvalley-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/mindvalley-downloader/" }
+      - { label: "Latest Release", url: "https://github.com/serpapps/mindvalley-video-downloader/releases/latest" }
+  - id: lst_dd5782afd06d1c32fbfac989
+    slug: moodle-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/moodle-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/moodle-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/moodle-downloader" }
+  - id: lst_890185225bb932ac835ecc31
+    slug: netflix-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/netflix-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/netflix-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/netflix-downloader" }
+  - id: lst_e28edab5e2315d59ed1cda83
+    slug: nicovideo-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/nicovideo-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/nicovideo-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/nicovideo-downloader" }
+  - id: lst_4251455a4d740603c89dd58a
+    slug: onlyfans-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/onlyfans-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/onlyfans-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/onlyfans-downloader/" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/onlyfans-downloader" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Onlyfans-Downloader-886" }
+      - { label: "SERP", url: "https://serp.co/products/onlyfans-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/onlyfans-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/onlyfans-downloader/" }
+      - { label: "Latest Release", url: "https://github.com/serpapps/onlyfans-downloader/releases/latest" }
+      - { label: "Firefox Store", url: "https://addons.mozilla.org/en-US/firefox/addon/onlyfans-video-downloader/" }
+      - { label: "Open Collective", url: "https://opencollective.com/serpapps/projects/onlyfans-bulk-downloader" }
+      - { label: "Reddit", url: "https://www.reddit.com/r/serpdownloaders/comments/1okjpfr/onlyfans_downloader_browser_extension_chrome/" }
+      - { label: "Product Hunt", url: "https://www.producthunt.com/products/onlyfans-downloader-2" }
+  - id: lst_1fd5fd08aa68460a8accf27a
+    slug: patreon-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/patreon-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/patreon-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/patreon-downloader" }
+  - id: lst_306bb8afe41d79e1f5de3836
+    slug: pexels-video-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/pexels-video-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/pexels-video-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/pexels-video-downloader" }
+  - id: lst_06c324c136fbbe04cda04bcb
+    slug: pinterest-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/pinterest-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/pinterest-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/pinterest-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/pinterest-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Pinterest-Downloader-1289" }
+      - { label: "SERP", url: "https://serp.co/products/pinterest-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/pinterest-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/pinterest-downloader/" }
+  - id: lst_36cab7ecb5f76ab812932b37
+    slug: podia-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/podia-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/podia-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/podia-downloader" }
+  - id: lst_06785630fed8a53ca1841695
+    slug: rawpixel-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/rawpixel-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/rawpixel-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/rawpixel-downloader" }
+  - id: lst_31ccb57efcd0e48b95a659b2
+    slug: reddit-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/reddit-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/reddit-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/reddit-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/reddit-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Reddit-Video-Downloader-1292" }
+      - { label: "SERP", url: "https://serp.co/products/reddit-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/reddit-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/reddit-downloader/" }
+  - id: lst_92706ab1980a42e7172f7642
+    slug: serp-video-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/serp-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/serp-video-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/serp-video-downloader" }
+  - id: lst_48e170d8e92f5471119caba7
+    slug: skillshare-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/skillshare-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/skillshare-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/skillshare-downloader" }
+  - id: lst_2d97c5bf77ddd52e691d2826
+    slug: skool-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/skool-video-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/skool-video-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/skool-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/skool-video-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Skool-Video-Downloader-882" }
+      - { label: "SERP", url: "https://serp.co/products/skool-video-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/skool-video-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/skool-video-downloader/" }
+      - { label: "Product Hunt", url: "https://www.producthunt.com/products/skool-com-downloader" }
+      - { label: "Chrome Web Store", url: "https://chromewebstore.google.com/detail/skool-video-downloader-by/adjbknblejbhfmcefnhgkdboanoboimj" }
+  - id: lst_7df4054ba79c031fe5c35a43
+    slug: skool-video-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/skool-video-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/skool-video-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/skool-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/skool-video-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Skool-Video-Downloader-882" }
+      - { label: "SERP", url: "https://serp.co/products/skool-video-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/skool-video-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/skool-video-downloader/" }
+      - { label: "Product Hunt", url: "https://www.producthunt.com/products/skool-com-downloader" }
+      - { label: "Chrome Web Store", url: "https://chromewebstore.google.com/detail/skool-video-downloader-by/adjbknblejbhfmcefnhgkdboanoboimj" }
+  - id: lst_96dddd16b0b5c776aa9585dd
+    slug: snapchat-video-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/snapchat-video-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/snapchat-video-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/snapchat-video-downloader" }
+  - id: lst_be200da7aa284c43afa03b02
+    slug: soundgasm-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/soundgasm-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/soundgasm-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/soundgasm-downloader" }
+  - id: lst_8950abff1c7315b2a05ed3d4
+    slug: sprout-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/sprout-video-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/sprout-video-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/sprout-video-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/sprout-video-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Sprout-Video-Downloader-893" }
+      - { label: "SERP", url: "https://serp.co/products/sprout-video-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/sprout-video-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/sprout-video-downloader/" }
+      - { label: "Latest Release", url: "https://github.com/serpapps/sprout-video-downloader/releases/latest" }
+      - { label: "Reddit", url: "https://www.reddit.com/r/serpdownloaders/comments/1oekx0x/sprout_video_downloader/" }
+      - { label: "Product Hunt", url: "https://www.producthunt.com/products/sprout-video-downloader" }
+      - { label: "Firefox Add-ons", url: "https://addons.mozilla.org/en-US/firefox/addon/sprout-video-downloader/" }
+  - id: lst_8220983e1c99a496fc5b4fd3
+    slug: sprout-video-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/sprout-video-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/sprout-video-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/sprout-video-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/sprout-video-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Sprout-Video-Downloader-893" }
+      - { label: "SERP", url: "https://serp.co/products/sprout-video-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/sprout-video-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/sprout-video-downloader/" }
+      - { label: "Latest Release", url: "https://github.com/serpapps/sprout-video-downloader/releases/latest" }
+      - { label: "Reddit", url: "https://www.reddit.com/r/serpdownloaders/comments/1oekx0x/sprout_video_downloader/" }
+      - { label: "Product Hunt", url: "https://www.producthunt.com/products/sprout-video-downloader" }
+      - { label: "Firefox Add-ons", url: "https://addons.mozilla.org/en-US/firefox/addon/sprout-video-downloader/" }
+  - id: lst_6b11053b27225043df32ffbf
+    slug: teachable-video-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/teachable-video-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/teachable-video-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/teachable-video-downloader" }
+  - id: lst_2eb70f2c088c9106dd5452bc
+    slug: tellatv-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/tellatv-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/tellatv-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/tellatv-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/tellatv-downloader/" }
+      - { label: "SERP", url: "https://serp.co/products/tellatv-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/tellatv-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/tellatv-downloader/" }
+      - { label: "Latest Release", url: "https://github.com/serpapps/tellatv-downloader/releases/latest" }
+  - id: lst_e77b0ef6719c2e91713fe56c
+    slug: terabox-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/terabox-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/terabox-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/terabox-downloader" }
+  - id: lst_c7a578768511cf9c68baca0a
+    slug: thinkific-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/thinkific-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/thinkific-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/thinkific-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/thinkific-downloader/" }
+      - { label: "SERP", url: "https://serp.co/products/thinkific-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/thinkific-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/thinkific-downloader/" }
+  - id: lst_9952c3387802b77bab58bc34
+    slug: thumbnail-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/thumbnail-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/thumbnail-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/thumbnail-downloader" }
+  - id: lst_939891a6494949693bb712ff
+    slug: tiktok-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/tiktok-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/tiktok-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/tiktok-video-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/tiktok-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Tiktok-Downloader-1301" }
+      - { label: "SERP", url: "https://serp.co/products/tiktok-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/tiktok-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/tiktok-downloader/" }
+      - { label: "Chrome Web Store", url: "https://chromewebstore.google.com/detail/tiktok-downloader/apkldlbgpmenoilgjldmbkipidboplae" }
+  - id: lst_a97de07030551e1fdfc4b467
+    slug: twitch-video-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/twitch-video-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/twitch-video-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/twitch-video-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/twitch-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Twitch-Video-Downloader-1304" }
+      - { label: "SERP", url: "https://serp.co/products/twitch-video-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/twitch-video-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/twitch-video-downloader/" }
+  - id: lst_34b9d549c34b75076ae98e93
+    slug: twitter-x-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/twitter-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/twitter-video-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/twitter-video-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/twitter-x-downloader/" }
+      - { label: "SERP", url: "https://serp.co/products/twitter-x-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/twitter-x-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/twitter-x-downloader/" }
+  - id: lst_7ef2560bf800c58122f12fa0
+    slug: udemy-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/udemy-video-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/udemy-video-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/udemy-video-downloader" }
+      - { label: "Chrome Web Store", url: "https://chromewebstore.google.com/detail/udemy-downloader/ecbbfcaojpjlnpeabmdmggbffdlghjjk" }
+  - id: lst_5260439100496f0ee08de2f2
+    slug: unsplash-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/unsplash-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/unsplash-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/unsplash-downloader" }
+  - id: lst_af3fd94beeada1db64f89c98
+    slug: vectorstock-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/vectorstock-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/vectorstock-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/vectorstock-downloader" }
+  - id: lst_23fc568c5d83d33a8e1ff8b8
+    slug: vimeo-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/vimeo-video-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/vimeo-video-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/vimeo-video-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/vimeo-video-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Vimeo-Video-Downloader-879" }
+      - { label: "SERP", url: "https://serp.co/products/vimeo-video-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/vimeo-video-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/vimeo-video-downloader/" }
+      - { label: "Reddit", url: "https://www.reddit.com/r/serpdownloaders/comments/1oexd2g/vimeo_video_downloader/" }
+      - { label: "Product Hunt", url: "https://www.producthunt.com/products/vimeo-video-downloader" }
+      - { label: "Chrome Web Store", url: "https://chromewebstore.google.com/detail/vimeo-video-downloader/dhgiccbhamhpghhoaajjiikjlegbfhdj" }
+  - id: lst_57e20ae1ccd797430b80911e
+    slug: vimeo-video-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/vimeo-video-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/vimeo-video-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/vimeo-video-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/vimeo-video-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Vimeo-Video-Downloader-879" }
+      - { label: "SERP", url: "https://serp.co/products/vimeo-video-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/vimeo-video-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/vimeo-video-downloader/" }
+      - { label: "Reddit", url: "https://www.reddit.com/r/serpdownloaders/comments/1oexd2g/vimeo_video_downloader/" }
+      - { label: "Product Hunt", url: "https://www.producthunt.com/products/vimeo-video-downloader" }
+      - { label: "Chrome Web Store", url: "https://chromewebstore.google.com/detail/vimeo-video-downloader/dhgiccbhamhpghhoaajjiikjlegbfhdj" }
+  - id: lst_eb9f9e91aa46a4e661aeb2e4
+    slug: whop-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/whop-video-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/whop-video-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/whop-video-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/whop-video-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Whop-Video-Downloader-881" }
+      - { label: "SERP", url: "https://serp.co/products/whop-video-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/whop-video-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/whop-video-downloader/" }
+      - { label: "Product Hunt", url: "https://www.producthunt.com/products/whop-video-downloader" }
+      - { label: "Chrome Web Store", url: "https://chromewebstore.google.com/detail/whop-video-downloader/obiiijgnmblffcopbdfpdlmbdkgmblgf" }
+      - { label: "Firefox Add-ons", url: "https://addons.mozilla.org/en-US/firefox/addon/whop-video-downloader/" }
+  - id: lst_834a96e6f8c01222d90d0390
+    slug: whop-video-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/whop-video-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/whop-video-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/whop-video-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/whop-video-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Whop-Video-Downloader-881" }
+      - { label: "SERP", url: "https://serp.co/products/whop-video-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/whop-video-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/whop-video-downloader/" }
+      - { label: "Product Hunt", url: "https://www.producthunt.com/products/whop-video-downloader" }
+      - { label: "Chrome Web Store", url: "https://chromewebstore.google.com/detail/whop-video-downloader/obiiijgnmblffcopbdfpdlmbdkgmblgf" }
+      - { label: "Firefox Add-ons", url: "https://addons.mozilla.org/en-US/firefox/addon/whop-video-downloader/" }
+  - id: lst_dd8fb0cfe5d5d2e3524ebf0f
+    slug: wistia-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/wistia-video-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/wistia-video-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/wistia-video-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/wistia-video-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Wistia-Video-Downloader-1308" }
+      - { label: "SERP", url: "https://serp.co/products/wistia-video-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/wistia-video-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/wistia-video-downloader/" }
+      - { label: "Chrome Web Store", url: "https://chromewebstore.google.com/detail/wistia-video-downloader/enlffdifedcjihdhejdgbihipfehgibl" }
+  - id: lst_5fd233158f7997c59a6dac65
+    slug: wistia-video-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/wistia-video-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/wistia-video-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/wistia-video-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/wistia-video-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Wistia-Video-Downloader-1308" }
+      - { label: "SERP", url: "https://serp.co/products/wistia-video-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/wistia-video-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/wistia-video-downloader/" }
+      - { label: "Chrome Web Store", url: "https://chromewebstore.google.com/detail/wistia-video-downloader/enlffdifedcjihdhejdgbihipfehgibl" }
+  - id: lst_5c78bbdb78f3fa13970399c1
+    slug: youtube-downloader
+    links:
+      - { label: "Install browser extension", url: "https://serp.ly/youtube-downloader" }
+      - { label: "SERP Apps", url: "https://apps.serp.co/youtube-downloader" }
+      - { label: "GitHub repository", url: "https://github.com/serpapps/youtube-downloader" }
+      - { label: "SERP Extensions", url: "https://extensions.serp.co/extensions/serp/youtube-downloader/" }
+      - { label: "ExtensionHub", url: "https://www.extensionhub.io/extensions/Youtube-Downloader-884" }
+      - { label: "SERP", url: "https://serp.co/products/youtube-downloader/reviews/" }
+      - { label: "SERP AI", url: "https://serp.ai/products/youtube-downloader/reviews/" }
+      - { label: "Browser Extensions", url: "https://browserextensions.io/products/youtube-downloader/" }
