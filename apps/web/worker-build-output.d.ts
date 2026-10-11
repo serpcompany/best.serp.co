@@ -13,6 +13,9 @@ export default openNextWorker
 /** Next's `.next/routes-manifest.json`; `configRedirectPatterns` validates its shape. */
 export const routesManifest: unknown
 
+/** The build's Sentry DSN and commit (`.open-next/worker-sentry.json`, #210); unset stays unset. */
+export const workerSentryBuild: { commit?: string; dsn?: string }
+
 // OpenNext's Durable Object classes, which the Worker must export by name.
 export const BucketCachePurge: unknown
 export const DOQueueHandler: unknown

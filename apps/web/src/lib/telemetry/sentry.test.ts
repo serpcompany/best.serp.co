@@ -34,6 +34,26 @@ describe('Sentry settings (#48)', () => {
     expect(Object.keys(options)).not.toContain('replaysSessionSampleRate')
   })
 
+  it('takes the DSN and release from the build the Worker entry recorded (#210)', () => {
+    vi.stubEnv('NEXT_PUBLIC_SENTRY_DSN', '')
+    vi.stubEnv('NEXT_PUBLIC_SENTRY_RELEASE', '')
+    expect(
+      sentryOptions(() => 'production', {
+        commit: 'abc1234',
+        dsn: 'https://public@o1.ingest.sentry.io/2'
+      })
+    ).toMatchObject({
+      dsn: 'https://public@o1.ingest.sentry.io/2',
+      enabled: true,
+      release: 'best-serp-co@abc1234'
+    })
+    expect(sentryOptions(() => 'production', {})).toMatchObject({
+      dsn: undefined,
+      enabled: false,
+      release: undefined
+    })
+  })
+
   it('sets the environment on each event when it is sent', () => {
     let environment: 'local' | 'production' = 'local'
     const options = sentryOptions(() => environment)
