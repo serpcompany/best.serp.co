@@ -1,8 +1,8 @@
 /**
  * The billing configuration of the admin panel suite's Worker (`admin-fixture.ts`), which the
  * orders suite (`billing.spec.ts`, #68) shares instead of starting a Worker of its own: every
- * preview Worker costs the CI runner about 1.5–2.5 GB of memory, and a ninth one exhausted it
- * (#111, run 37535200552). Orders are on everywhere (`features.orders`, #133); this gives a
+ * preview Worker costs the CI runner about 2.5 GB of memory, so each Playwright run starts at
+ * most four (#111, #393). Orders are on everywhere (`features.orders`, #133); this gives a
  * Worker what staging and production have, the provider's secrets, as the suite's own test-mode
  * values (never real ones), with billing talking to the suite's mocked Stripe API on 127.0.0.1
  * (`LOCAL_STRIPE_MOCK_PORT`). The badge program suite's Worker takes it too, because the hourly

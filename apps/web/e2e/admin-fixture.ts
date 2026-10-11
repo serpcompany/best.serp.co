@@ -13,10 +13,10 @@ import { type SyncPoster, startSyncPoster } from './sync-post'
 
 /**
  * The admin panel suite (serpcompany/best.serp.co#64) runs on its own local Worker with its own
- * D1, which `playwright.config.ts` starts from the already-built Worker: the suite publishes and
- * unpublishes listings, which would change the seeded catalog the smoke suite counts exactly.
- * Helpers here run SQL on that D1, seed fixture submissions, and sign in a fresh admin. Never
- * used against a deployed Worker.
+ * D1, which `playwright.suites.config.ts` starts from the already-built Worker: the suite
+ * publishes and unpublishes listings, which would change the seeded catalog the smoke suite
+ * counts exactly. Helpers here run SQL on that D1, seed fixture submissions, and sign in a fresh
+ * admin. Never used against a deployed Worker.
  */
 
 const playwrightPort = Number(process.env.PLAYWRIGHT_PORT ?? 3100)

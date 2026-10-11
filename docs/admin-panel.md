@@ -200,5 +200,5 @@ plan builder and read on Wrangler-local D1), and `apps/web/e2e/admin-panel.spec.
 (Playwright: the gate, approve, request changes, reject, allow resubmission, unpublish with 410
 and republish, a redirected duplicate's 308 (#338), the Tags field (#341), the allowlist, and a
 replay of each decision). The suite runs on its own local Worker and empty D1 (`PLAYWRIGHT_PORT` + 3, started by
-`playwright.config.ts` from the same build), because it publishes listings and the smoke suite
+`playwright.suites.config.ts` from the same build), because it publishes listings and the smoke suite
 counts the fixture seed's listings exactly.
