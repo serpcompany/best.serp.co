@@ -122,14 +122,16 @@ checks the same way as the ones above and expect no rows:
 
 1. **No submission in review** and **no owner revision open**, the two checks above, for the same
    reasons: a move refuses the first and gives the listing a new checksum.
-2. **Nothing in flight names Other.** Once Other retires, a submission or revision that names it
-   can't go live: a paid draft fails at payment. Approve each in `/admin` with a hub, or reject it:
+2. **Nothing in flight names Other**, before `-01-removals` and again right before `-03-retire`:
+   Other stays selectable on `/submit` until `-03` publishes. Once it retires, a submission or
+   revision that names it can't go live: a paid draft fails at payment. Approve each in `/admin`
+   with a hub, or reject it:
 
    ```sql
    SELECT 'submission' AS kind, id, slug, status FROM listing_submissions WHERE category_slug='other' AND status IN ('draft','pending_badge','verified','paid_pending_review','changes_requested') UNION ALL SELECT 'revision', r.id, l.slug, r.status FROM listing_revisions r JOIN listings l ON l.id=r.listing_id WHERE r.category_slug='other' AND r.status IN ('pending_review','changes_requested') ORDER BY 1, 3
    ```
 
-3. **Before `-03-retire`: nothing filed under Other that `category-unpublish` refuses**, a live
+3. **Before `-03-retire`, with check 2: nothing filed under Other that `category-unpublish` refuses**, a live
    listing or a slug redirect source. A listing approved into Other since the inventory would show
    here: file it under its hub first.
 

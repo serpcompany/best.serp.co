@@ -18,6 +18,7 @@ import {
   otherRetirementIds,
   otherRetirementInputManifests,
   otherRetirementPaths,
+  parseRetirementArgs,
   planOtherRetirement,
   RETIRE_REASONS,
   type ReplayedCatalog,
@@ -370,6 +371,27 @@ describe('the Other retirement generator (#351)', () => {
   })
 })
 
+describe("the generator's command line (#351 review)", () => {
+  it('parses the commands before acting, and refuses anything else with the usage', () => {
+    expect(parseRetirementArgs([])).toEqual({ command: 'generate' })
+    expect(parseRetirementArgs(['--'])).toEqual({ command: 'generate' })
+    expect(parseRetirementArgs(['--', 'inventory'])).toEqual({ command: 'inventory', check: false })
+    expect(parseRetirementArgs(['inventory', '--check'])).toEqual({
+      command: 'inventory',
+      check: true
+    })
+    // A mistyped flag never rewrites the inventory with the old checks as if refreshed.
+    expect(() => parseRetirementArgs(['inventory', '--chek'])).toThrow(
+      /Unexpected argument --chek for inventory\. Usage: pnpm catalog:other-retirement/u
+    )
+    expect(() => parseRetirementArgs(['inventory', '--check', '--check'])).toThrow(
+      /Unexpected argument --check/u
+    )
+    expect(() => parseRetirementArgs(['--check'])).toThrow(/Unknown command --check\. Usage/u)
+    expect(() => parseRetirementArgs(['manifests'])).toThrow(/Unknown command manifests/u)
+  })
+})
+
 // ---------------------------------------------------------------------------------------------
 // Replays: the generator's manifests on a database, then #351's invariants.
 
@@ -659,6 +681,47 @@ describe('the Other retirement manifests replayed (#351)', () => {
           ]
         })
       )
+      // The owner's in-flight check stops the run on a submission or revision that names Other:
+      // one couldn't go live once Other retires.
+      const inFlight = retirementChecks('other').inFlight
+      expect(all(db, inFlight)).toEqual([])
+      const submission = all<{ id: string; slug: string; status: string }>(
+        db,
+        "SELECT id, slug, status FROM listing_submissions WHERE status IN ('draft','pending_badge','verified','paid_pending_review','changes_requested') ORDER BY id LIMIT 1"
+      )[0]
+      const revision = all<{ id: string; slug: string; status: string }>(
+        db,
+        "SELECT r.id, l.slug, r.status FROM listing_revisions r JOIN listings l ON l.id=r.listing_id WHERE r.status IN ('pending_review','changes_requested') ORDER BY r.id LIMIT 1"
+      )[0]
+      expect(submission).toBeDefined()
+      expect(revision).toBeDefined()
+      const named = (table: string, rowId: string | undefined, slug: string | null) =>
+        db.prepare(`UPDATE ${table} SET category_slug=? WHERE id=?`).run(slug, rowId ?? '')
+      const before = {
+        submission: all<{ category_slug: string | null }>(
+          db,
+          'SELECT category_slug FROM listing_submissions WHERE id=?',
+          submission?.id ?? ''
+        )[0]?.category_slug,
+        revision: all<{ category_slug: string | null }>(
+          db,
+          'SELECT category_slug FROM listing_revisions WHERE id=?',
+          revision?.id ?? ''
+        )[0]?.category_slug
+      }
+      named('listing_submissions', submission?.id, 'other')
+      named('listing_revisions', revision?.id, 'other')
+      expect(all(db, inFlight)).toEqual(
+        [
+          { kind: 'revision', ...revision },
+          { kind: 'submission', ...submission }
+        ].sort((a, b) => (a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : a.slug < b.slug ? -1 : 1))
+      )
+      // Resolved (here, named back to their own categories), the check is empty again.
+      named('listing_submissions', submission?.id, before.submission ?? null)
+      named('listing_revisions', revision?.id, before.revision ?? null)
+      expect(all(db, inFlight)).toEqual([])
+
       const { mapping, plan } = retire(db, 'other', ['design-tools', 'developer-tools'])
       expect(
         plan.moves.some(move => !move.live && plan.removals.every(r => r.id !== move.id))
@@ -711,9 +774,9 @@ describe('the committed Other retirement (#351)', () => {
     expect(mapping.listings).toHaveLength(141)
     expect(mapping.unpublished).toHaveLength(584)
     expect(mapping.leftInOther?.map(entry => entry.slug)).toEqual(['imgnai.com'])
-    expect(plan.removals).toHaveLength(46)
+    expect(plan.removals).toHaveLength(48)
     expect(plan.moves).toHaveLength(725)
-    expect(plan.moves.filter(move => move.live)).toHaveLength(95)
+    expect(plan.moves.filter(move => move.live)).toHaveLength(93)
     expect(plan.slugRedirects).toEqual([
       {
         from: { id: 'lst_07d139284ae444577f159706', slug: 'notion.com' },
@@ -740,7 +803,7 @@ describe('the committed Other retirement (#351)', () => {
         retireKinds.map(kind => [kind, plan.removals.filter(entry => entry.kind === kind).length])
       )
     ).toEqual({
-      dead: 12,
+      dead: 14,
       hijacked: 2,
       'not-a-product': 21,
       spam: 4,
@@ -762,7 +825,7 @@ describe('the committed Other retirement (#351)', () => {
         removal.slug
       ).toBe(true)
     // The counts are what the taxonomy left, less the retirements, plus the moves.
-    expect([...plan.hubCounts.values()].reduce((sum, count) => sum + count, 0)).toBe(2544 - 46)
+    expect([...plan.hubCounts.values()].reduce((sum, count) => sum + count, 0)).toBe(2544 - 48)
     expect(plan.hubCounts.get('other') ?? 0).toBe(0)
   })
 

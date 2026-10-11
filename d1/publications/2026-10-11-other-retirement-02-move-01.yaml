@@ -1,5 +1,5 @@
 # serpcompany/best.serp.co#351 (#341 step 10, phase 2 of 3): batch 01, 179 listings filed under other
-# (autoportrait.ai to everyprompt.com), 21 of them staying live. Each is filed under its hub alone
+# (autoportrait.ai to everyprompt.com), 20 of them staying live. Each is filed under its hub alone
 # (listing-categories-set), and a live one gets its tags (listing-tags-set, expecting none). Unpublished
 # listings are re-filed too, so their 410 stays a 410 when other retires. Publish in order, after -01.
 # A listing keeps its batch when the manifests are regenerated.
@@ -228,12 +228,6 @@ operations:
       - other
     categories:
       - chatbots-agents
-  - action: listing-tags-set
-    id: lst_5e25a65c76cf4f72196baa81
-    slug: blog.rossintelligence.com
-    expected: []
-    tags:
-      - ai-lawyer
   - action: listing-categories-set
     id: lst_5e25a65c76cf4f72196baa81
     slug: blog.rossintelligence.com

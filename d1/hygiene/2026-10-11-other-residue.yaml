@@ -38,9 +38,11 @@
 #                                      already categorized and #349 tagged (notion.ai, plusai.com), so nothing live
 #                                      moves.
 #   Kept although #333 or #349 flagged them (no owner rule removes them): hardware (eightsleep.com), academic-integrity
-#   flags (collegetools.io, gptinf.com, studycrumb.com), an uncensored image generator (graydient.ai, as
-#   freedomgpt.com), betting predictions (sportsprediction.ai), and dead flags the website check overturned
-#   (blog.rossintelligence.com, magicthumbnails.com). Retirements never feature in a sample.
+#   flags (collegetools.io, gptinf.com, studycrumb.com), betting predictions (sportsprediction.ai), and a collection of
+#   AI entertainment tools whose copy mentions virtual girlfriends (boredhumans.com, not built for adult content under
+#   the owner's 2026-10-09 #260 decision). Open owner call: graydient.ai (Pirate Diffusion), which permits NSFW image
+#   generation once activated; kept until the owner decides. A listing is filed by what its link lands on when that
+#   is the product (studycrumb.com, flyingdog.de). Retirements never feature in a sample.
 # unpublished: each of the 585 unpublished listings filed under Other but one, re-filed under a hub with no tags
 #   (design 1.5: unpublished approved listings are re-filed, so their 410 doesn't become a 404 and Republish keeps
 #   working). basis is where the hub comes from: #340's audit category, then #333's cluster or held category, mapped
@@ -60,11 +62,11 @@ redirect:
 counts:
   listings: 726
   live: 141
-  moved: 95
-  movedWithTags: 16
-  retired: 46
+  moved: 93
+  movedWithTags: 13
+  retired: 48
   retiredBy:
-    dead: 12
+    dead: 14
     hijacked: 2
     not-a-product: 21
     spam: 4
@@ -79,15 +81,15 @@ counts:
     cluster: 5
   leftInOther: 1
   refiled: 725
-  liveListingsAfter: 2498
+  liveListingsAfter: 2496
 hubs:
   writing: 303
-  image-design: 282
-  developer-tools: 267
-  productivity: 261
+  image-design: 281
+  developer-tools: 266
+  productivity: 262
   chatbots-agents: 245
   marketing: 189
-  business: 177
+  business: 176
   audio: 122
   lifestyle: 127
   education: 94
@@ -100,13 +102,11 @@ hubs:
 tags:
   ai-content-creator: 99
   ai-paraphrasing-tool: 19
-  ai-graphic-design: 28
   ai-image-generators: 84
-  ai-development-services: 9
+  ai-development-services: 8
   ai-news: 5
   ai-agents: 24
   ai-financial-advisor: 23
-  ai-lawyer: 19
   ai-health: 19
   ai-tutor: 25
   cloud-gpu-providers: 31
@@ -139,9 +139,8 @@ listings:
 - slug: blog.rossintelligence.com
   id: lst_5e25a65c76cf4f72196baa81
   hub: business
-  tags:
-  - ai-lawyer
-  evidence: 'ROSS''s site is live with features, pricing and free sign-up (rossintelligence.com/features), so #333''s dead flag no longer holds: AI legal research'
+  retire: dead
+  evidence: 'ROSS shut down: rossintelligence.com/features is a frozen marketing page (''© ROSS Intelligence, Inc. 2014–2020''), its Log in and Sign up go to app.rossintelligence.com, which doesn''t resolve, and the blog''s newest post (January 2021) is the shutdown note (#333 flag)'
 - slug: bogar.ai
   id: lst_ab1d338c71a2bd62367cade2
   hub: developer-tools
@@ -281,10 +280,8 @@ listings:
   evidence: AI plant identification app ('The Flora Incognita app')
 - slug: flyingdog.de
   id: lst_29bd944620150d7051b50564
-  hub: developer-tools
-  tags:
-  - ai-development-services
-  evidence: German enterprise software firm, as its copy says; the link lands on its AI for Photoshop plugin ('flying dog - AI for Photoshop')
+  hub: image-design
+  evidence: 'The link lands on flying dog''s AI Studio for Photoshop: Stable Diffusion and DALL-E 2 connectors sold as a plugin (''flying dog - AI for Photoshop'', ''BUY NOW''). Filed by what its link lands on, as studycrumb.com is; its copy describes the company, so no tag'
 - slug: fydeos.io
   id: lst_6d6b1136eecc5dad75239ba7
   hub: productivity
@@ -322,7 +319,7 @@ listings:
   hub: image-design
   tags:
   - ai-image-generators
-  evidence: 'Pirate Diffusion, a Stable Diffusion image generator; the link ends on piratediffusion.com, the same product. Uncensored like freedomgpt.com, which #333 categorized and #349 never pins'
+  evidence: 'Pirate Diffusion, a Stable Diffusion image generator; the link ends on piratediffusion.com, the same product, which mentions lifting ''the NSFW restrictions'' once a bot is activated. #333 held it for that flag: an open owner call under the no-adult rule (#260), kept until the owner decides'
 - slug: handyplugins.co
   id: lst_c240fb9ef00b72f8100876c1
   hub: developer-tools
@@ -437,9 +434,8 @@ listings:
 - slug: magicthumbnails.com
   id: lst_87a3a7f579857d54d68e92b7
   hub: image-design
-  tags:
-  - ai-graphic-design
-  evidence: 'AI YouTube thumbnail generator that still works (''Generate YouTube Thumbnails with AI''), so #333''s dead flag (its copy expected a February 2024 shutdown) doesn''t hold; thumbnails sit with ai-graphic-design''s covers and posters'
+  retire: dead
+  evidence: Its front page still shows its own shutdown notice ('Magic Thumbnails will be shutting down on February 1st, 2024. Please download any thumbnails you want to keep before then.'), and nothing shows a generation still runs (#333 flag)
 - slug: makeavideo.studio
   id: lst_a25957a959adf7a9727dff5f
   hub: video
@@ -528,8 +524,8 @@ listings:
   evidence: Nourish, a personalized news app ('Nourish - Better News')
 - slug: octoeverywhere.com
   id: lst_e1ac0318fba39292840461a8
-  hub: image-design
-  evidence: Remote 3D-printer access with AI print-failure detection; the link lands on its Gadget page
+  hub: productivity
+  evidence: 'Remote access and AI print-failure detection for 3D printers (''OctoEverywhere - The 3D Printer Cloud''; the link lands on its Gadget page): a device utility, filed with ccleaner.com and imyfone.com under productivity rather than with image and design tools'
 - slug: ohdear.app
   id: lst_6351cf96cd2abbc7973af070
   hub: developer-tools

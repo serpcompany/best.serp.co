@@ -119,8 +119,8 @@ content, including every downloader for an adult video or cam site. Fan-site dow
 and the like). A submission for an adult product is rejected in review
 ([Submission flow](./submission-flow.md#review-in-the-admin-panel-64)). An adult listing found
 after these manifests can't leave the same way: a retired category can't be added to a listing,
-so for now it can only be unpublished, and its URL answers 410 with the gone page, not 404. How
-such a listing should leave is the owner's open question.
+so it can only be unpublished: its URL answers 410, not 404. One filed under Other stays there
+when Other retires (#351), so it answers 404 and can't be relisted; others are the owner's call.
 
 - **The decisions.** `d1/hygiene/2026-10-09-adult-decisions.yaml` lists the 272 adult listings of
   the reviewed catalog: 259 filed under the Adult category, and 13 adult-site downloaders filed

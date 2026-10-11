@@ -965,15 +965,38 @@ export function readRetirementInputs(paths = otherRetirementPaths): RetirementIn
   }
 }
 
-async function main(): Promise<void> {
-  const [command, ...flags] = process.argv.slice(2).filter(arg => arg !== '--')
+export type RetirementCommand = { command: 'generate' } | { command: 'inventory'; check: boolean }
+
+const USAGE =
+  "Usage: pnpm catalog:other-retirement [-- inventory [--check]]. With no command it writes the manifests from the mapping; `inventory` rebuilds the inventory, keeping its recorded website checks, and `--check` checks the live listings' websites again first."
+
+/**
+ * The command line, parsed before anything is read or written (scripts/AGENTS.md): no command
+ * writes the manifests, `inventory` the inventory, and `inventory --check` checks the websites
+ * again first. Throws, with the usage, on any other command, flag or argument, so a mistyped
+ * `--check` never rewrites the inventory with the old checks as if it had refreshed them.
+ */
+export function parseRetirementArgs(argv: readonly string[]): RetirementCommand {
+  const [command, ...rest] = argv.filter(arg => arg !== '--')
+  if (command === undefined) return { command: 'generate' }
   if (command === 'inventory') {
+    if (rest.length > 1 || (rest.length === 1 && rest[0] !== '--check'))
+      throw new Error(`Unexpected argument ${rest.at(-1)} for inventory. ${USAGE}`)
+    return { command: 'inventory', check: rest.length === 1 }
+  }
+  throw new Error(`Unknown command ${command}. ${USAGE}`)
+}
+
+async function main(): Promise<void> {
+  const args = parseRetirementArgs(process.argv.slice(2))
+  if (args.command === 'inventory') {
     const catalog = readReplayedCatalog()
-    let checks = recordedChecks()
-    if (flags.includes('--check')) {
-      const unchecked = buildResidueInventory(catalog)
-      checks = await checkWebsites(unchecked.listings, new Date().toISOString().slice(0, 10))
-    }
+    const checks = args.check
+      ? await checkWebsites(
+          buildResidueInventory(catalog).listings,
+          new Date().toISOString().slice(0, 10)
+        )
+      : recordedChecks()
     writeFileSync(
       resolve(otherRetirementPaths.residueInventory),
       renderInventory(buildResidueInventory(catalog, otherRetirementPaths, checks))
@@ -981,7 +1004,6 @@ async function main(): Promise<void> {
     console.log(`Wrote ${otherRetirementPaths.residueInventory}`)
     return
   }
-  if (command !== undefined) throw new Error(`Unknown command ${command}`)
   const plan = planOtherRetirement(readRetirementInputs())
   const manifests = buildOtherRetirementManifests(
     plan,

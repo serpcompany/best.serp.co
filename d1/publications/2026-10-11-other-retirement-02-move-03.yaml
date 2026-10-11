@@ -1,5 +1,5 @@
 # serpcompany/best.serp.co#351 (#341 step 10, phase 2 of 3): batch 03, 183 listings filed under other
-# (loyae.com to scribblediffusion.com), 27 of them staying live. Each is filed under its hub alone
+# (loyae.com to scribblediffusion.com), 26 of them staying live. Each is filed under its hub alone
 # (listing-categories-set), and a live one gets its tags (listing-tags-set, expecting none). Unpublished
 # listings are re-filed too, so their 410 stays a 410 when other retires. Publish in order, after -01.
 # A listing keeps its batch when the manifests are regenerated.
@@ -61,12 +61,6 @@ operations:
       - other
     categories:
       - business
-  - action: listing-tags-set
-    id: lst_87a3a7f579857d54d68e92b7
-    slug: magicthumbnails.com
-    expected: []
-    tags:
-      - ai-graphic-design
   - action: listing-categories-set
     id: lst_87a3a7f579857d54d68e92b7
     slug: magicthumbnails.com
@@ -527,7 +521,7 @@ operations:
     expected:
       - other
     categories:
-      - image-design
+      - productivity
   - action: listing-categories-set
     id: lst_6351cf96cd2abbc7973af070
     slug: ohdear.app

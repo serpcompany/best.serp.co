@@ -208,19 +208,13 @@ operations:
       - other
     categories:
       - writing
-  - action: listing-tags-set
-    id: lst_29bd944620150d7051b50564
-    slug: flyingdog.de
-    expected: []
-    tags:
-      - ai-development-services
   - action: listing-categories-set
     id: lst_29bd944620150d7051b50564
     slug: flyingdog.de
     expected:
       - other
     categories:
-      - developer-tools
+      - image-design
   - action: listing-categories-set
     id: lst_d86e06fa8095493f899fd07a
     slug: framedrop.ai

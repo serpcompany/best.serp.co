@@ -1,4 +1,4 @@
-# serpcompany/best.serp.co#351 (#341 step 10, phase 1 of 3): unpublish 46 live listings filed under other (12 dead, 2 hijacked, 21 not-a-product, 4 spam, 5 wrong-copy, 2 duplicate),
+# serpcompany/best.serp.co#351 (#341 step 10, phase 1 of 3): unpublish 48 live listings filed under other (14 dead, 2 hijacked, 21 not-a-product, 4 spam, 5 wrong-copy, 2 duplicate),
 # then redirect /products/categories/other/ to /products/. Each reason names its kind; the evidence is in the mapping.
 # Hygiene removals come down even if someone owns or claimed the listing; a wrong-copy or duplicate one is
 # `unowned` and refuses the batch instead (#332, #340 decision 2). Other renders over its redirect while it
@@ -36,6 +36,14 @@ operations:
     reason: "#351 retire-not-a-product (as #340 decision 1): an article, research page, demo, art project, or publication; evidence in d1/hygiene/2026-10-11-other-residue.yaml"
     expected:
       website: https://blog.google
+  - action: listing-unpublish
+    id: lst_5e25a65c76cf4f72196baa81
+    slug: blog.rossintelligence.com
+    categories:
+      - other
+    reason: "#351 retire-dead (as #340 decision 1): the site is gone, parked, or no longer the product; evidence in d1/hygiene/2026-10-11-other-residue.yaml"
+    expected:
+      website: https://serp.ly/ross-intelligence
   - action: listing-unpublish
     id: lst_ab1d338c71a2bd62367cade2
     slug: bogar.ai
@@ -198,6 +206,14 @@ operations:
     reason: "#351 retire-not-a-product (as #340 decision 1): an article, research page, demo, art project, or publication; evidence in d1/hygiene/2026-10-11-other-residue.yaml"
     expected:
       website: https://serp.ly/kitt
+  - action: listing-unpublish
+    id: lst_87a3a7f579857d54d68e92b7
+    slug: magicthumbnails.com
+    categories:
+      - other
+    reason: "#351 retire-dead (as #340 decision 1): the site is gone, parked, or no longer the product; evidence in d1/hygiene/2026-10-11-other-residue.yaml"
+    expected:
+      website: https://serp.ly/magicthumbnails
   - action: listing-unpublish
     id: lst_a25957a959adf7a9727dff5f
     slug: makeavideo.studio
