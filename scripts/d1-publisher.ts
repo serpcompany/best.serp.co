@@ -210,6 +210,14 @@ function targetPair(target: TaxonomyTarget): [string, string | null] {
 const sameTarget = (a: TaxonomyTarget | null, b: TaxonomyTarget | null): boolean =>
   JSON.stringify(a && targetPair(a)) === JSON.stringify(b && targetPair(b))
 const resource = z.object({ label: z.string().min(1), url: z.string().url() }).strict()
+/**
+ * A resource link exactly as a listing stores it (`listing_resource_links`): what
+ * `listing-resources-set` compares, and keeps when a link stays.
+ */
+const storedResource = z.object({ label: z.string().min(1), url: z.string().min(1) }).strict()
+/** The owner edit's limits for a link's label and URL (`ACCOUNT_LIMITS` in `db/account.ts`). */
+const LINK_LABEL_MAX = 60
+const LINK_URL_MAX = 2048
 const faq = z.object({ question: z.string().min(1), answer: z.string().min(1) }).strict()
 /**
  * A hosted image a manifest names (#95): its key in the media bucket, the metadata D1 records,
@@ -481,6 +489,26 @@ const operation = z.discriminatedUnion('action', [
           website: z.string().trim().url().optional()
         })
         .strict()
+    })
+    .strict(),
+  /**
+   * Replaces a listing's resource links, the page's "Links" section (#376: links to deleted
+   * repositories and removed store items), compared and swapped on its slug and every current
+   * link in order (`expected`), so it is row-level like `listing-details-set`. `resources` is the
+   * whole new list, in order; a link not in `expected` follows the owner edit's link rule. As the
+   * admin panel's edits do (#64), it refuses a listing that isn't approved or whose own submission
+   * is in review or was rejected.
+   */
+  z
+    .object({
+      action: z.literal('listing-resources-set'),
+      id: listingId,
+      slug: existingSlug,
+      reason: z.string().trim().min(1).max(200),
+      expected: z.array(storedResource),
+      resources: z
+        .array(storedResource)
+        .superRefine(unique('Duplicate listing resource.', value => `${value.label}\0${value.url}`))
     })
     .strict(),
   /**
@@ -796,8 +824,9 @@ export const manifestConcurrency = ['publication', 'rows'] as const
  * category (#333: its insert refuses the batch when the slug exists, retired or not), a slug
  * redirect (#338: an unpublished source, a live target, no redirect for the slug, no chain or
  * loop, all still true at the end of the batch), a listing's name, short description, and website
- * (#340: `expected`), and every taxonomy operation (#344: each compares the tag, best page,
- * listing, or redirect it changes).
+ * (#340: `expected`), a listing's resource links (#376: `expected`, every link in order), and
+ * every taxonomy operation (#344: each compares the tag, best page, listing, or redirect it
+ * changes).
  */
 const rowLevelActions = new Set<string>([
   'listing-media-update',
@@ -805,6 +834,7 @@ const rowLevelActions = new Set<string>([
   'listing-categories-remove',
   'listing-categories-set',
   'listing-details-set',
+  'listing-resources-set',
   'listing-content-remove-suffix',
   'listing-unpublish',
   'listing-claim-hold-add',
@@ -842,7 +872,7 @@ export const manifestSchema = z
           context.addIssue({
             code: z.ZodIssueCode.custom,
             message:
-              'A row-level manifest holds only listing-media-update, listing-categories-add/-remove/-set, listing-details-set, listing-content-remove-suffix, listing-unpublish, listing-claim-hold-add/-clear, listing-slug-redirect, category-create/-unpublish, and taxonomy (tag-*, listing-tags-set, best-page-*, taxonomy-redirect-set) operations.',
+              'A row-level manifest holds only listing-media-update, listing-categories-add/-remove/-set, listing-details-set, listing-resources-set, listing-content-remove-suffix, listing-unpublish, listing-claim-hold-add/-clear, listing-slug-redirect, category-create/-unpublish, and taxonomy (tag-*, listing-tags-set, best-page-*, taxonomy-redirect-set) operations.',
             path: ['operations', index, 'action']
           })
         }
@@ -942,6 +972,34 @@ export const manifestSchema = z
             message: 'A listing website must be a public HTTP(S) URL.',
             path: ['operations', index, 'details', 'website']
           })
+      }
+      if (op.action === 'listing-resources-set') {
+        const key = (link: { label: string; url: string }) => `${link.label}\0${link.url}`
+        if (JSON.stringify(op.resources) === JSON.stringify(op.expected))
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'The listing already has exactly these links.',
+            path: ['operations', index, 'resources']
+          })
+        // A link the listing keeps is compared as it is stored; a new one follows the owner
+        // edit's rule (`validateExtras` in `db/account.ts`), whatever count the listing carries.
+        const kept = new Set(op.expected.map(key))
+        op.resources.forEach((link, order) => {
+          if (kept.has(key(link))) return
+          const checked = link.url.length <= LINK_URL_MAX ? validatePublicHttpUrl(link.url) : null
+          if (
+            link.label !== link.label.trim() ||
+            link.label.length > LINK_LABEL_MAX ||
+            link.url !== link.url.trim() ||
+            !checked?.ok ||
+            checked.url.protocol !== 'https:'
+          )
+            context.addIssue({
+              code: z.ZodIssueCode.custom,
+              message: `A new link needs a trimmed label of ${LINK_LABEL_MAX} characters or fewer and a public https URL.`,
+              path: ['operations', index, 'resources', order]
+            })
+        })
       }
       if (op.action === 'listing-media-update') {
         const keyed = [
@@ -1426,6 +1484,13 @@ export const parseManifest = (source: string): PublicationManifest =>
  * then sort order: what a `listing-media-update` compares and swaps on (`?` is the listing id).
  */
 export const CURRENT_MEDIA_JSON = `(SELECT json_group_array(json_array(kind,url,media_key)) FROM (SELECT kind,url,media_key FROM listing_media WHERE listing_id=? AND kind IN ('logo','image') ORDER BY kind,sort_order))`
+
+/**
+ * A listing's resource links as one JSON array of `[label, url]`, in sort order: what a
+ * `listing-resources-set` compares and swaps on (`?` is the listing id). `sort_order` is unique
+ * per listing (`listing_resource_links_listing_order_unique`), so the order is total.
+ */
+const CURRENT_RESOURCES_JSON = `(SELECT json_group_array(json_array(label,url)) FROM (SELECT label,url FROM listing_resource_links WHERE listing_id=? ORDER BY sort_order))`
 
 /** The JSON a listing's `expected` rows must equal (`CURRENT_MEDIA_JSON`). */
 export function expectedMediaJson(rows: ExpectedMediaRow[]): string {
@@ -2110,6 +2175,57 @@ export function buildPublicationPlan(
             manifest: manifest.id,
             reason: op.reason
           }),
+          manifest.provenance.actor
+        )
+      )
+      routes.add(listingRoute(op.slug))
+    }
+    if (op.action === 'listing-resources-set') {
+      const label = `listing-resources-set ${op.slug}`
+      statements.push(
+        // As in the admin panel (#64): never while the listing's own submission is in review, whose
+        // approval needs the checksum the listing was paid at; the new checksum below changes it.
+        statement(
+          `SELECT CASE WHEN ${listingHasQueuedSubmission('?')} THEN ${REASONED_GUARD_FAILURE} ELSE 1 END`,
+          op.id,
+          `${label}: its own submission is in review`
+        ),
+        // As in the admin panel: a listing whose own submission stands rejected stays read-only.
+        statement(
+          `SELECT CASE WHEN ${listingSubmissionRejected('?')} THEN ${REASONED_GUARD_FAILURE} ELSE 1 END`,
+          op.id,
+          `${label}: its own submission was rejected`
+        ),
+        // Compared and swapped on the slug and every link, in order. The page changed, so
+        // `updated_at` (sitemap lastmod, #218) moves, and a new checksum refuses an owner revision
+        // or admin edit read before it: a revision's approval replaces the links with its own.
+        statement(
+          `UPDATE listings SET checksum=?,updated_at=? WHERE id=? AND slug=? AND status='approved' AND ${CURRENT_RESOURCES_JSON}=?`,
+          hash(`${manifest.id}\0${op.id}\0resources`),
+          now,
+          op.id,
+          op.slug,
+          op.id,
+          JSON.stringify(op.expected.map(link => [link.label, link.url]))
+        ),
+        changedOne(
+          `${label}: the listing is not approved, or its slug or links changed since the manifest`
+        ),
+        statement('DELETE FROM listing_resource_links WHERE listing_id=?', op.id),
+        ...op.resources.map((link, order) =>
+          statement(
+            'INSERT INTO listing_resource_links (listing_id,label,url,sort_order) VALUES (?,?,?,?)',
+            op.id,
+            link.label,
+            link.url,
+            order
+          )
+        ),
+        // The admin panel's activity record for an edit (#64): "Details edited: links".
+        statement(
+          "INSERT INTO listing_events (listing_id,event_type,detail,actor) VALUES (?,'edited',?,?)",
+          op.id,
+          JSON.stringify({ fields: ['links'], manifest: manifest.id, reason: op.reason }),
           manifest.provenance.actor
         )
       )
