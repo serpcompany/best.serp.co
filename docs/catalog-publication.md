@@ -166,7 +166,7 @@ These operations write #341's taxonomy: tags, best pages, and redirects of old t
 operation and reason, and D1 reports it as `bad JSON path: '<operation> <slug>: <reason>'`. Their
 statements, with `category-create`'s and `category-unpublish`'s, are in
 `apps/web/src/db/taxonomy-plans.ts`, which the admin panel builds too
-([Admin panel](./admin-panel.md#categories-tags-and-best-pages-405), #405).
+([Admin taxonomy](./admin-taxonomy.md#categories-tags-and-best-pages-405), #405).
 
 | Operation | What it does | Refused, with nothing written, when |
 |---|---|---|

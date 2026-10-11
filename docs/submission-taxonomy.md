@@ -25,5 +25,5 @@ When no category fits, a Creator may suggest one on `/submit/` or the owner's li
 of at most 60 characters on one line and, once named, a note of at most 300, stored as
 `suggested_category` and `suggested_category_note` (whose CHECKs hold the limits and refuse a note
 alone). The primary category stays required, approval and payment never read the suggestion, and
-the reviewer acts on it in `/admin` ([Admin panel](./admin-panel.md#category-suggestions-406)).
+the reviewer acts on it in `/admin` ([Admin taxonomy](./admin-taxonomy.md#category-suggestions-406)).
 A draft edit that leaves it out keeps it; an empty name clears it. No message repeats the input.
