@@ -1,11 +1,13 @@
 import { mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { type BrowserContext, expect, type Page } from '@playwright/test'
-import { client, q, signIn, unique } from './admin-fixture'
+import { client, q, signIn, unique, uniqueIp } from './admin-fixture'
 import {
+  claimCode,
   claimsD1,
   claimsOrigin,
   claimsSuiteEnabled,
+  resetClaimDomainBudget,
   seedClaimsCatalog,
   seedClaimsListing
 } from './claims-fixture'
@@ -59,17 +61,17 @@ interface Seeded {
   slug: string
 }
 
-function seed(
+async function seed(
   name: string,
   badge: 'missing' | 'valid' = 'missing',
   /** A slug other than the fixture site's host, for a listing whose slug and website disagree. */
   slugOverride?: string
-): Seeded {
+): Promise<Seeded> {
   const label = `dialog-${unique()}`
   fixture.set(label, { badge, description: `${name}, a fixture.`, name })
   const slug = slugOverride ?? fixture.slug(label)
   const id = `e2e-dialog-${label}`
-  seedClaimsListing({
+  await seedClaimsListing({
     content: 'A listing for the claim dialog suite.',
     description: `${name} helps teams ship.`,
     id,
@@ -84,16 +86,6 @@ async function signedIn(context: BrowserContext, email: string): Promise<void> {
   await signIn(client(context.request, baseURL), email)
 }
 
-async function codeFor(page: Page, to: string): Promise<string> {
-  const response = await page.request.get(`/api/dev/email-outbox?to=${encodeURIComponent(to)}`)
-  const { messages } = (await response.json()) as { messages: Array<{ subject: string }> }
-  const code = messages
-    .map(message => /^(\d{6}) is your SERP code to claim /u.exec(message.subject)?.[1])
-    .find(Boolean)
-  if (!code) throw new Error(`no claim code for ${to}`)
-  return code
-}
-
 function dialog(page: Page) {
   return page.getByRole('dialog')
 }
@@ -106,19 +98,23 @@ async function enterCode(page: Page, code: string): Promise<void> {
 
 test.beforeAll(async () => {
   fixture = await startFixtureSite()
-  seedClaimsCatalog()
+  await seedClaimsCatalog()
 })
 
 test.afterAll(async () => {
   await fixture?.close()
 })
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ context, page }) => {
   await page.emulateMedia({ colorScheme: scheme })
+  // Each test is its own client address and starts with the fixture domain's code cap empty, so
+  // no test, retry, or repeat spends another's hourly caps (#200).
+  await context.setExtraHTTPHeaders({ 'cf-connecting-ip': uniqueIp() })
+  await resetClaimDomainBudget()
 })
 
 test('a visitor sees the claim link and signs in first', async ({ page }) => {
-  const listing = seed('Visitor product')
+  const listing = await seed('Visitor product')
   await page.goto(`/products/${listing.slug}/`)
   await expect(page.getByText('Work at Visitor product?')).toBeVisible()
   await capture(page, '9a-claim-link')
@@ -134,7 +130,7 @@ test('claims a listing with the badge through every step and its errors', async 
   page
 }) => {
   test.setTimeout(120_000)
-  const listing = seed('Dialog product')
+  const listing = await seed('Dialog product')
   const email = `claimer-${unique()}@example.com`
   await signedIn(context, email)
   await page.clock.install()
@@ -201,24 +197,20 @@ test('claims a listing with the badge through every step and its errors', async 
     dialog(page).getByText(/It expires in 10 minutes\. Didn’t get it\? Resend in/u)
   ).toBeVisible()
   await capture(page, '8c-code')
-  const code = await codeFor(page, address)
+  const code = await claimCode(page.request, address)
   await enterCode(page, code === '000000' ? '111111' : '000000')
   await expect(dialog(page).getByText('That code isn’t right.')).toBeVisible()
-  claimsD1(`UPDATE listing_claims SET code_expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 second')
+  await claimsD1(`UPDATE listing_claims SET code_expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 second')
     WHERE listing_id = ${q(listing.id)}`)
   await enterCode(page, code)
   await expect(dialog(page).getByText('This code has expired. Send a new one.')).toBeVisible()
   await expect(dialog(page).getByRole('button', { name: 'Send a new code' })).toBeVisible()
   await capture(page, '8j-expired')
-  claimsD1(`UPDATE listing_claims SET code_sent_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-2 minutes')
+  await claimsD1(`UPDATE listing_claims SET code_sent_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-2 minutes')
     WHERE listing_id = ${q(listing.id)}`)
   await dialog(page).getByRole('button', { name: 'Send a new code' }).click()
   await expect(dialog(page).getByText(/Resend in/u)).toBeVisible()
-  const fresh = (await page.request
-    .get(`/api/dev/email-outbox?to=${encodeURIComponent(address)}`)
-    .then(response => response.json())) as { messages: Array<{ subject: string }> }
-  const newest = /^(\d{6}) /u.exec(fresh.messages[0]?.subject ?? '')?.[1] ?? ''
-  await enterCode(page, newest)
+  await enterCode(page, await claimCode(page.request, address, 2))
 
   // Step 4: the badge. Missing first (one of ten checks used), then published.
   await expect(dialog(page).getByText('Step 4 of 4')).toBeVisible()
@@ -241,7 +233,7 @@ test('claims a listing with the badge through every step and its errors', async 
   fixture.update(listing.label, { badge: 'valid' })
   // The 30-second wait between checks, on the page's clock.
   await page.clock.fastForward(31_000)
-  claimsD1(`UPDATE listing_claims SET badge_checked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 minute')
+  await claimsD1(`UPDATE listing_claims SET badge_checked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 minute')
     WHERE listing_id = ${q(listing.id)}`)
   await expect(dialog(page).getByRole('button', { name: 'Verify badge and claim' })).toBeEnabled()
   await dialog(page).getByRole('button', { name: 'Verify badge and claim' }).click()
@@ -269,7 +261,7 @@ test('claims a listing with the badge through every step and its errors', async 
   )
   await capture(page, '8f-success')
   expect(
-    claimsD1(`SELECT verified_via FROM listing_owners WHERE listing_id = ${q(listing.id)}`)
+    await claimsD1(`SELECT verified_via FROM listing_owners WHERE listing_id = ${q(listing.id)}`)
   ).toEqual([{ verified_via: 'badge_claim' }])
   // The claim link goes at once, whatever the cached page says, and stays gone after closing.
   await expect(page.getByRole('button', { name: 'Claim this listing' })).toHaveCount(0)
@@ -281,9 +273,9 @@ test('claims a listing with the badge through every step and its errors', async 
 test('shows the Verified owner badge, with its tooltip, and no claim link on an owned listing', async ({
   page
 }) => {
-  const listing = seed('Verified product')
+  const listing = await seed('Verified product')
   const ownerId = `e2e-dialog-owner-${unique()}`
-  claimsD1(`
+  await claimsD1(`
     INSERT INTO users (id, name, email, email_verified) VALUES (${q(ownerId)}, 'Owner', ${q(`${ownerId}@example.com`)}, 1);
     INSERT INTO listing_owners (listing_id, user_id, verified_via, verified_at)
       VALUES (${q(listing.id)}, ${q(ownerId)}, 'badge_claim', ${q(new Date().toISOString())});
@@ -298,7 +290,7 @@ test('shows the Verified owner badge, with its tooltip, and no claim link on an 
 })
 
 test('locks after five wrong codes', async ({ context, page }) => {
-  const listing = seed('Locked product')
+  const listing = await seed('Locked product')
   await signedIn(context, `locked-${unique()}@example.com`)
   await page.goto(`/products/${listing.slug}/`)
   await page.getByRole('button', { name: 'Claim this listing' }).click()
@@ -306,7 +298,7 @@ test('locks after five wrong codes', async ({ context, page }) => {
   const address = `team@${listing.slug}`
   await dialog(page).getByLabel('Your email at localtest.me').fill(address)
   await dialog(page).getByRole('button', { name: 'Send code' }).click()
-  const code = await codeFor(page, address)
+  const code = await claimCode(page.request, address)
   const wrong = code === '000000' ? '111111' : '000000'
   for (let attempt = 1; attempt <= 5; attempt += 1) {
     await enterCode(page, wrong)
@@ -323,13 +315,13 @@ test('locks after five wrong codes', async ({ context, page }) => {
 })
 
 test('shows the already-owned dialog with the contact path', async ({ context, page }) => {
-  const listing = seed('Owned product')
+  const listing = await seed('Owned product')
   await signedIn(context, `second-${unique()}@example.com`)
   // The page rendered while the listing had no owner; someone verifies before this visitor clicks.
   await page.goto(`/products/${listing.slug}/`)
   await expect(page.getByRole('button', { name: 'Claim this listing' })).toBeVisible()
   const ownerId = `e2e-dialog-owner-${unique()}`
-  claimsD1(`
+  await claimsD1(`
     INSERT INTO users (id, name, email, email_verified) VALUES (${q(ownerId)}, 'Owner', ${q(`${ownerId}@example.com`)}, 1);
     INSERT INTO listing_owners (listing_id, user_id, verified_via, verified_at)
       VALUES (${q(listing.id)}, ${q(ownerId)}, 'badge_claim', ${q(new Date().toISOString())});
@@ -359,11 +351,11 @@ test('sends a held listing, and one whose slug and website disagree, to the cont
 }) => {
   await signedIn(context, `review-${unique()}@example.com`)
   // On #100's owner-review list (`listing_claim_holds`): the owner decides, not a claim.
-  const held = seed('Held product')
-  claimsD1(`INSERT INTO listing_claim_holds (listing_id, reason, source)
+  const held = await seed('Held product')
+  await claimsD1(`INSERT INTO listing_claim_holds (listing_id, reason, source)
     VALUES (${q(held.id)}, 'off_domain', 'd1/hygiene/2026-10-06-listing-domains.yaml')`)
   // The slug names a domain the website doesn't land on.
-  const mismatched = seed('Mismatched product', 'missing', `mismatch-${unique()}.example`)
+  const mismatched = await seed('Mismatched product', 'missing', `mismatch-${unique()}.example`)
   for (const listing of [held, mismatched]) {
     await page.goto(`/products/${listing.slug}/`)
     const answer = page.waitForResponse(
@@ -386,7 +378,7 @@ test('sends a held listing, and one whose slug and website disagree, to the cont
   }
   await capture(page, '8n-review')
   expect(
-    claimsD1(
+    await claimsD1(
       `SELECT COUNT(*) AS claims FROM listing_claims WHERE listing_id IN (${q(held.id)}, ${q(mismatched.id)})`
     )
   ).toEqual([{ claims: 0 }])
@@ -396,13 +388,13 @@ test('tells the owner they manage the listing, never that someone else owns it',
   context,
   page
 }) => {
-  const listing = seed('Mine product')
+  const listing = await seed('Mine product')
   const email = `mine-${unique()}@example.com`
   await signedIn(context, email)
   // The page rendered before this visitor's ownership reached it (the catalog cache).
   await page.goto(`/products/${listing.slug}/`)
   await expect(page.getByRole('button', { name: 'Claim this listing' })).toBeVisible()
-  claimsD1(`
+  await claimsD1(`
     INSERT INTO listing_owners (listing_id, user_id, verified_via, verified_at)
       SELECT ${q(listing.id)}, id, 'badge_claim', ${q(new Date().toISOString())}
       FROM users WHERE email = ${q(email)};
@@ -425,7 +417,7 @@ test('says when the hourly caps stop a send, and when a confirmation ran out', a
   context,
   page
 }) => {
-  const listing = seed('Capped product')
+  const listing = await seed('Capped product')
   await signedIn(context, `capped-${unique()}@example.com`)
   await page.clock.install()
   await page.goto(`/products/${listing.slug}/`)
@@ -437,7 +429,7 @@ test('says when the hourly caps stop a send, and when a confirmation ran out', a
   await expect(dialog(page).getByText(`Code sent to ${address}`)).toBeVisible()
   // Three codes an hour per address: the fourth send is refused, and the dialog says so.
   for (let send = 2; send <= 4; send += 1) {
-    claimsD1(`UPDATE listing_claims SET code_sent_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-2 minutes')
+    await claimsD1(`UPDATE listing_claims SET code_sent_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-2 minutes')
       WHERE listing_id = ${q(listing.id)}`)
     await page.clock.fastForward(61_000)
     const answer = page.waitForResponse(
@@ -455,9 +447,9 @@ test('says when the hourly caps stop a send, and when a confirmation ran out', a
   await capture(page, '8l-capped')
 
   // The most recent code still confirms; a day later the confirmation has run out.
-  await enterCode(page, await codeFor(page, address))
+  await enterCode(page, await claimCode(page.request, address, 3))
   await expect(dialog(page).getByText('Step 4 of 4')).toBeVisible()
-  claimsD1(`UPDATE listing_claims SET email_verified_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-25 hours')
+  await claimsD1(`UPDATE listing_claims SET email_verified_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-25 hours')
     WHERE listing_id = ${q(listing.id)}`)
   await dialog(page).getByRole('button', { name: 'Verify badge and claim' }).click()
   await expect(dialog(page).getByText('Step 3 of 4')).toBeVisible()
@@ -470,7 +462,7 @@ test.describe('on a phone', () => {
   test.use({ viewport: { height: 812, width: 375 } })
 
   test('opens the claim flow in a drawer', async ({ context, page }) => {
-    const listing = seed('Phone product')
+    const listing = await seed('Phone product')
     await signedIn(context, `phone-${unique()}@example.com`)
     await page.goto(`/products/${listing.slug}/`)
     await page.getByRole('button', { name: 'Claim this listing' }).click()

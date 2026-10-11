@@ -1,19 +1,11 @@
 import { type APIRequestContext, expect, request as playwrightRequest } from '@playwright/test'
+import { ADMIN_EMAIL_PREFIXES, type Client, client, q, signIn, unique } from './admin-fixture'
 import {
-  ADMIN_EMAIL_PREFIXES,
-  type Client,
-  client,
-  q,
-  removeLeftoverAdmins,
-  signIn,
-  signInAsNewAdmin,
-  unique
-} from './admin-fixture'
-import {
+  claimCode,
   claimsD1,
   claimsOrigin,
-  claimsServer,
   claimsSuiteEnabled,
+  resetClaimDomainBudget,
   seedClaimsCatalog,
   seedClaimsListing
 } from './claims-fixture'
@@ -45,11 +37,11 @@ interface Seeded {
   slug: string
 }
 
-function seedListing(label: string, name: string): Seeded {
+async function seedListing(label: string, name: string): Promise<Seeded> {
   fixture.set(label, { badge: 'missing', description: `${name}, a fixture.`, name })
   const slug = fixture.slug(label)
   const id = `e2e-claim-${label}`
-  seedClaimsListing({
+  await seedClaimsListing({
     content: 'Imported.',
     description: 'A listing for the claims suite.',
     id,
@@ -67,15 +59,6 @@ async function account(email: string): Promise<{ client: Client; context: APIReq
   return { client: user, context }
 }
 
-async function codeFor(request: APIRequestContext, to: string): Promise<string> {
-  const response = await request.get(`/api/dev/email-outbox?to=${encodeURIComponent(to)}`)
-  const { messages } = (await response.json()) as { messages: Array<{ subject: string }> }
-  const subject = messages.map(message => message.subject).find(s => /code to claim/u.test(s))
-  const code = /^(\d{6}) is your SERP code to claim /u.exec(subject ?? '')?.[1]
-  if (!code) throw new Error(`no claim code for ${to}`)
-  return code
-}
-
 async function claim(user: Client, body: Record<string, unknown>) {
   return user.request.post('/api/claims', { data: body, headers: user.headers })
 }
@@ -86,8 +69,13 @@ async function step(user: Client, id: string, action: string, data: unknown = {}
 
 test.beforeAll(async () => {
   fixture = await startFixtureSite()
-  seedClaimsCatalog()
-  removeLeftoverAdmins([ADMIN_EMAIL_PREFIXES.claims], claimsServer)
+  await seedClaimsCatalog()
+})
+
+// Every attempt has its own listing, accounts, addresses, and client addresses; only the cap on
+// the fixture domain is shared, so each starts with it empty (#200).
+test.beforeEach(async () => {
+  await resetClaimDomainBudget()
 })
 
 test.afterAll(async () => {
@@ -96,7 +84,7 @@ test.afterAll(async () => {
 
 test('claims a listing with the badge and a domain-email code; the badge program can take it back', async () => {
   const key = unique()
-  const listing = seedListing(`claimed-${key}`, 'Claimed product')
+  const listing = await seedListing(`claimed-${key}`, 'Claimed product')
   const owner = await account(`claimer-${key}@example.com`)
   const domainAddress = `jo@${listing.slug}`
 
@@ -130,7 +118,7 @@ test('claims a listing with the badge and a domain-email code; the badge program
   expect(started.status(), await started.text()).toBe(201)
   const { claim: opened } = (await started.json()) as { claim: { id: string; status: string } }
   expect(opened.status).toBe('code_sent')
-  const code = await codeFor(owner.context, domainAddress)
+  const code = await claimCode(owner.context, domainAddress)
   const wrong = code === '000000' ? '111111' : '000000'
   const miss = await step(owner.client, opened.id, 'confirm', { code: wrong })
   expect(miss.status()).toBe(422)
@@ -147,7 +135,7 @@ test('claims a listing with the badge and a domain-email code; the badge program
   })
   fixture.update(listing.label, { badge: 'valid' })
   // Skip the 30-second cooldown between checks.
-  claimsD1(
+  await claimsD1(
     `UPDATE listing_claims SET badge_checked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 minute') WHERE id = ${q(opened.id)}`
   )
   const passed = await step(owner.client, opened.id, 'verify-badge')
@@ -156,7 +144,7 @@ test('claims a listing with the badge and a domain-email code; the badge program
     result: { ok: true }
   })
   expect(
-    claimsD1(
+    await claimsD1(
       `SELECT verified_via FROM listing_owners WHERE listing_id = ${q(listing.id)} AND revoked_at IS NULL`
     )
   ).toEqual([{ verified_via: 'badge_claim' }])
@@ -165,14 +153,17 @@ test('claims a listing with the badge and a domain-email code; the badge program
   const dashboard = await owner.context.get('/account/listings/')
   expect(dashboard.status()).toBe(200)
   expect(await dashboard.text()).toContain('Claimed product')
+  // A fresh admin: on the allowlist before its first sign-in, off it once it has looked.
   const adminContext = await playwrightRequest.newContext({ baseURL })
-  const admin = client(adminContext, baseURL)
-  await signInAsNewAdmin(admin, ADMIN_EMAIL_PREFIXES.claims, claimsServer)
+  const adminEmail = `${ADMIN_EMAIL_PREFIXES.claims}-${key}@example.com`
+  await claimsD1(`INSERT INTO admin_allowlist (email, added_by) VALUES (${q(adminEmail)}, 'e2e')`)
+  await signIn(client(adminContext, baseURL), adminEmail)
   const adminPage = await adminContext.get(`/admin/listings/${listing.slug}/`)
   expect(adminPage.status()).toBe(200)
   const adminHtml = await adminPage.text()
   expect(adminHtml).toContain(`claimer-${key}@example.com`)
   expect(adminHtml).toContain('Badge claim')
+  await claimsD1(`DELETE FROM admin_allowlist WHERE email = ${q(adminEmail)}`)
 
   // Someone else can't claim an owned listing; they get the contact path.
   const other = await account(`second-${key}@example.com`)
@@ -187,33 +178,40 @@ test('claims a listing with the badge and a domain-email code; the badge program
   // The weekly badge program (#66): the badge goes missing, the recheck confirms it, and the
   // claimer loses ownership while the listing stays live.
   fixture.update(listing.label, { badge: 'missing' })
+  // The passes check every listing on this Worker: another run's pass may have checked this one
+  // while its badge was up, which would leave nothing due this week (#200).
+  await claimsD1(`DELETE FROM badge_checks WHERE listing_id = ${q(listing.id)}`)
   expect(
     (await owner.context.get(`/__scheduled?cron=${encodeURIComponent('15 3 * * 1')}`)).status()
   ).toBe(200)
-  claimsD1(
+  await claimsD1(
     `UPDATE badge_checks SET checked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-2 days') WHERE listing_id = ${q(listing.id)}`
   )
   expect(
     (await owner.context.get(`/__scheduled?cron=${encodeURIComponent('45 3 * * *')}`)).status()
   ).toBe(200)
   expect(
-    claimsD1(`SELECT revoked_reason FROM listing_owners WHERE listing_id = ${q(listing.id)}`)
+    await claimsD1(`SELECT revoked_reason FROM listing_owners WHERE listing_id = ${q(listing.id)}`)
   ).toEqual([{ revoked_reason: 'badge_removed' }])
   expect((await owner.context.get(`/products/${listing.slug}/`)).status()).toBe(200)
-  const outbox = await owner.context.get(
-    `/api/dev/email-outbox?to=${encodeURIComponent(`claimer-${key}@example.com`)}`
-  )
-  const subjects = ((await outbox.json()) as { messages: Array<{ subject: string }> }).messages.map(
-    m => m.subject
-  )
-  expect(subjects).toEqual(expect.arrayContaining([`You no longer manage Claimed product on SERP`]))
+  // The notice goes out after the scheduled run answers (`waitUntil`).
+  await expect
+    .poll(async () => {
+      const outbox = await owner.context.get(
+        `/api/dev/email-outbox?to=${encodeURIComponent(`claimer-${key}@example.com`)}`
+      )
+      return ((await outbox.json()) as { messages: Array<{ subject: string }> }).messages.map(
+        m => m.subject
+      )
+    })
+    .toEqual(expect.arrayContaining([`You no longer manage Claimed product on SERP`]))
 
   await Promise.all([owner.context.dispose(), other.context.dispose(), adminContext.dispose()])
 })
 
 test('refuses expired and over-attempt codes, and requests without a session or from elsewhere', async () => {
   const key = unique()
-  const listing = seedListing(`codes-${key}`, 'Code product')
+  const listing = await seedListing(`codes-${key}`, 'Code product')
   const user = await account(`codes-${key}@example.com`)
   const address = `team@${listing.slug}`
   const started = await claim(user.client, {
@@ -221,11 +219,12 @@ test('refuses expired and over-attempt codes, and requests without a session or 
     listing: listing.slug,
     method: 'badge'
   })
+  expect(started.status(), await started.text()).toBe(201)
   const { claim: opened } = (await started.json()) as { claim: { id: string } }
-  const code = await codeFor(user.context, address)
+  const code = await claimCode(user.context, address)
 
   // Expired: the code's 10 minutes are over.
-  claimsD1(
+  await claimsD1(
     `UPDATE listing_claims SET code_expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 second') WHERE id = ${q(opened.id)}`
   )
   const expired = await step(user.client, opened.id, 'confirm', { code })
@@ -233,13 +232,16 @@ test('refuses expired and over-attempt codes, and requests without a session or 
   expect(await expired.json()).toMatchObject({ code: 'code_expired' })
 
   // A new code after the resend cooldown, then five wrong codes lock the claim for 15 minutes.
-  claimsD1(
+  await claimsD1(
     `UPDATE listing_claims SET code_sent_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-2 minutes') WHERE id = ${q(opened.id)}`
   )
-  expect(
-    (await claim(user.client, { email: address, listing: listing.slug, method: 'badge' })).status()
-  ).toBe(201)
-  const fresh = await codeFor(user.context, address)
+  const resent = await claim(user.client, {
+    email: address,
+    listing: listing.slug,
+    method: 'badge'
+  })
+  expect(resent.status(), await resent.text()).toBe(201)
+  const fresh = await claimCode(user.context, address, 2)
   const wrong = fresh === '000000' ? '111111' : '000000'
   for (let attempt = 1; attempt <= 4; attempt += 1) {
     expect((await step(user.client, opened.id, 'confirm', { code: wrong })).status()).toBe(422)
@@ -252,7 +254,7 @@ test('refuses expired and over-attempt codes, and requests without a session or 
   // An imported listing that links through serp.ly is claimed through its product's domain:
   // SERP's own mail never proves it (#108 review round 1).
   const imported = `e2e-claim-serply-${key}`
-  seedClaimsListing({
+  await seedClaimsListing({
     content: 'Imported.',
     description: 'd',
     id: imported,
@@ -269,8 +271,8 @@ test('refuses expired and over-attempt codes, and requests without a session or 
   expect(await serply.json()).toMatchObject({ code: 'domain_mismatch' })
 
   // A listing on #100's owner-review list is held: the claimer gets the contact path.
-  const held = seedListing(`held-${key}`, 'Held product')
-  claimsD1(`INSERT INTO listing_claim_holds (listing_id, reason, source)
+  const held = await seedListing(`held-${key}`, 'Held product')
+  await claimsD1(`INSERT INTO listing_claim_holds (listing_id, reason, source)
     VALUES (${q(held.id)}, 'off_domain', 'd1/hygiene/2026-10-06-listing-domains.yaml')`)
   const heldClaim = await claim(user.client, {
     email: `team@${held.slug}`,

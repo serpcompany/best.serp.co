@@ -7,6 +7,7 @@ import {
   insert,
   listingStatements,
   type SeedStatement,
+  type SeedValue,
   suiteCatalogStatements
 } from './fixture-seed'
 import { BILLING_PREVIEW_VARS } from './orders-worker'
@@ -89,7 +90,10 @@ export function seedAdminCatalog(server: SuiteServer = adminServer): void {
 
 /**
  * The admin Worker's D1 file. Miniflare keeps each local D1 database as one SQLite file in WAL
- * mode, which this process can share with workerd.
+ * mode, which this process can open beside workerd. workerd waits for no lock, though: while
+ * this process writes the file, every query the Worker makes fails at once (`SQLITE_BUSY`,
+ * answered as a 500 "internal error"). A suite whose Worker serves another test meanwhile
+ * writes through `workerD1` instead (#200).
  */
 function databaseFile(server: SuiteServer): string {
   const directory = resolve(stateRoot(server), 'v3', 'd1', 'miniflare-D1DatabaseObject')
@@ -148,6 +152,64 @@ export function runStatements(
   }
 }
 
+/** The id of the local D1 database every preview Worker binds as `DB` (`wrangler.jsonc`). */
+const LOCAL_D1_DATABASE_ID = 'local-only-do-not-deploy'
+
+/** A seed statement with its values written in as SQL literals. */
+function inlined(statement: SeedStatement): string {
+  const values = [...statement.params]
+  let quoted = false
+  let sql = ''
+  for (const char of statement.sql) {
+    if (char === "'") quoted = !quoted
+    if (char !== '?' || quoted) {
+      sql += char
+      continue
+    }
+    if (values.length === 0) throw new Error(`Too few values for: ${statement.sql}`)
+    const value = values.shift() as SeedValue
+    sql += value === null ? 'NULL' : typeof value === 'number' ? String(value) : q(value)
+  }
+  if (values.length > 0) throw new Error(`Too many values for: ${statement.sql}`)
+  return sql
+}
+
+/**
+ * Runs SQL on a suite Worker's local D1 through the Worker's own D1 Durable Object, the one its
+ * `DB` binding queries: Wrangler's Local Explorer API (`/cdn-cgi/local/explorer/api`), which
+ * every local preview serves. Its statements queue behind the Worker's instead of locking the
+ * SQLite file under them, as `localD1` does (#200). A string may hold several statements; an
+ * array runs as one batch, in one transaction. Returns the last statement's rows.
+ */
+export async function workerD1<T = Record<string, unknown>>(
+  server: SuiteServer,
+  statements: string | readonly SeedStatement[]
+): Promise<T[]> {
+  const queries =
+    typeof statements === 'string'
+      ? [{ sql: statements }]
+      : statements.map(s => ({ sql: inlined(s) }))
+  const response = await fetch(
+    `${adminOrigin(server)}/cdn-cgi/local/explorer/api/d1/database/${LOCAL_D1_DATABASE_ID}/raw`,
+    {
+      body: JSON.stringify(queries.length === 1 ? queries[0] : { batch: queries }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    }
+  )
+  const body = (await response.json().catch(() => null)) as {
+    errors?: Array<{ message: string }>
+    result?: Array<{ results?: { columns?: string[]; rows?: unknown[][] } }>
+    success?: boolean
+  } | null
+  if (!response.ok || !body?.success) {
+    const message = body?.errors?.map(error => error.message).join('; ') || response.statusText
+    throw new Error(`Local D1 query failed (${response.status}): ${message}`)
+  }
+  const { columns = [], rows = [] } = body.result?.at(-1)?.results ?? {}
+  return rows.map(row => Object.fromEntries(columns.map((column, i) => [column, row[i]])) as T)
+}
+
 /** SQL string literal. */
 export function q(value: string): string {
   return `'${value.replaceAll("'", "''")}'`
@@ -158,7 +220,7 @@ export function unique(): string {
 }
 
 /** A documentation-range client IP per request context, for the local sign-in limits. */
-function uniqueIp(): string {
+export function uniqueIp(): string {
   const octet = () => Math.floor(Math.random() * 250) + 1
   return `198.19.${octet()}.${octet()}`
 }
