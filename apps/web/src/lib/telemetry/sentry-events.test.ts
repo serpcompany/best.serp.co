@@ -141,7 +141,8 @@ describe('what reaches Sentry (#211)', () => {
     Sentry.captureRequestError(
       error,
       {
-        headers: { cookie: `session=${PRIVATE}` },
+        // Staging's admin key (#408) is a header too.
+        headers: { cookie: `session=${PRIVATE}`, 'x-staging-admin-token': `key-${PRIVATE}` },
         method: 'GET',
         path: `/api/search/?q=${PRIVATE}`
       },
@@ -150,6 +151,7 @@ describe('what reaches Sentry (#211)', () => {
     const [event] = await waitForEvents(1)
     // The request data integration copied the cookie into the event, before the scrubber.
     expect(received[0]?.request?.headers?.cookie).toContain(PRIVATE)
+    expect(received[0]?.request?.headers?.['x-staging-admin-token']).toContain(PRIVATE)
     expect(event?.exception?.values).toEqual([
       expect.objectContaining({ type: 'Error', value: REDACTED_MESSAGE }),
       expect.objectContaining({ type: 'Error', value: REDACTED_MESSAGE })

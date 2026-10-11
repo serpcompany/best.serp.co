@@ -55,7 +55,8 @@ forbids `'use server'`): an action id is reachable from any path, so no path gat
 Every request passes, in order: the Worker's Cloudflare Access and session-cookie gate
 ([Accounts](./accounts.md#admin-gate)); `authorizeAdminRequest()`, which re-checks the session
 and the allowlist and, for any write, requires an `Origin` among the Worker's trusted origins
-(the CSRF check: every `*.serp.co` site is same-site, so `SameSite=Lax` alone is not enough);
+(the CSRF check: every `*.serp.co` site is same-site, so `SameSite=Lax` alone is not enough), or
+on staging takes the agents' key instead ([Staging admin key](./staging-admin-key.md));
 a JSON body (`application/json`, at most 64 KB) parsed by its schema (`lib/admin/schemas.ts`);
 then the decision (`lib/admin/decisions.ts`). Answers are JSON with `cache-control: private,
 no-store`: `200 {ok: true, replayed}`, or `{ok: false, error, message}` with 404, 409 (the state
@@ -263,12 +264,19 @@ taxonomy's included since #405. Its guards instead:
   change.
 
 Recovery is D1 Time Travel, run by the owner ([D1 recovery](./d1-recovery.md)). Nothing else in
-the app writes production data, and agents never use the production admin panel.
+the app writes production data, and agents never use the production admin panel. The staging
+admin key ([Staging admin key](./staging-admin-key.md)) is refused on production.
+
+## Staging admin key for agents (#408)
+
+On staging only, agents call `/api/admin/*` with a key instead of a session, as the fixed actor
+`staging-agent`, never to change the allowlist: [Staging admin key](./staging-admin-key.md).
 
 ## Tests
 
 `apps/web/src/db/{admin-plans,admin-queries,listing-plans,taxonomy-plans}.test.ts` and
-`apps/web/src/lib/admin/{decisions,taxonomy-decisions}.test.ts` (node:sqlite),
+`apps/web/src/lib/admin/{decisions,taxonomy-decisions,staging-agent}.test.ts` (node:sqlite; the
+last is the staging admin key through the route handlers),
 `scripts/d1-workerd-plans.test.ts` (every plan builder and read on Wrangler-local D1), and
 `apps/web/e2e/admin-panel.spec.ts` (Playwright: the gate, approve, request changes, reject, allow
 resubmission, unpublish with 410 and republish, a redirected duplicate's 308 (#338), the Tags field

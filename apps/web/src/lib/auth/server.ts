@@ -7,7 +7,8 @@ import 'server-only'
  *
  * - `requireUser()` / `requireAdmin()` for Server Components and route handlers: they return
  *   the signed-in user or interrupt with Next.js `unauthorized()` (401) / `forbidden()` (403).
- * - `authorizeAdminRequest()` returns the decision, for route handlers that answer JSON.
+ * - `authorizeAdminRequest()` returns the decision, for route handlers that answer JSON. On
+ *   staging it also takes the admin key for agents (#408, `staging-admin-key.ts`).
  *
  * Accounts that cannot be checked (missing binding, invalid settings) fail closed: the auth
  * route answers 503 and the guards never grant access.
@@ -40,6 +41,7 @@ import {
   resolveAuthSettings
 } from './settings'
 import { createSignInCodeEmail } from './sign-in-code-email'
+import { authorizeStagingAdminKey, hasStagingAdminKey } from './staging-admin-key'
 
 const runtimeEnvironments = new Set(['local', 'staging', 'production'])
 
@@ -192,10 +194,27 @@ export async function requireAdmin(): Promise<SessionUser> {
 }
 
 /**
+ * The admin decision for a request with staging's admin key (#408): `staging-agent` for the right
+ * key on staging, otherwise 401. It reads no session and sets no cookie.
+ */
+async function authorizeAdminKeyRequest(request: Request): Promise<Authorization> {
+  let env: CloudflareEnv
+  try {
+    env = (await getCloudflareContext({ async: true })).env as CloudflareEnv
+  } catch (error) {
+    logUnavailable(error)
+    return { ok: false, reason: 'auth_unavailable', status: 503 }
+  }
+  return authorizeStagingAdminKey(request, env)
+}
+
+/**
  * The admin decision for a route handler that answers its own JSON errors. A request that can
- * change state (anything but GET, HEAD, OPTIONS) must also carry a trusted `Origin`.
+ * change state (anything but GET, HEAD, OPTIONS) must also carry a trusted `Origin`. A request
+ * with staging's admin key header is judged by the key alone (#408), without the `Origin` check.
  */
 export async function authorizeAdminRequest(request: Request): Promise<Authorization> {
+  if (hasStagingAdminKey(request)) return authorizeAdminKeyRequest(request)
   let runtime: AccountRuntime
   try {
     runtime = await getAccountRuntime()

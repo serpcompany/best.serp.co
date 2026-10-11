@@ -33,6 +33,13 @@ export const stagingAccessSuiteEnabled = adminSuiteEnabled
 
 export const STAGING_ACCESS_TEST_PASSWORD = 'e2e-staging-password'
 
+/**
+ * Staging's admin key (#408) as this Worker's `STAGING_ADMIN_TOKEN`: a test value, never staging's
+ * own secret. A local Worker refuses every key, even serving as staging with the secret set, and
+ * the suite proves it.
+ */
+export const STAGING_ADMIN_TEST_KEY = 'e2e-staging-admin-key-refused-by-local-workers'
+
 export const stagingAccessServer: SuiteServer = {
   // +1 and +2 are the Access-lock Workers, +3 admin, +4 media, +5 account, +6 badge, +7 claims,
   // +8 the billing suite's mocked Stripe API (`orders-worker.ts`).
@@ -47,7 +54,11 @@ export function stagingAccessOrigin(): string {
 /** Serves the built Worker on a fresh, migrated D1 of its own, as staging. */
 export function stagingAccessServerCommand(): string {
   const state = stagingAccessServer.stateDirectory
-  const vars = `LOCAL_STAGING_ACCESS=on,STAGING_BASIC_AUTH_PASSWORD=${STAGING_ACCESS_TEST_PASSWORD}`
+  const vars = [
+    'LOCAL_STAGING_ACCESS=on',
+    `STAGING_ADMIN_TOKEN=${STAGING_ADMIN_TEST_KEY}`,
+    `STAGING_BASIC_AUTH_PASSWORD=${STAGING_ACCESS_TEST_PASSWORD}`
+  ].join(',')
   return [
     // The main run builds the Worker (`pnpm test:e2e`); alone, build it first (`pnpm build`).
     `test -f .open-next/worker.js || { echo 'No built Worker: pnpm build' >&2; exit 1; }`,
