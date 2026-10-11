@@ -150,8 +150,8 @@ approved, or its slug or links changed since the manifest'`.
 
 The manifest itself is refused when `resources` equals `expected` or repeats a link, or when a link
 not in `expected` breaks the owner edit's link rule: a trimmed label of 60 characters or fewer and a
-public https URL. A link the listing keeps is compared as stored, so an imported listing's longer
-list of links can still lose one.
+public https URL of 2,048 characters or fewer. A link the listing keeps is compared as stored, so an
+imported listing's longer list of links can still lose one.
 
 It sets `updated_at` (the sitemap `lastmod`), gives the listing a new checksum, so an owner revision
 or admin edit read before it is refused as stale instead of putting the old links back, and logs an

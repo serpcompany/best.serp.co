@@ -132,6 +132,31 @@ describe('a cached listing content tree (#334)', () => {
     expect(markup).toContain('href="mailto:sales@example.test">sales@example.test</a>')
   })
 
+  it('links no email that starts inside a word or has a letter outside ASCII (#383)', () => {
+    for (const text of [
+      // Not the word's tail (`user@…`) after `-`, `+` or `.`.
+      'naïve-user@example.test',
+      'naïve+user@example.test',
+      'café.user@example.test',
+      // Not `ſ` (U+017F) or the Kelvin sign (U+212A) as an ASCII letter.
+      'ſupport@example.test',
+      '\u212Aelvin@example.test',
+      // Upper- and mixed-case URL prefixes are still bare URLs.
+      'HTTPS://api.example.test/verify?email=foo@bar.test',
+      'WWW.example.test/contact?to=sales@example.test',
+      'HtTp://example.test/?to=sales@example.test'
+    ]) {
+      const markup = renderToStaticMarkup(cached(`See ${text} for details.`, false))
+      expect(markup).toContain(`See ${text} for details.`)
+      expect(markup).not.toContain('<a ')
+    }
+    const markup = renderToStaticMarkup(
+      cached('Write to first.last+tag@example.test or (ops-team@example.test).', false)
+    )
+    expect(markup).toContain('href="mailto:first.last+tag@example.test">first.last+tag@')
+    expect(markup).toContain('href="mailto:ops-team@example.test">ops-team@example.test</a>)')
+  })
+
   it('scans a long bare URL once, so hostile runs stay fast (#379 review)', () => {
     // Each run, 20 KB without whitespace, is followed by 200 emails. Checking the text before
     // each email for a URL took about 19 s on this body; one forward scan takes milliseconds.

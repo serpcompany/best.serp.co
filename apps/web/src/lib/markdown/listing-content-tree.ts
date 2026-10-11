@@ -53,15 +53,20 @@ function remarkGfmWithoutUrlLiterals(this: Processor) {
  * address stays text whole too (`/john.doe@…` does not link `doe@…`). Both are returned as text
  * rather than `false`, which would retry the search one character on, inside them; this way the
  * search never goes back, so a long URL costs its length once (#379).
+ *
+ * A match after `-`, `+` or `.` started inside a longer word, behind a letter `\w` lacks
+ * (`naïve-user@…`), so it is rejected rather than linking the word's tail; one character is
+ * checked, without a rescan (#383). The pattern has no `i` flag, which with `u` would let `\w`
+ * match `ſ` and the Kelvin sign; the URL prefixes spell both cases instead.
  */
 function linkBareEmails(tree: MarkdownRoot) {
   findAndReplace(
     tree,
     [
-      /(?:https?:\/\/|www\.)\S*|(?<=^|\s|\p{P}|\p{S})([-.\w+]+)@([-\w]+(?:\.[-\w]+)+)/giu,
+      /(?:[Hh][Tt][Tt][Pp][Ss]?:\/\/|[Ww]{3}\.)\S*|(?<=^|\s|\p{P}|\p{S})([-.\w+]+)@([-\w]+(?:\.[-\w]+)+)/gu,
       (text: string, _local: unknown, domain: string | undefined, match: RegExpMatchObject) =>
         domain === undefined || // a bare URL
-        match.input.charAt(match.index - 1) === '/' ||
+        /[-+./]/u.test(match.input.charAt(match.index - 1)) ||
         /[-\d_]$/u.test(domain)
           ? text
           : {
