@@ -91,9 +91,10 @@ fixture sites on the site's flags.
      owner gets `listing-unlisted`; there is no automatic restore (paying, #68, is the way back).
      A badge-claimed listing **loses its owner** (`badge_removed`; the listing stays up as
      curated) and the former owner gets `ownership-removed`. As a run records its rechecks one at
-     a time, only an outside writer (an admin decision or an overlapping run) can beat a recheck
-     to the catalog version. The recheck then retries once; otherwise nothing is recorded and the
-     next run rechecks.
+     a time, only another writer of the catalog version can beat a recheck to it, such as an
+     admin decision, a paid checkout's fulfilment, a completed claim, the media job, or an
+     overlapping run. The recheck then retries once; otherwise nothing is recorded and the next
+     run rechecks.
 - **Idempotency.** Every write is a compare-and-swap on that state, and each email goes through
   the email ledger under `<template>:<check id>`, so a replayed or overlapping trigger never
   records a check, unpublishes, or emails twice. Writing a check never moves the catalog epoch;

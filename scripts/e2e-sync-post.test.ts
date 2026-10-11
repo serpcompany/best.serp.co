@@ -68,32 +68,65 @@ describe('the e2e fixtures’ synchronous POST (#389)', () => {
     ['throws', "throw new Error('the request thread crashed')"],
     ['calls process.exit', 'process.exit(3)']
   ])('wakes a call already waiting when its thread %s (#402)', async (_, stop) => {
-    // The thread's source gets one more listener, which stops it 200 ms after a request arrives,
-    // while the call waits on a server that never answers (the thread's own timeout is 30 s).
-    vi.resetModules()
-    vi.doMock('node:worker_threads', async importOriginal => {
-      const actual = await importOriginal<typeof import('node:worker_threads')>()
-      class StoppingWorker extends actual.Worker {
-        constructor(source: string, options: WorkerOptions) {
-          super(`${source}\nport.on('message', () => setTimeout(() => { ${stop} }, 200))`, options)
-        }
-      }
-      return { ...actual, Worker: StoppingWorker }
+    const { poster } = await stoppingPoster(stop)
+    const started = Date.now()
+    // `exiting`: the wake came from the thread's exit handler, as the caller's thread can't take
+    // the `exit` event while it waits.
+    expect(() => poster.post(`${origin}/hang`, '{}')).toThrow(
+      /\/hang failed: the request thread stopped \(exiting\)\.$/u
+    )
+    expect(Date.now() - started).toBeLessThan(5_000)
+    await new Promise(resolve => poster.thread.once('exit', resolve))
+  })
+
+  it('wakes a call whose thread exits between its check and its wait (#402)', async () => {
+    const { poster, state } = await stoppingPoster('process.exit(3)', 1_000)
+    const now = Date.now.bind(Date)
+    let reads = 0
+    // post() reads the clock for its deadline, then again between its EXITING check and its
+    // wait. Holding that second read until the exit handler has notified on the reply count
+    // (index 0) starts the wait after the exit.
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => {
+      if (++reads === 2) Atomics.wait(state, 0, 0, 5_000)
+      return now()
     })
+    const started = now()
     try {
-      const { startSyncPoster: startStopping } = await import('../apps/web/e2e/sync-post')
-      const poster = startStopping()
-      const started = Date.now()
-      // `exiting`: the wake came from the thread's exit handler, as the caller's thread can't take
-      // the `exit` event while it waits.
-      expect(() => poster.post(`${origin}/hang`, '{}')).toThrow(
-        /\/hang failed: the request thread stopped \(exiting\)\.$/u
-      )
-      expect(Date.now() - started).toBeLessThan(5_000)
-      await new Promise(resolve => poster.thread.once('exit', resolve))
+      expect(() => poster.post(`${origin}/hang`, '{}')).toThrow(/stopped \(exiting\)\.$/u)
     } finally {
-      vi.doUnmock('node:worker_threads')
-      vi.resetModules()
+      clock.mockRestore()
     }
+    // Unless the exit changed the count, the wait sleeps to the deadline: the timeout plus 5 s.
+    expect(now() - started).toBeLessThan(2_000)
+    await new Promise(resolve => poster.thread.once('exit', resolve))
   })
 })
+
+/**
+ * A poster from a fresh import of `sync-post.ts` whose request thread's source gets one more
+ * listener, which runs `stop` 200 ms after a request arrives, while the call waits on a server
+ * that never answers. `state` is the thread's shared state.
+ */
+async function stoppingPoster(stop: string, timeoutMs?: number) {
+  let state: Int32Array | undefined
+  vi.resetModules()
+  vi.doMock('node:worker_threads', async importOriginal => {
+    const actual = await importOriginal<typeof import('node:worker_threads')>()
+    class StoppingWorker extends actual.Worker {
+      constructor(source: string, options: WorkerOptions) {
+        state = (options.workerData as { state: Int32Array }).state
+        super(`${source}\nport.on('message', () => setTimeout(() => { ${stop} }, 200))`, options)
+      }
+    }
+    return { ...actual, Worker: StoppingWorker }
+  })
+  try {
+    const { startSyncPoster: start } = await import('../apps/web/e2e/sync-post')
+    const poster = start(timeoutMs)
+    if (!state) throw new Error('The request thread was not started.')
+    return { poster, state }
+  } finally {
+    vi.doUnmock('node:worker_threads')
+    vi.resetModules()
+  }
+}
