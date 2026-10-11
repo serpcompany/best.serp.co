@@ -17,10 +17,22 @@ import {
 } from '../apps/web/src/db/media-keys'
 import {
   listingHasQueuedSubmission,
-  listingInRetiredCategory
+  listingInRetiredCategory,
+  type StatementPlan
 } from '../apps/web/src/db/plan-support'
 import { validatePublicHttpUrl } from '../apps/web/src/db/public-url'
 import { BEST_PAGE_LIST_SIZE, taxonomyRedirectSourceKinds } from '../apps/web/src/db/schema'
+import {
+  bestPageColumns,
+  categoryCreateStatement,
+  categoryUnpublishStatements,
+  exclusionsJson,
+  pinsJson,
+  REASONED_GUARD_FAILURE,
+  sameTarget,
+  taxonomyBatchChecks,
+  taxonomyOperationStatements
+} from '../apps/web/src/db/taxonomy-plans'
 import { hasFileExtension } from '../apps/web/src/lib/seo/canonical-url'
 import { isReservedListingSlug } from '../apps/web/src/lib/site'
 import { assertD1Compatible } from './d1-compat'
@@ -47,13 +59,14 @@ import {
 export const GUARD_FAILURE = "json_extract('', '$')"
 /** Refuses the batch unless the statement right before it changed exactly one row. */
 const CHANGED_ONE_GUARD = `SELECT CASE WHEN changes()=1 THEN 1 ELSE ${GUARD_FAILURE} END`
+
 /**
  * A guard failure that says why (#338 review): it rolls the batch back like `GUARD_FAILURE`, and
  * D1 names the reason in its error (`bad JSON path: '<reason>'`), so the workflow's log says what
- * to fix. The reason names manifest values (slugs), so it is bound like every runtime value: the
- * statement binds it as the parameter for this `?`, its last.
+ * to fix. It lives with the taxonomy's shared statements (`apps/web/src/db/taxonomy-plans.ts`),
+ * which the admin panel builds too (#405).
  */
-export const REASONED_GUARD_FAILURE = "json_extract('{}', ?)"
+export { REASONED_GUARD_FAILURE }
 
 /** A slug that already exists; renaming or unpublishing it must stay possible. */
 const existingSlug = z.string().regex(/^[a-z0-9.-]+$/)
@@ -96,8 +109,10 @@ const category = z
   })
   .strict()
 /**
- * The taxonomy (#341): tags and best pages are written only by manifests (design 4.1). Their
- * slugs have a category's shape: `/products/tags/<slug>/` and `/best/<slug>/`.
+ * The taxonomy (#341): tags and best pages are written by manifests (design 4.1) and, since #405
+ * replaced design default 12 by the owner's decision, by the admin panel, on the same statements
+ * (`apps/web/src/db/taxonomy-plans.ts`). Their slugs have a category's shape:
+ * `/products/tags/<slug>/` and `/best/<slug>/`.
  */
 const taxonomySlug = categorySlug
 /** Text a page shows: never empty or only whitespace. */
@@ -131,7 +146,6 @@ const bestPageState = z
     order: z.number().int().nonnegative()
   })
   .strict()
-type BestPageState = z.infer<typeof bestPageState>
 /** A listing a best page pins or excludes: its id and slug, as the row-level guards compare. */
 const listingRef = z.object({ id: listingId, slug: existingSlug }).strict()
 const bestPagePins = z
@@ -164,51 +178,6 @@ const bestPageListings = z
         message: `Listing ${key} is pinned or excluded twice.`
       })
   })
-/** A best page's pins as its guard compares them: `[id, slug, blurb]` in position order. */
-const pinsJson = (pins: BestPageListings['pins']): string =>
-  JSON.stringify(pins.map(pin => [pin.id, pin.slug, pin.blurb ?? null]))
-/** A best page's exclusions as its guard compares them: `[id, slug]` ordered by id. */
-const exclusionsJson = (exclude: BestPageListings['exclude']): string =>
-  JSON.stringify(
-    exclude
-      .map(entry => [entry.id, entry.slug])
-      .sort(([a = ''], [b = '']) => (a < b ? -1 : a > b ? 1 : 0))
-  )
-/**
- * The `best_pages` columns a best page's state writes, each with its value's SQL, bound from
- * `bestPageColumns` in this order. A null tag or category binds null, so its id is null.
- */
-const BEST_PAGE_WRITES = {
-  keyword: '?',
-  title: '?',
-  heading: '?',
-  intro: '?',
-  tag_id: '(SELECT id FROM tags WHERE slug=?)',
-  category_id: '(SELECT id FROM categories WHERE slug=?)',
-  list_size: '?',
-  keyword_volume: '?',
-  keyword_checked_at: '?',
-  sort_order: '?'
-} as const
-/** A best page's state in `BEST_PAGE_WRITES` order, as `best-page-update` compares and writes it. */
-const bestPageColumns = (page: BestPageState) => [
-  page.keyword,
-  page.title,
-  page.heading,
-  page.intro,
-  page.tag,
-  page.category,
-  page.listSize,
-  page.keywordVolume,
-  page.keywordCheckedAt,
-  page.order
-]
-/** A redirect target as `[kind, slug]`, the shape its guard compares (`slug` null for `/products/`). */
-function targetPair(target: TaxonomyTarget): [string, string | null] {
-  return [target.kind, target.kind === 'directory' ? null : target.slug]
-}
-const sameTarget = (a: TaxonomyTarget | null, b: TaxonomyTarget | null): boolean =>
-  JSON.stringify(a && targetPair(a)) === JSON.stringify(b && targetPair(b))
 const resource = z.object({ label: z.string().min(1), url: z.string().url() }).strict()
 /**
  * A resource link exactly as a listing stores it (`listing_resource_links`): what
@@ -1120,6 +1089,9 @@ export interface PublicationDatabase {
 
 const hash = (value: string): string => createHash('sha256').update(value).digest('hex')
 const statement = (query: string, ...bindings: unknown[]): PlannedStatement => ({ query, bindings })
+/** The shared plan builders' statements (`{ sql, params }`) in the publisher's shape. */
+const planned = (plans: readonly StatementPlan[]): PlannedStatement[] =>
+  plans.map(plan => statement(plan.sql, ...plan.params))
 function membershipGuard(id: string, expected: string[]): PlannedStatement {
   return statement(
     `SELECT CASE WHEN (SELECT COUNT(*) FROM listing_categories lc JOIN categories c ON c.id=lc.category_id WHERE lc.listing_id=? AND c.is_active=1)=? AND NOT EXISTS (SELECT 1 FROM listing_categories lc JOIN categories c ON c.id=lc.category_id WHERE lc.listing_id=? AND c.is_active=1 AND c.slug NOT IN (${expected.map(() => '?').join(', ')})) THEN 1 ELSE ${GUARD_FAILURE} END`,
@@ -1152,192 +1124,15 @@ function categoriesGuard(id: string, slug: string, expected: string[]): PlannedS
     JSON.stringify(expected)
   )
 }
-/**
- * Taxonomy guards (#344) refuse with their reason (`REASONED_GUARD_FAILURE`, bound last): a batch
- * of thousands of operations names the one that failed, and why.
- */
-function guard(condition: string, reason: string, ...bindings: unknown[]): PlannedStatement {
-  return statement(
-    `SELECT CASE WHEN ${condition} THEN 1 ELSE ${REASONED_GUARD_FAILURE} END`,
-    ...bindings,
-    reason
-  )
-}
 /** Refuses the batch, with `reason`, unless the statement right before it changed one row. */
 const changedOne = (reason: string): PlannedStatement =>
   statement(`SELECT CASE WHEN changes()=1 THEN 1 ELSE ${REASONED_GUARD_FAILURE} END`, reason)
-
-const TAXONOMY_TABLES = { best: 'best_pages', category: 'categories', tag: 'tags' } as const
-const TARGET_ID_COLUMNS = {
-  best: 'target_best_page_id',
-  category: 'target_category_id',
-  tag: 'target_tag_id'
-} as const
-/** A listing's tags as `listing-tags-set` compares them: slugs by sort order, then slug. */
-const CURRENT_TAGS_JSON =
-  '(SELECT json_group_array(slug) FROM (SELECT t.slug FROM listing_tags lt JOIN tags t ON t.id=lt.tag_id WHERE lt.listing_id=? ORDER BY lt.sort_order, t.slug))'
-/** A redirect source's current target as `[kind, slug]` (`slug` null for `/products/`), or null. */
-const CURRENT_REDIRECT_TARGET =
-  '(SELECT json_array(r.target_kind, COALESCE(c.slug, t.slug, b.slug)) FROM taxonomy_redirects r LEFT JOIN categories c ON c.id=r.target_category_id LEFT JOIN tags t ON t.id=r.target_tag_id LEFT JOIN best_pages b ON b.id=r.target_best_page_id WHERE r.source_kind=? AND r.source_slug=?)'
-/** A best page's pins (`?` its slug), compared with `pinsJson`. */
-const CURRENT_PINS_JSON =
-  '(SELECT json_group_array(json_array(id, slug, blurb)) FROM (SELECT l.id, l.slug, bpl.blurb FROM best_page_listings bpl JOIN best_pages b ON b.id=bpl.best_page_id JOIN listings l ON l.id=bpl.listing_id WHERE b.slug=? AND bpl.excluded=0 ORDER BY bpl.position))'
-/** A best page's exclusions (`?` its slug), compared with `exclusionsJson`. */
-const CURRENT_EXCLUSIONS_JSON =
-  '(SELECT json_group_array(json_array(id, slug)) FROM (SELECT l.id, l.slug FROM best_page_listings bpl JOIN best_pages b ON b.id=bpl.best_page_id JOIN listings l ON l.id=bpl.listing_id WHERE b.slug=? AND bpl.excluded=1 ORDER BY l.id))'
 
 /** The page a redirect target names: its own URL, or `/products/`. */
 function targetRoute(target: TaxonomyTarget): string {
   if (target.kind === 'directory') return listingIndexRoute()
   if (target.kind === 'category') return categoryRoute(target.slug)
   return target.kind === 'tag' ? tagRoute(target.slug) : bestRoute(target.slug)
-}
-/** The id of slug `?` in `table`, or NULL for a column the target doesn't set. */
-const idOf = (table: string, set: boolean) =>
-  set ? `(SELECT id FROM ${table} WHERE slug=?)` : 'NULL'
-/**
- * A redirect target's columns, `target_kind` then the category, tag, and best page ids, as SQL
- * expressions and their bindings. Exactly the target's own id is set, as the table's CHECK
- * requires; the guards have already found it active.
- */
-function targetColumns(target: TaxonomyTarget): { bindings: unknown[]; sql: string[] } {
-  return {
-    bindings: [target.kind, ...(target.kind === 'directory' ? [] : [target.slug])],
-    sql: [
-      '?',
-      idOf('categories', target.kind === 'category'),
-      idOf('tags', target.kind === 'tag'),
-      idOf('best_pages', target.kind === 'best')
-    ]
-  }
-}
-const KIND_NOUNS = { best: 'best page', category: 'category', tag: 'tag' } as const
-/**
- * Refuses the batch unless `target` is an active category, tag, or best page (`/products/`
- * always is). `role` names it in the reason: a redirect's target, a best page's pool, a tag's hub.
- */
-function targetActiveGuard(
-  target: TaxonomyTarget,
-  label: string,
-  role = 'the redirect target'
-): PlannedStatement[] {
-  if (target.kind === 'directory') return []
-  return [
-    guard(
-      `EXISTS (SELECT 1 FROM ${TAXONOMY_TABLES[target.kind]} WHERE slug=? AND is_active=1)`,
-      `${label}: ${role} ${KIND_NOUNS[target.kind]} ${target.slug} is missing or retired`,
-      target.slug
-    )
-  ]
-}
-/**
- * Refuses a redirect that would make a chain or a loop (design 2.2: no chains), as
- * `listing-slug-redirect` does for listings: `to`'s own URL already redirects, or a redirect
- * already ends at `from`. A page wins over its redirect, so either would become a second hop once
- * that page empties or retires. Retiring a tag or best page is how a URL that others point at
- * moves: it re-points them (`retireWithRedirect`).
- */
-function redirectChainGuard(
-  from: { kind: keyof typeof TAXONOMY_TABLES; slug: string },
-  to: TaxonomyTarget,
-  label: string
-): PlannedStatement {
-  const endsAtSource = `EXISTS (SELECT 1 FROM taxonomy_redirects WHERE ${TARGET_ID_COLUMNS[from.kind]}=(SELECT id FROM ${TAXONOMY_TABLES[from.kind]} WHERE slug=?))`
-  const reason = `${label}: this would make a chain: the target redirects too, or a redirect already ends at this URL`
-  if (to.kind === 'directory') return guard(`NOT ${endsAtSource}`, reason, from.slug)
-  return guard(
-    `NOT EXISTS (SELECT 1 FROM taxonomy_redirects WHERE source_kind=? AND source_slug=?) AND NOT ${endsAtSource}`,
-    reason,
-    to.kind,
-    to.slug,
-    from.slug
-  )
-}
-/** Inserts the redirect of `kind` `slug` to `target`; the caller has removed any earlier one. */
-function insertRedirect(
-  kind: string,
-  slug: string,
-  target: TaxonomyTarget,
-  manifestId: string,
-  now: string
-): PlannedStatement {
-  const columns = targetColumns(target)
-  return statement(
-    `INSERT INTO taxonomy_redirects (source_kind,source_slug,target_kind,target_category_id,target_tag_id,target_best_page_id,manifest_id,created_at) VALUES (?,?,${columns.sql.join(',')},?,?)`,
-    kind,
-    slug,
-    ...columns.bindings,
-    manifestId,
-    now
-  )
-}
-/**
- * Retires the active tag or best page `slug` (`tag-unpublish`, `best-page-unpublish`) and sends
- * its URL to `target`, which must be active. Every redirect aimed at it is re-pointed to the same
- * target, so a redirect never leads to a retired page or through a second hop (design 2.2). A
- * redirect from the target's own URL would then point at itself, so it is removed instead: while
- * the target is active its page renders, and if it retires later, its own retirement writes the
- * redirect for that URL. A redirect from the target's own URL to anywhere else refuses the batch:
- * it would be a second hop.
- */
-function retireWithRedirect(
-  kind: 'best' | 'tag',
-  slug: string,
-  target: TaxonomyTarget,
-  label: string,
-  manifestId: string,
-  now: string
-): PlannedStatement[] {
-  const table = TAXONOMY_TABLES[kind]
-  const column = TARGET_ID_COLUMNS[kind]
-  const columns = targetColumns(target)
-  return [
-    ...targetActiveGuard(target, label),
-    statement(
-      `UPDATE ${table} SET is_active=0,updated_at=? WHERE slug=? AND is_active=1`,
-      now,
-      slug
-    ),
-    changedOne(`${label}: no active ${KIND_NOUNS[kind]} has this slug`),
-    ...(target.kind === 'directory'
-      ? []
-      : [
-          // A redirect from the target's own URL to anywhere else would be a second hop.
-          guard(
-            `NOT EXISTS (SELECT 1 FROM taxonomy_redirects WHERE source_kind=? AND source_slug=? AND ${column} IS NOT (SELECT id FROM ${table} WHERE slug=?))`,
-            `${label}: the redirect target itself redirects elsewhere; this would make a chain`,
-            target.kind,
-            target.slug,
-            slug
-          ),
-          statement(
-            `DELETE FROM taxonomy_redirects WHERE source_kind=? AND source_slug=? AND ${column}=(SELECT id FROM ${table} WHERE slug=?)`,
-            target.kind,
-            target.slug,
-            slug
-          )
-        ]),
-    statement(
-      `UPDATE taxonomy_redirects SET target_kind=${columns.sql[0]},target_category_id=${columns.sql[1]},target_tag_id=${columns.sql[2]},target_best_page_id=${columns.sql[3]},manifest_id=? WHERE ${column}=(SELECT id FROM ${table} WHERE slug=?)`,
-      ...columns.bindings,
-      manifestId,
-      slug
-    ),
-    statement('DELETE FROM taxonomy_redirects WHERE source_kind=? AND source_slug=?', kind, slug),
-    insertRedirect(kind, slug, target, manifestId, now)
-  ]
-}
-/** Refuses the batch unless the named tag and category of a best page's pool are active. */
-function poolGuards(
-  page: { category: string | null; tag: string | null },
-  label: string
-): PlannedStatement[] {
-  return [
-    ...(page.tag === null ? [] : targetActiveGuard({ kind: 'tag', slug: page.tag }, label, 'the')),
-    ...(page.category === null
-      ? []
-      : targetActiveGuard({ kind: 'category', slug: page.category }, label, 'the'))
-  ]
 }
 /** The routes a best page's pool shows on: its tag's page and its category's. */
 function poolRoutes(page: { category: string | null; tag: string | null }): string[] {
@@ -1517,11 +1312,9 @@ export function publicationBase(
 }
 /**
  * A taxonomy operation's statements (#341 design 4.1, #344), adding the pages it changes to
- * `routes`. Every guard runs before the write it protects, so a refusal writes nothing, and every
- * value is bound, the guards' reasons too. Tags and listing tags are written
- * with `UPDATE`, or `INSERT … SELECT … WHERE is_active=1`, never an upsert: SQLite fires a
- * `BEFORE INSERT` trigger on an upsert's attempted insert even when it becomes an update, so an
- * upsert touching a retired tag would be refused (`0013_taxonomy_triggers.sql`).
+ * `routes`. The statements are the taxonomy's shared ones (`apps/web/src/db/taxonomy-plans.ts`),
+ * which the admin panel builds too (#405): every guard runs before the write it protects, so a
+ * refusal writes nothing, and every value is bound, the guards' reasons too.
  */
 function taxonomyStatements(
   op: TaxonomyOperation,
@@ -1530,272 +1323,48 @@ function taxonomyStatements(
   routes: Set<string>
 ): PlannedStatement[] {
   switch (op.action) {
-    case 'tag-create': {
-      const label = `tag-create ${op.tag.slug}`
+    case 'tag-create':
       routes.add(tagRoute(op.tag.slug)).add(tagIndexRoute()).add(categoryRoute(op.tag.category))
-      return [
-        guard(
-          'NOT EXISTS (SELECT 1 FROM tags WHERE slug=?)',
-          `${label}: a tag has this slug, active or retired`,
-          op.tag.slug
-        ),
-        statement(
-          'INSERT INTO tags (slug,name,description,category_id,sort_order,is_active,created_at,updated_at) SELECT ?,?,?,id,?,1,?,? FROM categories WHERE slug=? AND is_active=1',
-          op.tag.slug,
-          op.tag.name,
-          op.tag.description,
-          op.tag.order,
-          now,
-          now,
-          op.tag.category
-        ),
-        changedOne(`${label}: the category ${op.tag.category} is missing or retired`)
-      ]
-    }
-    case 'tag-update': {
-      const label = `tag-update ${op.slug}`
+      break
+    case 'tag-update':
       routes
         .add(tagRoute(op.slug))
         .add(tagIndexRoute())
         .add(categoryRoute(op.expected.category))
         .add(categoryRoute(op.tag.category))
-      return [
-        guard(
-          'EXISTS (SELECT 1 FROM tags t JOIN categories c ON c.id=t.category_id WHERE t.slug=? AND t.name=? AND t.description=? AND c.slug=?)',
-          `${label}: the tag is missing or not as expected`,
-          op.slug,
-          op.expected.name,
-          op.expected.description,
-          op.expected.category
-        ),
-        ...targetActiveGuard({ kind: 'category', slug: op.tag.category }, label, 'the'),
-        // A retired tag stays retired: `is_active` is not written.
-        statement(
-          'UPDATE tags SET name=?,description=?,category_id=(SELECT id FROM categories WHERE slug=?),sort_order=?,updated_at=? WHERE slug=?',
-          op.tag.name,
-          op.tag.description,
-          op.tag.category,
-          op.tag.order,
-          now,
-          op.slug
-        )
-      ]
-    }
-    case 'tag-unpublish': {
-      const label = `tag-unpublish ${op.slug}`
+      break
+    case 'tag-unpublish':
       routes.add(tagRoute(op.slug)).add(tagIndexRoute()).add(targetRoute(op.redirect))
-      return [
-        guard(
-          'NOT EXISTS (SELECT 1 FROM best_pages b JOIN tags t ON t.id=b.tag_id WHERE t.slug=? AND b.is_active=1)',
-          `${label}: an active best page uses the tag`,
-          op.slug
-        ),
-        ...retireWithRedirect('tag', op.slug, op.redirect, label, manifest.id, now)
-      ]
-    }
-    case 'listing-tags-set': {
-      const label = `listing-tags-set ${op.slug}`
+      break
+    case 'listing-tags-set':
       routes.add(listingRoute(op.slug)).add(tagIndexRoute())
       for (const tag of [...op.expected, ...op.tags]) routes.add(tagRoute(tag))
-      return [
-        // Approved, live or unpublished: the migration re-files unpublished listings too (1.5).
-        guard(
-          "EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=? AND status='approved')",
-          `${label}: no approved listing has this id and slug`,
-          op.id,
-          op.slug
-        ),
-        guard(
-          `${CURRENT_TAGS_JSON}=?`,
-          `${label}: its tags are not the expected ones`,
-          op.id,
-          JSON.stringify(op.expected)
-        ),
-        statement('DELETE FROM listing_tags WHERE listing_id=?', op.id),
-        // A missing or retired tag inserts nothing: refused.
-        ...op.tags.flatMap((tag, order) => [
-          statement(
-            'INSERT INTO listing_tags (listing_id,tag_id,sort_order) SELECT ?,id,? FROM tags WHERE slug=? AND is_active=1',
-            op.id,
-            order,
-            tag
-          ),
-          changedOne(`${label}: the tag ${tag} is missing or retired`)
-        ]),
-        // The page shows its tags: sitemap lastmod (#218). The checksum stays, so a revision or a
-        // paid submission read before this still applies (design 4.1).
-        statement('UPDATE listings SET updated_at=? WHERE id=?', now, op.id),
-        statement(
-          "INSERT INTO listing_events (listing_id,event_type,detail,actor) VALUES (?,'edited',?,?)",
-          op.id,
-          JSON.stringify({
-            fields: ['tags'],
-            manifest: manifest.id,
-            from: op.expected,
-            to: op.tags
-          }),
-          manifest.provenance.actor
-        )
-      ]
-    }
-    case 'best-page-create': {
-      const { page } = op
-      const label = `best-page-create ${page.slug}`
-      routes.add(bestRoute(page.slug)).add(bestIndexRoute())
-      for (const route of poolRoutes(page)) routes.add(route)
-      return [
-        guard(
-          'NOT EXISTS (SELECT 1 FROM best_pages WHERE slug=?)',
-          `${label}: a best page has this slug, active or retired`,
-          page.slug
-        ),
-        ...poolGuards(page, label),
-        statement(
-          `INSERT INTO best_pages (slug,${Object.keys(BEST_PAGE_WRITES).join(',')},is_active,created_at,updated_at) VALUES (?,${Object.values(BEST_PAGE_WRITES).join(',')},1,?,?)`,
-          page.slug,
-          ...bestPageColumns(page),
-          now,
-          now
-        )
-      ]
-    }
-    case 'best-page-update': {
-      const { expected, page } = op
-      const label = `best-page-update ${op.slug}`
+      break
+    case 'best-page-create':
+      routes.add(bestRoute(op.page.slug)).add(bestIndexRoute())
+      for (const route of poolRoutes(op.page)) routes.add(route)
+      break
+    case 'best-page-update':
       routes.add(bestRoute(op.slug)).add(bestIndexRoute())
-      for (const route of [...poolRoutes(expected), ...poolRoutes(page)]) routes.add(route)
-      return [
-        // `IS`: the tag, category, volume, and check date may each be null.
-        guard(
-          'EXISTS (SELECT 1 FROM best_pages b LEFT JOIN tags t ON t.id=b.tag_id LEFT JOIN categories c ON c.id=b.category_id WHERE b.slug=? AND b.keyword=? AND b.title=? AND b.heading=? AND b.intro=? AND t.slug IS ? AND c.slug IS ? AND b.list_size=? AND b.keyword_volume IS ? AND b.keyword_checked_at IS ? AND b.sort_order=?)',
-          `${label}: the best page is missing or not as expected`,
-          op.slug,
-          ...bestPageColumns(expected)
-        ),
-        ...poolGuards(page, label),
-        statement(
-          `UPDATE best_pages SET ${Object.entries(BEST_PAGE_WRITES)
-            .map(([column, value]) => `${column}=${value}`)
-            .join(',')},updated_at=? WHERE slug=?`,
-          ...bestPageColumns(page),
-          now,
-          op.slug
-        )
-      ]
-    }
-    case 'best-page-listings-set': {
-      const label = `best-page-listings-set ${op.slug}`
+      for (const route of [...poolRoutes(op.expected), ...poolRoutes(op.page)]) routes.add(route)
+      break
+    case 'best-page-listings-set':
       routes.add(bestRoute(op.slug)).add(bestIndexRoute())
-      const insert = (
-        entry: { id: string; slug: string },
-        values: string,
-        ...bindings: unknown[]
-      ) => [
-        statement(
-          `INSERT INTO best_page_listings (best_page_id,listing_id,position,excluded,blurb) SELECT (SELECT id FROM best_pages WHERE slug=?),id,${values} FROM listings WHERE id=? AND slug=? AND status='approved'`,
-          op.slug,
-          ...bindings,
-          entry.id,
-          entry.slug
-        ),
-        changedOne(`${label}: no approved listing is ${entry.slug} (${entry.id})`)
-      ]
-      return [
-        // The page changed: its sitemap lastmod. Also the check that the page exists.
-        statement('UPDATE best_pages SET updated_at=? WHERE slug=?', now, op.slug),
-        changedOne(`${label}: no best page has this slug`),
-        guard(
-          `${CURRENT_PINS_JSON}=? AND ${CURRENT_EXCLUSIONS_JSON}=?`,
-          `${label}: its pins and exclusions are not the expected ones`,
-          op.slug,
-          pinsJson(op.expected.pins),
-          op.slug,
-          exclusionsJson(op.expected.exclude)
-        ),
-        statement(
-          'DELETE FROM best_page_listings WHERE best_page_id=(SELECT id FROM best_pages WHERE slug=?)',
-          op.slug
-        ),
-        // `excluded` is the literal 0 or 1, never a bound boolean (#339 review).
-        ...op.pins.flatMap((pin, index) => insert(pin, '?,0,?', index + 1, pin.blurb ?? null)),
-        ...op.exclude.flatMap(entry => insert(entry, 'NULL,1,NULL'))
-      ]
-    }
-    case 'best-page-unpublish': {
-      const label = `best-page-unpublish ${op.slug}`
+      break
+    case 'best-page-unpublish':
       routes.add(bestRoute(op.slug)).add(bestIndexRoute()).add(targetRoute(op.redirect))
-      return retireWithRedirect('best', op.slug, op.redirect, label, manifest.id, now)
-    }
-    case 'taxonomy-redirect-set': {
-      const { expected, from, to } = op
-      const label = `taxonomy-redirect-set ${from.kind} ${from.slug}`
-      routes.add(targetRoute(from)).add(targetRoute(to))
-      const columns = targetColumns(to)
-      return [
-        guard(
-          `${CURRENT_REDIRECT_TARGET} IS ?`,
-          `${label}: its current target is not the expected one`,
-          from.kind,
-          from.slug,
-          expected === null ? null : JSON.stringify(targetPair(expected))
-        ),
-        ...targetActiveGuard(to, label),
-        redirectChainGuard(from, to, label),
-        expected === null
-          ? insertRedirect(from.kind, from.slug, to, manifest.id, now)
-          : statement(
-              `UPDATE taxonomy_redirects SET target_kind=${columns.sql[0]},target_category_id=${columns.sql[1]},target_tag_id=${columns.sql[2]},target_best_page_id=${columns.sql[3]},manifest_id=? WHERE source_kind=? AND source_slug=?`,
-              ...columns.bindings,
-              manifest.id,
-              from.kind,
-              from.slug
-            )
-      ]
-    }
+      break
+    case 'taxonomy-redirect-set':
+      routes.add(targetRoute(op.from)).add(targetRoute(op.to))
+      break
   }
-}
-/**
- * Checks after a batch's last operation (#344, the ordering gap #338's review found): a later
- * operation in the same batch can retire what an earlier one pointed at. `category-unpublish`
- * re-points nothing, so retiring a category after a redirect to it, or after a best page drawing
- * on it, would leave a redirect to a retired page or an active best page on a retired hub.
- * Either refuses the whole batch, whatever the order of its operations.
- */
-function taxonomyBatchChecks(manifest: PublicationManifest): PlannedStatement[] {
-  return manifest.operations.flatMap(op => {
-    const redirect =
-      op.action === 'taxonomy-redirect-set'
-        ? {
-            kind: op.from.kind,
-            label: `${op.action} ${op.from.kind} ${op.from.slug}`,
-            slug: op.from.slug
-          }
-        : op.action === 'tag-unpublish'
-          ? { kind: 'tag', label: `${op.action} ${op.slug}`, slug: op.slug }
-          : op.action === 'best-page-unpublish'
-            ? { kind: 'best', label: `${op.action} ${op.slug}`, slug: op.slug }
-            : null
-    if (redirect)
-      return [
-        guard(
-          "EXISTS (SELECT 1 FROM taxonomy_redirects r LEFT JOIN categories c ON c.id=r.target_category_id LEFT JOIN tags t ON t.id=r.target_tag_id LEFT JOIN best_pages b ON b.id=r.target_best_page_id WHERE r.source_kind=? AND r.source_slug=? AND (r.target_kind='directory' OR c.is_active=1 OR t.is_active=1 OR b.is_active=1))",
-          `${redirect.label}: by the end of the batch, its redirect is gone or its target is retired`,
-          redirect.kind,
-          redirect.slug
-        )
-      ]
-    if (op.action === 'best-page-create' || op.action === 'best-page-update') {
-      const slug = op.action === 'best-page-create' ? op.page.slug : op.slug
-      return [
-        guard(
-          'EXISTS (SELECT 1 FROM best_pages b LEFT JOIN tags t ON t.id=b.tag_id LEFT JOIN categories c ON c.id=b.category_id WHERE b.slug=? AND (b.is_active=0 OR ((b.tag_id IS NULL OR t.is_active=1) AND (b.category_id IS NULL OR c.is_active=1))))',
-          `${op.action} ${slug}: by the end of the batch, its tag or category is retired`,
-          slug
-        )
-      ]
-    }
-    return []
-  })
+  return planned(
+    taxonomyOperationStatements(op, {
+      actor: manifest.provenance.actor,
+      manifestId: manifest.id,
+      now
+    })
+  )
 }
 export function buildPublicationPlan(
   manifest: PublicationManifest,
@@ -1835,15 +1404,7 @@ export function buildPublicationPlan(
       continue
     }
     if (op.action === 'category-create') {
-      statements.push(
-        statement(
-          'INSERT INTO categories (slug,name,description,sort_order,is_active) VALUES (?,?,?,?,1)',
-          op.category.slug,
-          op.category.name,
-          op.category.description,
-          op.category.order
-        )
-      )
+      statements.push(...planned([categoryCreateStatement(op.category)]))
       addCategories([op.category.slug])
     }
     if (op.action === 'category-update') {
@@ -1861,21 +1422,7 @@ export function buildPublicationPlan(
       addCategories([op.category.slug])
     }
     if (op.action === 'category-unpublish') {
-      statements.push(
-        statement(
-          "UPDATE categories SET is_active=0,updated_at=? WHERE slug=? AND NOT EXISTS (SELECT 1 FROM listing_categories lc JOIN listings l ON l.id=lc.listing_id WHERE lc.category_id=categories.id AND l.status='approved' AND l.is_active=1)",
-          now,
-          op.slug
-        ),
-        statement(CHANGED_ONE_GUARD),
-        // #338: never while a listing filed under it is a slug redirect's source. Retired, that
-        // listing would answer 404 (#260), but the product page reads the redirect first.
-        statement(
-          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listing_categories lc JOIN categories c ON c.id=lc.category_id JOIN listings l ON l.id=lc.listing_id JOIN listing_slug_redirects r ON r.old_slug=l.slug WHERE c.slug=?) THEN ${REASONED_GUARD_FAILURE} ELSE 1 END`,
-          op.slug,
-          `category-unpublish ${op.slug}: a listing filed under it is the source of a slug redirect; re-file that listing first`
-        )
-      )
+      statements.push(...planned(categoryUnpublishStatements(op.slug, now)))
       addCategories([op.slug])
     }
     if (op.action === 'listing-create' || op.action === 'listing-update') {
@@ -2372,7 +1919,7 @@ export function buildPublicationPlan(
     .sort()
     .join('\n')
   statements.push(
-    ...taxonomyBatchChecks(manifest),
+    ...planned(taxonomyBatchChecks(manifest.operations.filter(isTaxonomyOperation))),
     statement(
       'UPDATE publication_state SET version=?,manifest_id=?,checksum=?,published_at=? WHERE id=1 AND version=? AND checksum=?',
       base.version + 1,

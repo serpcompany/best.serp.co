@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { MAX_LISTING_TAGS } from '@/db/listing-plans'
-import { MAX_SUGGESTED_TAGS } from '@/db/schema'
+import { BEST_PAGE_LIST_SIZE, MAX_SUGGESTED_TAGS } from '@/db/schema'
 
 /**
  * Request bodies of the admin API (`/api/admin/*`, serpcompany/best.serp.co#64). Route handlers
@@ -86,6 +86,63 @@ export const transferOwnerSchema = z.object({
 export const removeOwnerSchema = z.object({ expectedOwnerUserId: z.string().min(1).max(200) })
 
 export const adminEmailSchema = z.object({ email: text(254) })
+
+/**
+ * The taxonomy screens (#405). A path's slug is checked against the stored rows, so it only has to
+ * look like one; the decisions check every field (`lib/admin/taxonomy-fields.ts`).
+ */
+export const taxonomySlugSchema = z.string().regex(/^[a-z0-9-]{1,120}$/u)
+
+const categoryFields = z
+  .object({
+    description: text(2_000),
+    name: text(200),
+    order: z.number().int().min(0).max(1_000_000),
+    slug: text(120)
+  })
+  .strict()
+
+export const createCategorySchema = categoryFields
+export const updateCategorySchema = z.object({
+  category: categoryFields,
+  expected: categoryFields
+})
+
+const tagFields = z
+  .object({ category: text(120), description: text(2_000), name: text(200), slug: text(120) })
+  .strict()
+
+export const createTagSchema = tagFields
+export const updateTagSchema = z.object({ expected: tagFields, tag: tagFields })
+
+const bestPageFields = z
+  .object({
+    intro: text(5_000),
+    keyword: text(200),
+    slug: text(120),
+    tag: text(120),
+    title: text(200)
+  })
+  .strict()
+
+export const createBestPageSchema = bestPageFields
+export const updateBestPageSchema = z.object({ expected: bestPageFields, page: bestPageFields })
+
+const listingRef = z.object({ id: z.string().max(80), slug: z.string().max(300) }).strict()
+
+/** A best page's pins in order, and the pins the admin saw. */
+export const bestPagePinsSchema = z.object({
+  expectedPins: z.array(listingRef).max(BEST_PAGE_LIST_SIZE.max),
+  pins: z.array(listingRef).max(BEST_PAGE_LIST_SIZE.max)
+})
+
+/** Where a retired category, tag, or best page sends its URL: an active page, or `/products/`. */
+export const retireTaxonomySchema = z.object({
+  redirect: z.union([
+    z.object({ kind: z.enum(['category', 'tag', 'best']), slug: taxonomySlugSchema }).strict(),
+    z.object({ kind: z.literal('directory') }).strict()
+  ])
+})
 
 export type ApproveSubmissionBody = z.infer<typeof approveSubmissionSchema>
 export type ListingDetailsBody = z.infer<typeof listingDetailsSchema>
