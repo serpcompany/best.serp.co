@@ -74,7 +74,9 @@ apart: an edge HTML key names the host and Worker version, and the shared epoch'
 (`https://html-cache.invalid/catalog-epoch/<environment>`) and every data-cache key
 (`https://catalog-data-ops.invalid/<environment>/<key>`) name the environment,
 `D1_RUNTIME_ENV`, which each request validates. There is no unscoped fallback: without a valid
-environment the edge cache is bypassed and catalog reads fail closed.
+environment the edge cache is bypassed and catalog reads fail closed. Cloudflare doesn't document
+whether the caches `caches.open(name)` returns are split per Worker; the environment-scoped keys
+don't depend on it.
 
 Both Cache API layers are per data center and populate on demand. A deployment gets a new
 Worker version and therefore a cold HTML cache; the data cache survives deployments. Confirming

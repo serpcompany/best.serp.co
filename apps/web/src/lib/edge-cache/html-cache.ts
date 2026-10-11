@@ -69,7 +69,10 @@ export interface EdgeCacheContext {
 }
 
 export interface EdgeCacheOptions {
-  /** Worker-local Cache API namespace for stored responses. */
+  /**
+   * Cache API namespace for stored responses: the zone's cache, which staging's and production's
+   * Workers share in each data center, so every key names the host and deployment (#397).
+   */
   cache: Cache
   /** Identifies the deployed build (Worker version); markup and asset URLs change with it. */
   deploymentId: string
