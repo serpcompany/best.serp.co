@@ -43,35 +43,33 @@ function remarkGfmWithoutUrlLiterals(this: Processor) {
 }
 
 /**
- * Links a bare email in body text to `mailto:`. The pattern and the label check are remark-gfm's
- * (mdast-util-gfm-autolink-literal's `findEmail`). It runs after parsing, so an escape in the
- * address has resolved (`john\_doe@…` links `mailto:john_doe@…`). An email in code (which has no
- * text nodes) or in a link's text stays as it is. Two guards remark-gfm did not need, because its
- * URL literals took whole URLs first: an email inside a bare URL stays text with the URL, and a
- * rejected address stays text whole (`/john.doe@…` does not link `doe@…`).
+ * Links a bare email in body text to `mailto:`. The email pattern and the label check are
+ * remark-gfm's (mdast-util-gfm-autolink-literal's `findEmail`). It runs after parsing, so an
+ * escape in the address has resolved (`john\_doe@…` links `mailto:john_doe@…`). An email in code
+ * (which has no text nodes) or in a link's text stays as it is.
+ *
+ * remark-gfm's URL literals took whole URLs first. Here the pattern also matches a bare URL, to
+ * the next whitespace, and keeps it as text, so an email inside it stays text with it. A rejected
+ * address stays text whole too (`/john.doe@…` does not link `doe@…`). Both are returned as text
+ * rather than `false`, which would retry the search one character on, inside them; this way the
+ * search never goes back, so a long URL costs its length once (#379).
  */
 function linkBareEmails(tree: MarkdownRoot) {
   findAndReplace(
     tree,
     [
-      /(?<=^|\s|\p{P}|\p{S})([-.\w+]+)@([-\w]+(?:\.[-\w]+)+)/gu,
-      (address: string, _local: string, domain: string, match: RegExpMatchObject) => {
-        const before = match.input.slice(0, match.index)
-        const rejected =
-          // After a `/` (as remark-gfm), or the end of a longer address already rejected.
-          /[-+./\w]$/u.test(before) ||
-          // In a bare URL: the text since the last whitespace starts one.
-          /(?:https?:\/\/|www\.)\S*$/iu.test(before) ||
-          /[-\d_]$/u.test(domain)
-        return rejected
-          ? false
+      /(?:https?:\/\/|www\.)\S*|(?<=^|\s|\p{P}|\p{S})([-.\w+]+)@([-\w]+(?:\.[-\w]+)+)/giu,
+      (text: string, _local: unknown, domain: string | undefined, match: RegExpMatchObject) =>
+        domain === undefined || // a bare URL
+        match.input.charAt(match.index - 1) === '/' ||
+        /[-\d_]$/u.test(domain)
+          ? text
           : {
-              children: [{ type: 'text', value: address }],
+              children: [{ type: 'text', value: text }],
               title: null,
               type: 'link',
-              url: `mailto:${address}`
+              url: `mailto:${text}`
             }
-      }
     ],
     { ignore: ['link', 'linkReference'] }
   )

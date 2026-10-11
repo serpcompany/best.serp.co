@@ -132,6 +132,24 @@ describe('a cached listing content tree (#334)', () => {
     expect(markup).toContain('href="mailto:sales@example.test">sales@example.test</a>')
   })
 
+  it('scans a long bare URL once, so hostile runs stay fast (#379 review)', () => {
+    // Each run, 20 KB without whitespace, is followed by 200 emails. Checking the text before
+    // each email for a URL took about 11 s on this body; one forward scan takes milliseconds.
+    const emails = Array.from({ length: 200 }, (_, index) => `u${index}@example.test`).join(' ')
+    const body = `${'www.'.repeat(5000)} ${emails}\n\n${'http://'.repeat(3000)}?to=sales@example.test ${emails}`
+    const markup = renderToStaticMarkup(cached(body, false))
+    expect(markup).toContain(`>${'www.'.repeat(5000)} <a `)
+    expect(markup).toContain(`>${'http://'.repeat(3000)}?to=sales@example.test <a `)
+    expect(markup.match(/href="mailto:u\d+@example\.test">u\d+@example\.test<\/a>/gu)).toHaveLength(
+      400
+    )
+    expect(markup).not.toContain('mailto:sales@')
+    const started = performance.now()
+    listingContentTree(body, false)
+    // Generous for a slow runner: about 10 ms on Node 24 on an Apple silicon Mac.
+    expect(performance.now() - started).toBeLessThan(1000)
+  })
+
   it('renders everything else as remark-gfm does (#377)', () => {
     const withoutBareUrls = KITCHEN_SINK_BODY.replace(/^<https:\/\/auto\.test.*\n.*\n/mu, '')
     expect(withoutBareUrls).not.toMatch(/bare\.test|john/u)
