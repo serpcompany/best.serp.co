@@ -14,6 +14,7 @@ import {
   type MediaOperations,
   type MediaRunSummary
 } from '@/db/media-operations'
+import { errorFields } from '../telemetry/error-fields'
 
 export interface MediaWorkerEnv {
   D1_RUNTIME_ENV?: string
@@ -74,7 +75,7 @@ export function createMediaHost(
       }
       waitUntil(
         operations.processListingMedia(listingId).catch(error => {
-          log({ event: 'media_settle_error', message: error instanceof Error ? error.message : '' })
+          log({ event: 'media_settle_error', ...errorFields(error) })
         })
       )
     },
@@ -108,7 +109,7 @@ export async function runMediaCron(env: MediaWorkerEnv): Promise<MediaRunSummary
   const summary = await operations.processDueMedia()
   // Finished submissions' own images (rejected, withdrawn, or approved and copied): #96 S1.
   await operations.forgetFinishedPendingMedia().catch(error => {
-    log({ event: 'media_forget_failed', message: error instanceof Error ? error.message : '' })
+    log({ event: 'media_forget_failed', ...errorFields(error) })
   })
   return summary
 }

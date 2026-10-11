@@ -30,11 +30,11 @@ import {
 import type { AppEmailTemplates } from '../email/registry'
 import type { EmailRequest } from '../email/service'
 import type { TemplateInput } from '../email/templates'
+import { errorFields } from '../telemetry/error-fields'
 import type { GuardrailResult } from './guardrails'
 import {
   type BillingEvent,
   type BillingProvider,
-  BillingProviderError,
   BillingWebhookError,
   type CheckoutState
 } from './provider'
@@ -152,15 +152,9 @@ function log(event: string, detail: Record<string, unknown>): void {
   console.info(JSON.stringify({ event, ...detail }))
 }
 
+/** A failure's code and name, never its message: a provider's can echo what the buyer entered. */
 function logError(event: string, error: unknown, detail: Record<string, unknown> = {}): void {
-  console.error(
-    JSON.stringify({
-      event,
-      ...detail,
-      code: error instanceof BillingProviderError ? error.code : undefined,
-      message: error instanceof Error ? error.message : String(error)
-    })
-  )
+  console.error(JSON.stringify({ event, ...detail, ...errorFields(error) }))
 }
 
 const nowIso = (deps: BillingDependencies) => deps.now().toISOString()

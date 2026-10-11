@@ -32,6 +32,7 @@ import { runMediaCron } from '../media/worker-media'
 import { verifyFeaturedBadge } from '../submissions/badge-verifier'
 import { runDraftJobs } from '../submissions/draft-jobs'
 import { submissionBadgeVerificationTargets } from '../submissions/presentation'
+import { errorFields } from '../telemetry/error-fields'
 
 /** Hourly, on the hour: each draft reminder goes out within an hour of falling due. */
 export const DRAFT_JOBS_CRON = '0 * * * *'
@@ -227,7 +228,7 @@ export async function handleScheduled(
         cron: event.cron,
         event: 'scheduled_job_failed',
         job: job.name,
-        message: error instanceof Error ? error.message : String(error)
+        ...errorFields(error)
       })
     }
   }

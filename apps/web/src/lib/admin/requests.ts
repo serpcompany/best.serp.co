@@ -1,6 +1,7 @@
 import 'server-only'
 
 import type { z } from 'zod'
+import { errorFields } from '@/lib/telemetry/error-fields'
 import type { AdminContext, Decision } from './decisions'
 import { adminDecisionContext } from './runtime'
 
@@ -57,7 +58,7 @@ export async function runAdminDecision<S extends z.ZodTypeAny, T extends object>
     console.error(
       JSON.stringify({
         event: 'admin_decision_failed',
-        message: error instanceof Error ? error.message : String(error)
+        ...errorFields(error)
       })
     )
     return adminJson({ error: 'unavailable', message: 'Something went wrong. Try again.' }, 503)

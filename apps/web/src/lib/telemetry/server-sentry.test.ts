@@ -53,8 +53,8 @@ describe('starting the Worker Sentry SDK (#355)', () => {
     expect(logged.mock.calls.map(call => JSON.parse(String(call[0])))).toEqual([
       { event: 'server_sentry_start_failed', message: 'integration setup failed' },
       expect.objectContaining({
+        code: 'UNKNOWN',
         event: 'request_error',
-        message: 'admin render failed',
         path: '/admin/listings/'
       })
     ])

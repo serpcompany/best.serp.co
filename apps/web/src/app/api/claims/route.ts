@@ -11,6 +11,7 @@ import {
   payloadTooLarge,
   readJsonBody
 } from '@/lib/submissions/http'
+import { errorFields } from '@/lib/telemetry/error-fields'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
     console.error(
       JSON.stringify({
         event: 'claim_failed',
-        message: error instanceof Error ? error.message : String(error)
+        ...errorFields(error)
       })
     )
     return apiError(500, 'claim_failed', 'Unable to start the claim.')
@@ -97,7 +98,7 @@ export async function GET(request: Request) {
     console.error(
       JSON.stringify({
         event: 'claim_failed',
-        message: error instanceof Error ? error.message : String(error)
+        ...errorFields(error)
       })
     )
     return apiError(500, 'claim_failed', 'Unable to load the claim.')

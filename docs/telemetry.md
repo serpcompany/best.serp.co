@@ -39,12 +39,40 @@ Sentry reports errors from the browser (`instrumentation-client.ts`) on every pa
 the Worker (`apps/web/src/instrumentation.ts`, server rendering and route handlers) on the
 signed-in and operational surfaces only: `/admin`, `/account`, `/submit`, `/login`, `/claims`
 and `/api` (#355). The settings and the scrubber are in `apps/web/src/lib/telemetry/sentry.ts`:
-errors only, with no PII, query strings, cookies, headers, console output, logger data,
-sessions, tracing, or replay. Both deploy builds bake in `NEXT_PUBLIC_SENTRY_DSN` (repo variable
+errors only, with no PII, free-text error messages, query strings, cookies, headers, console
+output, logger data, sessions, tracing, or replay. Both deploy builds bake in `NEXT_PUBLIC_SENTRY_DSN` (repo variable
 `SENTRY_DSN`) and the commit as the release; with no DSN, Sentry stays off (E2E sets none).
 `SENTRY_AUTH_TOKEN` (repo secret, project releases scope) and the `SENTRY_PROJECT` variable
 only upload source maps. The owner creates the project and sets all three, then checks that the
 first staging error's stack frames resolve. Worker-entry and cron errors are #210.
+
+### Stable error codes, not messages
+
+serp's [telemetry standard](https://github.com/serpcompany/serp/blob/main/docs/engineering/technology/telemetry.md#required-defaults-for-every-project)
+asks for stable error codes, not arbitrary error strings (#211). A message can hold what a
+visitor typed, a validation error can echo a field, and Drizzle adds a failed statement's bound
+values to its message. So:
+- **Sentry gets a code or nothing.** `scrubEvent` keeps an event's message, and each exception's
+  in the chain (an error's `cause` included), only when it is exactly one of `ERROR_CODES` in
+  `sentry.ts`. Anything else becomes `[redacted]`, from the logger, `onRequestError`, the
+  browser's global handlers or `global-error.tsx`. The error's type, stack and route stay, so
+  issues still group and point at the code.
+- **The shared logger takes a code.** `logger.error` (`apps/web/src/lib/logging`) accepts one of
+  `ERROR_CODES` or an `Error`; context goes in `data`, which stays in the browser console. A new
+  code joins `ERROR_CODES`, and `sentry-events.test.ts` checks what the SDK sends.
+- **Worker log lines carry a code too.** Where a caught error can hold user input, the JSON line
+  spreads in `errorFields(error)` (`lib/telemetry/error-fields.ts`): `code` is an allowlisted
+  message, the error's own `code` (`BillingProviderError`, `SubmissionError`) or `d1ErrorCode`,
+  else `UNKNOWN`; `name` is the error's class. That covers `request_error`, `claim_failed`,
+  `submission_request_failed`, `admin_decision_failed`, `admin_refund_failed`,
+  `auth_guard_error`, `billing_webhook_failed`, the billing service's failures,
+  `legacy_root_lookup_failed`, `scheduled_job_failed`, and the media failures
+  (`submission_media_error`, `revision_media_error`, `media_settle_error`, `media_forget_failed`).
+- **Configuration failures keep their message.** `billing_unavailable`, `auth_unavailable`,
+  `site_environment_error`, `server_sentry_start_failed`, `routes_manifest_invalid`,
+  `media_cron_disabled` and the other `*_media_disabled` lines catch only a missing binding, variable or SDK, whose fixed message
+  names the setting to fix; `sign_in_code_prune_failed` binds only a date and a limit. The email
+  logs keep `redactedErrorMessage` beside `errorCode` (`lib/email/senders.ts`).
 
 ### Public pages: Worker logs, not Sentry
 
@@ -57,7 +85,8 @@ A server error on a public page is one JSON line on `console.error`, which Worke
 keeps. Find it by filtering the Worker's logs on `request_error`. The line has:
 - the method, the path without its query string, the route, the route type and the render
   source;
-- the error's name, message, stack and digest.
+- the error's code, name, stack frames and digest, but not its message (#211): the stack drops
+  its first line, which repeats the message.
 
 Next.js can report one error twice, when a page and its metadata await the same failed read; it
 is logged once, as Sentry captures it once. Next.js also prints the error itself, as before.

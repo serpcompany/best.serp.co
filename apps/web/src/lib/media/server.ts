@@ -4,6 +4,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare'
 import type { MediaOperations } from '@/db/media-operations'
 import { validatePublicHttpUrl } from '@/db/public-url'
 import { readSitePrefill } from '../submissions/prefill'
+import { errorFields } from '../telemetry/error-fields'
 import { createWorkerMediaOperations } from './worker-media'
 
 /**
@@ -56,9 +57,9 @@ async function backgroundMedia(event: string): Promise<{
   }
 }
 
+/** A background copy's failure: its code, never its message, which can hold the source URL. */
 function logFailure(event: string, kind: string) {
-  return (error: unknown) =>
-    log({ event, kind, message: error instanceof Error ? error.message : String(error) })
+  return (error: unknown) => log({ event, kind, ...errorFields(error) })
 }
 
 /**

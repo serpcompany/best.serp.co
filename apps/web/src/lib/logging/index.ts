@@ -1,4 +1,5 @@
 import { IS_DEVELOPMENT } from '@/lib/environment/constants'
+import type { ErrorCode } from '@/lib/telemetry/sentry'
 import { keys } from './keys'
 
 type LogLevel = 'debug' | 'info' | 'warn' | 'error'
@@ -103,7 +104,13 @@ class Logger {
     console.warn(this.formatMessage(message, { ...options, level: 'warn' }))
   }
 
-  error(message: string | Error, options?: Omit<LogOptions, 'level'>) {
+  /**
+   * Logs to the console and reports to Sentry. The message is a stable code (#211): Sentry gets it
+   * as the error's message, so it never holds user input. Put context in `data`, which stays in
+   * the console (`scrubEvent` drops it). An `Error` is reported as it is, and the scrubber
+   * redacts its message unless that is a code.
+   */
+  error(message: ErrorCode | Error, options?: Omit<LogOptions, 'level'>) {
     // Always log errors
     const errorMessage = message instanceof Error ? message.message : message
     const errorStack = message instanceof Error ? message.stack : undefined
@@ -162,12 +169,3 @@ class Logger {
 }
 
 export const logger = new Logger()
-
-// Convenience function for easy migration from console.error
-export const logError = (
-  message: string | Error,
-  data?: unknown,
-  extra?: Record<string, unknown>
-) => {
-  logger.error(message, { data, extra })
-}
