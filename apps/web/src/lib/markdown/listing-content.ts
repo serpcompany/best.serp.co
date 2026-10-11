@@ -18,7 +18,7 @@ export type ListingContentTree = Root
  * a react-markdown, GFM extension or remark-rehype upgrade that changes their output, other
  * `LISTING_MARKDOWN_OPTIONS`, or another `stripDuplicateLinksSection`. `listing-content.test.ts`
  * pins the tree of a sample body, so such a change fails there until this is bumped and the pin
- * updated. `gfm-2`: bare URLs are text, not autolink literals (#377).
+ * updated. `gfm-2`: bare URLs are text; only bare emails are autolink literals (#377).
  */
 export const LISTING_CONTENT_FORMAT = 'gfm-2'
 

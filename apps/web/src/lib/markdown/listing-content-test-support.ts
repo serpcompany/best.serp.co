@@ -1,8 +1,8 @@
 /**
  * Listing bodies for the content tree tests (#334): every Markdown construct a body can hold,
  * including the ones react-markdown rewrites (raw HTML, unsafe URLs) or GitHub-flavored Markdown
- * adds (tables, footnotes, task lists, strikethrough), and bare URLs, which stay text (#377).
- * Hosts are `.test` (#311).
+ * adds (tables, footnotes, task lists, strikethrough, email autolinks), and bare URLs, which stay
+ * text (#377). Hosts are `.test` (#311).
  */
 export const KITCHEN_SINK_BODY = String.raw`# Fixture Studio Review
 
@@ -17,8 +17,10 @@ Links: [inline](https://studio.test/a "With a title"), [relative](/products/fixt
 [anchor](#what-this-page-shows), [mail](mailto:hello@studio.test),
 [short link](https://serp.ly/fixture-studio), [short link with query](https://serp.ly/x?y=1#z),
 [already tagged](https://serp.ly/a?via=other), [script](javascript:alert(1)), [reference][ref],
-<https://auto.test/path>, www.literal.test, https://bare.test/x?y=1 and hello@studio.test, and
-an escaped https://bare.test/engines/\[model\]/run?aff=YOUR\_CODE.
+[team@studio.test](https://studio.test/team), ${'`ops@studio.test`'} and hello@studio.test.
+
+<https://auto.test/path>, www.literal.test, https://bare.test/x?y=1, an escaped
+https://bare.test/engines/\[model\]/run?aff=YOUR\_CODE and an escaped john\_doe@studio.test.
 
 [ref]: https://ref.test/page "Ref title"
 
@@ -53,7 +55,7 @@ an escaped https://bare.test/engines/\[model\]/run?aff=YOUR\_CODE.
 - [x] done task
 
 ${'```'}ts
-const answer: number = 42 // <not html>
+const answer: number = 42 // <not html> ops@studio.test
 ${'```'}
 
     indented code

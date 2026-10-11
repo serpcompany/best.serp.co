@@ -149,6 +149,9 @@ importers:
       lucide-react:
         specifier: ^0.486.0
         version: 0.486.0(react@19.2.4)
+      mdast-util-find-and-replace:
+        specifier: ^3.0.2
+        version: 3.0.2
       mdast-util-gfm-footnote:
         specifier: ^2.1.0
         version: 2.1.0
@@ -225,6 +228,9 @@ importers:
       '@types/hast':
         specifier: ^3.0.4
         version: 3.0.4
+      '@types/mdast':
+        specifier: ^4.0.4
+        version: 4.0.4
       '@types/node':
         specifier: 'catalog:'
         version: 22.19.11

@@ -91,18 +91,31 @@ describe('a cached listing content tree (#334)', () => {
   it('renders bare URLs as text with their escapes resolved, and links as links (#377)', () => {
     const markup = renderToStaticMarkup(cached(KITCHEN_SINK_BODY, false))
     expect(markup).toContain(
-      'www.literal.test, https://bare.test/x?y=1 and hello@studio.test, and\n' +
-        'an escaped https://bare.test/engines/[model]/run?aff=YOUR_CODE.'
+      'www.literal.test, https://bare.test/x?y=1, an escaped\n' +
+        'https://bare.test/engines/[model]/run?aff=YOUR_CODE and an escaped'
     )
+    expect(markup).not.toContain('href="http://www.literal.test')
+    expect(markup).not.toContain('href="https://bare.test')
     expect(markup).not.toContain('%5C')
     expect(markup).toContain('href="https://auto.test/path">https://auto.test/path</a>')
     expect(markup).toContain('title="With a title" href="https://studio.test/a">inline</a>')
     expect(markup).toContain('title="Ref title" href="https://ref.test/page">reference</a>')
   })
 
+  it('keeps bare emails as mailto links, outside code and links (#377)', () => {
+    const markup = renderToStaticMarkup(cached(KITCHEN_SINK_BODY, false))
+    expect(markup).toContain('href="mailto:hello@studio.test">hello@studio.test</a>')
+    // An escape in a bare email resolves before it is linked.
+    expect(markup).toContain('href="mailto:john_doe@studio.test">john_doe@studio.test</a>')
+    expect(markup).toContain('href="https://studio.test/team">team@studio.test</a>')
+    expect(markup).toContain('ops@studio.test</code>')
+    expect(markup).not.toContain('mailto:team@')
+    expect(markup).not.toContain('mailto:ops@')
+  })
+
   it('renders everything else as remark-gfm does (#377)', () => {
     const withoutBareUrls = KITCHEN_SINK_BODY.replace(/^<https:\/\/auto\.test.*\n.*\n/mu, '')
-    expect(withoutBareUrls).not.toContain('bare.test')
+    expect(withoutBareUrls).not.toMatch(/bare\.test|john/u)
     expect(renderToStaticMarkup(direct(withoutBareUrls, false))).toBe(
       renderToStaticMarkup(
         ReactMarkdown({ children: withoutBareUrls, components, remarkPlugins: [remarkGfm] })
