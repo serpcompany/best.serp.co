@@ -25,9 +25,15 @@ import {
   expectedWorkerVersionFromEnvironment,
   type GateClock,
   type HttpGateOptions,
+  type HttpGateSamples,
   httpGateSamples,
-  retiredCategorySlugs,
+  liveSamples,
+  manifestMayHold,
   runHttpGates,
+  SAMPLE_CHANGING_ACTIONS,
+  SAMPLE_FAILURE_HINT,
+  taxonomyChanges,
+  taxonomyChangesOf,
   waitForWorkerVersion
 } from './d1-preview-http-gates.ts'
 
@@ -42,7 +48,24 @@ const stagingCanonicalOrigin = 'https://staging.best.serp.co'
 const stagingPlatformOrigin = 'https://best-serp-co-staging.serpcompany.workers.dev'
 const slug = 'example-product'
 const category = 'seo-tools'
-const samples = { categories: [category], listing: slug }
+const tag = 'seo-writing'
+const bestPage = 'seo-writer'
+/** A retired category whose URL the fixture answers with one 308 to `bestPage`. */
+const movedCategory = 'old-seo-writing'
+const samples: HttpGateSamples = {
+  bestPages: [bestPage],
+  categories: [category],
+  listing: slug,
+  movedCategories: [{ category: movedCategory, to: { kind: 'best', slug: bestPage } }],
+  tags: [tag]
+}
+/** The 308s of the fixture's and the checked-in moved categories (#350). */
+const movedCategoryRedirects: Record<string, string> = Object.fromEntries(
+  [...samples.movedCategories, ...httpGateSamples.movedCategories].map(moved => [
+    `/products/categories/${moved.category}/`,
+    `/${moved.to.kind === 'best' ? 'best' : 'products/tags'}/${moved.to.slug}/`
+  ])
+)
 const fixtureDirectory = mkdtempSync(join(tmpdir(), 'best-serp-co-http-gates-'))
 // Production gates, and staging gates on staging's platform host, read CANONICAL_HOST_REDIRECT
 // from wrangler.jsonc. These tests pin both to `off` unless they pass their own config, so they
@@ -80,34 +103,83 @@ function gates(
   })
 }
 
+/** A taxonomy page a manifest names: a redirect's source or target. */
+interface SamplePage {
+  kind?: string
+  slug?: string
+}
+
 interface SampleOperation {
   action?: string
   categories?: string[]
-  from?: string
+  /** `category-create` and `category-update`. */
+  category?: { slug?: string }
+  /** A `listing-slug-change`'s old slug, or a `taxonomy-redirect-set`'s source. */
+  from?: string | SamplePage
   listing?: { categories?: string[]; slug?: string }
+  /** `best-page-create`. */
+  page?: { slug?: string }
   remove?: string[]
   slug?: string
-  to?: string
+  /** `tag-create`. */
+  tag?: { slug?: string }
+  to?: string | SamplePage
 }
 type SampleManifest = { operations?: SampleOperation[] } | null
+
+/** The operations on a listing that `sampleChanges` reads for the sample listing. */
+const sampleListingActions = [
+  'listing-categories-remove',
+  'listing-categories-set',
+  'listing-slug-change',
+  'listing-unpublish',
+  'listing-update'
+]
+
+/** What manifests do to the gates' samples (`sampleChanges`). */
+interface SampleChanges {
+  /** Best pages created (`best-page-create`) and retired (`best-page-unpublish`), #350. */
+  bestPages: { created: Set<string>; retired: Set<string> }
+  /** Sample categories detached from the sample listing. */
+  detached: Set<string>
+  /** Listing slugs taken off the site. */
+  gone: Set<string>
+  /** Categories made active again (`category-update`), whose pages may render. */
+  reactivated: Set<string>
+  /** Every target each category URL is pointed at (`taxonomy-redirect-set`), as `kind:slug`. */
+  redirects: Map<string, Set<string>>
+  /** Categories retired (`category-unpublish`). */
+  retired: Set<string>
+  /** Tags created (`tag-create`) and retired (`tag-unpublish`), #350. */
+  tags: { created: Set<string>; retired: Set<string> }
+}
 
 /**
  * What manifests do to the gates' samples: the categories they retire, the listing slugs they
  * take off the site, and the sample categories they detach from the sample listing, with a
  * `listing-categories-remove`, or a `listing-update` or `listing-categories-set` (#333) whose
- * categories leave one out (#320).
+ * categories leave one out (#320); and the tags and best pages they create and retire, the
+ * categories they make active again, and where they point each category URL (#350).
  */
 function sampleChanges(
   manifests: readonly SampleManifest[],
-  { categories, listing }: { categories: readonly string[]; listing: string }
-): { detached: Set<string>; gone: Set<string>; retired: Set<string> } {
-  const detached = new Set<string>()
-  const gone = new Set<string>()
-  const retired = new Set<string>()
+  { categories, listing }: Pick<HttpGateSamples, 'categories' | 'listing'>
+): SampleChanges {
+  const changes: SampleChanges = {
+    bestPages: { created: new Set(), retired: new Set() },
+    detached: new Set(),
+    gone: new Set(),
+    reactivated: new Set(),
+    redirects: new Map(),
+    retired: new Set(),
+    tags: { created: new Set(), retired: new Set() }
+  }
+  const { detached, gone, retired } = changes
   for (const operation of manifests.flatMap(manifest => manifest?.operations ?? [])) {
     if (operation.action === 'category-unpublish' && operation.slug) retired.add(operation.slug)
     if (operation.action === 'listing-unpublish' && operation.slug) gone.add(operation.slug)
-    if (operation.action === 'listing-slug-change' && operation.from) gone.add(operation.from)
+    if (operation.action === 'listing-slug-change' && typeof operation.from === 'string')
+      gone.add(operation.from)
     if (operation.action === 'listing-categories-remove' && operation.slug === listing)
       for (const removed of operation.remove ?? []) detached.add(removed)
     if (operation.action === 'listing-update' && operation.listing?.slug === listing)
@@ -116,8 +188,30 @@ function sampleChanges(
     if (operation.action === 'listing-categories-set' && operation.slug === listing)
       for (const sampled of categories)
         if (!operation.categories?.includes(sampled)) detached.add(sampled)
+    if (operation.action === 'category-update' && operation.category?.slug)
+      changes.reactivated.add(operation.category.slug)
+    if (operation.action === 'tag-create' && operation.tag?.slug)
+      changes.tags.created.add(operation.tag.slug)
+    if (operation.action === 'tag-unpublish' && operation.slug)
+      changes.tags.retired.add(operation.slug)
+    if (operation.action === 'best-page-create' && operation.page?.slug)
+      changes.bestPages.created.add(operation.page.slug)
+    if (operation.action === 'best-page-unpublish' && operation.slug)
+      changes.bestPages.retired.add(operation.slug)
+    const { from, to } = operation
+    if (
+      operation.action === 'taxonomy-redirect-set' &&
+      typeof from === 'object' &&
+      from.kind === 'category' &&
+      from.slug &&
+      typeof to === 'object'
+    )
+      changes.redirects.set(
+        from.slug,
+        new Set([...(changes.redirects.get(from.slug) ?? []), `${to.kind}:${to.slug ?? ''}`])
+      )
   }
-  return { detached, gone, retired }
+  return changes
 }
 
 /** Requests the trailing-slash gates make, and the canonical redirects they require. */
@@ -147,8 +241,8 @@ function successfulResponse(url: URL, redirectLocation?: string, emptyBody = fal
   if (adminLockGatePaths.includes(url.pathname)) return adminLockResponse(url)
   if (url.pathname === badSignInPath)
     return new Response('{"code":"INVALID_EMAIL"}', { status: 400 })
-  const canonical = canonicalRedirects[url.pathname]
-  if (canonical) return new Response(null, { status: 308, headers: { location: canonical } })
+  const moved = canonicalRedirects[url.pathname] ?? movedCategoryRedirects[url.pathname]
+  if (moved) return new Response(null, { status: 308, headers: { location: moved } })
   if (url.pathname === `/${slug}/`)
     return new Response(null, {
       status: 308,
@@ -177,7 +271,7 @@ describe('environment-specific HTTP gates', () => {
       const urls = installSuccessfulFetch()
       await expect(gates('production', given)).resolves.toBeUndefined()
       expect(urls).toHaveLength(
-        8 +
+        11 +
           trailingSlashGatePaths.length +
           adminLockGatePaths.length +
           authGatePaths.length +
@@ -194,6 +288,9 @@ describe('environment-specific HTTP gates', () => {
         expect.arrayContaining([
           '/',
           `/products/categories/${category}/`,
+          `/products/tags/${tag}/`,
+          `/best/${bestPage}/`,
+          `/products/categories/${movedCategory}/`,
           `/products/${slug}/`,
           '/api/search',
           '/rss.xml',
@@ -221,39 +318,254 @@ describe('environment-specific HTTP gates', () => {
     const urls = installSuccessfulFetch()
     await gates('staging', stagingOrigin, undefined, {
       publicationsDirectory: publications,
-      samples: { categories: ['adult', category], listing: slug }
+      samples: { ...samples, categories: ['adult', category] }
     })
     const paths = urls.map(url => url.pathname)
     expect(paths).toContain(`/products/categories/${category}/`)
     expect(paths).not.toContain('/products/categories/adult/')
-    expect(retiredCategorySlugs(publications)).toEqual(new Set(['adult']))
+    expect(taxonomyChanges(publications).retiredCategories).toEqual(new Set(['adult']))
     await expect(
       gates('staging', stagingOrigin, undefined, {
         publicationsDirectory: publications,
-        samples: { categories: ['adult'], listing: slug }
+        samples: { ...samples, categories: ['adult'] }
       })
-    ).rejects.toThrow('add a live one to httpGateSamples')
+    ).rejects.toThrow('every HTTP gate sample category; add a live one to httpGateSamples')
   })
 
-  it('samples a listing and a category no committed manifest takes off the site (#315)', () => {
+  it('requests a live tag, a best page, and one 308 from a moved category (#350)', async () => {
+    const urls = installSuccessfulFetch()
+    await gates('staging', stagingOrigin)
+    expect(urls.map(url => url.pathname)).toEqual(
+      expect.arrayContaining([
+        `/products/tags/${tag}/`,
+        `/best/${bestPage}/`,
+        `/products/categories/${movedCategory}/`
+      ])
+    )
+    const movedPath = `/products/categories/${movedCategory}/`
+    // Not one 308 to the sample's target: a page, another redirect, another target, a 404.
+    for (const [status, location] of [
+      [200, null],
+      [301, `/best/${bestPage}/`],
+      [308, `/products/tags/${tag}/`],
+      [308, `/best/${bestPage}/?page=2`],
+      [404, null]
+    ] as const) {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: string | URL | Request) => {
+          const url = new URL(String(input))
+          return withCrawlPolicy(
+            url,
+            url.pathname === movedPath
+              ? new Response(status === 200 ? 'ok' : null, {
+                  headers: location ? { location } : {},
+                  status
+                })
+              : successfulResponse(url)
+          )
+        })
+      )
+      await expect(gates('staging', stagingOrigin)).rejects.toThrow(
+        `staging route ${movedPath} returned ${status}`
+      )
+    }
+    // Any sample that stops answering names the likeliest cause, an /admin change (#405), and the
+    // fix; a page that is no sample doesn't.
+    const failure = async (path: string, answer: () => Response) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (input: string | URL | Request) => {
+          const url = new URL(String(input))
+          return withCrawlPolicy(url, url.pathname === path ? answer() : successfulResponse(url))
+        })
+      )
+      return gates('staging', stagingOrigin).then(
+        () => '',
+        (error: unknown) => (error instanceof Error ? error.message : String(error))
+      )
+    }
+    const renamed = () => new Response(null, { status: 308, headers: { location: '/best/x/' } })
+    for (const path of [
+      `/products/categories/${category}/`,
+      `/products/tags/${tag}/`,
+      `/best/${bestPage}/`,
+      `/products/${slug}/`
+    ]) {
+      const message = await failure(path, renamed)
+      expect(message, path).toBe(`staging route ${path} returned 308. ${SAMPLE_FAILURE_HINT}`)
+    }
+    expect(await failure(movedPath, renamed)).toBe(
+      `staging route ${movedPath} returned 308 /best/x/, not a 308 to /best/${bestPage}/. ${SAMPLE_FAILURE_HINT}`
+    )
+    expect(SAMPLE_FAILURE_HINT).toContain('httpGateSamples in scripts/d1-preview-http-gates.ts')
+    expect(SAMPLE_FAILURE_HINT).toContain('/admin (#405)')
+    expect(await failure('/rss.xml', () => new Response('failed', { status: 500 }))).toBe(
+      'staging route /rss.xml returned 500.'
+    )
+  })
+
+  it('never samples a tag, best page or moved category a reviewed manifest retires or moves (#350)', async () => {
+    const publications = join(fixtureDirectory, 'taxonomy-publications')
+    mkdirSync(publications, { recursive: true })
+    // A manifest that names none of the operations the gates read is never parsed: not even
+    // this one, which isn't YAML.
+    writeFileSync(join(publications, 'listing-batch.yaml'), 'operations: [{ action: listing-')
+    expect(manifestMayHold('action: listing-media-update', SAMPLE_CHANGING_ACTIONS)).toBe(false)
+    const changesOf = (...operations: SampleOperation[]) => {
+      writeFileSync(join(publications, 'changes.yaml'), stringify({ operations }))
+      return taxonomyChanges(publications)
+    }
+    const moved = (slug: string, to: { kind: 'best' | 'tag'; slug: string }) => ({
+      category: slug,
+      to
+    })
+    const candidates: HttpGateSamples = {
+      ...samples,
+      bestPages: ['retired-best', bestPage],
+      movedCategories: [
+        moved('re-pointed', { kind: 'best', slug: bestPage }),
+        moved('target-retired', { kind: 'best', slug: 'retired-best' }),
+        moved('tag-retired', { kind: 'tag', slug: 'retired-tag' }),
+        moved('reactivated', { kind: 'best', slug: bestPage }),
+        moved(movedCategory, { kind: 'best', slug: bestPage })
+      ],
+      tags: ['retired-tag', tag]
+    }
+    const changes = changesOf(
+      { action: 'tag-unpublish', slug: 'retired-tag', to: { kind: 'directory' } },
+      { action: 'best-page-unpublish', slug: 'retired-best' },
+      { action: 'category-unpublish', slug: movedCategory },
+      // The redirect the sample expects, and one pointing another URL elsewhere.
+      {
+        action: 'taxonomy-redirect-set',
+        from: { kind: 'category', slug: movedCategory },
+        to: { kind: 'best', slug: bestPage }
+      },
+      {
+        action: 'taxonomy-redirect-set',
+        from: { kind: 'category', slug: 're-pointed' },
+        to: { kind: 'best', slug: bestPage }
+      },
+      {
+        action: 'taxonomy-redirect-set',
+        from: { kind: 'category', slug: 're-pointed' },
+        to: { kind: 'tag', slug: tag }
+      },
+      // A redirect from a tag's URL is not a category's.
+      {
+        action: 'taxonomy-redirect-set',
+        from: { kind: 'tag', slug: movedCategory },
+        to: { kind: 'directory' }
+      },
+      { action: 'category-update', category: { slug: 'reactivated' } }
+    )
+    expect(changes).toEqual({
+      categoryRedirects: new Map([
+        [movedCategory, new Set([`best:${bestPage}`])],
+        ['re-pointed', new Set([`best:${bestPage}`, `tag:${tag}`])]
+      ]),
+      retiredBestPages: new Set(['retired-best']),
+      retiredCategories: new Set([movedCategory]),
+      retiredTags: new Set(['retired-tag']),
+      updatedCategories: new Set(['reactivated'])
+    })
+    expect(liveSamples(candidates, changes)).toEqual({
+      bestPage,
+      category,
+      movedCategory: moved(movedCategory, { kind: 'best', slug: bestPage }),
+      tag
+    })
+    for (const [kind, only] of [
+      ['tag', { tags: ['retired-tag'] }],
+      ['best page', { bestPages: ['retired-best'] }],
+      ['moved category', { movedCategories: candidates.movedCategories.slice(0, 4) }]
+    ] as const)
+      expect(() => liveSamples({ ...candidates, ...only }, changes), kind).toThrow(
+        `every HTTP gate sample ${kind}; add a live one to httpGateSamples`
+      )
+    // The gates request the live ones.
+    const urls = installSuccessfulFetch()
+    await gates('staging', stagingOrigin, undefined, {
+      publicationsDirectory: publications,
+      samples: candidates
+    })
+    const paths = urls.map(url => url.pathname)
+    expect(paths).toEqual(
+      expect.arrayContaining([
+        `/products/tags/${tag}/`,
+        `/best/${bestPage}/`,
+        `/products/categories/${movedCategory}/`
+      ])
+    )
+    expect(
+      paths.filter(path => /retired|re-pointed|reactivated/u.test(path)),
+      'retired or moved samples'
+    ).toEqual([])
+  })
+
+  it('samples pages no committed manifest takes off the site (#315, #350)', () => {
     // Committed manifests only: d1-remote-publisher.test.ts writes temporary ones here.
     const committed = execFileSync('git', ['ls-files', 'd1/publications'], { encoding: 'utf8' })
       .split('\n')
       .filter(path => /\.ya?ml$/u.test(path))
+      .map(path => ({ path, text: readFileSync(resolve(path), 'utf8') }))
     expect(committed.length).toBeGreaterThan(0)
-    const { detached, gone, retired } = sampleChanges(
-      committed.map(path => parse(readFileSync(resolve(path), 'utf8')) as SampleManifest),
+    // Each manifest that can change a sample is parsed once (`manifestMayHold`): one naming an
+    // operation that retires, creates or moves a taxonomy page, or one that names the sample
+    // listing and an operation on a listing. The large listing batches hold neither, and parsing
+    // all of `d1/publications` took this test past its timeout on CI.
+    const parsed = committed
+      .filter(
+        ({ text }) =>
+          manifestMayHold(text, [...SAMPLE_CHANGING_ACTIONS, 'tag-create', 'best-page-create']) ||
+          (text.includes(httpGateSamples.listing) && manifestMayHold(text, sampleListingActions))
+      )
+      .map(({ text }) => ({ manifest: parse(text) as SampleManifest, text }))
+    const changes = sampleChanges(
+      parsed.map(({ manifest }) => manifest),
       httpGateSamples
     )
+    const { bestPages, detached, gone, reactivated, redirects, retired, tags } = changes
     expect(gone.has(httpGateSamples.listing), httpGateSamples.listing).toBe(false)
     const [sampled] = httpGateSamples.categories.filter(slug => !retired.has(slug))
     expect(sampled).toBeDefined()
     // #320: the sampled category is the sample listing's own, so it can't be empty while the
     // listing the gates already require is live and filed under it.
     expect(detached.has(String(sampled)), String(sampled)).toBe(false)
+    // #350: the tag and best page are ones the taxonomy's manifests created and none retires.
+    const [sampledTag] = httpGateSamples.tags.filter(slug => !tags.retired.has(slug))
+    expect(sampledTag && tags.created.has(sampledTag), 'a created, live sample tag').toBe(true)
+    const [sampledBest] = httpGateSamples.bestPages.filter(slug => !bestPages.retired.has(slug))
+    expect(sampledBest && bestPages.created.has(sampledBest), 'a created, live best page').toBe(
+      true
+    )
+    // The moved category is one they retired and point only at its sample target, which they
+    // created and none retires, and none makes it active again.
+    const [moved] = httpGateSamples.movedCategories.filter(({ category: slug, to }) => {
+      const target = to.kind === 'best' ? bestPages : tags
+      return (
+        retired.has(slug) &&
+        !reactivated.has(slug) &&
+        target.created.has(to.slug) &&
+        !target.retired.has(to.slug) &&
+        [...(redirects.get(slug) ?? [])].join() === `${to.kind}:${to.slug}`
+      )
+    })
+    expect(moved, 'a moved category that answers its 308').toBeDefined()
+    // The gates themselves pick the same samples from the manifests they parse.
+    const gateManifests = parsed
+      .filter(({ text }) => manifestMayHold(text, SAMPLE_CHANGING_ACTIONS))
+      .map(({ manifest }) => manifest)
+    expect(liveSamples(httpGateSamples, taxonomyChangesOf(gateManifests))).toEqual({
+      bestPage: sampledBest,
+      category: sampled,
+      movedCategory: moved,
+      tag: sampledTag
+    })
   })
 
-  it('counts every manifest operation that takes a sample off the site (#320)', () => {
+  it('counts every manifest operation that takes a sample off the site (#320, #350)', () => {
     const changes = (...operations: SampleOperation[]) => sampleChanges([{ operations }], samples)
     expect(
       changes(
@@ -261,10 +573,34 @@ describe('environment-specific HTTP gates', () => {
         { action: 'listing-unpublish', slug },
         { action: 'listing-slug-change', from: 'renamed-product', to: 'other-product' }
       )
-    ).toEqual({
+    ).toMatchObject({
       detached: new Set(),
       gone: new Set([slug, 'renamed-product']),
       retired: new Set([category])
+    })
+    expect(
+      changes(
+        { action: 'tag-create', tag: { slug: tag } },
+        { action: 'tag-unpublish', slug: 'retired-tag' },
+        { action: 'best-page-create', page: { slug: bestPage } },
+        { action: 'best-page-unpublish', slug: 'retired-best' },
+        { action: 'category-update', category: { slug: movedCategory } },
+        {
+          action: 'taxonomy-redirect-set',
+          from: { kind: 'category', slug: movedCategory },
+          to: { kind: 'best', slug: bestPage }
+        },
+        {
+          action: 'taxonomy-redirect-set',
+          from: { kind: 'tag', slug: tag },
+          to: { kind: 'best', slug: bestPage }
+        }
+      )
+    ).toMatchObject({
+      bestPages: { created: new Set([bestPage]), retired: new Set(['retired-best']) },
+      reactivated: new Set([movedCategory]),
+      redirects: new Map([[movedCategory, new Set([`best:${bestPage}`])]]),
+      tags: { created: new Set([tag]), retired: new Set(['retired-tag']) }
     })
     // Either way the sample listing leaves the sampled category: removed, or left out of the
     // categories a listing-update replaces its memberships with.
@@ -296,7 +632,8 @@ describe('environment-specific HTTP gates', () => {
       vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
         const url = new URL(String(input))
         requests.push({ method: init?.method ?? 'GET', url })
-        // The checked-in samples' legacy listing URL redirects like the fixture's.
+        // The checked-in samples' legacy listing URL redirects like the fixture's (the moved
+        // category's 308 is in `successfulResponse`).
         if (url.pathname === `/${httpGateSamples.listing}/`)
           return withCrawlPolicy(
             url,
@@ -318,10 +655,14 @@ describe('environment-specific HTTP gates', () => {
     expect(paths).toEqual(
       expect.arrayContaining([
         `/products/categories/${httpGateSamples.categories[0]}/`,
+        `/products/tags/${httpGateSamples.tags[0]}/`,
+        `/best/${httpGateSamples.bestPages[0]}/`,
+        `/products/categories/${httpGateSamples.movedCategories[0]?.category}/`,
         `/products/${httpGateSamples.listing}/`
       ])
     )
-    expect(paths.filter(path => path.startsWith('/products/categories/'))).toHaveLength(1)
+    // One category page and one moved category.
+    expect(paths.filter(path => path.startsWith('/products/categories/'))).toHaveLength(2)
     expect(
       requests
         .filter(request => request.method !== 'GET')
@@ -372,9 +713,15 @@ describe('environment-specific HTTP gates', () => {
       })
     )
     await expect(gates('production', origin)).rejects.toThrow('returned 500')
+    // Every page answers 200, so the legacy listing URL is not a redirect (nor is the moved
+    // category, which answers its 308 here so the legacy check is the one reported).
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => new Response('ok', { status: 200 }))
+      vi.fn(async (input: string | URL | Request) =>
+        new URL(String(input)).pathname === `/products/categories/${movedCategory}/`
+          ? successfulResponse(new URL(String(input)))
+          : new Response('ok', { status: 200 })
+      )
     )
     await expect(gates('production', origin)).rejects.toThrow('not a redirect')
   })

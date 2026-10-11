@@ -19,27 +19,13 @@ import {
   getListingNamePage,
   type PublishedCategory
 } from '@/lib/catalog/repository'
-import { getCategoryIcon } from '@/lib/directory/categories'
 import { getRoute } from '@/lib/routing/routes'
 import { type PageSearchParams, redirectMovedTaxonomyPage } from '@/lib/routing/taxonomy-redirect'
-import {
-  isCategoryIndexable,
-  linkedTags,
-  listedBestPages,
-  renderingCategory
-} from '@/lib/seo/taxonomy-indexing'
+import { linkedTags, listedBestPages, renderingCategory } from '@/lib/seo/taxonomy-indexing'
 
 interface CategoryPageProps {
   params: Promise<{ category: string }>
   searchParams: Promise<PageSearchParams>
-}
-
-function presentCategory(storedCategory: PublishedCategory) {
-  return {
-    ...storedCategory,
-    icon: getCategoryIcon(storedCategory.slug),
-    priority: 'low' as const
-  }
 }
 
 /** The category at `slug` when its page renders (`renderingCategory`, #341 design 2.2). */
@@ -65,9 +51,8 @@ export async function generateMetadata({
   }
 
   const metadata = await generateCategoryRouteMetadata({
-    category: presentCategory(storedCategory),
-    count: storedCategory.count,
-    noindex: !isCategoryIndexable(storedCategory)
+    category: storedCategory,
+    count: storedCategory.count
   })
   return paginatedMetadata(metadata, {
     basePath: getRoute('category.page', { category: storedCategory.slug }),
@@ -84,18 +69,18 @@ export async function generateMetadata({
  */
 export default async function CategoryPage({ params, searchParams }: CategoryPageProps) {
   const [resolvedParams, resolvedSearchParams] = await Promise.all([params, searchParams])
-  const storedCategory = await publicCategory(resolvedParams.category)
+  const category = await publicCategory(resolvedParams.category)
 
-  if (!storedCategory) {
+  if (!category) {
     await redirectMovedTaxonomyPage('category', resolvedParams.category, resolvedSearchParams)
     notFound()
   }
 
   const page = parseListingPageParam(resolvedSearchParams.page)
   const [listingPage, firstPage, tags, bestPages] = await Promise.all([
-    getListingNamePage({ category: storedCategory.slug, page }),
+    getListingNamePage({ category: category.slug, page }),
     // Structured data describes the whole category, so every page repeats page 1's list.
-    getListingNamePage({ category: storedCategory.slug, page: 1 }),
+    getListingNamePage({ category: category.slug, page: 1 }),
     getActiveTags(),
     getBestPages()
   ])
@@ -103,7 +88,6 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
     notFound()
   }
 
-  const category = presentCategory(storedCategory)
   const categoryPath = getRoute('category.page', { category: category.slug })
   const hubTags = linkedTags(tags.filter(tag => tag.category === category.slug)).sort(
     (left, right) => right.count - left.count || left.name.localeCompare(right.name)

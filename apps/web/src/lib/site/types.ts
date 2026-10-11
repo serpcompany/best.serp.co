@@ -10,7 +10,6 @@ export type AssetSource =
 
 export type SiteCopyConfig = {
   brandsLabel: string
-  categoryLabels: Record<string, string>
   docsLabel: string
   listingName: {
     plural: string

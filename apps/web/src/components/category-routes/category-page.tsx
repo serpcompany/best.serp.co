@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
-import type { Category } from '../../lib/directory/categories'
+import type { PublishedCategory } from '@/db/contracts'
 import { getCategorySEO } from '../../lib/directory/category-seo'
 import {
   toWebsiteBrowseCardMetadata,
@@ -24,11 +24,8 @@ import { type BreadcrumbItemData, SiteBreadcrumb } from '../layout/site-breadcru
 import { JsonLd } from '../seo/json-ld'
 import { resolveCollectionPageSchemaDates } from './schema-dates'
 
-export function generateCategoryRouteStaticParams(categories: Category[]) {
-  return categories.map(category => ({
-    category: category.slug
-  }))
-}
+/** What a category page shows of its category, all from D1. */
+type CategoryContent = Pick<PublishedCategory, 'description' | 'name' | 'slug'>
 
 /**
  * The whole category, independent of the page being shown: its size, publication span,
@@ -51,11 +48,11 @@ export async function generateCategoryRouteMetadata({
   kind = 'category',
   noindex
 }: {
-  category: Pick<Category, 'description' | 'name' | 'slug'>
+  category: CategoryContent
   count: number
   /** A tag page (#341) writes its own canonical URL; its title and description read the same. */
   kind?: 'category' | 'tag'
-  /** `noindex, follow` (`isCategoryIndexable`, `isTagIndexable`). */
+  /** `noindex, follow` (`isTagIndexable`). */
   noindex?: boolean
 }): Promise<Metadata> {
   const seoContent = getCategorySEO(category.slug, category)
@@ -96,7 +93,7 @@ export function CategoryRoutePage({
 }: {
   /** A hub's "Best {hub} lists", between its hero and its listings (#347). */
   beforeListings?: ReactNode
-  category: Category
+  category: CategoryContent
   /** A hub's tag chips under its hero (#347). */
   chips?: ReactNode
   collection: CategoryCollection

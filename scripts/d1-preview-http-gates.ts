@@ -57,7 +57,7 @@ import {
   xRobotsTagBlocksIndexing
 } from './crawl-policy'
 import { project, type RemoteEnvironment } from './project'
-import { categoryRoute, listingRoute } from './site-routes'
+import { bestRoute, categoryRoute, listingRoute, tagRoute } from './site-routes'
 
 export type HttpGateMode = 'staging' | 'production' | 'public'
 const defaultRequestTimeoutMs = 15_000
@@ -100,9 +100,9 @@ export interface HttpGateOptions {
   clock?: GateClock
   /** The deployed Worker version; gates wait for it and require it on every response. */
   expectedVersion?: string
-  /** The reviewed manifests whose retired categories the gates never sample (#260). */
+  /** The reviewed manifests whose retired pages the gates never sample (#260, #350). */
   publicationsDirectory?: string
-  /** The listing and categories the gates request; `httpGateSamples` by default. */
+  /** The listing and taxonomy pages the gates request; `httpGateSamples` by default. */
   samples?: HttpGateSamples
   timeoutMs?: number
   versionPollIntervalMs?: number
@@ -436,10 +436,26 @@ async function requireNonemptyBody(response: Response, label: string): Promise<v
   throw new Error(`${label} returned no content in its bounded body probe.`)
 }
 
-async function expectRoute(target: GateTarget, path: string): Promise<void> {
+/**
+ * Appended when a sample page (`httpGateSamples`) answers otherwise than expected: its likeliest
+ * cause is an admin's change to that page (#405), not the deploy, and the fix is another sample.
+ */
+export const SAMPLE_FAILURE_HINT =
+  'It is an HTTP gate sample (httpGateSamples in scripts/d1-preview-http-gates.ts): most likely it was renamed, retired or unpublished in /admin (#405). Name another page that is live on both staging and production there.'
+
+/** A route's failure message, with `SAMPLE_FAILURE_HINT` for a sample page. */
+function routeFailure(message: string, sample: boolean): Error {
+  return new Error(sample ? `${message} ${SAMPLE_FAILURE_HINT}` : message)
+}
+
+async function expectRoute(
+  target: GateTarget,
+  path: string,
+  { sample = false }: { sample?: boolean } = {}
+): Promise<void> {
   await boundedFetch(target, routeUrl(target.baseUrl, path), async response => {
     if (response.status < 200 || response.status >= 300)
-      throw new Error(`${target.mode} route ${path} returned ${response.status}.`)
+      throw routeFailure(`${target.mode} route ${path} returned ${response.status}.`, sample)
     await requireNonemptyBody(response, `${target.mode} route ${path}`)
   })
 }
@@ -556,27 +572,36 @@ function trustedAuthOrigin({ baseUrl, mode }: GateTarget): string {
   return baseUrl.origin
 }
 
+/** `path` answers exactly one 308 to `expectedPath` on the same origin, query string included. */
+async function expectPermanentRedirect(
+  target: GateTarget,
+  path: string,
+  expectedPath: string,
+  { sample = false }: { sample?: boolean } = {}
+): Promise<void> {
+  const { baseUrl, mode } = target
+  await boundedFetch(target, routeUrl(baseUrl, path), async response => {
+    await response.body?.cancel().catch(() => undefined)
+    const location = response.headers.get('location')
+    const observed = location ? new URL(location, baseUrl) : undefined
+    const expected = routeUrl(baseUrl, expectedPath)
+    if (response.status !== 308 || observed?.href !== expected.href)
+      throw routeFailure(
+        `${mode} route ${path} returned ${response.status} ${location ?? ''}, not a 308 to ${expectedPath}.`,
+        sample
+      )
+  })
+}
+
 /**
  * URL trailing-slash standard (serp docs/engineering/standards/url-trailing-slash.md): a page
  * URL without its slash and a file URL with one answer exactly one 308 to the canonical form,
  * and /api is served as requested.
  */
 async function expectTrailingSlashPolicy(target: GateTarget, searchQuery: string): Promise<void> {
-  const { baseUrl, mode } = target
-  const expectPermanentRedirect = (path: string, expectedPath: string) =>
-    boundedFetch(target, routeUrl(baseUrl, path), async response => {
-      await response.body?.cancel().catch(() => undefined)
-      const location = response.headers.get('location')
-      const observed = location ? new URL(location, baseUrl) : undefined
-      const expected = routeUrl(baseUrl, expectedPath)
-      if (response.status !== 308 || observed?.href !== expected.href)
-        throw new Error(
-          `${mode} route ${path} returned ${response.status} ${location ?? ''}, not a 308 to ${expectedPath}.`
-        )
-    })
   await Promise.all([
-    expectPermanentRedirect('/about', '/about/'),
-    expectPermanentRedirect('/robots.txt/', '/robots.txt'),
+    expectPermanentRedirect(target, '/about', '/about/'),
+    expectPermanentRedirect(target, '/robots.txt/', '/robots.txt'),
     expectRoute(target, `/api/search/?q=${encodeURIComponent(searchQuery)}`)
   ])
 }
@@ -913,13 +938,12 @@ export async function runHttpGates(
 ): Promise<void> {
   const mode = parseMode(modeValue)
   const baseUrl = gateOrigin(mode, validateBaseUrl(mode, baseUrlValue))
-  const { categories, listing: listingSlug } = options.samples ?? httpGateSamples
-  const retired = retiredCategorySlugs(options.publicationsDirectory ?? 'd1/publications')
-  const categorySlug = categories.find(slug => !retired.has(slug))
-  if (!categorySlug)
-    throw new Error(
-      'Every HTTP gate sample category is retired; add a live one to httpGateSamples.'
-    )
+  const samples = options.samples ?? httpGateSamples
+  const listingSlug = samples.listing
+  const { bestPage, category, movedCategory, tag } = liveSamples(
+    samples,
+    taxonomyChanges(options.publicationsDirectory ?? 'd1/publications')
+  )
   const timeoutMs = options.timeoutMs ?? defaultRequestTimeoutMs
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > defaultRequestTimeoutMs)
     throw new Error('HTTP gate timeout must be a positive integer within the protected bound.')
@@ -949,8 +973,17 @@ export async function runHttpGates(
   }
   await withTrailingSlashPolicy(target, listingSlug, [
     expectRoute(target, '/'),
-    expectRoute(target, categoryRoute(categorySlug)),
-    expectRoute(target, listingRoute(listingSlug)),
+    // The samples: fixed pages, so a routing regression on a known page fails the deploy.
+    expectRoute(target, categoryRoute(category), { sample: true }),
+    expectRoute(target, tagRoute(tag), { sample: true }),
+    expectRoute(target, bestRoute(bestPage), { sample: true }),
+    expectPermanentRedirect(
+      target,
+      categoryRoute(movedCategory.category),
+      movedTargetRoute(movedCategory.to),
+      { sample: true }
+    ),
+    expectRoute(target, listingRoute(listingSlug), { sample: true }),
     expectRoute(target, `/api/search?q=${encodeURIComponent(listingSlug)}`),
     expectRoute(target, '/rss.xml'),
     expectRoute(target, '/sitemap-index.xml'),
@@ -969,42 +1002,192 @@ export async function runHttpGates(
 }
 
 /**
- * The live listing and categories the gates request on a deployed Worker. They are real catalog
- * rows, because the gates run against staging's and production's data. The listing is the v1
- * import's first one (#315). The category is that listing's own, `video-downloaders`, with 63
- * live listings on staging and production on 2026-10-10 (#320). An empty category answers 404,
- * so the gates no longer sample `ai-advertising-tools`, which one unpublish would have emptied;
- * and while the listing the gates already require is filed under this one, it can't be empty. A
- * committed manifest that unpublishes or renames the listing, takes the category off it, or
- * retires every category here fails `d1-preview-http-gates.test.ts`; name another live one then.
+ * The live pages the gates request on a deployed Worker. They are real catalog rows, because the
+ * gates run against staging's and production's data.
+ * - The listing is the v1 import's first one (#315).
+ * - The category is that listing's own, `video-downloaders`, with 63 live listings on staging
+ *   and production on 2026-10-10 (#320). An empty category answers 404, so the gates no longer
+ *   sample `ai-advertising-tools`, which one unpublish would have emptied; and while the listing
+ *   the gates already require is filed under this one, it can't be empty.
+ * - The taxonomy's samples (#341 design 4.5, #350), live on both environments since its
+ *   publication (2026-10-11): the `ai-chatbots` tag (171 listings on 2026-10-12), the
+ *   `ai-chatbot` best page ranking it, and `ai-copywriting`, a narrow category the taxonomy
+ *   retired, whose URL answers one 308 to its best page.
+ *
+ * A committed manifest that unpublishes or renames the listing, takes the category off it,
+ * retires every sample category, tag or best page, or moves every moved category elsewhere fails
+ * `d1-preview-http-gates.test.ts`; name another live one then. An admin's rename or retirement
+ * in `/admin` (#405) is no manifest: the next deploy's gates fail on it instead, with
+ * `SAMPLE_FAILURE_HINT`, so `docs/urls.md` asks admins not to change these pages before a merged
+ * PR moves the samples.
  */
 export interface HttpGateSamples {
+  /** Best pages, in order of preference: the first one no reviewed manifest retires. */
+  bestPages: readonly string[]
   /** In order of preference: the gates request the first one no reviewed manifest retires. */
   categories: readonly string[]
   listing: string
+  /** Retired categories' URLs and their 308s, in order of preference (`liveSamples`). */
+  movedCategories: readonly MovedCategorySample[]
+  /** Tags, in order of preference: the first one no reviewed manifest retires. */
+  tags: readonly string[]
+}
+
+/** A retired category whose URL answers one 308 to the tag or best page that took it over. */
+export interface MovedCategorySample {
+  category: string
+  to: { kind: 'best' | 'tag'; slug: string }
 }
 
 export const httpGateSamples: HttpGateSamples = {
+  bestPages: ['ai-chatbot'],
   categories: ['video-downloaders'],
-  listing: '123movies-downloader'
+  listing: '123movies-downloader',
+  movedCategories: [{ category: 'ai-copywriting', to: { kind: 'best', slug: 'ai-copywriting' } }],
+  tags: ['ai-chatbots']
+}
+
+/** The page a moved category's 308 names. */
+function movedTargetRoute(target: MovedCategorySample['to']): string {
+  return target.kind === 'best' ? bestRoute(target.slug) : tagRoute(target.slug)
+}
+
+/** A taxonomy redirect target as manifests write it, as one comparable key. */
+function redirectTargetKey(target: { kind?: unknown; slug?: unknown }): string {
+  return `${String(target.kind)}:${typeof target.slug === 'string' ? target.slug : ''}`
 }
 
 /**
- * Categories a reviewed manifest retires (`category-unpublish`, #260: Adult, the import's first
- * category). A retired category's page answers 404 once the manifest is published, so the gates
- * sample the first category no manifest retires, which answers 200 before and after.
+ * What the reviewed manifests do to taxonomy pages the gates could sample. Read in no particular
+ * order, so it is conservative: a page any manifest retires is never sampled, even one a later
+ * manifest might bring back.
  */
-export function retiredCategorySlugs(directory: string): Set<string> {
-  const retired = new Set<string>()
-  for (const file of readdirSync(resolve(directory)).filter(name => /\.ya?ml$/u.test(name))) {
-    const manifest = parse(readFileSync(resolve(directory, file), 'utf8')) as {
-      operations?: Array<{ action?: unknown; slug?: unknown }>
-    } | null
-    for (const operation of manifest?.operations ?? [])
-      if (operation.action === 'category-unpublish' && typeof operation.slug === 'string')
-        retired.add(operation.slug)
+export interface TaxonomyChanges {
+  /** Best pages a manifest retires (`best-page-unpublish`). */
+  retiredBestPages: Set<string>
+  /** Categories a manifest retires (`category-unpublish`, #260: Adult, the import's first one). */
+  retiredCategories: Set<string>
+  /** Tags a manifest retires (`tag-unpublish`). */
+  retiredTags: Set<string>
+  /** Categories a manifest makes active again (`category-update`), whose pages may render. */
+  updatedCategories: Set<string>
+  /** Every target a manifest points each category URL at (`taxonomy-redirect-set`). */
+  categoryRedirects: Map<string, Set<string>>
+}
+
+interface ManifestOperation {
+  action?: unknown
+  category?: { slug?: unknown }
+  from?: { kind?: unknown; slug?: unknown }
+  slug?: unknown
+  to?: { kind?: unknown; slug?: unknown }
+}
+
+/** The manifest operations that retire or move a page the gates could sample (`taxonomyChanges`). */
+export const SAMPLE_CHANGING_ACTIONS: readonly string[] = [
+  'best-page-unpublish',
+  'category-unpublish',
+  'category-update',
+  'tag-unpublish',
+  'taxonomy-redirect-set'
+]
+
+/**
+ * Whether a manifest's text may hold one of `actions`: one that never names an action can't hold
+ * it, so it needn't be parsed. That skips the large listing batches (most of `d1/publications`'
+ * 5 MB of YAML), which hold none of the operations the gates read.
+ */
+export function manifestMayHold(text: string, actions: readonly string[]): boolean {
+  return actions.some(action => text.includes(action))
+}
+
+/** What these parsed manifests do to the pages the gates could sample (`taxonomyChanges`). */
+export function taxonomyChangesOf(manifests: readonly unknown[]): TaxonomyChanges {
+  const changes: TaxonomyChanges = {
+    categoryRedirects: new Map(),
+    retiredBestPages: new Set(),
+    retiredCategories: new Set(),
+    retiredTags: new Set(),
+    updatedCategories: new Set()
   }
-  return retired
+  const retiring = new Map([
+    ['best-page-unpublish', changes.retiredBestPages],
+    ['category-unpublish', changes.retiredCategories],
+    ['tag-unpublish', changes.retiredTags]
+  ])
+  for (const manifest of manifests as Array<{ operations?: ManifestOperation[] } | null>) {
+    for (const operation of manifest?.operations ?? []) {
+      const action = String(operation.action)
+      if (typeof operation.slug === 'string') retiring.get(action)?.add(operation.slug)
+      if (action === 'category-update' && typeof operation.category?.slug === 'string')
+        changes.updatedCategories.add(operation.category.slug)
+      const from = operation.from
+      if (
+        action === 'taxonomy-redirect-set' &&
+        from?.kind === 'category' &&
+        typeof from.slug === 'string' &&
+        operation.to
+      ) {
+        const targets = changes.categoryRedirects.get(from.slug) ?? new Set<string>()
+        targets.add(redirectTargetKey(operation.to))
+        changes.categoryRedirects.set(from.slug, targets)
+      }
+    }
+  }
+  return changes
+}
+
+/**
+ * Reads the reviewed manifests for the pages they retire or move (#260, #350). A retired page
+ * answers 404 or a 308 once its manifest is published, so the gates sample the first page no
+ * manifest retires, which answers the same before and after. Only manifests that name one of
+ * `SAMPLE_CHANGING_ACTIONS` are parsed (`manifestMayHold`).
+ */
+export function taxonomyChanges(directory: string): TaxonomyChanges {
+  const manifests: unknown[] = []
+  for (const file of readdirSync(resolve(directory)).filter(name => /\.ya?ml$/u.test(name))) {
+    const text = readFileSync(resolve(directory, file), 'utf8')
+    if (manifestMayHold(text, SAMPLE_CHANGING_ACTIONS)) manifests.push(parse(text))
+  }
+  return taxonomyChangesOf(manifests)
+}
+
+/**
+ * Whether a moved category still answers its 308 after every reviewed manifest: no manifest
+ * points its URL anywhere else, makes it active again, or retires its target (which re-points
+ * the redirects aimed at it).
+ */
+function movedCategoryHolds(moved: MovedCategorySample, changes: TaxonomyChanges): boolean {
+  const target = redirectTargetKey(moved.to)
+  const retiredTargets = moved.to.kind === 'best' ? changes.retiredBestPages : changes.retiredTags
+  return (
+    !changes.updatedCategories.has(moved.category) &&
+    !retiredTargets.has(moved.to.slug) &&
+    [...(changes.categoryRedirects.get(moved.category) ?? [])].every(key => key === target)
+  )
+}
+
+/** The first sample of each kind the reviewed manifests leave live (`taxonomyChanges`). */
+export function liveSamples(
+  samples: HttpGateSamples,
+  changes: TaxonomyChanges
+): { bestPage: string; category: string; movedCategory: MovedCategorySample; tag: string } {
+  const first = <T>(kind: string, candidates: readonly T[], live: (candidate: T) => boolean) => {
+    const found = candidates.find(live)
+    if (found === undefined)
+      throw new Error(
+        `Reviewed manifests retire or move every HTTP gate sample ${kind}; add a live one to httpGateSamples.`
+      )
+    return found
+  }
+  return {
+    bestPage: first('best page', samples.bestPages, slug => !changes.retiredBestPages.has(slug)),
+    category: first('category', samples.categories, slug => !changes.retiredCategories.has(slug)),
+    movedCategory: first('moved category', samples.movedCategories, moved =>
+      movedCategoryHolds(moved, changes)
+    ),
+    tag: first('tag', samples.tags, slug => !changes.retiredTags.has(slug))
+  }
 }
 
 export async function runStagingHttpGates(baseUrlValue: string): Promise<void> {
@@ -1030,7 +1213,7 @@ async function main(): Promise<void> {
   if (output)
     writeFileSync(
       resolve(output),
-      `${JSON.stringify({ home: true, category: true, detail: true, search: true, rss: true, sitemap: true, legacyRedirect: true, submit: true, workerVersion: expectedVersion ?? null })}\n`
+      `${JSON.stringify({ home: true, category: true, tag: true, bestPage: true, movedCategory: true, detail: true, search: true, rss: true, sitemap: true, legacyRedirect: true, submit: true, workerVersion: expectedVersion ?? null })}\n`
     )
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]))

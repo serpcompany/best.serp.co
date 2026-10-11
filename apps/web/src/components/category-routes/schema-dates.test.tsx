@@ -1,17 +1,13 @@
-import { Package } from 'lucide-react'
 import React, { isValidElement, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Category } from '../../lib/directory/categories'
 import type { WebsiteMetadata } from '../../lib/directory/content-query'
 import { JsonLd } from '../seo/json-ld'
 import { CategoryRoutePage } from './category-page'
 import { resolveCollectionPageSchemaDates } from './schema-dates'
 
-const category: Category = {
+const category = {
   description: 'Alpha listings.',
-  icon: Package,
   name: 'Alpha',
-  priority: 'medium',
   slug: 'alpha'
 }
 

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import type { PublishedBestPage } from '@/db/contracts'
-import { getCategoryDisplayName } from '../../lib/directory/category-display'
+import { categoryNameFromSlug } from '../../lib/directory/categories'
 import type {
   TaxonomyName,
   WebsiteDetailMetadata,
@@ -34,7 +34,7 @@ type WebsiteResourcesSectionWebsite = Pick<WebsiteDetailMetadata, 'resourceLinks
 export async function generateWebsiteDetailRouteMetadata(
   project: WebsiteDetailMetadata
 ): Promise<Metadata> {
-  const categoryFormatted = project.category ? getCategoryDisplayName(project.category) : null
+  const categoryFormatted = project.category ? categoryNameFromSlug(project.category) : null
 
   // Short descriptions are padded with directory context, long ones truncated (#151).
   const seoDescription = composeMetaDescription(project.description, [
@@ -84,7 +84,7 @@ export function generateWebsiteDetailRouteStaticParams(
 
 /**
  * A listing's categories, its hub (the primary) first, named from D1 (#347): `categoryNames` is
- * the shell stats' names by slug. A slug they lack keeps its checked-in name.
+ * the shell stats' names by slug. A slug they lack is named from itself.
  */
 export function listingCategoryNames(
   project: Pick<WebsiteDetailMetadata, 'categories' | 'category'>,
@@ -92,7 +92,7 @@ export function listingCategoryNames(
 ): TaxonomyName[] {
   return [...(project.category ? [project.category] : []), ...(project.categories ?? [])]
     .filter((slug, index, slugs) => Boolean(slug) && slugs.indexOf(slug) === index)
-    .map(slug => ({ name: categoryNames.get(slug) ?? getCategoryDisplayName(slug), slug }))
+    .map(slug => ({ name: categoryNames.get(slug) ?? categoryNameFromSlug(slug), slug }))
 }
 
 export function WebsiteDetailRoutePage({

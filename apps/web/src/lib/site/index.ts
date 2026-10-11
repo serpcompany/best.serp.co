@@ -17,7 +17,6 @@ export {
 export {
   BEST_PAGE_INDEX_MIN_ENTRIES,
   TAG_INDEX_MIN_LISTINGS,
-  TAG_LINK_MIN_LISTINGS,
-  TRANSITIONAL_CATEGORY_SLUGS
+  TAG_LINK_MIN_LISTINGS
 } from './taxonomy'
 export type { SiteDefinition, SiteOwnedContent } from './types'
