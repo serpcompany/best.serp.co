@@ -698,6 +698,12 @@ test.describe('listings', () => {
     await listbox.getByRole('option', { name: gamma.name }).click()
     await listbox.getByRole('option', { name: alpha.name }).click()
     await page.keyboard.press('Escape')
+    // Each chip's remove button is named after its tag (#370).
+    for (const chosen of [gamma, alpha]) {
+      await expect(
+        page.getByRole('button', { name: `Remove ${chosen.name}`, exact: true })
+      ).toBeVisible()
+    }
     await capture(page, '12-listing-tags')
     expect(publicationsFor(listing.slug)).toBe(0)
     await page.getByRole('button', { name: 'Save tags' }).click()

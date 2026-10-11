@@ -294,7 +294,15 @@ test.describe('submit v2', () => {
       seedTags.noteTaking.name,
       seedTags.whiteboards.name
     ])
-    await chips.filter({ hasText: seedTags.noteTaking.name }).getByRole('button').click()
+    // Each chip's remove button is named after its tag (#370).
+    for (const tag of [seedTags.mockups, seedTags.noteTaking, seedTags.whiteboards]) {
+      await expect(chips.filter({ hasText: tag.name }).getByRole('button')).toHaveAccessibleName(
+        `Remove ${tag.name}`
+      )
+    }
+    await page
+      .getByRole('button', { name: `Remove ${seedTags.noteTaking.name}`, exact: true })
+      .click()
     await page.getByRole('button', { name: 'Continue' }).click()
     await page.waitForURL(/\/submit\/[0-9a-f-]{36}\/choose\/\?saved=1$/u)
     await page.goto(`/submit/?edit=${submissionId}`)
