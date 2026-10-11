@@ -6,7 +6,8 @@
  *    configuration, 403 without a valid Access JWT.
  * 2. A request with staging's admin key header (#408, `staging-admin-key.ts`) is judged by the
  *    key alone: it goes on only to `/api/admin/*` on staging, after staging's password, with
- *    the right key; otherwise 401, whatever cookie it carries.
+ *    the right key; otherwise 401, whatever cookie it carries. The right key on the allowlist's
+ *    endpoints (`/api/admin/admins`) is 403.
  * 3. Any other request without a Better Auth session cookie is 401.
  *
  * Requests that pass still reach the pages and route handlers, which authorize the session
@@ -19,7 +20,7 @@ import { hasSessionCookie } from './cookies'
 import {
   hasStagingAdminKey,
   type StagingAdminKeyEnv,
-  stagingAdminKeyMatches
+  stagingAdminKeyDecision
 } from './staging-admin-key'
 
 export interface AdminGateEnv extends AccessEnv, StagingAdminKeyEnv {}
@@ -69,8 +70,9 @@ export async function adminGate(
   if (access.status === 'not-configured') return denied(503, 'Access not configured')
   if (access.status === 'missing' || access.status === 'invalid') return denied(403, 'Forbidden')
   if (hasStagingAdminKey(request)) {
-    const admitted = passedStagingGate && (await stagingAdminKeyMatches(request, env))
-    return admitted ? null : denied(401, 'Unauthorized')
+    const decision = passedStagingGate ? await stagingAdminKeyDecision(request, env) : 'refused'
+    if (decision === 'admitted') return null
+    return decision === 'forbidden' ? denied(403, 'Forbidden') : denied(401, 'Unauthorized')
   }
   if (!hasSessionCookie(request.headers.get('cookie'))) return denied(401, 'Unauthorized')
   return null

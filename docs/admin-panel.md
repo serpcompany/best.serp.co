@@ -205,6 +205,9 @@ gate and again by `authorizeAdminRequest()`):
   ([Architecture](./architecture.md#environments-and-hosts)). Production and local refuse any key,
   even with the secret set, and the smoke-test exemption doesn't carry it. It opens no `/admin`
   page, and never creates a session or sets a cookie.
+- **Never the allowlist:** the right key on `/api/admin/admins` (adding or removing an admin) is
+  403 `admin_key_forbidden`, from the Worker gate, `authorizeAdminRequest()`, and the route
+  itself, which refuses any request without a session. Only a person changes who is an admin.
 - **The key** is the Worker secret `STAGING_ADMIN_TOKEN`, at least 32 characters (without it,
   every key is refused), sent as `X-Staging-Admin-Token` and compared in constant time. A
   request with the header is judged by the key alone: a wrong key is 401 even with a session.
@@ -248,7 +251,7 @@ pnpm exec wrangler secret put STAGING_ADMIN_TOKEN --env staging \
 
 **Revoke** with `pnpm exec wrangler secret delete STAGING_ADMIN_TOKEN --env staging`: every key is
 refused. Decisions made with a key stay in the audit trail as `staging-agent`; after a suspected
-leak, rotate or revoke, then check `admin_allowlist` for rows `added_by = 'staging-agent'`.
+leak, rotate or revoke.
 
 ## Tests
 

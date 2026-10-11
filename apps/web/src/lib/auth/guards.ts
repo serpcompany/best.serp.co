@@ -28,6 +28,7 @@ export interface SessionSnapshot {
 export type AuthorizationFailure = {
   ok: false
   reason:
+    | 'admin_key_forbidden'
     | 'admin_key_rejected'
     | 'admin_required'
     | 'auth_unavailable'
@@ -129,6 +130,7 @@ export async function authorizeAdmin(dependencies: AdminGuardDependencies): Prom
 /** A JSON error response for a failed authorization (route handlers). */
 export function authorizationErrorResponse(failure: AuthorizationFailure): Response {
   const message = {
+    admin_key_forbidden: 'The staging admin key can’t change admins.',
     admin_key_rejected: 'The staging admin key was refused.',
     admin_required: 'Admin access required.',
     auth_unavailable: 'Accounts are unavailable.',

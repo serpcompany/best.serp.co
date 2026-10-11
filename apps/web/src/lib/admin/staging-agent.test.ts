@@ -8,7 +8,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { POST as adminsPost } from '@/app/api/admin/admins/route'
+import { DELETE as adminsDelete, POST as adminsPost } from '@/app/api/admin/admins/route'
 import { POST as submissionPost } from '@/app/api/admin/submissions/[id]/[action]/route'
 import { SqliteD1 } from '@/db/test-support'
 import { STAGING_ADMIN_KEY_HEADER } from '@/lib/auth/staging-admin-key'
@@ -66,11 +66,16 @@ function worker(environment: Environment, secret: string | undefined = KEY): Sql
   return sqlite
 }
 
-function keyed(path: string, body: unknown, headers: Record<string, string> = {}): Request {
+function keyed(
+  path: string,
+  body: unknown,
+  headers: Record<string, string> = {},
+  method = 'POST'
+): Request {
   return new Request(`${ORIGIN}${path}`, {
     body: JSON.stringify(body),
     headers: { 'content-type': 'application/json', [STAGING_ADMIN_KEY_HEADER]: KEY, ...headers },
-    method: 'POST'
+    method
   })
 }
 
@@ -146,12 +151,34 @@ describe('the staging admin key through the admin API', () => {
     expect(actors(sqlite)).toEqual({ allowlist: [], publications: [], submissionEvents: [] })
   })
 
-  it('records staging-agent on an allowlist change too', async () => {
+  it('never adds or removes an admin: 403, and the allowlist is unchanged', async () => {
     const sqlite = worker('staging')
-    const response = await adminsPost(keyed('/api/admin/admins', { email: 'tester@example.com' }))
-    expect(response.status).toBe(200)
-    expect(response.headers.get('set-cookie')).toBeNull()
-    expect(actors(sqlite).allowlist).toEqual(['staging-agent'])
+    sqlite.database
+      .prepare(
+        "INSERT INTO admin_allowlist (email, added_by) VALUES ('second@example.com', 'test')"
+      )
+      .run()
+    const emails = () =>
+      sqlite.database.prepare('SELECT email FROM admin_allowlist ORDER BY email').all()
+    const before = emails()
+    const attempts = [
+      { handler: adminsPost, method: 'POST', path: '/api/admin/admins' },
+      { handler: adminsDelete, method: 'DELETE', path: '/api/admin/admins' },
+      // Reached under another path, where the key itself matches, the route still refuses it.
+      { handler: adminsPost, method: 'POST', path: '/api/admin/listings/lst_1/tags' },
+      { handler: adminsDelete, method: 'DELETE', path: '/api/admin/listings/lst_1/tags' }
+    ]
+    for (const { handler, method, path } of attempts) {
+      const email = method === 'POST' ? 'tester@example.com' : 'second@example.com'
+      const response = await handler(keyed(path, { email }, {}, method))
+      expect(response.status, `${method} ${path}`).toBe(403)
+      expect(await response.json()).toEqual({
+        error: 'admin_key_forbidden',
+        message: 'The staging admin key can’t change admins.'
+      })
+    }
+    expect(emails()).toEqual(before)
+    expect(actors(sqlite).allowlist).toEqual(['test'])
   })
 
   it('refuses a wrong key, even with a trusted Origin, and writes nothing', async () => {

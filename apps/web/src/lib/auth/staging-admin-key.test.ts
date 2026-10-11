@@ -9,9 +9,11 @@ import {
   authorizeStagingAdminKey,
   hasStagingAdminKey,
   isAdminApiPath,
+  isAllowlistApiPath,
   STAGING_ADMIN_ACTOR,
   STAGING_ADMIN_KEY_HEADER,
   type StagingAdminKeyEnv,
+  stagingAdminKeyDecision,
   stagingAdminKeyMatches
 } from './staging-admin-key'
 
@@ -48,14 +50,16 @@ describe('staging admin key', () => {
       ).toBe(true)
     }
     // The header name is case-insensitive, like every header.
-    const upper = new Request(`${ORIGIN}/api/admin/admins`, {
+    const upper = new Request(`${ORIGIN}/api/admin/listings/lst_1/tags`, {
       headers: { 'X-Staging-Admin-Token': KEY }
     })
     expect(await stagingAdminKeyMatches(upper, staging)).toBe(true)
   })
 
   it('acts as the fixed actor staging-agent, without a session', async () => {
-    expect(await authorizeStagingAdminKey(keyed('/api/admin/admins'), staging)).toEqual({
+    expect(
+      await authorizeStagingAdminKey(keyed('/api/admin/listings/lst_1/tags'), staging)
+    ).toEqual({
       ok: true,
       sessionId: null,
       user: {
@@ -70,6 +74,46 @@ describe('staging admin key', () => {
     expect(STAGING_ADMIN_ACTOR).not.toContain('@')
   })
 
+  it('forbids the allowlist: the right key on /api/admin/admins is 403, never an admin', async () => {
+    for (const path of [
+      '/api/admin/admins',
+      '/api/admin/admins/',
+      '/API/Admin/Admins',
+      '/api//admin/admins',
+      '/api/admin/%61dmins',
+      '/api/admin/admins/devin@serp.co'
+    ]) {
+      const request = keyed(path, KEY, { method: 'POST' })
+      expect(await stagingAdminKeyMatches(request, staging), path).toBe(true)
+      expect(await stagingAdminKeyDecision(request, staging), path).toBe('forbidden')
+      expect(await authorizeStagingAdminKey(request, staging), path).toEqual({
+        ok: false,
+        reason: 'admin_key_forbidden',
+        status: 403
+      })
+    }
+    // A wrong key is refused there first, as anywhere.
+    expect(
+      await authorizeStagingAdminKey(keyed('/api/admin/admins', `${KEY}x`), staging)
+    ).toMatchObject({ reason: 'admin_key_rejected', status: 401 })
+    for (const path of ['/api/admin/adminsx', '/api/admin/listings/admins', '/admin/admins/']) {
+      expect(isAllowlistApiPath(path), path).toBe(false)
+    }
+    expect(await stagingAdminKeyDecision(keyed('/api/admin/listings/lst_1/tags'), staging)).toBe(
+      'admitted'
+    )
+    const answer = authorizationErrorResponse({
+      ok: false,
+      reason: 'admin_key_forbidden',
+      status: 403
+    })
+    expect(answer.status).toBe(403)
+    expect(await answer.json()).toEqual({
+      error: 'admin_key_forbidden',
+      message: 'The staging admin key can’t change admins.'
+    })
+  })
+
   it('refuses a wrong, partial, padded, empty or missing key', async () => {
     for (const key of [
       `${KEY.slice(0, -1)}x`,
@@ -80,7 +124,7 @@ describe('staging admin key', () => {
       '',
       null
     ]) {
-      const request = keyed('/api/admin/admins', key)
+      const request = keyed('/api/admin/listings/lst_1/tags', key)
       expect(await stagingAdminKeyMatches(request, staging), String(key)).toBe(false)
       expect(await authorizeStagingAdminKey(request, staging)).toEqual({
         ok: false,
@@ -88,8 +132,8 @@ describe('staging admin key', () => {
         status: 401
       })
     }
-    expect(hasStagingAdminKey(keyed('/api/admin/admins', ''))).toBe(true)
-    expect(hasStagingAdminKey(keyed('/api/admin/admins', null))).toBe(false)
+    expect(hasStagingAdminKey(keyed('/api/admin/listings/lst_1/tags', ''))).toBe(true)
+    expect(hasStagingAdminKey(keyed('/api/admin/listings/lst_1/tags', null))).toBe(false)
   })
 
   it('refuses every key while the secret is missing, empty, or shorter than 32 characters', async () => {
@@ -97,13 +141,17 @@ describe('staging admin key', () => {
     for (const secret of [undefined, '', '   ', short, ` ${short} `]) {
       const env = { ...staging, STAGING_ADMIN_TOKEN: secret }
       for (const key of [secret ?? '', short, KEY]) {
-        expect(await stagingAdminKeyMatches(keyed('/api/admin/admins', key), env)).toBe(false)
+        expect(
+          await stagingAdminKeyMatches(keyed('/api/admin/listings/lst_1/tags', key), env)
+        ).toBe(false)
       }
     }
     // 32 characters is enough.
     const minimum = 'b'.repeat(32)
     const env = { ...staging, STAGING_ADMIN_TOKEN: minimum }
-    expect(await stagingAdminKeyMatches(keyed('/api/admin/admins', minimum), env)).toBe(true)
+    expect(
+      await stagingAdminKeyMatches(keyed('/api/admin/listings/lst_1/tags', minimum), env)
+    ).toBe(true)
   })
 
   it('refuses any key in production and locally, even with the secret set (fail closed)', async () => {
@@ -158,11 +206,14 @@ describe('staging admin key', () => {
         calls.push(args)
       })
     }
-    const refused = await authorizeStagingAdminKey(keyed('/api/admin/admins', `${KEY}-wrong`), {
-      ...staging
-    })
-    await authorizeStagingAdminKey(keyed('/api/admin/admins'), staging)
-    await authorizeStagingAdminKey(keyed('/api/admin/admins'), {
+    const refused = await authorizeStagingAdminKey(
+      keyed('/api/admin/listings/lst_1/tags', `${KEY}-wrong`),
+      {
+        ...staging
+      }
+    )
+    await authorizeStagingAdminKey(keyed('/api/admin/listings/lst_1/tags'), staging)
+    await authorizeStagingAdminKey(keyed('/api/admin/listings/lst_1/tags'), {
       ...staging,
       SITE_ENVIRONMENT: 'production'
     })

@@ -5,6 +5,9 @@
  *
  * - **Only `/api/admin/*`.** The key never opens an `/admin` page, and never creates a session or
  *   sets a cookie: it is checked on each request and nothing about it is stored.
+ * - **Never the allowlist.** A valid key on `/api/admin/admins` (adding or removing an admin) is
+ *   403: only a person's session changes who is an admin, so a leaked key can't add one that
+ *   outlives its rotation. The allowlist route also refuses any request without a session.
  * - **Only staging.** `SITE_ENVIRONMENT` and `D1_RUNTIME_ENV` must both be exactly `staging`.
  *   Production, local (a local Worker serving as staging with `LOCAL_STAGING_ACCESS=on`
  *   included), and a missing or misspelled environment refuse every key, even with the secret
@@ -37,6 +40,8 @@ export const STAGING_ADMIN_KEY_HEADER = 'x-staging-admin-token'
 export const MIN_STAGING_ADMIN_KEY_LENGTH = 32
 /** The actor every decision made with the key records. It has no `@`, so no email equals it. */
 export const STAGING_ADMIN_ACTOR = 'staging-agent'
+/** The admin allowlist's endpoints, which the key never reaches. */
+const ALLOWLIST_API_PATH = '/api/admin/admins'
 
 /** The Worker vars and secret the key reads. */
 export interface StagingAdminKeyEnv {
@@ -52,19 +57,35 @@ export function hasStagingAdminKey(request: Pick<Request, 'headers'>): boolean {
 }
 
 /**
- * True for `/api/admin` and everything below it, in any letter case, with percent-encoding and
- * repeated slashes resolved, as `isAdminPath` (`admin-gate.ts`) reads admin paths. A path that
- * cannot be decoded is not one, so the key is refused there.
+ * A path in any letter case, with percent-encoding and repeated slashes resolved, as `isAdminPath`
+ * (`admin-gate.ts`) reads admin paths; null when it cannot be decoded.
+ */
+function normalizedPath(pathname: string): string | null {
+  try {
+    return decodeURIComponent(pathname)
+      .replace(/[\\/]+/gu, '/')
+      .toLowerCase()
+  } catch {
+    return null
+  }
+}
+
+function isAtOrBelow(pathname: string, prefix: string): boolean {
+  const normalized = normalizedPath(pathname)
+  return normalized !== null && (normalized === prefix || normalized.startsWith(`${prefix}/`))
+}
+
+/**
+ * True for `/api/admin` and everything below it, however it is spelled. A path that cannot be
+ * decoded is not one, so the key is refused there.
  */
 export function isAdminApiPath(pathname: string): boolean {
-  let decoded: string
-  try {
-    decoded = decodeURIComponent(pathname)
-  } catch {
-    return false
-  }
-  const normalized = decoded.replace(/[\\/]+/gu, '/').toLowerCase()
-  return normalized === '/api/admin' || normalized.startsWith('/api/admin/')
+  return isAtOrBelow(pathname, '/api/admin')
+}
+
+/** True for the allowlist's endpoints (`/api/admin/admins` and below), however spelled. */
+export function isAllowlistApiPath(pathname: string): boolean {
+  return isAtOrBelow(pathname, ALLOWLIST_API_PATH)
 }
 
 /** The key this Worker accepts: only on staging, and only a secret of at least 32 characters. */
@@ -75,8 +96,9 @@ function configuredKey(env: StagingAdminKeyEnv): string | null {
 }
 
 /**
- * True only when the request may act as `staging-agent`: an `/api/admin/*` path on a staging
- * Worker whose secret is set, and a header equal to it. Everything else is false.
+ * True only when the request carries the right key: an `/api/admin/*` path on a staging Worker
+ * whose secret is set, and a header equal to it. Everything else is false. A matching key is
+ * still forbidden on the allowlist (`stagingAdminKeyDecision`).
  */
 export async function stagingAdminKeyMatches(
   request: Request,
@@ -87,6 +109,18 @@ export async function stagingAdminKeyMatches(
   const given = request.headers.get(STAGING_ADMIN_KEY_HEADER)
   if (given === null) return false
   return secretsEqual(given, expected)
+}
+
+/**
+ * What a request with the key may do: `refused` (401) unless the key matches, `forbidden` (403)
+ * on the allowlist's endpoints, otherwise `admitted` as `staging-agent`.
+ */
+export async function stagingAdminKeyDecision(
+  request: Request,
+  env: StagingAdminKeyEnv
+): Promise<'admitted' | 'forbidden' | 'refused'> {
+  if (!(await stagingAdminKeyMatches(request, env))) return 'refused'
+  return isAllowlistApiPath(new URL(request.url).pathname) ? 'forbidden' : 'admitted'
 }
 
 /** The admin a valid key acts as: no session, no account, the fixed actor. */
@@ -101,15 +135,16 @@ function stagingAgent(): SessionUser {
 }
 
 /**
- * The admin decision for a request that carries the key: `staging-agent` when it matches,
- * otherwise 401 `admin_key_rejected`. The `Origin` check doesn't apply (see the module comment).
+ * The admin decision for a request that carries the key: `staging-agent` when it matches, 403
+ * `admin_key_forbidden` on the allowlist, otherwise 401 `admin_key_rejected`. The `Origin` check
+ * doesn't apply (see the module comment).
  */
 export async function authorizeStagingAdminKey(
   request: Request,
   env: StagingAdminKeyEnv
 ): Promise<Authorization> {
-  if (await stagingAdminKeyMatches(request, env)) {
-    return { ok: true, sessionId: null, user: stagingAgent() }
-  }
+  const decision = await stagingAdminKeyDecision(request, env)
+  if (decision === 'admitted') return { ok: true, sessionId: null, user: stagingAgent() }
+  if (decision === 'forbidden') return { ok: false, reason: 'admin_key_forbidden', status: 403 }
   return { ok: false, reason: 'admin_key_rejected', status: 401 }
 }

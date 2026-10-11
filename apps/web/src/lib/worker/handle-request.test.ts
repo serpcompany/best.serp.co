@@ -744,7 +744,7 @@ describe('staging admin key in the Worker gate', () => {
   }
 
   it('passes the right key behind the password on to the admin API, without a cookie', async () => {
-    for (const path of ['/api/admin/submissions/sub_1/approve', '/api/admin/admins']) {
+    for (const path of ['/api/admin/submissions/sub_1/approve', '/api/admin/listings/lst_1/tags']) {
       const { response, serve } = await visit(`${stagingCanonical}${path}`, stagingKeyEnv, {
         ...withPassword,
         ...keyHeader
@@ -759,14 +759,43 @@ describe('staging admin key in the Worker gate', () => {
     }
   })
 
-  it('still asks for the password, and the smoke-test exemption does not carry the key', async () => {
-    const withoutPassword = await visit(`${stagingCanonical}/api/admin/admins`, stagingKeyEnv, {
-      ...keyHeader
+  it('forbids the allowlist to the right key, and refuses a wrong key there', async () => {
+    for (const [path, method] of [
+      ['/api/admin/admins', 'POST'],
+      ['/API/Admin/Admins/', 'DELETE']
+    ]) {
+      const handler = pipeline()
+      const response = await handleWorkerRequest(
+        new Request(`${stagingCanonical}${path}`, {
+          headers: { ...withPassword, ...keyHeader },
+          method
+        }),
+        stagingKeyEnv,
+        handler
+      )
+      expect(response.status, path).toBe(403)
+      expect(await response.text()).toBe('Forbidden\n')
+      expect(handler.serve).not.toHaveBeenCalled()
+    }
+    const wrong = await visit(`${stagingCanonical}/api/admin/admins`, stagingKeyEnv, {
+      ...withPassword,
+      [STAGING_ADMIN_KEY_HEADER]: `${KEY}x`
     })
+    expect(wrong.response.status).toBe(401)
+  })
+
+  it('still asks for the password, and the smoke-test exemption does not carry the key', async () => {
+    const withoutPassword = await visit(
+      `${stagingCanonical}/api/admin/listings/lst_1/tags`,
+      stagingKeyEnv,
+      {
+        ...keyHeader
+      }
+    )
     expect(withoutPassword.response.status).toBe(401)
     expect(withoutPassword.response.headers.get('www-authenticate')).toBe(STAGING_ACCESS_CHALLENGE)
     expect(withoutPassword.serve).not.toHaveBeenCalled()
-    const smoke = await visit(`${staging}/api/admin/admins`, stagingKeyEnv, {
+    const smoke = await visit(`${staging}/api/admin/listings/lst_1/tags`, stagingKeyEnv, {
       [SMOKE_TEST_HEADER]: '1',
       ...keyHeader
     })
@@ -778,7 +807,7 @@ describe('staging admin key in the Worker gate', () => {
   it('refuses a wrong or empty key, even with a session cookie: the header decides', async () => {
     for (const key of [`${KEY}x`, KEY.slice(1), '']) {
       const { body, response, serve } = await visit(
-        `${stagingCanonical}/api/admin/admins`,
+        `${stagingCanonical}/api/admin/listings/lst_1/tags`,
         stagingKeyEnv,
         { ...withPassword, ...session, [STAGING_ADMIN_KEY_HEADER]: key }
       )
@@ -791,7 +820,7 @@ describe('staging admin key in the Worker gate', () => {
   it('refuses every key while the secret is missing or shorter than 32 characters', async () => {
     for (const secret of [undefined, '', KEY.slice(0, 31)]) {
       const { response, serve } = await visit(
-        `${stagingCanonical}/api/admin/admins`,
+        `${stagingCanonical}/api/admin/listings/lst_1/tags`,
         { ...stagingKeyEnv, STAGING_ADMIN_TOKEN: secret },
         { ...withPassword, [STAGING_ADMIN_KEY_HEADER]: secret || KEY }
       )
@@ -834,7 +863,7 @@ describe('staging admin key in the Worker gate', () => {
     // Even past Access, with the owner's session, a request with the key is refused.
     const handler = pipeline()
     const response = await handleWorkerRequest(
-      new Request(`${production}/api/admin/admins`, {
+      new Request(`${production}/api/admin/listings/lst_1/tags`, {
         headers: { ...session, ...keyHeader, [ACCESS_JWT_HEADER]: jwt },
         method: 'POST'
       }),
@@ -845,7 +874,8 @@ describe('staging admin key in the Worker gate', () => {
     expect(handler.serve).not.toHaveBeenCalled()
     // Without Access it never gets that far.
     expect(
-      (await visit(`${production}/api/admin/admins`, productionKeyEnv, keyHeader)).response.status
+      (await visit(`${production}/api/admin/listings/lst_1/tags`, productionKeyEnv, keyHeader))
+        .response.status
     ).toBe(403)
 
     const localKeyEnv: WorkerRequestEnv = {
@@ -858,7 +888,7 @@ describe('staging admin key in the Worker gate', () => {
       // A local Worker serving as staging, behind the password (`LOCAL_STAGING_ACCESS=on`).
       { ...localKeyEnv, LOCAL_STAGING_ACCESS: 'on', STAGING_BASIC_AUTH_PASSWORD: STAGING_PASSWORD }
     ]) {
-      const local = await visit('http://127.0.0.1:8832/api/admin/admins', env, {
+      const local = await visit('http://127.0.0.1:8832/api/admin/listings/lst_1/tags', env, {
         ...withPassword,
         ...keyHeader
       })
@@ -869,12 +899,12 @@ describe('staging admin key in the Worker gate', () => {
 
   it('never echoes the key', async () => {
     const answers = await Promise.all([
-      visit(`${stagingCanonical}/api/admin/admins`, stagingKeyEnv, {
+      visit(`${stagingCanonical}/api/admin/listings/lst_1/tags`, stagingKeyEnv, {
         ...withPassword,
         [STAGING_ADMIN_KEY_HEADER]: `${KEY}-wrong`
       }),
       visit(
-        `${production}/api/admin/admins`,
+        `${production}/api/admin/listings/lst_1/tags`,
         { ...productionEnv, STAGING_ADMIN_TOKEN: KEY },
         keyHeader
       )

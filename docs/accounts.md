@@ -18,7 +18,8 @@ email is #61.
   remove each other on `/admin/admins/` (#64); the last admin cannot be removed.
 - **`/admin` and `/api/admin`** need Cloudflare Access (production) **and** an admin session.
   On staging only, agents use `/api/admin/*` with a key instead of a session, as the fixed actor
-  `staging-agent` ([Admin panel](./admin-panel.md#staging-admin-key-for-agents-408)).
+  `staging-agent`, never to change the allowlist
+  ([Admin panel](./admin-panel.md#staging-admin-key-for-agents-408)).
 
 | Piece | Where |
 |---|---|
@@ -193,6 +194,7 @@ path (any case, decoded) before the edge cache and Next.js:
 | Production, `CF_ACCESS_TEAM_DOMAIN` or `CF_ACCESS_AUD` unset or malformed | 503 `Access not configured` |
 | Access required, `Cf-Access-Jwt-Assertion` missing or invalid (RS256, issuer, AUD, expiry) | 403 |
 | `X-Staging-Admin-Token` present but not a valid staging key, behind the password, on `/api/admin/*` | 401 |
+| A valid staging key on `/api/admin/admins` (the allowlist) | 403 |
 | No Better Auth session cookie (and no key) | 401 |
 
 Requests that pass reach pages and handlers, which call `requireAdmin()` (Next.js
