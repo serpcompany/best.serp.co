@@ -19,7 +19,7 @@ export default async function TagsPage({ searchParams }: Props) {
   await requireAdmin()
   const reads = await getAdminReads()
   const [tags, categories, params] = await Promise.all([
-    reads.listAdminTags(),
+    reads.listAdminTags(new Date().toISOString()),
     reads.listActiveCategories(),
     searchParams
   ])

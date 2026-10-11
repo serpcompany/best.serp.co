@@ -9,7 +9,7 @@ import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { buttonVariants } from '@/components/ui/button'
 import { isFeatureListing } from '@/lib/admin/feature-listings'
 import { getAdminReads } from '@/lib/admin/runtime'
-import { redirectChoices } from '@/lib/admin/taxonomy-view'
+import { defaultRedirect, redirectChoices } from '@/lib/admin/taxonomy-view'
 import { requireAdmin } from '@/lib/auth/server'
 import { getRoute } from '@/lib/routing/routes'
 
@@ -27,11 +27,17 @@ export default async function BestPagePage({ params }: Props) {
   const reads = await getAdminReads()
   const page = await reads.getAdminBestPage(decodeURIComponent(slug))
   if (!page) notFound()
-  const [categories, tags, bestPages] = await Promise.all([
-    reads.listActiveCategories(),
-    reads.listActiveTags(),
-    reads.listAdminBestPages()
+  const now = new Date().toISOString()
+  const [categories, tags, bestPages, tagOptions] = await Promise.all([
+    reads.listAdminCategories(now),
+    reads.listAdminTags(now),
+    reads.listAdminBestPages(now),
+    reads.listActiveTags()
   ])
+  const choices = redirectChoices(
+    { bestPages, categories, tags },
+    { kind: 'best', slug: page.slug }
+  )
   const path = getRoute('best.page', { keyword: page.slug })
   const initial = {
     intro: page.intro,
@@ -56,7 +62,7 @@ export default async function BestPagePage({ params }: Props) {
         description={path}
         actions={
           <>
-            {page.pool.length > 0 || page.pins.some(pin => pin.live) ? (
+            {page.renders ? (
               <a
                 href={path}
                 target="_blank"
@@ -69,18 +75,24 @@ export default async function BestPagePage({ params }: Props) {
             ) : null}
             <RetireTaxonomy
               action={`/api/admin/best-pages/${encodeURIComponent(page.slug)}/retire`}
-              choices={redirectChoices(
-                { bestPages, categories, tags },
-                { kind: 'best', slug: page.slug }
-              )}
-              defaultTarget={page.tag ? `tag:${page.tag}` : 'directory'}
+              choices={choices}
+              defaultTarget={defaultRedirect(choices, [
+                page.tag && `tag:${page.tag}`,
+                page.category && `category:${page.category}`
+              ])}
               doneHref="/admin/best-pages/"
               name={page.title}
             />
           </>
         }
       />
-      <BestPageForm key={JSON.stringify(initial)} mode="edit" initial={initial} tags={tags} />
+      <BestPageForm
+        key={JSON.stringify(initial)}
+        categoryName={page.tag ? null : page.categoryName}
+        mode="edit"
+        initial={initial}
+        tags={tagOptions}
+      />
       <BestPagePins
         key={JSON.stringify(pins)}
         candidates={page.pool.filter(listing => !isFeatureListing(listing.id))}

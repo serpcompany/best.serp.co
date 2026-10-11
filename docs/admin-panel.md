@@ -169,13 +169,15 @@ The owner's decision on #405 replaced #341's design default 12 (hubs, tags, and 
 manifests only): admins create, edit, rename, and retire them here. `lib/admin/taxonomy-decisions.ts`
 sends each as `buildTaxonomyPlans` (`src/db/taxonomy-plans.ts`): the publisher's own operations and
 guards ([Taxonomy operations](./catalog-publication.md#taxonomy-operations)) with their `expected`
-checks, between a publication that advances the catalog version and records the run, plus three
-it lacks: `category-edit` (compared and swapped), `category-retire`, and `taxonomy-rename`.
+checks, between a publication that advances the catalog version and records the run, plus four
+it lacks: `category-edit` (compared and swapped), `category-retire`, `taxonomy-rename`, and
+`best-page-pins-check`.
 
 - **Forms** (`components/admin/taxonomy-forms.tsx`, stock `Card` and `Field`s). A category has a
   name, slug, description, and order; a tag a name, slug, category, and description (its order
   stays); a best page a keyword, slug, title (its H1 too, unless a manifest set them apart), intro,
-  and the tag it ranks, with a manifest's defaults for the rest (list size 10). A new or changed
+  and the tag it ranks, with a manifest's defaults for the rest (list size 10). A page a manifest
+  set on a category alone (`video-downloader`) keeps it and may stay without a tag. A new or changed
   slug is lowercase words joined by hyphens (`lib/admin/taxonomy-fields.ts`), not taken by any row
   of its kind, active or retired, and not a URL that already redirects. A create form takes initial
   values, as props or from its list page's query (`?name=`), so another screen can open it filled
@@ -189,17 +191,21 @@ it lacks: `category-edit` (compared and swapped), `category-retire`, and `taxono
   best page took over) keeps it. Renaming back removes the redirect that would point at itself. A
   submission or revision still naming a renamed category resolves through that redirect at
   approval; a suggested tag naming a renamed tag is dropped, as a retired one is.
-- **Retire.** The URL redirects to the page the admin picks (another active category, tag, or best
-  page, or `/products/`), every redirect aimed at it is re-pointed there, and a page whose own URL
-  redirects elsewhere can't be picked. A category can't retire while a live listing, an active tag,
-  or an active best page is filed under it or draws on it, or a listing filed under it is a slug
-  redirect's source (`category-unpublish`'s guards); a tag can't while a best page ranks it. A
-  retired tag's listings keep it as a retired membership, as `tag-unpublish` leaves them.
+- **Retire.** The URL redirects to the page the admin picks: another category, tag, or best page
+  whose page renders now (a redirect is followed only to one, #346), or `/products/`. Every redirect
+  aimed at it is re-pointed there, and a page whose own URL redirects elsewhere can't be picked. A
+  category can't retire while a live listing, an active tag, or an active best page is filed under
+  it or draws on it, or a listing filed under it is a slug redirect's source (`category-unpublish`'s
+  guards), or an unpublished listing is: its 410 would become a 404 that Republish can't undo
+  (#260), so it is filed under another category first. A tag can't retire while a best page ranks
+  it. A retired tag's listings keep it as a retired membership, as `tag-unpublish` leaves them.
 - **Pins** (`components/admin/best-page-pins.tsx`). In order, at most the page's list size, each a
   live listing of its pool (its tag's listings, in its category when it names one too), never one
   it excludes or a listing that names a feature of a larger site: `lib/admin/feature-listings.ts`,
   the reviewed mapping's `featureListings` (#349), which a test keeps equal. A pin the page keeps
-  keeps its blurb; its exclusions stay as manifests set them.
+  keeps its blurb; its exclusions stay as manifests set them. Pins join a page's pool, so its tag
+  changes only while every pin is in the new pool; otherwise the admin unpins those first. Both
+  batches end with `best-page-pins-check`, which refuses a pin outside the pool.
 
 ## Unpublished listings answer 410
 

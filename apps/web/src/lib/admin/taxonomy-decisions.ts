@@ -13,7 +13,7 @@
  * rename keeps the row, so its listings, pins, and the redirects aimed at it follow, and its old
  * URL answers a 308 to the new one; a retirement sends its URL to the page the admin chose.
  */
-import { createAdminReadOperations } from '@/db/admin-queries'
+import { createAdminReadOperations, selectListingsInPoolPlan } from '@/db/admin-queries'
 import { queryPlan } from '@/db/plan-runner'
 import { prepareCatalogPublication } from '@/db/plan-support'
 import { BEST_PAGE_LIST_SIZE } from '@/db/schema'
@@ -61,7 +61,10 @@ interface CategoryItem {
   name: string
   order: number
   redirectSources: number
+  renders: number
   slug: string
+  /** Approved, unpublished, and filed under no retired category: its URL answers 410. */
+  unpublishedListings: number
 }
 
 interface TagItem {
@@ -71,6 +74,7 @@ interface TagItem {
   description: string
   name: string
   order: number
+  renders: number
   slug: string
 }
 
@@ -78,6 +82,7 @@ interface BestPageItem extends BestPageState {
   active: number
   exclude: Array<[string, string]>
   pins: Array<[string, string, string | null]>
+  renders: number
   slug: string
 }
 
@@ -130,7 +135,10 @@ async function readState(
   kind: TaxonomyKind,
   slug: string
 ): Promise<StateRow> {
-  const [row] = await queryPlan<StateRow>(context.client, selectTaxonomyStatePlan(kind, slug))
+  const [row] = await queryPlan<StateRow>(
+    context.client,
+    selectTaxonomyStatePlan(kind, slug, nowIso(context))
+  )
   if (!row) throw new Error('The publication state is missing.')
   return row
 }
@@ -248,7 +256,16 @@ async function redirectProblem(
   if (target.kind === 'directory') return null
   if (sameTarget(target, self)) return invalidRedirect
   const read = await readState(context, target.kind, target.slug)
-  if (itemOf<{ active: number }>(read)?.active !== 1) return invalidRedirect
+  const item = itemOf<{ active: number; renders: number }>(read)
+  if (item?.active !== 1) return invalidRedirect
+  // A redirect is followed only to a page that renders (#346), so one to an empty page is a 404.
+  if (item.renders !== 1) {
+    return failure(
+      422,
+      'redirect_empty',
+      'That page has nothing to show yet, so its URL would answer 404. Choose another.'
+    )
+  }
   const redirect = redirectOf(read)
   if (redirect && !sameTarget(redirect, self)) {
     return failure(422, 'redirect_chain', 'That page’s URL redirects elsewhere. Choose another.')
@@ -462,6 +479,14 @@ async function retireCategoryOnce(
   }
   if (item.activeBestPages > 0) {
     return failure(409, 'category_has_best_pages', 'Retire the best pages that draw on it first.')
+  }
+  // Retired, its unpublished listings would answer 404 instead of 410, and stay down (#260).
+  if (item.unpublishedListings > 0) {
+    return failure(
+      409,
+      'category_has_unpublished',
+      'File its unpublished listings under another category first. Retiring it would turn their pages into 404s and block Republish.'
+    )
   }
   if (item.redirectSources > 0) {
     return failure(
@@ -685,10 +710,16 @@ function bestPageFields(input: BestPageFields): BestPageFields {
   }
 }
 
+/**
+ * Why a best page can't have these fields. Its tag must be active, but a page that ranks a
+ * category (`category`, as a manifest may set it: `video-downloader`) may have none, as the
+ * publisher allows: its pool is then the category's listings.
+ */
 async function bestPageProblem(
   context: AdminContext,
   fields: BestPageFields,
-  checkSlug: boolean
+  checkSlug: boolean,
+  category: string | null = null
 ): Promise<DecisionFailure | null> {
   if (checkSlug && !isTaxonomySlug(fields.slug)) return slugInvalid
   const text =
@@ -696,10 +727,37 @@ async function bestPageProblem(
     textProblem(fields.title, TAXONOMY_LIMITS.title, 'a title') ??
     textProblem(fields.intro, TAXONOMY_LIMITS.intro, 'an intro')
   if (text) return text
+  if (!fields.tag && category !== null) return null
   const tags = await createAdminReadOperations({ client: context.client }).listActiveTags()
   return tags.some(tag => tag.slug === fields.tag)
     ? null
     : failure(422, 'invalid_tag', 'Choose an active tag.')
+}
+
+/**
+ * Why a best page's tag can't change to `tag` (null for none): one of its pins isn't a live
+ * listing of the new pool, so the page would rank it first anyway (pins join the pool). The admin
+ * unpins it first.
+ */
+async function pinsOutsidePool(
+  context: AdminContext,
+  item: BestPageItem,
+  tag: string | null
+): Promise<DecisionFailure | null> {
+  if (item.pins.length === 0) return null
+  const ids = item.pins.map(([id]) => id)
+  const inPool = await queryPlan<{ id: string }>(
+    context.client,
+    selectListingsInPoolPlan({ category: item.category, ids, tag })
+  )
+  if (inPool.length === ids.length) return null
+  return failure(
+    409,
+    'pins_outside_pool',
+    tag
+      ? 'Some pinned listings don’t carry the new tag. Unpin them first, then change the tag.'
+      : 'Some pinned listings aren’t in this page’s category. Unpin them first, then remove the tag.'
+  )
 }
 
 // A page with no tag (a manifest may rank a category alone) compares as an empty tag field.
@@ -807,8 +865,14 @@ async function updateBestPageOnce(
   }
   if (sameBestPage(item, fields)) return replay(result)
   if (!sameBestPage(item, bestPageFields(input.expected))) return changed
-  const problem = await bestPageProblem(context, fields, renamed)
+  const problem = await bestPageProblem(context, fields, renamed, item.category)
   if (problem) return problem
+  const tag = fields.tag || null
+  const retagged = tag !== item.tag
+  if (retagged) {
+    const outside = await pinsOutsidePool(context, item, tag)
+    if (outside) return outside
+  }
   if (renamed) {
     const unavailable = await slugUnavailable(context, 'best', fields.slug, input.slug)
     if (unavailable) return unavailable
@@ -820,7 +884,7 @@ async function updateBestPageOnce(
     heading: item.heading === item.title ? fields.title : item.heading,
     intro: fields.intro,
     keyword: fields.keyword,
-    tag: fields.tag,
+    tag,
     title: fields.title
   }
   // The rename goes first, so the edit and the end-of-batch checks find the page by its new slug.
@@ -829,6 +893,10 @@ async function updateBestPageOnce(
     : []
   if (JSON.stringify(page) !== JSON.stringify(expected)) {
     operations.push({ action: 'best-page-update', expected, page, slug: fields.slug })
+  }
+  // The pins stay in the new pool (checked above), and the batch holds it.
+  if (retagged && item.pins.length > 0) {
+    operations.push({ action: 'best-page-pins-check', slug: fields.slug })
   }
   const decision = await publish({
     action: 'best-page-update',
@@ -841,7 +909,7 @@ async function updateBestPageOnce(
       pageRoute('best', input.slug),
       pageRoute('best', fields.slug),
       indexRoute('best'),
-      ...[item.tag, fields.tag].flatMap(tag => (tag ? [pageRoute('tag', tag)] : []))
+      ...[item.tag, tag].flatMap(slug => (slug ? [pageRoute('tag', slug)] : []))
     ],
     settled: () => bestPageHolds(context, fields),
     slug: input.slug
@@ -920,7 +988,8 @@ async function setBestPagePinsOnce(
         expected: { exclude, pins: current.map(withBlurb) },
         pins: input.pins.map(withBlurb),
         slug: input.slug
-      }
+      },
+      { action: 'best-page-pins-check', slug: input.slug }
     ],
     read,
     result,

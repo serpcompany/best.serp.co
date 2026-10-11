@@ -102,10 +102,16 @@ export type PublisherTaxonomyOperation =
  * - `category-create`: the publisher's own insert, guarded first so a taken slug says so;
  * - `category-edit`: a category's name, description, and order, compared and swapped;
  * - `category-retire`: `category-unpublish`'s refusals (a live listing, a slug redirect's source),
- *   plus an active tag or best page that draws on it, then the redirect a tag or best page
- *   retirement writes, re-pointing every redirect aimed at it;
+ *   plus an active tag or best page that draws on it, and an unpublished listing filed under it,
+ *   whose 410 would turn into a 404 that Republish can't undo (#260); then the redirect a tag or
+ *   best page retirement writes, re-pointing every redirect aimed at it;
  * - `taxonomy-rename`: a category, tag, or best page keeps its row (its listings, pins, and the
- *   redirects aimed at it follow its id) under a new slug, and its old URL redirects to it.
+ *   redirects aimed at it follow its id) under a new slug, and its old URL redirects to it;
+ * - `best-page-pins-check`: every pin of the best page is a live listing of its pool (its tag's
+ *   listings, in its category when it names one), as the admin's pins and tag changes require.
+ *
+ * A batch that renames a page and edits it renames it first, so the edit and the end-of-batch
+ * checks find it by its new slug.
  */
 export type AdminTaxonomyOperation =
   | {
@@ -115,6 +121,7 @@ export type AdminTaxonomyOperation =
   | { action: 'category-edit'; category: CategoryState; expected: CategoryState; slug: string }
   | { action: 'category-retire'; redirect: TaxonomyTarget; slug: string }
   | { action: 'taxonomy-rename'; kind: TaxonomyKind; slug: string; to: string }
+  | { action: 'best-page-pins-check'; slug: string }
 
 export type TaxonomyOperation = PublisherTaxonomyOperation | AdminTaxonomyOperation
 
@@ -403,6 +410,18 @@ export function categoryUnpublishStatements(slug: string, now: string): Statemen
   ]
 }
 
+/**
+ * Listing `l` is approved and unpublished, and filed under no retired category: its URL answers
+ * 410 with "Relist it" (#64). Retiring a category it is filed under would make that a 404 and keep
+ * it from being republished (#260), so `category-retire` refuses while one is.
+ */
+const UNPUBLISHED_ELSEWHERE_LIVE = `l.status='approved' AND l.is_active=0 AND NOT EXISTS (SELECT 1 FROM listing_categories x JOIN categories xc ON xc.id=x.category_id WHERE x.listing_id=l.id AND xc.is_active=0)`
+/**
+ * Listing `l` is live and in best page `b`'s pool: it carries the page's tag (when it has one) and
+ * is filed under its category (when it names one).
+ */
+const LIVE_IN_POOL = `l.status='approved' AND l.is_active=1 AND l.published_at IS NOT NULL AND (b.tag_id IS NULL OR EXISTS (SELECT 1 FROM listing_tags lt WHERE lt.listing_id=l.id AND lt.tag_id=b.tag_id)) AND (b.category_id IS NULL OR EXISTS (SELECT 1 FROM listing_categories lc WHERE lc.listing_id=l.id AND lc.category_id=b.category_id))`
+
 /** The statements of the admin-only operations (`AdminTaxonomyOperation`). */
 function adminStatements(
   op: AdminTaxonomyOperation,
@@ -465,11 +484,24 @@ function adminStatements(
           `${label}: a live listing is filed under it`,
           op.slug
         ),
+        guard(
+          `NOT EXISTS (SELECT 1 FROM listing_categories lc JOIN categories c ON c.id=lc.category_id JOIN listings l ON l.id=lc.listing_id WHERE c.slug=? AND ${UNPUBLISHED_ELSEWHERE_LIVE})`,
+          `${label}: an unpublished listing is filed under it`,
+          op.slug
+        ),
         ...targetActiveGuard(op.redirect, label),
         ...categoryUnpublishStatements(op.slug, now),
         ...redirectRetired('category', op.slug, op.redirect, label, manifestId, now)
       ]
     }
+    case 'best-page-pins-check':
+      return [
+        guard(
+          `NOT EXISTS (SELECT 1 FROM best_pages b JOIN best_page_listings p ON p.best_page_id=b.id AND p.excluded=0 JOIN listings l ON l.id=p.listing_id WHERE b.slug=? AND NOT (${LIVE_IN_POOL}))`,
+          `best-page-pins-check ${op.slug}: a pin is not a live listing of its pool`,
+          op.slug
+        )
+      ]
     case 'taxonomy-rename': {
       const table = TAXONOMY_TABLES[op.kind]
       const noun = KIND_NOUNS[op.kind]
@@ -740,6 +772,7 @@ function publisherStatements(
 }
 
 const ADMIN_ACTIONS = new Set<string>([
+  'best-page-pins-check',
   'category-create',
   'category-edit',
   'category-retire',
@@ -840,24 +873,64 @@ export function buildTaxonomyPlans(input: {
   ]
 }
 
+/** Listing `alias` is public at the bound instant: the catalog's public eligibility. */
+const publicAt = (alias: string) =>
+  `${alias}.status='approved' AND ${alias}.is_active=1 AND ${alias}.published_at IS NOT NULL AND ${alias}.published_at<=?`
+
+/**
+ * Whether a category, tag, or best page renders at `asOf` (#346), the rule a taxonomy redirect is
+ * followed by (`taxonomyTargetRenders` in `catalog-epoch.ts`): a category or tag with a public
+ * listing (a tag under an active hub), or a best page with an entry (a public pin, or a public
+ * listing of its pool it doesn't exclude). A retirement may redirect only to a page that renders,
+ * or its URL would answer 404 (#405). `alias` is the row's table alias.
+ */
+export function taxonomyRendersSql(
+  kind: TaxonomyKind,
+  alias: string,
+  asOf: string
+): { params: unknown[]; sql: string } {
+  if (kind === 'category') {
+    return {
+      params: [asOf],
+      sql: `EXISTS (SELECT 1 FROM listing_categories rlc JOIN listings rl ON rl.id=rlc.listing_id WHERE rlc.category_id=${alias}.id AND ${publicAt('rl')})`
+    }
+  }
+  if (kind === 'tag') {
+    return {
+      params: [asOf],
+      sql: `(EXISTS (SELECT 1 FROM categories rh WHERE rh.id=${alias}.category_id AND rh.is_active=1) AND EXISTS (SELECT 1 FROM listing_tags rlt JOIN listings rl ON rl.id=rlt.listing_id WHERE rlt.tag_id=${alias}.id AND ${publicAt('rl')}))`
+    }
+  }
+  const excluded = (listing: string) =>
+    `NOT EXISTS (SELECT 1 FROM best_page_listings rx WHERE rx.best_page_id=${alias}.id AND rx.listing_id=${listing}.id AND rx.excluded=1)`
+  return {
+    params: [asOf, asOf, asOf],
+    sql: `(EXISTS (SELECT 1 FROM best_page_listings rp JOIN listings rl ON rl.id=rp.listing_id WHERE rp.best_page_id=${alias}.id AND rp.excluded=0 AND ${publicAt('rl')}) OR EXISTS (SELECT 1 FROM listing_tags rlt JOIN listings rl ON rl.id=rlt.listing_id WHERE rlt.tag_id=${alias}.tag_id AND ${publicAt('rl')} AND (${alias}.category_id IS NULL OR EXISTS (SELECT 1 FROM listing_categories ri WHERE ri.listing_id=rl.id AND ri.category_id=${alias}.category_id)) AND ${excluded('rl')}) OR (${alias}.tag_id IS NULL AND EXISTS (SELECT 1 FROM listing_categories rlc JOIN listings rl ON rl.id=rlc.listing_id WHERE rlc.category_id=${alias}.category_id AND ${publicAt('rl')} AND ${excluded('rl')})))`
+  }
+}
+
 /** What `selectTaxonomyStatePlan` reads of each kind, as JSON (`item`), or null without a row. */
-const TAXONOMY_ITEM_JSON: Record<TaxonomyKind, string> = {
-  category: `(SELECT json_object('slug',c.slug,'name',c.name,'description',c.description,
+const TAXONOMY_ITEM_JSON: Record<TaxonomyKind, (renders: string) => string> = {
+  category: renders => `(SELECT json_object('slug',c.slug,'name',c.name,'description',c.description,
       'order',c.sort_order,'active',c.is_active,
       'liveListings',(SELECT COUNT(*) FROM listing_categories lc JOIN listings l
         ON l.id=lc.listing_id WHERE lc.category_id=c.id AND l.status='approved' AND l.is_active=1),
+      'unpublishedListings',(SELECT COUNT(*) FROM listing_categories ulc JOIN listings l
+        ON l.id=ulc.listing_id WHERE ulc.category_id=c.id AND ${UNPUBLISHED_ELSEWHERE_LIVE}),
       'activeTags',(SELECT COUNT(*) FROM tags t WHERE t.category_id=c.id AND t.is_active=1),
       'activeBestPages',(SELECT COUNT(*) FROM best_pages b
         WHERE b.category_id=c.id AND b.is_active=1),
       'redirectSources',(SELECT COUNT(*) FROM listing_categories lc
         JOIN listings l ON l.id=lc.listing_id JOIN listing_slug_redirects r ON r.old_slug=l.slug
-        WHERE lc.category_id=c.id))
+        WHERE lc.category_id=c.id),
+      'renders',${renders})
     FROM categories c WHERE c.slug=?)`,
-  tag: `(SELECT json_object('slug',t.slug,'name',t.name,'description',t.description,
+  tag: renders => `(SELECT json_object('slug',t.slug,'name',t.name,'description',t.description,
       'order',t.sort_order,'active',t.is_active,'category',c.slug,
-      'activeBestPages',(SELECT COUNT(*) FROM best_pages b WHERE b.tag_id=t.id AND b.is_active=1))
+      'activeBestPages',(SELECT COUNT(*) FROM best_pages b WHERE b.tag_id=t.id AND b.is_active=1),
+      'renders',${renders})
     FROM tags t JOIN categories c ON c.id=t.category_id WHERE t.slug=?)`,
-  best: `(SELECT json_object('slug',b.slug,'keyword',b.keyword,'title',b.title,
+  best: renders => `(SELECT json_object('slug',b.slug,'keyword',b.keyword,'title',b.title,
       'heading',b.heading,'intro',b.intro,'tag',t.slug,'category',c.slug,'listSize',b.list_size,
       'keywordVolume',b.keyword_volume,'keywordCheckedAt',b.keyword_checked_at,
       'order',b.sort_order,'active',b.is_active,
@@ -866,21 +939,31 @@ const TAXONOMY_ITEM_JSON: Record<TaxonomyKind, string> = {
         WHERE p.best_page_id=b.id AND p.excluded=0 ORDER BY p.position))),
       'exclude',json((SELECT json_group_array(json_array(id,slug)) FROM (SELECT l.id,l.slug
         FROM best_page_listings p JOIN listings l ON l.id=p.listing_id
-        WHERE p.best_page_id=b.id AND p.excluded=1 ORDER BY l.id))))
+        WHERE p.best_page_id=b.id AND p.excluded=1 ORDER BY l.id))),
+      'renders',${renders})
     FROM best_pages b LEFT JOIN tags t ON t.id=b.tag_id
     LEFT JOIN categories c ON c.id=b.category_id WHERE b.slug=?)`
 }
 
+const ITEM_ALIASES: Record<TaxonomyKind, string> = { best: 'b', category: 'c', tag: 't' }
+
 /**
  * A category, tag, or best page as an admin decision compares it (#405), active or retired, with
- * what its refusals count, the redirect from its URL (`[kind, slug]`, as
- * `taxonomy-redirect-set` compares it), and the publication state the decision publishes on:
+ * what its refusals count, whether it renders at `asOf`, the redirect from its URL (`[kind, slug]`,
+ * as `taxonomy-redirect-set` compares it), and the publication state the decision publishes on:
  * one row of `version`, `publication_checksum`, `item` (JSON, or null), and `redirect`.
  */
-export function selectTaxonomyStatePlan(kind: TaxonomyKind, slug: string): StatementPlan {
+export function selectTaxonomyStatePlan(
+  kind: TaxonomyKind,
+  slug: string,
+  asOf: string
+): StatementPlan {
+  const renders = taxonomyRendersSql(kind, ITEM_ALIASES[kind], asOf)
   return {
-    sql: `SELECT ps.version,ps.checksum AS publication_checksum,${TAXONOMY_ITEM_JSON[kind]} AS item,
+    sql: `SELECT ps.version,ps.checksum AS publication_checksum,${TAXONOMY_ITEM_JSON[kind](
+      `(CASE WHEN ${renders.sql} THEN 1 ELSE 0 END)`
+    )} AS item,
       ${CURRENT_REDIRECT_TARGET} AS redirect FROM publication_state ps WHERE ps.id=1`,
-    params: [slug, kind, slug]
+    params: [...renders.params, slug, kind, slug]
   }
 }

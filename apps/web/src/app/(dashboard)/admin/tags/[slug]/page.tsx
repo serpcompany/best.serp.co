@@ -7,7 +7,7 @@ import { RetireTaxonomy } from '@/components/admin/taxonomy-retire'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { buttonVariants } from '@/components/ui/button'
 import { getAdminReads } from '@/lib/admin/runtime'
-import { redirectChoices } from '@/lib/admin/taxonomy-view'
+import { defaultRedirect, redirectChoices } from '@/lib/admin/taxonomy-view'
 import { requireAdmin } from '@/lib/auth/server'
 import { getRoute } from '@/lib/routing/routes'
 
@@ -23,13 +23,16 @@ export default async function TagPage({ params }: Props) {
   await requireAdmin()
   const { slug } = await params
   const reads = await getAdminReads()
-  const tag = await reads.getAdminTag(decodeURIComponent(slug))
+  const now = new Date().toISOString()
+  const tag = await reads.getAdminTag(decodeURIComponent(slug), now)
   if (!tag) notFound()
-  const [categories, tags, bestPages] = await Promise.all([
-    reads.listActiveCategories(),
-    reads.listActiveTags(),
-    reads.listAdminBestPages()
+  const [categories, tags, bestPages, options] = await Promise.all([
+    reads.listAdminCategories(now),
+    reads.listAdminTags(now),
+    reads.listAdminBestPages(now),
+    reads.listActiveCategories()
   ])
+  const choices = redirectChoices({ bestPages, categories, tags }, { kind: 'tag', slug: tag.slug })
   const path = getRoute('tag.page', { tag: tag.slug })
   const initial = {
     category: tag.category,
@@ -52,7 +55,7 @@ export default async function TagPage({ params }: Props) {
         description={path}
         actions={
           <>
-            {tag.listingCount > 0 ? (
+            {tag.renders ? (
               <a
                 href={path}
                 target="_blank"
@@ -65,23 +68,15 @@ export default async function TagPage({ params }: Props) {
             ) : null}
             <RetireTaxonomy
               action={`/api/admin/tags/${encodeURIComponent(tag.slug)}/retire`}
-              choices={redirectChoices(
-                { bestPages, categories, tags },
-                { kind: 'tag', slug: tag.slug }
-              )}
-              defaultTarget={`category:${tag.category}`}
+              choices={choices}
+              defaultTarget={defaultRedirect(choices, [`category:${tag.category}`])}
               doneHref="/admin/tags/"
               name={tag.name}
             />
           </>
         }
       />
-      <TagForm
-        key={JSON.stringify(initial)}
-        categories={categories}
-        mode="edit"
-        initial={initial}
-      />
+      <TagForm key={JSON.stringify(initial)} categories={options} mode="edit" initial={initial} />
     </>
   )
 }

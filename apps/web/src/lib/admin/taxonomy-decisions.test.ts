@@ -198,7 +198,7 @@ describe('category decisions', () => {
     })
   })
 
-  it('refuses a retirement that would strand a live listing, a tag, or a best page', async () => {
+  it('refuses a retirement that would strand a listing, live or unpublished, a tag, or a best page', async () => {
     const { context, db, listing, row, version } = fixture()
     listing('lst_live', 'live.example', 2)
     const retire = () =>
@@ -211,15 +211,18 @@ describe('category decisions', () => {
       VALUES ('best-apps', 'apps', 'Best Apps', 'Best Apps', 'Apps.', 2)`)
     expect(await retire()).toMatchObject({ error: 'category_has_best_pages', status: 409 })
     db.exec("UPDATE best_pages SET is_active = 0 WHERE slug = 'best-apps'")
-    db.exec(`INSERT INTO listing_slug_redirects (listing_id, old_slug, new_slug, manifest_id, reason)
-      VALUES ('lst_live', 'live.example', 'elsewhere.example', 'fixture', 'duplicate')`)
-    expect(await retire()).toMatchObject({ error: 'category_redirect_source', status: 409 })
+    // Its unpublished listing answers 410; retired, the category would make that a 404 (#260).
+    expect(await retire()).toMatchObject({ error: 'category_has_unpublished', status: 409 })
     expect(row("SELECT is_active FROM categories WHERE slug = 'apps'")).toEqual({ is_active: 1 })
     expect(version()).toBe(1)
+    // Filed under the other category instead, it no longer holds this one back.
+    db.exec("UPDATE listing_categories SET category_id = 1 WHERE listing_id = 'lst_live'")
+    expect(await retire()).toMatchObject({ ok: true, replayed: false })
   })
 
   it('retires a category with its redirect, re-pointing those aimed at it; a replay is a no-op', async () => {
-    const { context, db, redirects } = fixture()
+    const { context, db, listing, redirects } = fixture()
+    listing('lst_t', 't.example')
     db.exec(`
       UPDATE tags SET category_id = 1 WHERE slug = 'whiteboards';
       INSERT INTO taxonomy_redirects (source_kind, source_slug, target_kind, target_category_id,
@@ -241,8 +244,8 @@ describe('category decisions', () => {
     ).toMatchObject({ error: 'conflict', status: 409 })
   })
 
-  it('refuses a redirect to itself, a retired page, or one whose URL redirects elsewhere', async () => {
-    const { context, db } = fixture()
+  it('refuses a redirect to itself, a retired or empty page, or one whose URL redirects elsewhere', async () => {
+    const { context, db, listing, tag } = fixture()
     db.exec("UPDATE tags SET category_id = 1 WHERE slug = 'whiteboards'")
     const retire = (redirect: Parameters<typeof retireCategory>[1]['redirect']) =>
       retireCategory(context(), { redirect, slug: 'apps' })
@@ -250,6 +253,13 @@ describe('category decisions', () => {
       error: 'invalid_redirect'
     })
     expect(await retire({ kind: 'tag', slug: 'nope' })).toMatchObject({ error: 'invalid_redirect' })
+    // An active page with nothing to show: a redirect is followed only to a page that renders.
+    expect(await retire({ kind: 'category', slug: 'tools' })).toMatchObject({
+      error: 'redirect_empty',
+      status: 422
+    })
+    listing('lst_t', 't.example')
+    tag('lst_t', 'note-taking')
     db.exec(`INSERT INTO taxonomy_redirects (source_kind, source_slug, target_kind, manifest_id)
       VALUES ('tag', 'note-taking', 'directory', 'fixture')`)
     expect(await retire({ kind: 'tag', slug: 'note-taking' })).toMatchObject({
@@ -311,7 +321,8 @@ describe('tag decisions', () => {
   })
 
   it('retires a tag to its category, but not while a best page ranks it', async () => {
-    const { context, db, redirects } = fixture()
+    const { context, db, listing, redirects } = fixture()
+    listing('lst_t', 't.example')
     db.exec(`INSERT INTO best_pages (slug, keyword, title, heading, intro, tag_id)
       SELECT 'best-notes', 'notes', 'Best Notes', 'Best Notes', 'Notes.', id FROM tags
       WHERE slug = 'note-taking'`)
@@ -396,6 +407,65 @@ describe('best page decisions', () => {
     })
   })
 
+  it('changes its tag only while every pin carries the new one', async () => {
+    const { context, listing, row, tag } = fixture()
+    await createBestPage(context(), fields)
+    listing('lst_a', 'a.example')
+    tag('lst_a', 'note-taking')
+    expect(
+      await setBestPagePins(context(), {
+        expectedPins: [],
+        pins: [{ id: 'lst_a', slug: 'a.example' }],
+        slug: 'note-app'
+      })
+    ).toMatchObject({ ok: true })
+    const retagged = { ...fields, tag: 'whiteboards' }
+    // The page would still rank its pin first (pins join the pool), so it's unpinned first.
+    expect(
+      await updateBestPage(context(), { expected: fields, page: retagged, slug: 'note-app' })
+    ).toMatchObject({ error: 'pins_outside_pool', status: 409 })
+    expect(
+      row(
+        `SELECT t.slug FROM best_pages b JOIN tags t ON t.id = b.tag_id WHERE b.slug = 'note-app'`
+      )
+    ).toEqual({ slug: 'note-taking' })
+    tag('lst_a', 'whiteboards')
+    expect(
+      await updateBestPage(context(), { expected: fields, page: retagged, slug: 'note-app' })
+    ).toMatchObject({ ok: true, replayed: false })
+  })
+
+  it('edits a best page that ranks a category alone, and pins from that category', async () => {
+    const { context, db, listing, row } = fixture()
+    // Like the published `video-downloader`: a category and no tag.
+    db.exec(`INSERT INTO best_pages (slug, keyword, title, heading, intro, category_id)
+      VALUES ('tool', 'tool', 'Best Tools', 'Best Tools', 'Tools.', 1)`)
+    listing('lst_t', 't.example')
+    const current = { intro: 'Tools.', keyword: 'tool', slug: 'tool', tag: '', title: 'Best Tools' }
+    expect(
+      await updateBestPage(context(), {
+        expected: current,
+        page: { ...current, title: 'Top Tools' },
+        slug: 'tool'
+      })
+    ).toMatchObject({ ok: true, replayed: false })
+    expect(
+      row("SELECT title, heading, tag_id, category_id FROM best_pages WHERE slug = 'tool'")
+    ).toEqual({ category_id: 1, heading: 'Top Tools', tag_id: null, title: 'Top Tools' })
+    expect(
+      await setBestPagePins(context(), {
+        expectedPins: [],
+        pins: [{ id: 'lst_t', slug: 't.example' }],
+        slug: 'tool'
+      })
+    ).toMatchObject({ ok: true, replayed: false })
+    // A new best page still needs a tag: the form has no category.
+    expect(await createBestPage(context(), { ...current, slug: 'fresh', tag: '' })).toMatchObject({
+      error: 'invalid_tag',
+      status: 422
+    })
+  })
+
   it('pins live listings of its pool in order, keeping blurbs, never a feature listing', async () => {
     const { context, db, listing, row, tag, version } = fixture()
     await createBestPage(context(), fields)
@@ -445,7 +515,9 @@ describe('best page decisions', () => {
   })
 
   it('retires a best page to its tag, which can then retire', async () => {
-    const { context, redirects } = fixture()
+    const { context, listing, redirects, tag } = fixture()
+    listing('lst_a', 'a.example')
+    tag('lst_a', 'note-taking')
     await createBestPage(context(), fields)
     expect(
       await retireBestPage(context(), {

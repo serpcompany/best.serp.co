@@ -13,6 +13,7 @@ import type {
   SubmissionPlan,
   SubmissionStatus
 } from './schema'
+import { taxonomyRendersSql } from './taxonomy-plans'
 
 /**
  * Reads for the admin panel (serpcompany/best.serp.co#64): the review queue, one submission or
@@ -500,48 +501,81 @@ const LIVE_LISTING = "l.status='approved' AND l.is_active=1 AND l.published_at I
 
 /**
  * Active categories (hubs) for the Categories screen (#405), or the one with `slug`, with how
- * many active tags and live listings (filed under it as their primary) each has.
+ * many active tags and live listings (filed under it as their primary) each has, and whether its
+ * page renders at `asOf` (`taxonomyRendersSql`).
  */
-export function selectAdminCategoriesPlan(slug?: string): StatementPlan {
+export function selectAdminCategoriesPlan(asOf: string, slug?: string): StatementPlan {
+  const renders = taxonomyRendersSql('category', 'c', asOf)
   return {
     sql: `SELECT c.slug,c.name,c.description,c.sort_order,
         (SELECT COUNT(*) FROM tags t WHERE t.category_id=c.id AND t.is_active=1) AS tag_count,
         (SELECT COUNT(*) FROM listing_categories lc JOIN listings l ON l.id=lc.listing_id
-          WHERE lc.category_id=c.id AND lc.is_primary=1 AND ${LIVE_LISTING}) AS listing_count
+          WHERE lc.category_id=c.id AND lc.is_primary=1 AND ${LIVE_LISTING}) AS listing_count,
+        CASE WHEN ${renders.sql} THEN 1 ELSE 0 END AS renders
       FROM categories c WHERE c.is_active=1${slug === undefined ? '' : ' AND c.slug=?'}
       ORDER BY c.sort_order,c.name`,
-    params: slug === undefined ? [] : [slug]
+    params: [...renders.params, ...(slug === undefined ? [] : [slug])]
   }
 }
 
 /**
- * Active tags for the Tags screen (#405), or the one with `slug`, with their hubs and how many
- * live listings carry each, in the hubs' display order and then the tags' own.
+ * Active tags for the Tags screen (#405), or the one with `slug`, with their hubs, how many live
+ * listings carry each, and whether its page renders at `asOf`, in the hubs' display order and then
+ * the tags' own.
  */
-export function selectAdminTagsPlan(slug?: string): StatementPlan {
+export function selectAdminTagsPlan(asOf: string, slug?: string): StatementPlan {
+  const renders = taxonomyRendersSql('tag', 't', asOf)
   return {
     sql: `SELECT t.slug,t.name,t.description,t.sort_order,c.slug AS category,
         c.name AS category_name,
         (SELECT COUNT(*) FROM listing_tags lt JOIN listings l ON l.id=lt.listing_id
-          WHERE lt.tag_id=t.id AND ${LIVE_LISTING}) AS listing_count
+          WHERE lt.tag_id=t.id AND ${LIVE_LISTING}) AS listing_count,
+        CASE WHEN ${renders.sql} THEN 1 ELSE 0 END AS renders
       FROM tags t JOIN categories c ON c.id=t.category_id
       WHERE t.is_active=1${slug === undefined ? '' : ' AND t.slug=?'}
       ORDER BY c.sort_order,c.name,t.sort_order,t.name`,
-    params: slug === undefined ? [] : [slug]
+    params: [...renders.params, ...(slug === undefined ? [] : [slug])]
   }
 }
 
-/** Active best pages for the Best pages screen (#405), with their pool and how many pins. */
-export function selectAdminBestPagesPlan(): StatementPlan {
+/**
+ * Active best pages for the Best pages screen (#405), with their pool, how many pins, and whether
+ * the page renders at `asOf`.
+ */
+export function selectAdminBestPagesPlan(asOf: string): StatementPlan {
+  const renders = taxonomyRendersSql('best', 'b', asOf)
   return {
     sql: `SELECT b.slug,b.keyword,b.title,t.slug AS tag,t.name AS tag_name,c.slug AS category,
         c.name AS category_name,
         (SELECT COUNT(*) FROM best_page_listings p
-          WHERE p.best_page_id=b.id AND p.excluded=0) AS pin_count
+          WHERE p.best_page_id=b.id AND p.excluded=0) AS pin_count,
+        CASE WHEN ${renders.sql} THEN 1 ELSE 0 END AS renders
       FROM best_pages b LEFT JOIN tags t ON t.id=b.tag_id
       LEFT JOIN categories c ON c.id=b.category_id
       WHERE b.is_active=1 ORDER BY b.sort_order,b.keyword,b.slug`,
-    params: []
+    params: renders.params
+  }
+}
+
+/**
+ * Which of `ids` are live listings of a best page's pool with this tag and category (#405): with
+ * the tag (or, without one, filed under the category), and filed under the category when it names
+ * one too. A best page's tag changes only while its pins all stay in its pool.
+ */
+export function selectListingsInPoolPlan(input: {
+  category: string | null
+  ids: readonly string[]
+  tag: string | null
+}): StatementPlan {
+  return {
+    sql: `SELECT l.id FROM listings l
+      WHERE l.id IN (SELECT value FROM json_each(?1)) AND ${LIVE_LISTING}
+        AND (?2 IS NULL OR EXISTS (SELECT 1 FROM listing_tags lt JOIN tags t ON t.id=lt.tag_id
+          WHERE lt.listing_id=l.id AND t.slug=?2))
+        AND (?3 IS NULL OR EXISTS (SELECT 1 FROM listing_categories lc
+          JOIN categories c ON c.id=lc.category_id WHERE lc.listing_id=l.id AND c.slug=?3))
+      ORDER BY l.id`,
+    params: [JSON.stringify(input.ids), input.tag, input.category]
   }
 }
 
@@ -882,6 +916,8 @@ export interface AdminCategory {
   listingCount: number
   name: string
   order: number
+  /** Its page renders now: a public listing is filed under it. */
+  renders: boolean
   slug: string
   tagCount: number
 }
@@ -894,6 +930,8 @@ export interface AdminTag {
   listingCount: number
   name: string
   order: number
+  /** Its page renders now: a public listing carries it. */
+  renders: boolean
   slug: string
 }
 
@@ -903,6 +941,8 @@ export interface AdminBestPageRow {
   categoryName: string | null
   keyword: string
   pinCount: number
+  /** Its page renders now: it has an entry. */
+  renders: boolean
   slug: string
   tag: string | null
   tagName: string | null
@@ -1028,13 +1068,14 @@ export interface AdminReadOperations {
   getRevisionReview(revisionId: string): Promise<RevisionReview | null>
   getSubmissionReview(submissionId: string): Promise<SubmissionReview | null>
   getAdminBestPage(slug: string): Promise<AdminBestPage | null>
-  getAdminCategory(slug: string): Promise<AdminCategory | null>
-  getAdminTag(slug: string): Promise<AdminTag | null>
+  /** The taxonomy reads take the instant their `renders` is judged at. */
+  getAdminCategory(slug: string, asOf: string): Promise<AdminCategory | null>
+  getAdminTag(slug: string, asOf: string): Promise<AdminTag | null>
   listActiveCategories(): Promise<CategoryOption[]>
   listActiveTags(): Promise<TagOption[]>
-  listAdminBestPages(): Promise<AdminBestPageRow[]>
-  listAdminCategories(): Promise<AdminCategory[]>
-  listAdminTags(): Promise<AdminTag[]>
+  listAdminBestPages(asOf: string): Promise<AdminBestPageRow[]>
+  listAdminCategories(asOf: string): Promise<AdminCategory[]>
+  listAdminTags(asOf: string): Promise<AdminTag[]>
   listReviewQueue(view: ReviewQueueView): Promise<ReviewQueueItem[]>
   reviewQueueCounts(): Promise<ReviewQueueCounts>
   searchListings(
@@ -1049,6 +1090,7 @@ function categoryRow(row: Row): AdminCategory {
     listingCount: Number(row.listing_count),
     name: text(row.name),
     order: Number(row.sort_order),
+    renders: Number(row.renders) === 1,
     slug: text(row.slug),
     tagCount: Number(row.tag_count)
   }
@@ -1062,6 +1104,7 @@ function tagRow(row: Row): AdminTag {
     listingCount: Number(row.listing_count),
     name: text(row.name),
     order: Number(row.sort_order),
+    renders: Number(row.renders) === 1,
     slug: text(row.slug)
   }
 }
@@ -1072,6 +1115,7 @@ function bestPageRow(row: Row): AdminBestPageRow {
     categoryName: optionalText(row.category_name),
     keyword: text(row.keyword),
     pinCount: Number(row.pin_count),
+    renders: Number(row.renders) === 1,
     slug: text(row.slug),
     tag: optionalText(row.tag),
     tagName: optionalText(row.tag_name),
@@ -1286,7 +1330,13 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
         slug: text(entry.slug)
       })
       return {
-        ...bestPageRow({ ...row, pin_count: pins?.length ?? 0 }),
+        // It renders with a live pin or a live listing of its pool.
+        ...bestPageRow({
+          ...row,
+          pin_count: pins?.length ?? 0,
+          renders:
+            (pins ?? []).some(pin => Number(pin.live) === 1) || (pool?.length ?? 0) > 0 ? 1 : 0
+        }),
         exclude: (exclude ?? []).map(listingRef),
         heading: text(row.heading),
         intro: text(row.intro),
@@ -1300,28 +1350,28 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
       }
     },
 
-    async getAdminCategory(slug) {
-      const row = await statement(selectAdminCategoriesPlan(slug)).first<Row>()
+    async getAdminCategory(slug, asOf) {
+      const row = await statement(selectAdminCategoriesPlan(asOf, slug)).first<Row>()
       return row ? categoryRow(row) : null
     },
 
-    async getAdminTag(slug) {
-      const row = await statement(selectAdminTagsPlan(slug)).first<Row>()
+    async getAdminTag(slug, asOf) {
+      const row = await statement(selectAdminTagsPlan(asOf, slug)).first<Row>()
       return row ? tagRow(row) : null
     },
 
-    async listAdminBestPages() {
-      const result = await statement(selectAdminBestPagesPlan()).all<Row>()
+    async listAdminBestPages(asOf) {
+      const result = await statement(selectAdminBestPagesPlan(asOf)).all<Row>()
       return result.results.map(bestPageRow)
     },
 
-    async listAdminCategories() {
-      const result = await statement(selectAdminCategoriesPlan()).all<Row>()
+    async listAdminCategories(asOf) {
+      const result = await statement(selectAdminCategoriesPlan(asOf)).all<Row>()
       return result.results.map(categoryRow)
     },
 
-    async listAdminTags() {
-      const result = await statement(selectAdminTagsPlan()).all<Row>()
+    async listAdminTags(asOf) {
+      const result = await statement(selectAdminTagsPlan(asOf)).all<Row>()
       return result.results.map(tagRow)
     },
 

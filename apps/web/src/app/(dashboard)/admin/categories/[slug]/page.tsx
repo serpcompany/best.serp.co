@@ -23,13 +23,18 @@ export default async function CategoryPage({ params }: Props) {
   await requireAdmin()
   const { slug } = await params
   const reads = await getAdminReads()
-  const category = await reads.getAdminCategory(decodeURIComponent(slug))
+  const now = new Date().toISOString()
+  const category = await reads.getAdminCategory(decodeURIComponent(slug), now)
   if (!category) notFound()
   const [categories, tags, bestPages] = await Promise.all([
-    reads.listActiveCategories(),
-    reads.listActiveTags(),
-    reads.listAdminBestPages()
+    reads.listAdminCategories(now),
+    reads.listAdminTags(now),
+    reads.listAdminBestPages(now)
   ])
+  const choices = redirectChoices(
+    { bestPages, categories, tags },
+    { kind: 'category', slug: category.slug }
+  )
   const path = getRoute('category.page', { category: category.slug })
   const initial = {
     description: category.description,
@@ -52,7 +57,7 @@ export default async function CategoryPage({ params }: Props) {
         description={path}
         actions={
           <>
-            {category.listingCount > 0 ? (
+            {category.renders ? (
               <a
                 href={path}
                 target="_blank"
@@ -65,10 +70,7 @@ export default async function CategoryPage({ params }: Props) {
             ) : null}
             <RetireTaxonomy
               action={`/api/admin/categories/${encodeURIComponent(category.slug)}/retire`}
-              choices={redirectChoices(
-                { bestPages, categories, tags },
-                { kind: 'category', slug: category.slug }
-              )}
+              choices={choices}
               defaultTarget="directory"
               doneHref="/admin/categories/"
               name={category.name}

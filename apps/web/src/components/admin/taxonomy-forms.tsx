@@ -406,11 +406,14 @@ export function TagForm({
 }
 
 export function BestPageForm({
+  categoryName = null,
   initial,
   mode,
   onSaved,
   tags
 }: {
+  /** The category a page without a tag ranks (a manifest's category-only page), if any. */
+  categoryName?: string | null
   initial?: Partial<BestPageValues>
   mode: Mode
   onSaved?: (slug: string) => void
@@ -490,6 +493,11 @@ export function BestPageForm({
               ))}
             </SelectContent>
           </Select>
+          {categoryName && !values.tag ? (
+            <FieldDescription>
+              Without a tag, it ranks the {categoryName} category.
+            </FieldDescription>
+          ) : null}
         </Field>
       </div>
       <Field>

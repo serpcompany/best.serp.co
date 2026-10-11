@@ -19,7 +19,7 @@ export default async function BestPagesPage({ searchParams }: Props) {
   await requireAdmin()
   const reads = await getAdminReads()
   const [pages, tags, params] = await Promise.all([
-    reads.listAdminBestPages(),
+    reads.listAdminBestPages(new Date().toISOString()),
     reads.listActiveTags(),
     searchParams
   ])

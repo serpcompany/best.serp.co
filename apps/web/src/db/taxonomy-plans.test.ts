@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import {
   count,
   execute,
+  NOW,
   planDatabase,
   publication,
   publicationState,
@@ -230,15 +231,21 @@ describe('admin taxonomy plans (#405)', () => {
         'category-retire apps: a live listing is filed under it',
         retire({ action: 'category-retire', redirect: { kind: 'directory' }, slug: 'apps' })
       )
+      // Unpublished, its page answers 410; retired, the category would make that a 404 (#260).
       db.exec("UPDATE listings SET is_active = 0 WHERE id = 'lst_live'")
-      db.exec(
-        `INSERT INTO listing_slug_redirects (listing_id, old_slug, new_slug, manifest_id, reason)
-          VALUES ('lst_live', 'lst_live.example', 'other.example', 'fixture', 'duplicate')`
-      )
       refused(
-        'category-unpublish apps: a listing filed under it is the source of a slug redirect; re-file that listing first',
+        'category-retire apps: an unpublished listing is filed under it',
         retire({ action: 'category-retire', redirect: { kind: 'directory' }, slug: 'apps' })
       )
+      // Filed under a retired category as well, it answers 404 already: it doesn't count.
+      db.exec(`
+        INSERT INTO categories (slug, name) VALUES ('gone-hub', 'Gone');
+        INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
+          SELECT 'lst_live', id, 1, 0 FROM categories WHERE slug = 'gone-hub';
+        UPDATE categories SET is_active = 0 WHERE slug = 'gone-hub';
+      `)
+      apply(retire({ action: 'category-retire', redirect: { kind: 'directory' }, slug: 'apps' }))
+      expect(row('categories', 'apps')).toMatchObject({ is_active: 0 })
     })
 
     it('refuses a retired or chained redirect target', () => {
@@ -398,6 +405,26 @@ describe('admin taxonomy plans (#405)', () => {
       )
     })
 
+    it('checks that every pin is a live listing of the pool', () => {
+      seedLiveListing(db, 'lst_a')
+      const pins = [{ id: 'lst_a', slug: 'lst_a.example' }]
+      const pin = (): TaxonomyOperation[] => [
+        {
+          action: 'best-page-listings-set',
+          exclude: [],
+          expected: { exclude: [], pins: [] },
+          pins,
+          slug: 'best-boards'
+        },
+        { action: 'best-page-pins-check', slug: 'best-boards' }
+      ]
+      refused('best-page-pins-check best-boards: a pin is not a live listing of its pool', ...pin())
+      db.exec(`INSERT INTO listing_tags (listing_id, tag_id, sort_order)
+        SELECT 'lst_a', id, 0 FROM tags WHERE slug = 'whiteboards'`)
+      apply(...pin())
+      expect(count(db, 'SELECT COUNT(*) AS count FROM best_page_listings')).toBe(1)
+    })
+
     it('refuses a best page on a retired tag', () => {
       refused('best-page-create fresh: the tag retired-tag is missing or retired', {
         action: 'best-page-create',
@@ -444,7 +471,13 @@ describe('admin taxonomy plans (#405)', () => {
 
   it('reads an item, what its refusals count, its redirect, and the publication state', () => {
     seedLiveListing(db, 'lst_live', { categories: ['apps'] })
-    const [state] = query(db, selectTaxonomyStatePlan('category', 'apps')) as Array<{
+    db.exec(`INSERT INTO listings (id, slug, name, description, website, status, is_active,
+      source_kind, source_identity, checksum) VALUES ('lst_down', 'down.example', 'Down', 'd',
+      'https://down.example/', 'draft', 0, 'fixture', 'down', 'c')`)
+    db.exec(`INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
+      SELECT 'lst_down', id, 0, 1 FROM categories WHERE slug = 'apps'`)
+    db.exec("UPDATE listings SET status = 'approved' WHERE id = 'lst_down'")
+    const [state] = query(db, selectTaxonomyStatePlan('category', 'apps', NOW)) as Array<{
       item: string
       publication_checksum: string
       redirect: string | null
@@ -460,22 +493,35 @@ describe('admin taxonomy plans (#405)', () => {
       name: 'Apps',
       order: 1,
       redirectSources: 0,
-      slug: 'apps'
+      renders: 1,
+      slug: 'apps',
+      unpublishedListings: 1
     })
-    const [narrow] = query(db, selectTaxonomyStatePlan('category', 'hub-narrow')) as Array<{
+    // Before its listing was published, the category didn't render.
+    const [early] = query(
+      db,
+      selectTaxonomyStatePlan('category', 'apps', '2026-01-01T00:00:00.000Z')
+    ) as Array<{
+      item: string
+    }>
+    expect(JSON.parse(early?.item ?? 'null')).toMatchObject({ renders: 0 })
+    const [narrow] = query(db, selectTaxonomyStatePlan('category', 'hub-narrow', NOW)) as Array<{
       redirect: string
     }>
     expect(JSON.parse(narrow?.redirect ?? 'null')).toEqual(['category', 'apps'])
-    const [best] = query(db, selectTaxonomyStatePlan('best', 'best-boards')) as Array<{
+    const [best] = query(db, selectTaxonomyStatePlan('best', 'best-boards', NOW)) as Array<{
       item: string
     }>
     expect(JSON.parse(best?.item ?? 'null')).toMatchObject({
       active: 1,
       exclude: [],
       pins: [],
+      renders: 0,
       tag: 'whiteboards'
     })
-    const [missing] = query(db, selectTaxonomyStatePlan('tag', 'nope')) as Array<{ item: null }>
+    const [missing] = query(db, selectTaxonomyStatePlan('tag', 'nope', NOW)) as Array<{
+      item: null
+    }>
     expect(missing?.item).toBeNull()
   })
 })

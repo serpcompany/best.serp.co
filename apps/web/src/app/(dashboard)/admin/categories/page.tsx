@@ -18,7 +18,7 @@ interface Props {
 export default async function CategoriesPage({ searchParams }: Props) {
   await requireAdmin()
   const [categories, params] = await Promise.all([
-    (await getAdminReads()).listAdminCategories(),
+    (await getAdminReads()).listAdminCategories(new Date().toISOString()),
     searchParams
   ])
   const initial = prefill(params, ['description', 'name', 'slug'])

@@ -1,6 +1,11 @@
 import { mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { expect, type Page, request as playwrightRequest } from '@playwright/test'
+import {
+  type APIRequestContext,
+  expect,
+  type Page,
+  request as playwrightRequest
+} from '@playwright/test'
 import {
   ADMIN_EMAIL_PREFIXES,
   activeCategory,
@@ -804,10 +809,30 @@ test.describe('listings', () => {
 })
 
 test.describe('taxonomy (#405)', () => {
+  /**
+   * Runs `check` as a signed-out visitor until it passes: the Worker reuses its catalog version
+   * for up to 30 s, so public pages follow an admin change within about a minute.
+   */
+  async function asVisitor(
+    baseURL: string | undefined,
+    check: (visitor: APIRequestContext) => Promise<void>
+  ): Promise<void> {
+    const visitor = await playwrightRequest.newContext({ baseURL })
+    try {
+      await expect(() => check(visitor)).toPass({
+        intervals: [1_000, 2_000, 5_000],
+        timeout: 90_000
+      })
+    } finally {
+      await visitor.dispose()
+    }
+  }
+
   test('creates a category and a tag under it; a rename answers 308, and a category with a live listing can’t retire (#405)', async ({
     baseURL,
     page
   }) => {
+    test.setTimeout(300_000)
     const admin = client(page.request, baseURL)
     admins.push(await signInAsNewAdmin(admin, ADMIN_EMAIL_PREFIXES.adminPanel))
     const key = unique()
@@ -841,14 +866,16 @@ test.describe('taxonomy (#405)', () => {
       headers: admin.headers
     })
     expect(await tagged.json()).toMatchObject({ ok: true })
-    for (const path of [`/products/categories/${hub.slug}/`, `/products/tags/${tag.slug}/`]) {
-      const response = await page.request.get(path)
-      expect(response.status(), path).toBe(200)
-      expect(await response.text(), path).toContain(listing.name)
-    }
-    expect(await (await page.request.get('/sitemap-categories.xml')).text()).toContain(
-      `/products/categories/${hub.slug}/`
-    )
+    await asVisitor(baseURL, async visitor => {
+      for (const path of [`/products/categories/${hub.slug}/`, `/products/tags/${tag.slug}/`]) {
+        const response = await visitor.get(path)
+        expect(response.status(), path).toBe(200)
+        expect(await response.text(), path).toContain(listing.name)
+      }
+      expect(await (await visitor.get('/sitemap-categories.xml')).text()).toContain(
+        `/products/categories/${hub.slug}/`
+      )
+    })
 
     // Renaming the tag keeps the old URL working: one 308 to the new one.
     const renamed = `${tag.slug}-renamed`
@@ -856,9 +883,11 @@ test.describe('taxonomy (#405)', () => {
     await page.getByLabel('Slug', { exact: true }).fill(renamed)
     await page.getByRole('button', { name: 'Save changes' }).click()
     await page.waitForURL(`**/admin/tags/${renamed}/`)
-    const moved = await page.request.get(`/products/tags/${tag.slug}/`, { maxRedirects: 0 })
-    expect(moved.status()).toBe(308)
-    expect(moved.headers().location).toMatch(new RegExp(`/products/tags/${renamed}/$`, 'u'))
+    await asVisitor(baseURL, async visitor => {
+      const moved = await visitor.get(`/products/tags/${tag.slug}/`, { maxRedirects: 0 })
+      expect(moved.status()).toBe(308)
+      expect(moved.headers().location).toMatch(new RegExp(`/products/tags/${renamed}/$`, 'u'))
+    })
 
     // The category can't retire while a live listing is filed under it.
     const refused = await page.request.post(`/api/admin/categories/${hub.slug}/retire`, {
@@ -877,19 +906,22 @@ test.describe('taxonomy (#405)', () => {
     await capture(page, '16-tag-retire')
     await page.getByRole('alertdialog').getByRole('button', { name: 'Retire' }).click()
     await page.waitForURL('**/admin/tags/')
-    for (const path of [`/products/tags/${renamed}/`, `/products/tags/${tag.slug}/`]) {
-      const response = await page.request.get(path, { maxRedirects: 0 })
-      expect(response.status(), path).toBe(308)
-      expect(response.headers().location, path).toMatch(
-        new RegExp(`/products/categories/${hub.slug}/$`, 'u')
-      )
-    }
+    await asVisitor(baseURL, async visitor => {
+      for (const path of [`/products/tags/${renamed}/`, `/products/tags/${tag.slug}/`]) {
+        const response = await visitor.get(path, { maxRedirects: 0 })
+        expect(response.status(), path).toBe(308)
+        expect(response.headers().location, path).toMatch(
+          new RegExp(`/products/categories/${hub.slug}/$`, 'u')
+        )
+      }
+    })
   })
 
   test('creates a best page on a tag, pins a listing of its pool, and its old URLs answer 308 (#405)', async ({
     baseURL,
     page
   }) => {
+    test.setTimeout(300_000)
     const admin = client(page.request, baseURL)
     admins.push(await signInAsNewAdmin(admin, ADMIN_EMAIL_PREFIXES.adminPanel))
     const key = unique()
@@ -937,16 +969,16 @@ test.describe('taxonomy (#405)', () => {
     ).toEqual([{ listing_id: pinned.id, position: 1 }])
 
     // The page ranks the pin first, is indexed, and is in its sitemap.
-    const live = await page.request.get(`/best/${best.slug}/`)
-    expect(live.status()).toBe(200)
-    const html = await live.text()
-    const places = listings.map(listing => html.indexOf(listing.name))
-    expect(Math.min(...places)).toBeGreaterThan(-1)
-    expect(html.indexOf(pinned.name)).toBe(Math.min(...places))
-    expect(html).toMatch(/<meta name="robots" content="index, follow/u)
-    expect(await (await page.request.get('/sitemap-best.xml')).text()).toContain(
-      `/best/${best.slug}/`
-    )
+    await asVisitor(baseURL, async visitor => {
+      const live = await visitor.get(`/best/${best.slug}/`)
+      expect(live.status()).toBe(200)
+      const html = await live.text()
+      const places = listings.map(listing => html.indexOf(listing.name))
+      expect(Math.min(...places)).toBeGreaterThan(-1)
+      expect(html.indexOf(pinned.name)).toBe(Math.min(...places))
+      expect(html).toMatch(/<meta name="robots" content="index, follow/u)
+      expect(await (await visitor.get('/sitemap-best.xml')).text()).toContain(`/best/${best.slug}/`)
+    })
 
     // A rename answers 308 from the old URL; retiring sends both URLs to the tag.
     const renamed = `${best.slug}-renamed`
@@ -961,22 +993,26 @@ test.describe('taxonomy (#405)', () => {
       headers: admin.headers
     })
     expect(await update.json()).toMatchObject({ ok: true, replayed: false, slug: renamed })
-    const moved = await page.request.get(`/best/${best.slug}/`, { maxRedirects: 0 })
-    expect(moved.status()).toBe(308)
-    expect(moved.headers().location).toMatch(new RegExp(`/best/${renamed}/$`, 'u'))
+    await asVisitor(baseURL, async visitor => {
+      const moved = await visitor.get(`/best/${best.slug}/`, { maxRedirects: 0 })
+      expect(moved.status()).toBe(308)
+      expect(moved.headers().location).toMatch(new RegExp(`/best/${renamed}/$`, 'u'))
+    })
 
     await page.goto(`/admin/best-pages/${renamed}/`)
     await page.getByRole('button', { name: 'Retire' }).click()
     await expect(page.getByRole('combobox', { name: 'Redirect to' })).toContainText(tag.name)
     await page.getByRole('alertdialog').getByRole('button', { name: 'Retire' }).click()
     await page.waitForURL('**/admin/best-pages/')
-    for (const path of [`/best/${renamed}/`, `/best/${best.slug}/`]) {
-      const response = await page.request.get(path, { maxRedirects: 0 })
-      expect(response.status(), path).toBe(308)
-      expect(response.headers().location, path).toMatch(
-        new RegExp(`/products/tags/${tag.slug}/$`, 'u')
-      )
-    }
+    await asVisitor(baseURL, async visitor => {
+      for (const path of [`/best/${renamed}/`, `/best/${best.slug}/`]) {
+        const response = await visitor.get(path, { maxRedirects: 0 })
+        expect(response.status(), path).toBe(308)
+        expect(response.headers().location, path).toMatch(
+          new RegExp(`/products/tags/${tag.slug}/$`, 'u')
+        )
+      }
+    })
   })
 })
 

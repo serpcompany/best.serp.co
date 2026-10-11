@@ -1807,19 +1807,42 @@ operations:
       'tag admin-tag -> tag admin-tag-2'
     ])
 
-    expect(await all(Q.selectAdminCategoriesPlan('admin-tax-hub'))).toEqual([
-      expect.objectContaining({ listing_count: 1, slug: 'admin-tax-hub', tag_count: 1 })
+    expect(await all(Q.selectAdminCategoriesPlan(NOW, 'admin-tax-hub'))).toEqual([
+      expect.objectContaining({ listing_count: 1, renders: 1, slug: 'admin-tax-hub', tag_count: 1 })
     ])
-    expect((await all(Q.selectAdminCategoriesPlan())).length).toBeGreaterThan(1)
-    expect(await all(Q.selectAdminTagsPlan('admin-tag-2'))).toEqual([
-      expect.objectContaining({ category: 'admin-tax-hub', listing_count: 1, slug: 'admin-tag-2' })
+    expect((await all(Q.selectAdminCategoriesPlan(NOW))).length).toBeGreaterThan(1)
+    expect(await all(Q.selectAdminTagsPlan(NOW, 'admin-tag-2'))).toEqual([
+      expect.objectContaining({
+        category: 'admin-tax-hub',
+        listing_count: 1,
+        renders: 1,
+        slug: 'admin-tag-2'
+      })
     ])
-    expect(await all(Q.selectAdminTagsPlan())).toContainEqual(
+    expect(await all(Q.selectAdminTagsPlan(NOW))).toContainEqual(
       expect.objectContaining({ slug: 'admin-tag-2' })
     )
-    expect(await all(Q.selectAdminBestPagesPlan())).toContainEqual(
-      expect.objectContaining({ pin_count: 1, slug: 'admin-best', tag: 'admin-tag-2' })
+    expect(await all(Q.selectAdminBestPagesPlan(NOW))).toContainEqual(
+      expect.objectContaining({ pin_count: 1, renders: 1, slug: 'admin-best', tag: 'admin-tag-2' })
     )
+    // Rendering is judged at the instant given: before the listing's publication, nothing renders.
+    expect(
+      await all(Q.selectAdminCategoriesPlan('2020-01-01T00:00:00.000Z', 'admin-tax-hub'))
+    ).toEqual([expect.objectContaining({ renders: 0 })])
+    expect(
+      await all(
+        Q.selectListingsInPoolPlan({
+          category: 'admin-tax-hub',
+          ids: ['lst_admin_tax', 'lst_nope'],
+          tag: 'admin-tag-2'
+        })
+      )
+    ).toEqual([{ id: 'lst_admin_tax' }])
+    expect(
+      await all(Q.selectListingsInPoolPlan({ category: null, ids: ['lst_admin_tax'], tag: 'nope' }))
+    ).toEqual([])
+    // Every pin is a live listing of the page's pool.
+    await decide({ action: 'best-page-pins-check', slug: 'admin-best' })
     const [rows, pins, exclude, pool] = await Promise.all(
       Q.selectAdminBestPagePlans('admin-best').map(plan => all<Record<string, unknown>>(plan))
     )
@@ -1833,9 +1856,12 @@ operations:
       ['best', 'admin-best']
     ] as const) {
       const [state] = await all<{ item: string; redirect: string | null }>(
-        T.selectTaxonomyStatePlan(kind, slug)
+        T.selectTaxonomyStatePlan(kind, slug, NOW)
       )
-      expect(JSON.parse(state?.item ?? 'null'), kind).toMatchObject({ slug })
+      expect(JSON.parse(state?.item ?? 'null'), kind).toMatchObject({
+        renders: kind === 'category' ? 0 : 1,
+        slug
+      })
     }
   })
 
