@@ -47,6 +47,11 @@ The local suite runs on the fixture seed, never the real catalog (#311, #313):
   parallel without counting each other's rows. The media server's D1 is the seed plus a queued
   logo. The staging-access Worker runs with `LOCAL_STAGING_ACCESS=on` and a test password, so
   it serves as staging does behind its password (#359), in its own run after the others.
+- Specs read and write a suite Worker's D1 only through `localD1` and `runStatements`
+  (`e2e/admin-fixture.ts`), which go through that Worker's own Miniflare (Wrangler's local
+  explorer API), never the SQLite file: Miniflare fails a Worker's D1 query when another
+  process writes the file at the same moment, which showed as React #441 on admin pages (#204).
+  D1's own limits apply, such as 50-byte `LIKE` patterns.
 - `smoke.spec.ts` and `public-parity.spec.ts` also run against staging after each deploy
   (`pnpm test:e2e:smoke`), on its workers.dev host: `playwright.config.ts` then sends the
   smoke-test header on every request, and one smoke test checks that a request without it gets

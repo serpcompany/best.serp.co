@@ -23,12 +23,10 @@ import { expectedResponse, test } from './test'
 test.use({
   allowedConsoleErrors: {
     because:
-      'unpublishing a listing makes its page answer 410, an invalid logo URL is refused with 422, and the listing editor intermittently hits a Server Components render error until #204 fixes it',
+      'unpublishing a listing makes its page answer 410, and an invalid logo URL is refused with 422',
     patterns: [
       expectedResponse(410, /\/products\//u),
-      expectedResponse(422, /\/api\/admin\/listings\/[^/]+\/details/u),
-      // #204: remove once the listing editor's render error is fixed.
-      /^console\.error on http:\/\/127\.0\.0\.1:\d+\/admin\/listings\/[^/]+\/: (?:\[ERROR\] )?(?:Error: )?Minified React error #441;/u
+      expectedResponse(422, /\/api\/admin\/listings\/[^/]+\/details/u)
     ]
   }
 })
@@ -780,5 +778,41 @@ test.describe('listings', () => {
       headers: admin.headers
     })
     expect(await removeReplay.json()).toMatchObject({ ok: true, replayed: true })
+  })
+})
+
+test.describe('suite D1', () => {
+  test('the fixtures write it while admin pages read it, and no page fails (#204)', async ({
+    baseURL,
+    page
+  }) => {
+    const admin = client(page.request, baseURL)
+    admins.push(await signInAsNewAdmin(admin, ADMIN_EMAIL_PREFIXES.adminPanel))
+    // Each admin page reads the session and the allowlist from D1. Fixture writes that went to
+    // the SQLite file from this process failed some of those reads ("internal error" from
+    // Miniflare): the page failed closed, as React #441 in the browser or a 500.
+    const statuses: number[] = []
+    let writing = true
+    const reading = (async () => {
+      while (writing) {
+        const pages = await Promise.all([1, 2, 3, 4].map(() => page.request.get('/admin/')))
+        statuses.push(...pages.map(response => response.status()))
+      }
+    })()
+    const writer = `e2e-overlap-${unique()}`
+    try {
+      for (let index = 0; index < 100; index++) {
+        const email = `${ADMIN_EMAIL_PREFIXES.adminPanel}-${unique()}@example.com`
+        localD1(`INSERT INTO admin_allowlist (email, added_by) VALUES (${q(email)}, ${q(writer)})`)
+        await new Promise(resolve => setTimeout(resolve, 10))
+      }
+    } finally {
+      writing = false
+      await reading
+      localD1(`DELETE FROM admin_allowlist WHERE added_by = ${q(writer)}`)
+    }
+    expect(statuses.filter(status => status !== 200)).toEqual([])
+    // Enough pages were read while the fixtures wrote.
+    expect(statuses.length).toBeGreaterThanOrEqual(8)
   })
 })

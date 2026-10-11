@@ -1,12 +1,12 @@
-import { readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
+import { MessageChannel, type MessagePort, receiveMessageOnPort, Worker } from 'node:worker_threads'
 import { type APIRequestContext, expect } from '@playwright/test'
 import {
   insert,
   listingStatements,
   type SeedStatement,
+  type SeedValue,
   suiteCatalogStatements
 } from './fixture-seed'
 import { BILLING_PREVIEW_VARS } from './orders-worker'
@@ -71,10 +71,6 @@ export function adminServerCommand(server: SuiteServer = adminServer): string {
   ].join(' && ')
 }
 
-function stateRoot(server: SuiteServer): string {
-  return resolve(server.stateDirectory, 'drizzle', 'best-serp-co')
-}
-
 /** The category the admin and account suites' submissions and listings use. */
 const adminCategory = {
   description: 'Tools for the admin panel suite.',
@@ -87,42 +83,159 @@ export function seedAdminCatalog(server: SuiteServer = adminServer): void {
   runStatements(suiteCatalogStatements({ category: adminCategory, checksum: 'e2e-admin' }), server)
 }
 
-/**
- * The admin Worker's D1 file. Miniflare keeps each local D1 database as one SQLite file in WAL
- * mode, which this process can share with workerd.
- */
-function databaseFile(server: SuiteServer): string {
-  const directory = resolve(stateRoot(server), 'v3', 'd1', 'miniflare-D1DatabaseObject')
-  const files = readdirSync(directory).filter(
-    name => name.endsWith('.sqlite') && name !== 'metadata.sqlite'
-  )
-  if (files.length !== 1) {
-    throw new Error(`Expected one local D1 database in ${directory}; found ${files.length}.`)
+/** The suite Workers' local D1 (`d1_databases` in `wrangler.jsonc`, `project.local.databaseId`). */
+const LOCAL_D1_DATABASE_ID = 'local-only-do-not-deploy'
+
+/** The thread that makes `postSync`'s requests, and the count of replies it has posted. */
+interface Requester {
+  port: MessagePort
+  replies: Int32Array
+}
+
+interface Reply {
+  error?: string
+  id: number
+  text?: string
+}
+
+let requester: Requester | undefined
+let requests = 0
+
+/** Posts JSON, replies with the body text or the error, then counts the reply. */
+const REQUESTER_SOURCE = `
+const { workerData } = require('node:worker_threads')
+const { port, replies } = workerData
+port.on('message', async ({ body, id, url }) => {
+  let reply
+  try {
+    const response = await fetch(url, {
+      body,
+      headers: { 'content-type': 'application/json' },
+      method: 'POST'
+    })
+    reply = { id, text: await response.text() }
+  } catch (error) {
+    reply = { error: String(error), id }
   }
-  return resolve(directory, files[0] as string)
+  port.postMessage(reply)
+  Atomics.add(replies, 0, 1)
+  Atomics.notify(replies, 0)
+})`
+
+function startRequester(): Requester {
+  const replies = new Int32Array(new SharedArrayBuffer(4))
+  const { port1, port2 } = new MessageChannel()
+  new Worker(REQUESTER_SOURCE, {
+    eval: true,
+    transferList: [port2],
+    workerData: { port: port2, replies }
+  }).unref()
+  port1.unref()
+  return { port: port1, replies }
 }
 
 /**
- * Runs SQL on the admin Worker's local D1 and returns the rows of a single query. It opens the
- * SQLite file directly: `wrangler d1 execute` would start a second Miniflare per call, which
- * takes seconds each. Rows built from values go through `runStatements` instead.
+ * POSTs JSON synchronously, as the helpers here are synchronous: one worker thread per test
+ * process makes each request while this thread waits for its reply.
+ */
+function postSync(url: string, body: string): string {
+  requester ??= startRequester()
+  const { port, replies } = requester
+  const id = ++requests
+  port.postMessage({ body, id, url })
+  const deadline = Date.now() + 30_000
+  for (;;) {
+    const seen = Atomics.load(replies, 0)
+    const received = receiveMessageOnPort(port)
+    if (received) {
+      const reply = received.message as Reply
+      // A late reply to a request that timed out.
+      if (reply.id !== id) continue
+      if (reply.text === undefined) throw new Error(`${url} failed: ${reply.error}`)
+      return reply.text
+    }
+    const remaining = deadline - Date.now()
+    if (remaining <= 0) throw new Error(`No answer from ${url} in 30 seconds.`)
+    Atomics.wait(replies, 0, seen, remaining)
+  }
+}
+
+interface D1QueryAnswer {
+  errors?: { message?: string }[]
+  result?: { results?: { columns: string[]; rows: unknown[][] } }[] | null
+  success?: boolean
+}
+
+/**
+ * Runs SQL on a suite Worker's local D1 through the Worker's own Miniflare: Wrangler's local
+ * explorer API (`/cdn-cgi/local/explorer/api/d1/database/<id>/raw`), which reaches the same D1
+ * Durable Object as the Worker's binding, so the two take turns. Never the SQLite file from this
+ * process: Miniflare fails a Worker's D1 query, as "internal error", when another process writes
+ * the file at the same moment, and the admin pages showed it as React #441 (#204). A `sql` of
+ * several statements runs as one batch; so does `batch`, in one transaction.
+ */
+function suiteD1(server: SuiteServer, body: { batch: { sql: string }[] } | { sql: string }) {
+  const url = `${adminOrigin(server)}/cdn-cgi/local/explorer/api/d1/database/${LOCAL_D1_DATABASE_ID}/raw`
+  const output = postSync(url, JSON.stringify(body))
+  let answer: D1QueryAnswer
+  try {
+    answer = JSON.parse(output) as D1QueryAnswer
+  } catch {
+    throw new Error(`Local D1 on port ${server.port} answered ${output.slice(0, 200)}`)
+  }
+  if (!answer.success || !answer.result) {
+    const reasons = answer.errors?.map(error => error.message).join('; ')
+    throw new Error(`Local D1 on port ${server.port} refused the query: ${reasons || output}`)
+  }
+  return answer.result
+}
+
+/** `value` as SQL: the explorer API binds only text, so numbers and NULL are written inline. */
+function sqlLiteral(value: SeedValue): string {
+  if (value === null) return 'NULL'
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new Error(`Cannot write ${value} to local D1.`)
+    return String(value)
+  }
+  return q(value)
+}
+
+/** The statement with each `?` outside quoted text replaced by its parameter's literal. */
+function inlineParameters({ params, sql }: SeedStatement): string {
+  let quote: string | null = null
+  let next = 0
+  let inlined = ''
+  for (const character of sql) {
+    if (quote) {
+      if (character === quote) quote = null
+    } else if (character === "'" || character === '"') {
+      quote = character
+    } else if (character === '?') {
+      if (next >= params.length) throw new Error(`Too few parameters for: ${sql}`)
+      inlined += sqlLiteral(params[next++] as SeedValue)
+      continue
+    }
+    inlined += character
+  }
+  if (next !== params.length) throw new Error(`Too many parameters for: ${sql}`)
+  return inlined
+}
+
+/**
+ * Runs SQL on a suite Worker's local D1 (the admin Worker's by default) and returns the rows of a
+ * single query. Rows built from values go through `runStatements` instead.
  */
 export function localD1<T = Record<string, unknown>>(
   sql: string,
   server: SuiteServer = adminServer
 ): T[] {
-  const database = new DatabaseSync(databaseFile(server))
-  try {
-    database.exec('PRAGMA busy_timeout = 10000; PRAGMA foreign_keys = ON;')
-    const trimmed = sql.trim()
-    if (/^(?:SELECT|WITH)\b/iu.test(trimmed) && !trimmed.replace(/;\s*$/u, '').includes(';')) {
-      return database.prepare(trimmed).all() as T[]
-    }
-    database.exec(trimmed)
+  const trimmed = sql.trim()
+  const [answer] = suiteD1(server, { sql: trimmed })
+  if (!/^(?:SELECT|WITH)\b/iu.test(trimmed) || trimmed.replace(/;\s*$/u, '').includes(';')) {
     return []
-  } finally {
-    database.close()
   }
+  const { columns, rows } = answer?.results ?? { columns: [], rows: [] }
+  return rows.map(row => Object.fromEntries(columns.map((name, i) => [name, row[i]])) as T)
 }
 
 /**
@@ -133,19 +246,8 @@ export function runStatements(
   statements: readonly SeedStatement[],
   server: SuiteServer = adminServer
 ): void {
-  const database = new DatabaseSync(databaseFile(server))
-  try {
-    database.exec('PRAGMA busy_timeout = 10000; PRAGMA foreign_keys = ON; BEGIN IMMEDIATE;')
-    try {
-      for (const statement of statements) database.prepare(statement.sql).run(...statement.params)
-      database.exec('COMMIT')
-    } catch (error) {
-      database.exec('ROLLBACK')
-      throw error
-    }
-  } finally {
-    database.close()
-  }
+  if (statements.length === 0) return
+  suiteD1(server, { batch: statements.map(statement => ({ sql: inlineParameters(statement) })) })
 }
 
 /** SQL string literal. */
