@@ -17,6 +17,8 @@ email is #61.
   allowlist again, so removing an email revokes access on the next request. Admins add and
   remove each other on `/admin/admins/` (#64); the last admin cannot be removed.
 - **`/admin` and `/api/admin`** need Cloudflare Access (production) **and** an admin session.
+  On staging only, agents use `/api/admin/*` with a key instead of a session, as the fixed actor
+  `staging-agent` ([Admin panel](./admin-panel.md#staging-admin-key-for-agents-408)).
 
 | Piece | Where |
 |---|---|
@@ -27,6 +29,7 @@ email is #61.
 | Limits, code binding, known devices | `apps/web/src/lib/auth/{rate-limits,code-binding,known-device}.ts` |
 | `requireUser()` / `requireAdmin()` | `apps/web/src/lib/auth/{guards,server}.ts` |
 | Worker gate: Access JWT and session cookie | `apps/web/src/lib/auth/{admin-gate,cloudflare-access}.ts` |
+| Staging admin key for agents (#408) | `apps/web/src/lib/auth/staging-admin-key.ts` |
 | Endpoints | `apps/web/src/app/api/auth/[...all]/route.ts` (`/api/auth/*`) |
 | `/login`, `/account`, header sign-out | `apps/web/src/app/(site)/login/page.tsx`, `apps/web/src/app/(dashboard)/account/page.tsx`, `apps/web/src/components/{auth,account}/` |
 
@@ -189,7 +192,8 @@ path (any case, decoded) before the edge cache and Next.js:
 |---|---|
 | Production, `CF_ACCESS_TEAM_DOMAIN` or `CF_ACCESS_AUD` unset or malformed | 503 `Access not configured` |
 | Access required, `Cf-Access-Jwt-Assertion` missing or invalid (RS256, issuer, AUD, expiry) | 403 |
-| No Better Auth session cookie | 401 |
+| `X-Staging-Admin-Token` present but not a valid staging key, behind the password, on `/api/admin/*` | 401 |
+| No Better Auth session cookie (and no key) | 401 |
 
 Requests that pass reach pages and handlers, which call `requireAdmin()` (Next.js
 `unauthorized()` 401 / `forbidden()` 403, with `experimental.authInterrupts`) or
@@ -228,6 +232,7 @@ cookie, so pages under auth are never served from or stored in it ([Caching](./c
 | `CF_ACCESS_TEAM_DOMAIN` | var (public) | unset | empty | `serpcompany.cloudflareaccess.com` |
 | `CF_ACCESS_AUD` | var (public) | unset | empty | `a30cbc5f…8b2491` (the `best` app's AUD tag) |
 | `CF_ACCESS_REQUIRED` | var (`on`/`off`) | unset (off) | `off` | ignored (always on) |
+| `STAGING_ADMIN_TOKEN` | secret (≥ 32 chars, #408) | refused | Worker secret | refused |
 
 Staging and production fail closed: a missing or short secret, or a base URL that is not an
 https origin, makes `/api/auth/*` answer 503 and grants no session.

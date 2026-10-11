@@ -45,7 +45,8 @@ forbids `'use server'`): an action id is reachable from any path, so no path gat
 Every request passes, in order: the Worker's Cloudflare Access and session-cookie gate
 ([Accounts](./accounts.md#admin-gate)); `authorizeAdminRequest()`, which re-checks the session
 and the allowlist and, for any write, requires an `Origin` among the Worker's trusted origins
-(the CSRF check: every `*.serp.co` site is same-site, so `SameSite=Lax` alone is not enough);
+(the CSRF check: every `*.serp.co` site is same-site, so `SameSite=Lax` alone is not enough), or
+on staging takes the agents' key instead ([below](#staging-admin-key-for-agents-408));
 a JSON body (`application/json`, at most 64 KB) parsed by its schema (`lib/admin/schemas.ts`);
 then the decision (`lib/admin/decisions.ts`). Answers are JSON with `cache-control: private,
 no-store`: `200 {ok: true, replayed}`, or `{ok: false, error, message}` with 404, 409 (the state
@@ -190,12 +191,61 @@ guards instead:
   change.
 
 Recovery is D1 Time Travel, run by the owner ([D1 recovery](./d1-recovery.md)). Nothing else in
-the app writes production data, and agents never use the production admin panel.
+the app writes production data, and agents never use the production admin panel. The staging
+admin key (below) is refused on production.
+
+## Staging admin key for agents (#408)
+
+Agents can't type a sign-in code into `/login`, so on staging they use the admin API with a key
+instead of a session (`apps/web/src/lib/auth/staging-admin-key.ts`, checked by the Worker's admin
+gate and again by `authorizeAdminRequest()`):
+
+- **Where it works:** `/api/admin/*` on the staging Worker only (`SITE_ENVIRONMENT` and
+  `D1_RUNTIME_ENV` both `staging`), on a request that gave staging's password
+  ([Architecture](./architecture.md#environments-and-hosts)). Production and local refuse any key,
+  even with the secret set, and the smoke-test exemption doesn't carry it. It opens no `/admin`
+  page, and never creates a session or sets a cookie.
+- **The key** is the Worker secret `STAGING_ADMIN_TOKEN`, at least 32 characters (without it,
+  every key is refused), sent as `X-Staging-Admin-Token` and compared in constant time. A
+  request with the header is judged by the key alone: a wrong key is 401 even with a session.
+- **Identity:** the fixed actor `staging-agent` (no email can equal it) on every decision, event
+  and `publication_runs` row. The plans' compare-and-swap guards hold as for any admin. Only a
+  valid key skips the `Origin` check: no browser sends the header on its own, so it can't be
+  forged cross-site. Session requests keep the check.
+- **Never logged:** no log line, answer or error carries it, Sentry never receives request
+  headers, and Cloudflare's tail events redact any header whose name contains `token`.
+
+The key opens no read screen, so take ids and `content_version` from staging D1 with a read-only
+query, then call the endpoint (an unknown path such as `/api/admin/` answers 404 to a valid key):
+
+```bash
+curl -sS -u "staging:<staging password>" \
+  -H "X-Staging-Admin-Token: $(cat ~/.config/best.serp.co/staging-admin-token)" \
+  -H 'content-type: application/json' -d '{"expectedContentVersion": 1}' \
+  https://staging.best.serp.co/api/admin/submissions/<id>/approve
+```
+
+**Where it lives:** the staging Worker secret, and one local file outside the repository,
+`~/.config/best.serp.co/staging-admin-token` (mode 600). Never commit it, paste it into an issue
+or a log, or set it on production. Only the owner, or an agent the owner authorized, sets it.
+
+**Rotate or revoke** from `apps/web`. A new secret replaces the old one at once; deleting it
+refuses every key. Decisions made with a key stay in the audit trail as `staging-agent`; after a
+suspected leak, also check `admin_allowlist` for rows `added_by = 'staging-agent'`.
+
+```bash
+(umask 077 && mkdir -p ~/.config/best.serp.co && openssl rand -hex 24 | tr -d '\n' \
+  > ~/.config/best.serp.co/staging-admin-token)
+pnpm exec wrangler secret put STAGING_ADMIN_TOKEN --env staging \
+  < ~/.config/best.serp.co/staging-admin-token
+pnpm exec wrangler secret delete STAGING_ADMIN_TOKEN --env staging  # revoke
+```
 
 ## Tests
 
 `apps/web/src/db/{admin-plans,admin-queries,listing-plans}.test.ts` and
-`apps/web/src/lib/admin/decisions.test.ts` (node:sqlite), `scripts/d1-workerd-plans.test.ts` (every
+`apps/web/src/lib/admin/{decisions,staging-agent}.test.ts` (node:sqlite; the second is the staging
+admin key through the route handlers), `scripts/d1-workerd-plans.test.ts` (every
 plan builder and read on Wrangler-local D1), and `apps/web/e2e/admin-panel.spec.ts`
 (Playwright: the gate, approve, request changes, reject, allow resubmission, unpublish with 410
 and republish, a redirected duplicate's 308 (#338), the Tags field (#341), the allowlist, and a

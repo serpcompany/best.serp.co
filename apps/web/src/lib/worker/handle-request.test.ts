@@ -2,6 +2,7 @@ import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose'
 import { describe, expect, it, vi } from 'vitest'
 import { parseRobotsTxt, robotsTxtAllows } from '../../../../../scripts/crawl-policy'
 import { ACCESS_JWT_HEADER } from '../auth/cloudflare-access'
+import { STAGING_ADMIN_KEY_HEADER } from '../auth/staging-admin-key'
 import { EDGE_CACHE_HEADER, withEdgeCache } from '../edge-cache/html-cache'
 import {
   NON_PRODUCTION_ROBOTS_TXT,
@@ -715,6 +716,172 @@ describe('admin gate', () => {
       const { response, serve } = await gate(`${production}${path}`, productionEnv)
       expect(response.status, path).toBe(200)
       expect(serve, path).toHaveBeenCalledOnce()
+    }
+  })
+})
+
+// serpcompany/best.serp.co#408: staging's admin key for agents. The Worker passes a request with
+// the key header only to /api/admin/* on staging, after staging's password, with the right key.
+describe('staging admin key in the Worker gate', () => {
+  /** A test value only; the real key is a staging Worker secret. */
+  const KEY = 'pipeline-test-staging-admin-key-0123456789'
+  const keyHeader = { [STAGING_ADMIN_KEY_HEADER]: KEY }
+  const session = { cookie: '__Secure-better-auth.session_token=token.signature' }
+  const stagingKeyEnv: WorkerRequestEnv = {
+    ...stagingEnv,
+    D1_RUNTIME_ENV: 'staging',
+    STAGING_ADMIN_TOKEN: KEY
+  }
+
+  async function visit(url: string, env: WorkerRequestEnv, headers: Record<string, string>) {
+    const handler = pipeline()
+    const response = await handleWorkerRequest(
+      new Request(url, { headers, method: 'POST' }),
+      env,
+      handler
+    )
+    return { body: await response.text(), response, serve: handler.serve }
+  }
+
+  it('passes the right key behind the password on to the admin API, without a cookie', async () => {
+    for (const path of ['/api/admin/submissions/sub_1/approve', '/api/admin/admins']) {
+      const { response, serve } = await visit(`${stagingCanonical}${path}`, stagingKeyEnv, {
+        ...withPassword,
+        ...keyHeader
+      })
+      expect(response.status, path).toBe(200)
+      expect(serve, path).toHaveBeenCalledOnce()
+      // The handler gets the key to check again; the password is gone, and no cookie is set.
+      const forwarded = serve.mock.calls[0]?.[0] as Request
+      expect(forwarded.headers.get(STAGING_ADMIN_KEY_HEADER)).toBe(KEY)
+      expect(forwarded.headers.has('authorization')).toBe(false)
+      expect(response.headers.get('set-cookie')).toBeNull()
+    }
+  })
+
+  it('still asks for the password, and the smoke-test exemption does not carry the key', async () => {
+    const withoutPassword = await visit(`${stagingCanonical}/api/admin/admins`, stagingKeyEnv, {
+      ...keyHeader
+    })
+    expect(withoutPassword.response.status).toBe(401)
+    expect(withoutPassword.response.headers.get('www-authenticate')).toBe(STAGING_ACCESS_CHALLENGE)
+    expect(withoutPassword.serve).not.toHaveBeenCalled()
+    const smoke = await visit(`${staging}/api/admin/admins`, stagingKeyEnv, {
+      [SMOKE_TEST_HEADER]: '1',
+      ...keyHeader
+    })
+    expect(smoke.response.status).toBe(401)
+    expect(smoke.response.headers.get('www-authenticate')).toBeNull()
+    expect(smoke.serve).not.toHaveBeenCalled()
+  })
+
+  it('refuses a wrong or empty key, even with a session cookie: the header decides', async () => {
+    for (const key of [`${KEY}x`, KEY.slice(1), '']) {
+      const { body, response, serve } = await visit(
+        `${stagingCanonical}/api/admin/admins`,
+        stagingKeyEnv,
+        { ...withPassword, ...session, [STAGING_ADMIN_KEY_HEADER]: key }
+      )
+      expect(response.status, key).toBe(401)
+      expect(body).toBe('Unauthorized\n')
+      expect(serve).not.toHaveBeenCalled()
+    }
+  })
+
+  it('refuses every key while the secret is missing or shorter than 32 characters', async () => {
+    for (const secret of [undefined, '', KEY.slice(0, 31)]) {
+      const { response, serve } = await visit(
+        `${stagingCanonical}/api/admin/admins`,
+        { ...stagingKeyEnv, STAGING_ADMIN_TOKEN: secret },
+        { ...withPassword, [STAGING_ADMIN_KEY_HEADER]: secret || KEY }
+      )
+      expect(response.status).toBe(401)
+      expect(serve).not.toHaveBeenCalled()
+    }
+  })
+
+  it('never opens an /admin page with the key', async () => {
+    for (const path of ['/admin/', '/admin/submissions/', '/ADMIN/admins/']) {
+      const { response, serve } = await visit(`${stagingCanonical}${path}`, stagingKeyEnv, {
+        ...withPassword,
+        ...session,
+        ...keyHeader
+      })
+      expect(response.status, path).toBe(401)
+      expect(serve, path).not.toHaveBeenCalled()
+    }
+  })
+
+  it('refuses the key in production and locally, even with the secret set', async () => {
+    const team = 'serpcompany.cloudflareaccess.com'
+    const aud = 'd'.repeat(64)
+    const pair = await generateKeyPair('RS256')
+    const jwks = { keys: [{ ...(await exportJWK(pair.publicKey)), alg: 'RS256', kid: 'k' }] }
+    const jwt = await new SignJWT({ email: 'devin@serp.co' })
+      .setProtectedHeader({ alg: 'RS256', kid: 'k' })
+      .setIssuer(`https://${team}`)
+      .setAudience(aud)
+      .setIssuedAt()
+      .setExpirationTime('5m')
+      .sign(pair.privateKey)
+    const productionKeyEnv: WorkerRequestEnv = {
+      ...productionEnv,
+      CF_ACCESS_AUD: aud,
+      CF_ACCESS_TEAM_DOMAIN: team,
+      D1_RUNTIME_ENV: 'production',
+      STAGING_ADMIN_TOKEN: KEY
+    }
+    // Even past Access, with the owner's session, a request with the key is refused.
+    const handler = pipeline()
+    const response = await handleWorkerRequest(
+      new Request(`${production}/api/admin/admins`, {
+        headers: { ...session, ...keyHeader, [ACCESS_JWT_HEADER]: jwt },
+        method: 'POST'
+      }),
+      productionKeyEnv,
+      { ...handler, access: { getKey: () => createLocalJWKSet(jwks) } }
+    )
+    expect(response.status).toBe(401)
+    expect(handler.serve).not.toHaveBeenCalled()
+    // Without Access it never gets that far.
+    expect(
+      (await visit(`${production}/api/admin/admins`, productionKeyEnv, keyHeader)).response.status
+    ).toBe(403)
+
+    const localKeyEnv: WorkerRequestEnv = {
+      D1_RUNTIME_ENV: 'local',
+      SITE_ENVIRONMENT: 'local',
+      STAGING_ADMIN_TOKEN: KEY
+    }
+    for (const env of [
+      localKeyEnv,
+      // A local Worker serving as staging, behind the password (`LOCAL_STAGING_ACCESS=on`).
+      { ...localKeyEnv, LOCAL_STAGING_ACCESS: 'on', STAGING_BASIC_AUTH_PASSWORD: STAGING_PASSWORD }
+    ]) {
+      const local = await visit('http://127.0.0.1:8832/api/admin/admins', env, {
+        ...withPassword,
+        ...keyHeader
+      })
+      expect(local.response.status).toBe(401)
+      expect(local.serve).not.toHaveBeenCalled()
+    }
+  })
+
+  it('never echoes the key', async () => {
+    const answers = await Promise.all([
+      visit(`${stagingCanonical}/api/admin/admins`, stagingKeyEnv, {
+        ...withPassword,
+        [STAGING_ADMIN_KEY_HEADER]: `${KEY}-wrong`
+      }),
+      visit(
+        `${production}/api/admin/admins`,
+        { ...productionEnv, STAGING_ADMIN_TOKEN: KEY },
+        keyHeader
+      )
+    ])
+    for (const { body, response } of answers) {
+      expect(body).not.toContain(KEY)
+      expect(JSON.stringify([...response.headers])).not.toContain(KEY)
     }
   })
 })

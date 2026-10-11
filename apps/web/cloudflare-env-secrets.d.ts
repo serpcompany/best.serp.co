@@ -17,6 +17,11 @@ interface CloudflareEnv {
   LOCAL_STAGING_ACCESS?: string
   /** A local Worker only: the port of the end-to-end suite's mocked Stripe API on 127.0.0.1. */
   LOCAL_STRIPE_MOCK_PORT?: string
+  /**
+   * Worker secret on staging only (#408): the admin key agents send as `X-Staging-Admin-Token`
+   * (`src/lib/auth/staging-admin-key.ts`). Production and local refuse every key even if set.
+   */
+  STAGING_ADMIN_TOKEN?: string
   /** Worker secret (#68): Stripe's secret key, test mode on staging and live in production. */
   STRIPE_SECRET_KEY?: string
   /** Worker secret (#68): the signing secret of the `/api/billing/webhook/` endpoint. */

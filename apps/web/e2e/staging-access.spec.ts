@@ -1,11 +1,14 @@
 import { type APIRequestContext, expect, request as playwrightRequest } from '@playwright/test'
+import { localD1 } from './admin-fixture'
 import { categoryPath, listingPath, site } from './site-fixture'
 import {
   STAGING_ACCESS_TEST_PASSWORD,
+  STAGING_ADMIN_TEST_KEY,
   seedStagingAccessCatalog,
   stagingAccessCategory,
   stagingAccessListing,
   stagingAccessOrigin,
+  stagingAccessServer,
   stagingAccessSuiteEnabled,
   stagingAuthorization
 } from './staging-access-fixture'
@@ -215,6 +218,37 @@ test.describe('with the password', () => {
       expect(new URL(location, STAGING_ORIGIN).href, from).toBe(`${STAGING_ORIGIN}${to}`)
       expect(response.headers()['x-robots-tag'], from).toBeUndefined()
     }
+  })
+})
+
+// #408: staging's admin key works only on the staging Worker itself. This Worker serves as
+// staging, behind the password, with the secret set, and still refuses every key: it is local.
+test.describe("staging's admin key", () => {
+  test('a local Worker refuses it on every admin path and writes nothing', async () => {
+    const key = { 'x-staging-admin-token': STAGING_ADMIN_TEST_KEY }
+    const attempts = [
+      { method: 'POST', path: '/api/admin/admins' },
+      { method: 'GET', path: '/api/admin/' },
+      { method: 'GET', path: '/admin/' }
+    ]
+    for (const { method, path } of attempts) {
+      const response = await authorized.fetch(path, {
+        data: method === 'POST' ? { email: 'agent@example.com' } : undefined,
+        headers: key,
+        maxRedirects: 0,
+        method
+      })
+      expect(response.status(), path).toBe(401)
+      expect(response.headers()['www-authenticate'], path).toBeUndefined()
+      expect(response.headers()['set-cookie'], path).toBeUndefined()
+      expect(await response.text(), path).not.toContain(STAGING_ADMIN_TEST_KEY)
+    }
+    expect(
+      localD1<{ count: number }>(
+        "SELECT COUNT(*) AS count FROM admin_allowlist WHERE email = 'agent@example.com'",
+        stagingAccessServer
+      )
+    ).toEqual([{ count: 0 }])
   })
 })
 
