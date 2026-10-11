@@ -8,9 +8,9 @@ import base from './playwright.config'
 
 /**
  * The staging-access suite's own run (#359): a local Worker that serves as staging, behind its
- * password (`e2e/staging-access-fixture.ts`). `pnpm test:e2e` runs it after the main run
- * (`playwright.config.ts`), whose eight preview Workers have stopped by then: a ninth beside
- * them exhausts the CI runner's memory (#111). It serves the Worker the main run built.
+ * password (`e2e/staging-access-fixture.ts`). `pnpm test:e2e` runs it last, after the main run
+ * (`playwright.config.ts`) and the suites run (`playwright.suites.config.ts`), whose preview
+ * Workers have stopped by then (#111, #393). It serves the Worker the main run built.
  */
 export default defineConfig({
   ...base,

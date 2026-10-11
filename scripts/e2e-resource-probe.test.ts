@@ -63,7 +63,7 @@ describe('e2e resource probe', () => {
     const samples = join(root, 'probe')
     const line = await firstSample(samples, { E2E_PROBE_PROC: fakeProc(root) })
     expect(line).toMatch(
-      /^\[resource-probe\] \+00:00 mem 15591\/15991M avail 400M swap 3071\/4095M psi10 42\.50\/30\.25 oom_kill 0 load 7\.91 disk \d+% workerd \d+\/\d+M esbuild \d+\/\d+M node \d+\/\d+M chrome \d+\/\d+M$/u
+      /^\[resource-probe\] \+00:00 mem 15591\/15991M avail 400M swap 3071\/4095M psi10 42\.50\/30\.25 oom_kill 0 load 7\.91 disk \d+% top( \S+ \d+\/\d+M){1,6}$/u
     )
     expect(readFileSync(join(samples, 'samples.log'), 'utf8')).toContain(line)
     const peak = readFileSync(join(samples, 'peak.txt'), 'utf8')
@@ -84,7 +84,9 @@ describe('e2e resource probe', () => {
     const root = directory()
     const samples = join(root, 'probe')
     const line = await firstSample(samples, { E2E_PROBE_PROC: join(root, 'missing') })
-    expect(line).toMatch(/^\[resource-probe\] \+00:00 mem - psi10 - oom_kill - load - .* node /u)
+    expect(line).toMatch(
+      /^\[resource-probe\] \+00:00 mem - psi10 - oom_kill - load - disk \S+ top \S+ \d+\/\d+M/u
+    )
     const report = spawnSync('bash', [probe, '--report', join(root, 'never-sampled')], {
       encoding: 'utf8'
     })

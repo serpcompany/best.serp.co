@@ -25,7 +25,10 @@ import { test } from './test'
  * - Every trigger replayed, and the hourly continuation, change nothing and send nothing twice.
  */
 
-test.skip(!badgeSuiteEnabled, 'needs the local badge program Worker from playwright.config.ts')
+test.skip(
+  !badgeSuiteEnabled,
+  'needs the local badge program Worker from playwright.suites.config.ts'
+)
 test.describe.configure({ mode: 'serial' })
 test.use({ baseURL: badgeOrigin() })
 

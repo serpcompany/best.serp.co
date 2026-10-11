@@ -20,11 +20,13 @@ meminfo() {
   awk -v key="$1:" '$1 == key { print $2; found = 1 } END { if (!found) print 0 }' "$proc/meminfo" 2>/dev/null || echo 0
 }
 
-# "<count>/<MiB>" of the processes whose name matches, from one `ps -o rss= -o comm=` listing
-# (Linux prints the name, macOS the path).
-processes() {
-  awk -v pattern="$2" '{ n = split($2, path, "/") } path[n] ~ pattern { count++; rss += $1 }
-    END { printf "%d/%dM", count, rss / 1024 }' <<<"$1"
+# The six process names holding the most memory, as "<name> <count>/<MiB>", from one
+# `ps -o rss= -o comm=` listing. Names, not fixed groups: Node tools retitle their processes
+# (pnpm, wrangler, playwright), and Linux prints the name where macOS prints the path.
+top_processes() {
+  awk '{ n = split($2, path, "/"); name = path[n]; count[name]++; rss[name] += $1 }
+    END { for (name in rss) printf "%d %s %d/%dM\n", rss[name], name, count[name], rss[name] / 1024 }' <<<"$1" |
+    sort -n -r | head -n 6 | awk '{ printf "%s%s %s", (NR > 1 ? " " : ""), $2, $3 }'
 }
 
 if [ "${1:-}" = "--report" ]; then
@@ -83,8 +85,7 @@ while :; do
     memory="mem -"
   fi
   line="[resource-probe] $stamp $memory psi10 ${pressure:--} oom_kill ${oom:--} load ${load:--} disk ${disk:--}"
-  line="$line workerd $(processes "$listing" '^workerd') esbuild $(processes "$listing" '^esbuild')"
-  line="$line node $(processes "$listing" '^node') chrome $(processes "$listing" 'chrom|headless')"
+  line="$line top $(top_processes "$listing")"
   {
     echo "== $(date -u +%FT%TZ) $stamp"
     echo "$line"

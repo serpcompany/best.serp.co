@@ -4,14 +4,6 @@ import {
   accessLockServerCommand,
   accessLockServersEnabled
 } from './e2e/access-lock-fixture'
-import {
-  accountServer,
-  adminOrigin,
-  adminServerCommand,
-  adminSuiteEnabled
-} from './e2e/admin-fixture'
-import { badgeOrigin, badgeServerCommand, badgeSuiteEnabled } from './e2e/badge-program-fixture'
-import { claimsOrigin, claimsServerCommand, claimsSuiteEnabled } from './e2e/claims-fixture'
 import { mediaOrigin, mediaServerCommand, mediaServerEnabled } from './e2e/media-fixture'
 import { isPlatformOrigin, site } from './e2e/site-fixture'
 
@@ -22,9 +14,22 @@ const defaultWebServerCommand = `cd ../.. && pnpm db:seed:local && pnpm db:verif
 const webServerCommand = process.env.PLAYWRIGHT_WEB_SERVER_COMMAND ?? defaultWebServerCommand
 const useExternalServer = process.env.PLAYWRIGHT_EXTERNAL_SERVER === '1'
 const workerCount = Number(process.env.E2E_WORKERS ?? 2)
+/**
+ * The suites with a preview Worker and D1 of their own, which run after this run in theirs
+ * (`playwright.suites.config.ts`, #393): their four Workers beside this run's four filled the CI
+ * runner's 16 GB and its swap, and GitHub shut the runner down mid-suite.
+ */
+export const suiteSpecs = [
+  '**/account-dashboard.spec.ts',
+  '**/admin-panel.spec.ts',
+  '**/badge-program.spec.ts',
+  '**/billing.spec.ts',
+  '**/claims-dialog.spec.ts',
+  '**/claims.spec.ts'
+]
 const ignoredTests = [
-  // Its own run, after this one (playwright.staging-access.config.ts, #359): a ninth preview
-  // Worker beside this run's eight exhausts the CI runner's memory (#111).
+  ...suiteSpecs,
+  // Its own run, after the suites' (playwright.staging-access.config.ts, #359).
   '**/staging-access.spec.ts',
   ...(process.env.E2E_VISUAL === '1' ? [] : ['**/visual.spec.ts']),
   ...(process.env.AGENT_CAPTURE_DIRECTORY ? [] : ['**/agent-capture.spec.ts'])
@@ -120,10 +125,11 @@ export default defineConfig({
   ],
   // Web servers start in order: the first builds the Worker, the Access-lock servers
   // (e2e/access-lock-fixture.ts) then serve that build with CF_ACCESS_REQUIRED=on, and the
-  // media server (e2e/media-fixture.ts) serves it on its own seeded local D1 and R2. Eight
-  // Workers in all: every preview Worker costs the CI runner 1.5-2.5 GB, and a ninth exhausts
-  // it (#111, #359), so the staging-access suite runs afterwards in its own run
-  // (playwright.staging-access.config.ts).
+  // media server (e2e/media-fixture.ts) serves it on its own seeded local D1 and R2. Four
+  // Workers: each preview Worker (wrangler, the esbuild service it keeps for rebuilds, workerd
+  // and their launchers) costs the CI runner about 2.5 GB, so the suites with Workers of their
+  // own run afterwards in their own runs (playwright.suites.config.ts, then
+  // playwright.staging-access.config.ts; #393).
   webServer: useExternalServer
     ? undefined
     : [
@@ -155,29 +161,6 @@ export default defineConfig({
               env: { FORCE_COLOR: '0', LOG_LEVEL: 'error' }
             }))
           : []),
-        // The admin panel and account dashboard suites' own Workers and D1s
-        // (e2e/admin-fixture.ts): both publish listings and add admins.
-        ...(adminSuiteEnabled
-          ? [undefined, accountServer].map(server => ({
-              command: adminServerCommand(server),
-              url: `${adminOrigin(server)}/robots.txt`,
-              reuseExistingServer: !process.env.CI,
-              timeout: 180000,
-              env: { FORCE_COLOR: '0', LOG_LEVEL: 'error' }
-            }))
-          : []),
-        // The badge program suite's own Worker and D1, with the program on (#66).
-        ...(badgeSuiteEnabled
-          ? [
-              {
-                command: badgeServerCommand(),
-                url: `${badgeOrigin()}/robots.txt`,
-                reuseExistingServer: !process.env.CI,
-                timeout: 180000,
-                env: { FORCE_COLOR: '0', LOG_LEVEL: 'error' }
-              }
-            ]
-          : []),
         // Hosted listing media on a seeded local D1 and R2 (e2e/media-fixture.ts).
         ...(mediaServerEnabled
           ? [
@@ -186,18 +169,6 @@ export default defineConfig({
                 url: `${mediaOrigin}/robots.txt`,
                 reuseExistingServer: !process.env.CI,
                 timeout: 300000,
-                env: { FORCE_COLOR: '0', LOG_LEVEL: 'error' }
-              }
-            ]
-          : []),
-        // The claims suite's own Worker and D1, with claims and the badge program on (#67).
-        ...(claimsSuiteEnabled
-          ? [
-              {
-                command: claimsServerCommand(),
-                url: `${claimsOrigin()}/robots.txt`,
-                reuseExistingServer: !process.env.CI,
-                timeout: 180000,
                 env: { FORCE_COLOR: '0', LOG_LEVEL: 'error' }
               }
             ]

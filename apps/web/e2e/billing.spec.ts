@@ -38,7 +38,7 @@ import { test } from './test'
  * - a paid submission rejected as `other` is refunded automatically.
  */
 
-test.skip(!billingSuiteEnabled, 'needs the local orders Worker from playwright.config.ts')
+test.skip(!billingSuiteEnabled, 'needs the local orders Worker from playwright.suites.config.ts')
 test.describe.configure({ mode: 'serial' })
 test.use({ baseURL: billingOrigin(), channel: 'chromium' })
 

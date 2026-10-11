@@ -1,15 +1,26 @@
 # Playwright E2E
 
-Playwright coverage for the best.serp.co Worker. The config is `apps/web/playwright.config.ts`.
-`pnpm test:e2e` (what CI runs) runs it, then `apps/web/playwright.staging-access.config.ts`
-(#359), which serves the Worker the first run built as staging: every preview Worker costs the
-CI runner 1.5-2.5 GB, and a ninth one beside the main run's eight exhausts it (#111). The second
-run starts even when the first fails, and the command fails when either does.
+Playwright coverage for the best.serp.co Worker, in three runs that `pnpm test:e2e` (what CI
+runs) starts one after another, each on preview Workers that serve the Worker the first builds:
+
+- `apps/web/playwright.config.ts`: the public site, on the main preview, the two Access-lock
+  Workers and the media Worker.
+- `apps/web/playwright.suites.config.ts`: the suites with a Worker and D1 of their own (admin
+  panel and orders, account dashboard, badge program, claims; `suiteSpecs`).
+- `apps/web/playwright.staging-access.config.ts` (#359): the Worker serving as staging.
+
+Every preview Worker (wrangler, the esbuild service it keeps for rebuilds, workerd and their
+launchers) costs the CI runner about 2.5 GB, so no run starts more than four: eight at once
+filled the 16 GB runner's memory and swap, and GitHub shut it down mid-suite (#111, #393). Each
+run starts even when an earlier one fails, and the command fails when any does. The e2e job's
+resource probe (`scripts/e2e-resource-probe.sh`) logs the runner's memory every 15 s and uploads
+its samples.
 
 ## Commands
 
 ```bash
-pnpm test:e2e         # both runs; pass spec filters to `pnpm --filter web test:e2e` instead
+pnpm test:e2e         # all three runs; to filter specs, run one config with `pnpm --filter web`:
+                      # test:e2e (public), test:e2e:suites, or test:e2e:staging-access
 pnpm test:e2e:smoke   # e2e/smoke.spec.ts + e2e/public-parity.spec.ts
 pnpm test:e2e:visual  # opt-in; no committed baselines yet (see Notes)
 pnpm test:e2e:ui
@@ -46,7 +57,8 @@ The local suite runs on the fixture seed, never the real catalog (#311, #313):
   rows with the seed's builders (`listingStatements`, `suiteCatalogStatements`), so they run in
   parallel without counting each other's rows. The media server's D1 is the seed plus a queued
   logo. The staging-access Worker runs with `LOCAL_STAGING_ACCESS=on` and a test password, so
-  it serves as staging does behind its password (#359), in its own run after the others.
+  it serves as staging does behind its password (#359). The suites run after the public specs,
+  and the staging-access one last, each in its own run.
 - Specs read and write a Worker's local D1 only through `localD1`, `runStatements` and
   `workerD1` (`e2e/admin-fixture.ts`), a suite Worker's or the main preview's (`executeLocalD1`
   in `e2e/submit-fixture.ts`, #389). They go through that Worker's own D1 (Wrangler's Local

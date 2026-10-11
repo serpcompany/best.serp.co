@@ -12,7 +12,7 @@ import { BILLING_PREVIEW_VARS } from './orders-worker'
 
 /**
  * The badge program suite (serpcompany/best.serp.co#66) runs on its own local Worker with its
- * own D1, which `playwright.config.ts` starts from the already-built Worker: the suite
+ * own D1, which `playwright.suites.config.ts` starts from the already-built Worker: the suite
  * unpublishes listings and removes owners, and its scheduled runs check every listing in the
  * program, so it shares a D1 with no other suite. The program runs because
  * `features.badgeProgram` is on (#130), with no local switch, and the Worker is started with
