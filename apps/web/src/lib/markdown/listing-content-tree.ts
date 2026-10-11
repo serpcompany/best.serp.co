@@ -43,18 +43,27 @@ function remarkGfmWithoutUrlLiterals(this: Processor) {
 }
 
 /**
- * Links a bare email in body text to `mailto:`, by GFM's email autolink literal rule
+ * Links a bare email in body text to `mailto:`. The pattern and the label check are remark-gfm's
  * (mdast-util-gfm-autolink-literal's `findEmail`). It runs after parsing, so an escape in the
  * address has resolved (`john\_doe@…` links `mailto:john_doe@…`). An email in code (which has no
- * text nodes) or in a link's text stays as it is.
+ * text nodes) or in a link's text stays as it is. Two guards remark-gfm did not need, because its
+ * URL literals took whole URLs first: an email inside a bare URL stays text with the URL, and a
+ * rejected address stays text whole (`/john.doe@…` does not link `doe@…`).
  */
 function linkBareEmails(tree: MarkdownRoot) {
   findAndReplace(
     tree,
     [
       /(?<=^|\s|\p{P}|\p{S})([-.\w+]+)@([-\w]+(?:\.[-\w]+)+)/gu,
-      (address: string, _local: string, domain: string, match: RegExpMatchObject) =>
-        match.input.charAt(match.index - 1) === '/' || /[-\d_]$/u.test(domain)
+      (address: string, _local: string, domain: string, match: RegExpMatchObject) => {
+        const before = match.input.slice(0, match.index)
+        const rejected =
+          // After a `/` (as remark-gfm), or the end of a longer address already rejected.
+          /[-+./\w]$/u.test(before) ||
+          // In a bare URL: the text since the last whitespace starts one.
+          /(?:https?:\/\/|www\.)\S*$/iu.test(before) ||
+          /[-\d_]$/u.test(domain)
+        return rejected
           ? false
           : {
               children: [{ type: 'text', value: address }],
@@ -62,6 +71,7 @@ function linkBareEmails(tree: MarkdownRoot) {
               type: 'link',
               url: `mailto:${address}`
             }
+      }
     ],
     { ignore: ['link', 'linkReference'] }
   )

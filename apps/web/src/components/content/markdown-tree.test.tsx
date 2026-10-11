@@ -113,6 +113,25 @@ describe('a cached listing content tree (#334)', () => {
     expect(markup).not.toContain('mailto:ops@')
   })
 
+  it('leaves an email in a bare URL, or in a rejected address, as text (#377)', () => {
+    for (const url of [
+      'https://api.example.test/verify?email=foo@bar.test',
+      'https://user:pass@host.example.test/',
+      'www.example.test/contact?to=sales@example.test',
+      'https://api.example.test/v1/users/john.doe@example.test',
+      'path/john.doe@example.test'
+    ]) {
+      const markup = renderToStaticMarkup(cached(`See ${url} for details.`, false))
+      expect(markup).toContain(`See ${url} for details.`)
+      expect(markup).not.toContain('<a ')
+    }
+    const markup = renderToStaticMarkup(
+      cached('Write to hello@example.test, or see https://example.test/ sales@example.test.', false)
+    )
+    expect(markup).toContain('href="mailto:hello@example.test">hello@example.test</a>')
+    expect(markup).toContain('href="mailto:sales@example.test">sales@example.test</a>')
+  })
+
   it('renders everything else as remark-gfm does (#377)', () => {
     const withoutBareUrls = KITCHEN_SINK_BODY.replace(/^<https:\/\/auto\.test.*\n.*\n/mu, '')
     expect(withoutBareUrls).not.toMatch(/bare\.test|john/u)
