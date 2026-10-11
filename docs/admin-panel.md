@@ -156,13 +156,14 @@ at review: set the listing's tags here. Hubs, tags, and best pages themselves ch
 
 Unpublishing keeps the row (`status = 'approved'`, `is_active = 0`); the public queries drop it
 from pages, search, the sitemap, RSS, and counts. Its URL answers **410 Gone** with screen 9's
-page (the listing is gone, a link to its category, "Relist it"). Next.js cannot answer 410, so
-the Worker entry does it (`lib/routing/gone-listing.ts`): when a `/products/<slug>/` render is a
-404, it asks D1 whether the slug is unpublished (`isUnpublishedListingSlug`, one index seek) and,
-if so, renders the page again with `x-best-serp-co-render-gone: 1`, which makes the page render
-the gone page, and answers it with 410. The edge cache stores the 410 under the epoch. The page
-looks up `listing_slug_redirects` first, so an unpublished duplicate that a manifest redirected to
-the listing it duplicated answers 308 there instead
+page: the listing is gone, a link to its hub (the directory while the hub's page doesn't render,
+`renderingCategory`), and "Relist it". Next.js cannot answer 410, so the Worker entry does it
+(`lib/routing/gone-listing.ts`): when a `/products/<slug>/` render is a 404, it asks D1 whether
+the slug is unpublished (`isUnpublishedListingSlug`, one index seek) and, if so, renders the page
+again with `x-best-serp-co-render-gone: 1`, which makes the page render the gone page, and
+answers it with 410. The edge cache stores the 410 under the epoch. The page looks up
+`listing_slug_redirects` first, so an unpublished duplicate that a manifest redirected to the
+listing it duplicated answers 308 there instead
 ([Slug redirects](./catalog-publication.md#slug-redirects)).
 
 An unpublished listing filed under a retired category (`categories.is_active = 0`, primary or
