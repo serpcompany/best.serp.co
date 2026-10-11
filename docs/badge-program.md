@@ -70,10 +70,12 @@ fixture sites on the site's flags.
   `0 * * * *` continues both. Each run sends again failed program emails that still apply, then
   rechecks due warnings, then checks listings due this cycle: at most 20 sites per run, 4 at a
   time, so a run stays far below the Workers subrequest (1,000) and CPU limits whatever the
-  catalog size, and about 3,000 listings fit in a week of hourly runs. A Queue was not needed: the
-  cursor is the data (a listing with a check since the cycle started is done), so batches need no
-  extra state, infrastructure, or ordering. Raise `BADGE_CHECK_LIMIT` or the hourly cadence
-  before the program outgrows that.
+  catalog size, and about 3,000 listings fit in a week of hourly runs. While sites are checked 4
+  at a time, a run records its rechecks one at a time, so its own unpublishes and revocations
+  never race each other for the catalog version (#389). A Queue was not needed: the cursor is
+  the data (a listing with a check since the cycle started is done), so batches need no extra
+  state, infrastructure, or ordering. Raise `BADGE_CHECK_LIMIT` or the hourly cadence before the
+  program outgrows that.
 - **State machine** (`badge_checks.kind` is `weekly` or `confirmation`; `refund` is below):
   1. *Due*: no check of any kind since the cycle started. The weekly check records `pass`,
      inconclusive `fail`, or conclusive `fail`.
@@ -88,8 +90,10 @@ fixture sites on the site's flags.
      `badge-program`, activity log, publication run, version bump; its URL answers 410) and the
      owner gets `listing-unlisted`; there is no automatic restore (paying, #68, is the way back).
      A badge-claimed listing **loses its owner** (`badge_removed`; the listing stays up as
-     curated) and the former owner gets `ownership-removed`. A lost publication race is retried
-     once; otherwise nothing is recorded and the next run rechecks.
+     curated) and the former owner gets `ownership-removed`. As a run records its rechecks one at
+     a time, only an outside writer (an admin decision or an overlapping run) can beat a recheck
+     to the catalog version. The recheck then retries once; otherwise nothing is recorded and the
+     next run rechecks.
 - **Idempotency.** Every write is a compare-and-swap on that state, and each email goes through
   the email ledger under `<template>:<check id>`, so a replayed or overlapping trigger never
   records a check, unpublishes, or emails twice. Writing a check never moves the catalog epoch;

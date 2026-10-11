@@ -37,20 +37,30 @@ const patterns: ReadonlyArray<readonly [string, RegExp]> = [
   ['color function', /(?<![\w-])(?:rgba?|hsla?|oklch|oklab)\(/gu]
 ]
 
-/** `source` with each range blanked, newlines kept, so line numbers still hold. */
+/**
+ * `source` with each range blanked, newlines kept, so line numbers still hold. Ranges come in
+ * order, so the result is built in one pass: rebuilding the file for each range made a file's
+ * scan quadratic in its tokens (#402).
+ */
 function blank(source: string, ranges: ReadonlyArray<{ end: number; pos: number }>): string {
-  let result = source
+  const parts: string[] = []
+  let at = 0
   for (const { end, pos } of ranges) {
-    result =
-      result.slice(0, pos) + result.slice(pos, end).replace(/[^\n]/gu, ' ') + result.slice(end)
+    if (end <= at) continue
+    const from = Math.max(pos, at)
+    parts.push(source.slice(at, from), source.slice(from, end).replace(/[^\n]/gu, ' '))
+    at = end
   }
-  return result
+  parts.push(source.slice(at))
+  return parts.join('')
 }
 
 /**
  * Comments name issues (`#155`) and colors in prose; only code counts. TypeScript's parser
  * splits the file into tokens, and the trivia before each token (whitespace and comments) is
- * blanked, so `'image/*'` in a string or `// …` in JSX text is never taken for a comment.
+ * blanked, so `'image/*'` in a string or `// …` in JSX text is never taken for a comment. JSDoc
+ * isn't parsed: a JSDoc block stays a comment in the trivia of the token after it, and parsing
+ * it would only cost time.
  */
 function withoutComments(source: string, fileName: string): string {
   if (fileName.endsWith('.css')) {
@@ -65,17 +75,19 @@ function withoutComments(source: string, fileName: string): string {
   const file = ts.createSourceFile(
     fileName,
     source,
-    ts.ScriptTarget.Latest,
-    true,
+    { jsDocParsingMode: ts.JSDocParsingMode.ParseNone, languageVersion: ts.ScriptTarget.Latest },
+    false,
     fileName.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
   )
   const trivia: Array<{ end: number; pos: number }> = []
   const visit = (node: ts.Node) => {
-    // JSX text is copy, whitespace included. A JSDoc block is already in a token's trivia (the
-    // end-of-file token's, at the end of a file), so a token is a node with no other children.
-    if (node.kind === ts.SyntaxKind.JsxText || ts.isJSDoc(node)) return
-    const children = node.getChildren(file).filter(child => !ts.isJSDoc(child))
-    if (children.length === 0) trivia.push({ end: node.getStart(file), pos: node.pos })
+    // JSX text is copy, whitespace included. A token is a node with no children.
+    if (node.kind === ts.SyntaxKind.JsxText) return
+    const children = node.getChildren(file)
+    if (children.length === 0) {
+      const start = node.getStart(file)
+      if (start > node.pos) trivia.push({ end: start, pos: node.pos })
+    }
     for (const child of children) visit(child)
   }
   visit(file)

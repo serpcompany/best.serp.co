@@ -1,6 +1,6 @@
 import { once } from 'node:events'
-import { Worker } from 'node:worker_threads'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { Worker, type WorkerOptions } from 'node:worker_threads'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { startSyncPoster } from '../apps/web/e2e/sync-post'
 
 /**
@@ -62,5 +62,38 @@ describe('the e2e fixtures’ synchronous POST (#389)', () => {
     )
     expect(() => poster.post(`${origin}/`, '{}')).toThrow(/the request thread stopped/u)
     expect(Date.now() - started).toBeLessThan(1_000)
+  })
+
+  it.each([
+    ['throws', "throw new Error('the request thread crashed')"],
+    ['calls process.exit', 'process.exit(3)']
+  ])('wakes a call already waiting when its thread %s (#402)', async (_, stop) => {
+    // The thread's source gets one more listener, which stops it 200 ms after a request arrives,
+    // while the call waits on a server that never answers (the thread's own timeout is 30 s).
+    vi.resetModules()
+    vi.doMock('node:worker_threads', async importOriginal => {
+      const actual = await importOriginal<typeof import('node:worker_threads')>()
+      class StoppingWorker extends actual.Worker {
+        constructor(source: string, options: WorkerOptions) {
+          super(`${source}\nport.on('message', () => setTimeout(() => { ${stop} }, 200))`, options)
+        }
+      }
+      return { ...actual, Worker: StoppingWorker }
+    })
+    try {
+      const { startSyncPoster: startStopping } = await import('../apps/web/e2e/sync-post')
+      const poster = startStopping()
+      const started = Date.now()
+      // `exiting`: the wake came from the thread's exit handler, as the caller's thread can't take
+      // the `exit` event while it waits.
+      expect(() => poster.post(`${origin}/hang`, '{}')).toThrow(
+        /\/hang failed: the request thread stopped \(exiting\)\.$/u
+      )
+      expect(Date.now() - started).toBeLessThan(5_000)
+      await new Promise(resolve => poster.thread.once('exit', resolve))
+    } finally {
+      vi.doUnmock('node:worker_threads')
+      vi.resetModules()
+    }
   })
 })
