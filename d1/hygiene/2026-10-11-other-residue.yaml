@@ -1,0 +1,3099 @@
+# serpcompany/best.serp.co#351 (step 10 of #341): where every approved listing still filed under Other goes, so
+# that Other retires with a permanent redirect to /products/. `pnpm catalog:other-retirement`
+# (scripts/other-retirement.ts) turns it into the row-level manifests d1/publications/2026-10-11-other-retirement-*.yaml.
+# The design is #341's "Design (1/3)" to "(3/3)", sections 1.5 and 6 step 10.
+#
+# Input: d1/hygiene/2026-10-11-other-residue-inventory.json, the 726 approved listings the committed manifests leave
+# filed under Other alone (141 live, 585 unpublished): the taxonomy generator's reviewed catalog, then #349's 25
+# taxonomy manifests and #376's downloader links, replayed. Staging D1 matched it read-only on 2026-10-11 (ids, live
+# states, names, websites, descriptions); production reaches it with its own publish of the same list.
+#
+# decidedAt: the owner's hands-off rule (#321: decide with defaults, record them, carry on). Every call below applies
+# an owner decision already made for the same kind of listing; the PR lists them for review.
+#
+# listings: each of the 141 live listings, with what its website showed on checkedAt (the inventory's `check`: the
+#   listing domain check's fetcher and classifier, read-only GETs, plus a browser-like curl of the pages it couldn't
+#   read or that changed) and its copy. Each either moves or retires:
+#   - Moves (hub, tags): filed under its hub alone; its tags are existing tags it squarely fits, else none. Hubs
+#     follow #349's: the hub a tag of its kind sits under, or the hub of its kind of product (dream, astrology, pet,
+#     plant, dating and game apps under lifestyle; name generators under business; website monitors, WordPress
+#     plugins and development firms under developer-tools, the firms tagged ai-development-services as #333's
+#     cluster tags revsys.com and osher.com.au). No new tag: the residue's clusters are 2 to 5 listings, which #333
+#     folded as too few for a category (its alignments), and a tag below 10 listings is noindex anyway (docs/urls.md).
+#   - retire: unpublished by -01-removals (410, Republish in /admin brings it back), then re-filed under its hub
+#     without tags, as #349 re-files retired listings, so its 410 stays a 410 when Other retires:
+#       dead, hijacked, not-a-product  #340's decision 1 (owner, 2026-10-10) for its retire-dead, retire-hijacked and
+#                                      retire-not-a-product verdicts: a hygiene removal, not `unowned`. Articles,
+#                                      press releases, research pages, demos, art projects, publications, a gone or
+#                                      parked site, a domain that serves something else.
+#       spam                           the owner's #333 decision of 2026-10-10 (2026-10-10-other-removals unpublished
+#                                      the traffic bots sparktraffic.com and trafficbotpro.com): the four CTR and
+#                                      traffic bots #333 left waiting. A hygiene removal, not `unowned`.
+#       wrong-copy                     #340's decision 2: a real, live product whose copy describes something else is
+#                                      retired instead of rewritten, `unowned` (a listing someone owns, claims or paid
+#                                      for refuses the batch). Includes #340's two held listings that came back.
+#       duplicate                      #332's rule: one listing per product stays; the other is unpublished `unowned`
+#                                      and its slug redirects to the kept one (-03-retire, #338). #333 held notion.com
+#                                      and plusdocs.com for the owner to pick; the default keeps the listing #333
+#                                      already categorized and #349 tagged (notion.ai, plusai.com), so nothing live
+#                                      moves.
+#   Kept although #333 or #349 flagged them, as the owner decided on 2026-10-12 (#404): hardware (eightsleep.com),
+#   academic-integrity flags (collegetools.io, gptinf.com, studycrumb.com), betting predictions (sportsprediction.ai),
+#   a collection of AI entertainment tools whose copy mentions virtual girlfriends (boredhumans.com, not built for adult
+#   content under the owner's 2026-10-09 #260 decision), and graydient.ai (Pirate Diffusion), which permits NSFW image
+#   generation once activated. The same decision keeps notion.ai and plusai.com over their duplicates. A listing is
+#   filed by what its link lands on when that is the product (studycrumb.com, flyingdog.de). Retirements never feature
+#   in a sample.
+# unpublished: each of the 585 unpublished listings filed under Other but one, re-filed under a hub with no tags
+#   (design 1.5: unpublished approved listings are re-filed, so their 410 doesn't become a 404 and Republish keeps
+#   working). basis is where the hub comes from: #340's audit category, then #333's cluster or held category, mapped
+#   to its tag's hub, else the listing's name and description (the inventory has both).
+# leftInOther: imgnai.com, the adult listing. It stays filed under Other and answers 404 once Other retires, as
+#   #260's adult listings filed under Adult do (docs/catalog-hygiene.md): adult search traffic isn't sent elsewhere,
+#   and nothing can relist it.
+# hubs, tags: live listings per hub once every phase is published, and per tag this mapping adds to. The generator
+#   refuses the mapping when its plan differs from them.
+issue: serpcompany/best.serp.co#351
+design: serpcompany/best.serp.co#341
+decidedAt: '2026-10-11'
+checkedAt: '2026-10-11'
+catchAll: other
+redirect:
+  kind: directory
+counts:
+  listings: 726
+  live: 141
+  moved: 93
+  movedWithTags: 13
+  retired: 48
+  retiredBy:
+    dead: 14
+    hijacked: 2
+    not-a-product: 21
+    spam: 4
+    wrong-copy: 5
+    duplicate: 2
+  unpublished: 585
+  unpublishedRefiled: 584
+  unpublishedHubBasis:
+    description: 482
+    audit: 86
+    held: 11
+    cluster: 5
+  leftInOther: 1
+  refiled: 725
+  liveListingsAfter: 2496
+hubs:
+  writing: 303
+  image-design: 281
+  developer-tools: 266
+  productivity: 262
+  chatbots-agents: 245
+  marketing: 189
+  business: 176
+  audio: 122
+  lifestyle: 127
+  education: 94
+  video: 94
+  data-analytics: 100
+  careers: 72
+  ecommerce: 60
+  video-downloaders: 55
+  cloud-hosting: 50
+tags:
+  ai-content-creator: 99
+  ai-paraphrasing-tool: 19
+  ai-image-generators: 84
+  ai-development-services: 8
+  ai-news: 5
+  ai-agents: 24
+  ai-financial-advisor: 23
+  ai-health: 19
+  ai-tutor: 25
+  cloud-gpu-providers: 31
+listings:
+- slug: babylontraffic.com
+  id: lst_68ae48f069b83b796f35752a
+  hub: marketing
+  retire: spam
+  evidence: Sells bot traffic from residential proxies ('#1 Traffic Bot - Website Traffic Generator'), the kind of traffic bot the owner unpublished as spam on 2026-10-10 (sparktraffic.com, trafficbotpro.com in 2026-10-10-other-removals)
+- slug: bemyeyes.com
+  id: lst_c6430265d320e6d755f3c35a
+  hub: lifestyle
+  evidence: Visual assistance app for blind and low-vision people ('Accessibility Technology for blind & low vision people')
+- slug: birdlabs.ai
+  id: lst_009aa28ee0d541103b4420ca
+  hub: developer-tools
+  tags:
+  - ai-development-services
+  evidence: 'Custom business software built for small companies (''Customised Business software''): a development service, which #333''s ai-development-services cluster takes (revsys.com, osher.com.au)'
+- slug: bjoernkarmann.dk
+  id: lst_928fb49dfea53856898eb299
+  hub: image-design
+  retire: not-a-product
+  evidence: Paragraphica is an art-project camera on its designer's portfolio (project page), not a product people can use (#333 flag)
+- slug: blog.google
+  id: lst_d2f7919049702dd2963b7fe1
+  hub: chatbots-agents
+  retire: not-a-product
+  evidence: LaMDA was a research model announced on Google's blog and superseded by Gemini; the link is blog.google's front page (#333 flag)
+- slug: blog.rossintelligence.com
+  id: lst_5e25a65c76cf4f72196baa81
+  hub: business
+  retire: dead
+  evidence: 'ROSS shut down: rossintelligence.com/features is a frozen marketing page (''© ROSS Intelligence, Inc. 2014–2020''), its Log in and Sign up go to app.rossintelligence.com, which doesn''t resolve, and the blog''s newest post (January 2021) is the shutdown note (#333 flag)'
+- slug: bogar.ai
+  id: lst_ab1d338c71a2bd62367cade2
+  hub: developer-tools
+  retire: wrong-copy
+  evidence: The copy describes Bogar's MVP development studio; the site now offers another product ('Bogar AI — Alchemy for the Mind', 'Bogar has changed')
+- slug: boredhumans.com
+  id: lst_79235d919fdb51b7df5cc60c
+  hub: lifestyle
+  evidence: 'Free AI entertainment tools: chat with celebrities, lyrics, stories (''BoredHumans - Free AI Tools''); not built for adult content (#260), and no tag fits'
+- slug: botto.com
+  id: lst_893f55d321289d392ca22727
+  hub: image-design
+  retire: not-a-product
+  evidence: 'A decentralized autonomous artist governed by a DAO (''Botto — Decentralized Autonomous Artist''): an art project, not a tool people run (#333 flag)'
+- slug: businessrocket.ai
+  id: lst_d39100a5c4a5d8951f732bd1
+  hub: marketing
+  evidence: 'Websites, client portals and dispatch for home-service trades (''Websites and Portals for NoVA Trades''): a digital agency'
+- slug: caktusgroup.com
+  id: lst_1fe8c04ece530c57dc815606
+  hub: developer-tools
+  tags:
+  - ai-development-services
+  evidence: Django development firm ('Your Partner for Ambitious Django Projects'), like revsys.com in ai-development-services
+- slug: ccleaner.com
+  id: lst_0a811c19542abd1bbb22b9f6
+  hub: productivity
+  evidence: PC cleanup and optimization utility; 403 to the check's bot, and a browser gets 'CCleaner Makes Your Computer Faster & More Secure'
+- slug: centerconstructionus.com
+  id: lst_199357ea1990cfb9ff604709
+  hub: business
+  retire: not-a-product
+  evidence: A roofing contractor in Albany, NY ('Roofing Contractor Albany NY'), not software (#333 flag)
+- slug: chaingpt.org
+  id: lst_73233e59b4e223ce71b09545
+  hub: business
+  tags:
+  - ai-financial-advisor
+  evidence: 'AI for crypto: blockchain analytics, AI trading, NFT and smart-contract tools (''Unleash The Power of Blockchain AI''); #333 files trading tools under ai-financial-advisor'
+- slug: chessgpt.ai
+  id: lst_e482e794fa418c5e3a71ee88
+  hub: lifestyle
+  evidence: Play chess against ChatGPT in the browser ('ChessGPT — Play Chess Against ChatGPT'); a game, which ai-game-generator doesn't take (#333 alignment)
+- slug: chirper.ai
+  id: lst_f58d30735d301c3cf1262e69
+  hub: chatbots-agents
+  tags:
+  - ai-agents
+  evidence: A social network where people create and interact with AI agents ('Chirper - AI-Powered Social Network')
+- slug: clickseo.io
+  id: lst_b36e1ec8bbf104f63cbe10b4
+  hub: marketing
+  retire: spam
+  evidence: Sells fake search clicks to move rankings ('CTR Bot · Boost SEO Rankings with Real Clicks'), the kind of traffic bot the owner unpublished as spam on 2026-10-10 (sparktraffic.com, trafficbotpro.com in 2026-10-10-other-removals)
+- slug: collegetools.io
+  id: lst_34a6254128744203a5387fca
+  hub: education
+  tags:
+  - ai-tutor
+  evidence: 'College Tools now answers as Mindko, the same LMS-integrated AI homework helper (mindko.com, ''AI Homework Helper''); #333''s academic-integrity flag is no owner rule'
+- slug: contabo.com
+  id: lst_99d9b10c6961f91549938283
+  hub: cloud-hosting
+  evidence: Cloud VPS and dedicated servers ('Cloud VPS & Dedicated Servers'); no tag fits
+- slug: cradle.bio
+  id: lst_75efd4d03fcfca82fb1b6fcc
+  hub: data-analytics
+  evidence: Generative AI for protein engineering ('Engineer better proteins, faster')
+- slug: ctrify.com
+  id: lst_a7da3750fe77057068557f2c
+  hub: marketing
+  retire: spam
+  evidence: Sells click-through-rate signals and auto-built ranking sites ('AutoSEO, AI Websites, Semantic Backlinks & UX Signals'), the kind of traffic bot the owner unpublished as spam on 2026-10-10 (sparktraffic.com, trafficbotpro.com in 2026-10-10-other-removals)
+- slug: ctrmaster.co
+  id: lst_0fb5d7882d85e0a13cb217d4
+  hub: marketing
+  retire: spam
+  evidence: Sells click-through-rate manipulation ('CTR Manipulation (SEO TRAFFIC) Service'), the kind of traffic bot the owner unpublished as spam on 2026-10-10 (sparktraffic.com, trafficbotpro.com in 2026-10-10-other-removals)
+- slug: cybertiks.com
+  id: lst_f0b6bd0d1647f02e690f43eb
+  hub: data-analytics
+  evidence: Remote sensing and Earth observation, such as sargassum monitoring ('Monitoreo de sargazo y observación de la Tierra')
+- slug: databasemart.com
+  id: lst_309158928b06f61850ba2410
+  hub: cloud-hosting
+  tags:
+  - cloud-gpu-providers
+  evidence: VPS, GPU and dedicated servers ('Affordable USA VPS, GPU Server & Dedicated Servers')
+- slug: domainotron.com
+  id: lst_fd39556d58a2b897ca6243b7
+  hub: business
+  evidence: AI domain-name brainstorming from a business description ('Domainotron - AI Domain Brainstorming')
+- slug: drawmeasheep.net
+  id: lst_1c89bfadb6c88a3392726eac
+  hub: image-design
+  retire: not-a-product
+  evidence: An artist's AI drawing project blog ('What is it?!'), not a tool (#333 flag)
+- slug: dreamdecoder.me
+  id: lst_11d69feb99f1c38017be1b4b
+  hub: lifestyle
+  evidence: AI dream interpreter and journal ('The Only AI Dream Interpreter That Remembers All Your Dreams')
+- slug: dreaminterpreter.ai
+  id: lst_63448a1a0037c4801f92dbb8
+  hub: lifestyle
+  evidence: AI dream interpretation; answers 429 (reachable, rate-limited)
+- slug: dreamstory.me
+  id: lst_b262c9bb9ec59cd655965ae7
+  hub: lifestyle
+  evidence: AI dream analysis and journaling; a bot check answers the check and curl (403), so nothing says it is down
+- slug: earkind.com
+  id: lst_3116fb5e4a066794366ae805
+  hub: audio
+  retire: not-a-product
+  evidence: 'An AI-generated podcast show (''AI generated podcasts ... Listen to our first show''): a publication, not a tool (#333 flag)'
+- slug: eightsleep.com
+  id: lst_ccde81cef2a1a7ec07a003d2
+  hub: lifestyle
+  tags:
+  - ai-health
+  evidence: 'The Pod smart bed with AI sleep optimization, its #333 cluster ai-health; the Pod AI page answers 404 but eightsleep.com sells the product, and no rule excludes hardware (#349 held it for that flag)'
+- slug: elfmessages.com
+  id: lst_9123d9bbd4e9e8f710f9b1a3
+  hub: lifestyle
+  evidence: Personalized Christmas elf audio messages ('Personalised Elf Messages')
+- slug: essentially.net
+  id: lst_4f8bcff6815c121a866455d7
+  hub: lifestyle
+  retire: dead
+  evidence: 'The game is gone: the link ends on ''This is a private network server run by Shawn Bayern'''
+- slug: fineshare.com
+  id: lst_0899cd0f7668406b327ad942
+  hub: video
+  evidence: FineCam AI virtual camera software ('Fineshare FineCam | AI Virtual Camera Software')
+- slug: floraincognita.com
+  id: lst_de2cc301db0941a25bd8c77e
+  hub: lifestyle
+  evidence: AI plant identification app ('The Flora Incognita app')
+- slug: flyingdog.de
+  id: lst_29bd944620150d7051b50564
+  hub: image-design
+  evidence: 'The link lands on flying dog''s AI Studio for Photoshop: Stable Diffusion and DALL-E 2 connectors sold as a plugin (''flying dog - AI for Photoshop'', ''BUY NOW''). Filed by what its link lands on, as studycrumb.com is; its copy describes the company, so no tag'
+- slug: fydeos.io
+  id: lst_6d6b1136eecc5dad75239ba7
+  hub: productivity
+  evidence: ChromeOS-alternative operating system with FydeOS AI ('FydeOS - Simple, Swift, and Secure for Everyone')
+- slug: galacticfed.com
+  id: lst_dfa06c8795f73f7b3ad0d336
+  hub: marketing
+  evidence: AI-powered digital marketing agency ('Top 1% Marketing Agency that Grows Your Digital ROI')
+- slug: getinspo.co
+  id: lst_6672728a53176a9df7746153
+  hub: lifestyle
+  retire: dead
+  evidence: The domain is for sale ('has been recently registered with namecheap.com ... Discover domains on auction'), and the copy is an unrelated essay
+- slug: getmagic.com
+  id: lst_d75b9c476e9fc601e4557a54
+  hub: business
+  evidence: Virtual assistant agency ('Magic | Trusted Virtual Assistant Agency')
+- slug: githubnext.com
+  id: lst_fb8cb45ea945475aa2623277
+  hub: developer-tools
+  retire: dead
+  evidence: The Hey, GitHub! research preview is gone (404 at githubnext.com/projects/hey-github)
+- slug: gitsulgroup.com
+  id: lst_8db6e455a41196937fe04c2c
+  hub: business
+  evidence: Startup consulting and web builds ('Beautiful builds that actually convert')
+- slug: gptinf.com
+  id: lst_531523d29ca24e1012c2d9ad
+  hub: writing
+  tags:
+  - ai-paraphrasing-tool
+  evidence: 'Rewrites AI text to read as human-written (''GPTinf: AI Writing Toolkit''); #333''s academic-integrity flag is no owner rule'
+- slug: graydient.ai
+  id: lst_e4cd27584045e22d95fbd69e
+  hub: image-design
+  tags:
+  - ai-image-generators
+  evidence: 'Pirate Diffusion, a Stable Diffusion image generator; the link ends on piratediffusion.com, the same product, which mentions lifting ''the NSFW restrictions'' once a bot is activated. #333 held it for that flag; the owner decided on 2026-10-12 (#404) to keep it under the no-adult rule (#260)'
+- slug: handyplugins.co
+  id: lst_c240fb9ef00b72f8100876c1
+  hub: developer-tools
+  evidence: WordPress plugin vendor; the link lands on its Handywriter AI writing plugin ('Handywriter — HandyPlugins')
+- slug: heardthat.ai
+  id: lst_abad473d84d98068b651a68f
+  hub: lifestyle
+  evidence: Smartphone app that removes background noise for listeners ('HeardThat | Best noise removal')
+- slug: hexagram.io
+  id: lst_aad4df28bf302f99530f2ba4
+  hub: audio
+  retire: dead
+  evidence: Only a placeholder page is left ('Hello Rob & Stan!')
+- slug: hexometer.com
+  id: lst_aac405c506091b0407f682e7
+  hub: developer-tools
+  evidence: AI website monitoring for uptime, errors and SEO ('24/7 AI Website Monitoring')
+- slug: hexowatch.com
+  id: lst_73286f11b2c5cea6afd91a3e
+  hub: developer-tools
+  evidence: Website change detection, monitoring and archiving ('Website Change Detection, Monitoring & Archiving')
+- slug: highcharts.com
+  id: lst_b97f6461e9b35a411060b25c
+  hub: developer-tools
+  evidence: JavaScript charting library; the link lands on Highcharts Assist, its AI chart builder
+- slug: idw-online.de
+  id: lst_dd08d9496d31db72c99ff8da
+  hub: chatbots-agents
+  retire: not-a-product
+  evidence: A press release about the OpenGPT-X research project (idw-online.de/en/news786967), not a tool (#333 flag)
+- slug: imaginaition.ai
+  id: lst_c04a8e0f49d92647ee5ba1e8
+  hub: developer-tools
+  retire: dead
+  evidence: 'Parked: ''This domain has been registered via IONOS and is not yet connected to a website'''
+- slug: imyfone.com
+  id: lst_efd2aac0bf3117663cc0a25e
+  hub: productivity
+  evidence: Phone repair and data recovery software; the link lands on its UltraRepair page
+- slug: instacart.com
+  id: lst_77502c1d83dad6f747f36dbc
+  hub: ecommerce
+  retire: dead
+  evidence: ChatGPT plugins were retired in 2024; the link is the plugin's launch post (company.instacart.com/updates/instacart-chatgpt) (#333 flag)
+- slug: jadbio.com
+  id: lst_ac59bf7aa3ebc34038e958a3
+  hub: data-analytics
+  evidence: AutoML for biomarker discovery ('JADBio Accelerate Biomarker Discovery - AutoML')
+- slug: jamesyu.org
+  id: lst_a91faccd5a59db32abf3a414
+  hub: writing
+  retire: not-a-product
+  evidence: Centaur Bard, a personal AI poetry art project page (jamesyu.org/centaur-bard), not a tool (#333 flag)
+- slug: jeffreycelavie.team
+  id: lst_5a26a25d66f6856358fc52cd
+  hub: lifestyle
+  evidence: AI astrologer ('Jeffrey Célavie — AI Astrologer & Kundli GPT')
+- slug: jetpack.com
+  id: lst_cdb71788a45b4323d79ed832
+  hub: developer-tools
+  evidence: WordPress security, performance and growth suite; the link lands on Jetpack AI
+- slug: joinrhubarb.com
+  id: lst_47f752f0373223f81dd5de9e
+  hub: lifestyle
+  evidence: 'Rhubarb, AI help for growing food (''Rhubarb :: Grow smarter, not harder''), renamed by #340'
+- slug: josh.ai
+  id: lst_b2c36ddfe1c378a928af849a
+  hub: lifestyle
+  evidence: AI control for the smart home ('Josh.ai | AI Control for the Smart Home')
+- slug: jua.ai
+  id: lst_cd9c58b65825ec40e6a95f6f
+  hub: data-analytics
+  evidence: AI weather forecasting ('The most accurate AI weather forecasting model')
+- slug: jungle.ai
+  id: lst_c068ad2d306a6949745b619f
+  hub: data-analytics
+  evidence: AI for industrial machine performance ('Jungle AI - The AI solutions taking machine performance to the next level')
+- slug: keeper.ai
+  id: lst_df7d336085d2ded16f38a7c4
+  hub: lifestyle
+  evidence: 'AI matchmaker (''Keeper: The AI Matchmaker'')'
+- slug: klarna.com
+  id: lst_a70d4d8fd9ecaeca027b271d
+  hub: ecommerce
+  retire: dead
+  evidence: ChatGPT plugins were retired in 2024; the link is Klarna's press release on its plugin (#333 flag)
+- slug: knowbuddy.ai
+  id: lst_9dc185da437179d0e0812db2
+  hub: chatbots-agents
+  retire: wrong-copy
+  evidence: '#340 held it as pre-registration only; it is live now (''AI without the faff. Message-based AI for everyone''), but its copy is a privacy summary (#340 keep-rewrite)'
+- slug: lifearchitect.ai
+  id: lst_a29e89f0ccaaa9f97eb51f88
+  hub: education
+  retire: not-a-product
+  evidence: A video series page about GPT-3 Leta (lifearchitect.ai/leta), not a tool (#333 flag)
+- slug: lincolnloop.com
+  id: lst_9e7a44b9cb067adb2a111851
+  hub: developer-tools
+  tags:
+  - ai-development-services
+  evidence: Python and Django software firm ('Perfect-fit software'), like revsys.com in ai-development-services
+- slug: lionbrowser.app
+  id: lst_3d9d4ff16ce2bca095e87339
+  hub: lifestyle
+  evidence: 'Lion Browser now answers as Lion Family: safer-screen apps and parental controls (lionfamily.org)'
+- slug: livekit.io
+  id: lst_fba8f8c4b45e258bb7536c19
+  hub: developer-tools
+  retire: not-a-product
+  evidence: 'Kitt is a LiveKit demo: the link is LiveKit''s blog post ''Meet Kitt'' (livekit.com/blog/meet-kitt), and the copy describes the demo, not LiveKit (#349 held it)'
+- slug: magicthumbnails.com
+  id: lst_87a3a7f579857d54d68e92b7
+  hub: image-design
+  retire: dead
+  evidence: Its front page still shows its own shutdown notice ('Magic Thumbnails will be shutting down on February 1st, 2024. Please download any thumbnails you want to keep before then.'), and nothing shows a generation still runs (#333 flag)
+- slug: makeavideo.studio
+  id: lst_a25957a959adf7a9727dff5f
+  hub: video
+  retire: not-a-product
+  evidence: Meta's Make-A-Video research page ('Read research paper'), not a public product (#333 flag)
+- slug: medarc.ai
+  id: lst_c0d68e67d274fa20ec667497
+  hub: data-analytics
+  retire: not-a-product
+  evidence: A public medical AI research community ('MedARC is a public research community'), not a tool (#333 flag)
+- slug: medium.engineering
+  id: lst_17013bab63a52960e2ed4a21
+  hub: writing
+  retire: dead
+  evidence: ChatGPT plugins were retired in 2024; the link is Medium's engineering post on building its plugin (#333 flag)
+- slug: meetfebin.com
+  id: lst_db72af4aecf4bd46034166d5
+  hub: productivity
+  retire: dead
+  evidence: Peace Messenger is gone (404 at meetfebin.com/apps/peac/)
+- slug: memprompt.com
+  id: lst_7f35edd387c30761a5c41d88
+  hub: developer-tools
+  retire: not-a-product
+  evidence: A research paper's project page ('Memory-assisted prompt editing to improve GPT-3'), not a tool (#333 flag)
+- slug: meowtalk.app
+  id: lst_33679199748e3840e626447d
+  hub: lifestyle
+  evidence: Translates cat meows ('Home | MeowTalk')
+- slug: metrotechs.io
+  id: lst_a194ab048ea02318b7590fa7
+  hub: marketing
+  retire: wrong-copy
+  evidence: The copy describes web development, analytics and AI content services; the site now sells supply-chain transformation for manufacturers ('Supply Chain Digital Transformation for Manufacturers')
+- slug: moises.ai
+  id: lst_3a0c67b2cbcf97d9e9c52aa6
+  hub: audio
+  evidence: 'AI stem separation and music practice (''Moises App: The Musician''s App | Vocal Remover'')'
+- slug: mostrecommendedbooks.com
+  id: lst_21d213dc3b84db63d54b2216
+  hub: lifestyle
+  retire: not-a-product
+  evidence: The copy is an article on GPT-3's book recommendations, and the link lands on a book-list publisher ('Best Book Recommendations & Lists')
+- slug: moveme.tv
+  id: lst_baf771e73c500da46694aecb
+  hub: lifestyle
+  evidence: Movie recommendations by mood ('Find a movie to move you to a mood')
+- slug: namesnack.com
+  id: lst_b7dc93ba48bc0333a224e796
+  hub: business
+  evidence: Business name generator ('NameSnack - Business Name Generator')
+- slug: namewizard.ai
+  id: lst_a700e49281b9a0e1262ad7d8
+  hub: business
+  evidence: AI domain and business name generator ('your AI-superpowered domain name generator')
+- slug: namingmagic.com
+  id: lst_806c9535f1a4b46375aa2fd2
+  hub: business
+  evidence: AI company naming with domain checks ('Use AI to name your company')
+- slug: naturallanguageplaylist.com
+  id: lst_948a499ceb41df26568b3e2a
+  hub: audio
+  evidence: Music playlists from natural-language mood descriptions ('Natural Language Playlist')
+- slug: nextthreebooks.com
+  id: lst_ed56cb11b0b5963e1a4b1087
+  hub: lifestyle
+  retire: hijacked
+  evidence: The domain now serves an Indonesian soccer-streaming site ('Jalalive - Streaming Bola Gratis Tanpa Ribet', curl); the check timed out
+- slug: notbyai.fyi
+  id: lst_1a1c694c103ec8fe38ea307e
+  hub: writing
+  evidence: Badges that mark content as human-made ('Not By AI — Add the Badge to Your Human-Created Content')
+- slug: notion.com
+  id: lst_07d139284ae444577f159706
+  hub: productivity
+  retire: duplicate
+  duplicateOf:
+    slug: notion.ai
+    id: lst_4b1393df1ad560e42c9b76e6
+  evidence: 'Notion''s own site (''The AI workspace that works for you''), the same product as notion.ai (Notion AI), which #333 categorized and keeps its hub and tags'
+- slug: nourished.news
+  id: lst_d922834dd1c634cbc9a764e6
+  hub: productivity
+  tags:
+  - ai-news
+  evidence: Nourish, a personalized news app ('Nourish - Better News')
+- slug: octoeverywhere.com
+  id: lst_e1ac0318fba39292840461a8
+  hub: productivity
+  evidence: 'Remote access and AI print-failure detection for 3D printers (''OctoEverywhere - The 3D Printer Cloud''; the link lands on its Gadget page): a device utility, filed with ccleaner.com and imyfone.com under productivity rather than with image and design tools'
+- slug: ohdear.app
+  id: lst_6351cf96cd2abbc7973af070
+  hub: developer-tools
+  evidence: 'Website uptime, SSL and cron monitoring (''Website Health Monitoring: Uptime, SSL & Cron'')'
+- slug: onepanel.app
+  id: lst_6586f7d3ba5026de637cc394
+  hub: lifestyle
+  evidence: Panel-by-panel manga reader ('OnePanel Reader')
+- slug: pagecanary.com
+  id: lst_e932bd5bac1e16b9949f5dd7
+  hub: developer-tools
+  evidence: Daily website QA monitoring ('Page Canary - Daily website monitoring')
+- slug: perxeive.com
+  id: lst_06fafc4b597cfd997189d43c
+  hub: education
+  retire: wrong-copy
+  evidence: '#340 held it as waitlist only; it is live now (''Generative AI applied to learning and studying''), but its copy explains the ReAct framework (#340 keep-rewrite)'
+- slug: pharmatrace.io
+  id: lst_4c82cbc70725139cd913e8b9
+  hub: business
+  evidence: Pharmaceutical serialization and track-and-trace ('PharmaTrace – Pharmaceutical Serialization & Track-and-Trace')
+- slug: photostockeditor.com
+  id: lst_5ca19135f8d9e4f050fef268
+  hub: image-design
+  evidence: Stock photo search across suppliers; the link lands on its AI crop and resize tool
+- slug: pioneer.app
+  id: lst_c3583ef0977cca5ec978ee75
+  hub: business
+  retire: dead
+  evidence: The GPT-3 Demo Day page is gone (404 at pioneer.app/gpt3), and it was an accelerator's event, not a product (#333 flag)
+- slug: pixify.io
+  id: lst_3b4e13f30494d0c3023209cf
+  hub: image-design
+  evidence: AI keywording for stock photos and videos ('Free AI Keywording Tool by Pixify')
+- slug: playlistable.io
+  id: lst_6f12a864ed913806b0c0bd8e
+  hub: audio
+  evidence: AI Spotify playlist maker ('Spotify Playlist Maker - AI Playlist Generator')
+- slug: playlistai.app
+  id: lst_b972734157443e970d051572
+  hub: audio
+  evidence: AI playlist generator ('AI Playlist Generator & Maker - PlaylistAI')
+- slug: playlistnameai.com
+  id: lst_f075d4c0efe20134cc52e108
+  hub: audio
+  evidence: AI playlist name generator ('A Playlist Name Generator Powered by AI')
+- slug: plusdocs.com
+  id: lst_d2b096011b7cf4a03641f07a
+  hub: productivity
+  retire: duplicate
+  duplicateOf:
+    slug: plusai.com
+    id: lst_9178db1976b647af0ee6a538
+  evidence: 'The link ends on plusai.com: the same product as plusai.com (Plus AI), which #333 categorized and keeps its hub and tags'
+- slug: polymathrobotics.com
+  id: lst_4db1023949b2cfdf23fea3e6
+  hub: developer-tools
+  evidence: Autonomy and safety systems for off-highway vehicles ('Autonomy & Safety Systems for Off-Highway')
+- slug: poppylist.com
+  id: lst_9a9ed13e1494eed92ab55095
+  hub: lifestyle
+  evidence: Poppylist baby registry ('The uncomplicated baby registry'); its Ask Poppy page answers 404, but the site serves the product
+- slug: protestgpt.com
+  id: lst_285317b9fb52da6be5d52764
+  hub: writing
+  evidence: ProtestGPT is now a mode of Outcry AI, an activist campaign strategy generator ('ProtestGPT — the raw mode of Outcry AI')
+- slug: pudding.cool
+  id: lst_53019b9e1a4b0749bed05a50
+  hub: writing
+  retire: not-a-product
+  evidence: An interactive essay on The Pudding (pudding.cool/2021/03/love-and-ai/), not a tool (#333 flag)
+- slug: pwi.co
+  id: lst_250023b5a383ae41cb226ed0
+  hub: business
+  retire: dead
+  evidence: The AI product-ideas page is gone (404 at pwi.co/ai-generated-new-product-ideas.html); PWI now runs supply chains ('Home | PWI')
+- slug: qwaiting.com
+  id: lst_90cfb0a309542af5d988e492
+  hub: business
+  evidence: Queue management system ('Queue Management System | Smart Queue Software')
+- slug: raizer.app
+  id: lst_67af857a54f94faac475c23d
+  hub: business
+  evidence: 'Find investors and pitch them (''Raizer: Find Investors, Pitch Them, Raise Money'')'
+- slug: replicate.com
+  id: lst_a8004ac9537c734125cfd07c
+  hub: video
+  retire: not-a-product
+  evidence: 'Google Research''s FILM frame-interpolation model page on Replicate, filed under the slug replicate.com: a research model, not Replicate (#333 flag)'
+- slug: rockpaperscissors-ai.vercel.app
+  id: lst_ee204807b48ed8d0ea097978
+  hub: lifestyle
+  evidence: Rock paper scissors against a pattern-learning AI ('Rock Paper Scissors with AI')
+- slug: safewaters.ai
+  id: lst_04567554e7371eed9e6f4b35
+  hub: lifestyle
+  evidence: Surf forecasts with shark activity ('Surfline with Shark Activity, Wave, and Visibility Forecasts')
+- slug: sillyrobotcards.com
+  id: lst_1500c5e53bd8dfd39a656582
+  hub: lifestyle
+  evidence: AI-personalized greeting cards ('Personalised Birthday Cards | Silly Robot Cards')
+- slug: siwalusoftware.com
+  id: lst_34dfc1281663421a766bcfab
+  hub: lifestyle
+  evidence: AI image recognition that identifies animals ('Siwalu - AI-based image recognition to identify animals')
+- slug: somniai.com
+  id: lst_4bde66e5b034586391b43af7
+  hub: lifestyle
+  evidence: AI dream interpretation ('SomniAI - Turn Your Dreams into a Wellness Routine')
+- slug: songmastr.com
+  id: lst_3f71927a5db1acb7038ba468
+  hub: audio
+  evidence: Automatic song mastering ('Songmastr | Automatic song mastering')
+- slug: source.ag
+  id: lst_8bbd8e05b63f59b7805018b7
+  hub: data-analytics
+  evidence: AI growing insights for greenhouse farming ('Home | Source')
+- slug: sportsprediction.ai
+  id: lst_e370d3a896d1ed8ac6f25258
+  hub: lifestyle
+  evidence: 'AI football predictions, renamed COPA (copascore.ai, ''COPA: Football Predictions & Betting Tips''); betting tips, not a gambling operator, and no owner rule removes them'
+- slug: starbyface.com
+  id: lst_2f6831ddfee131d99da30bc8
+  hub: lifestyle
+  evidence: Celebrity look-alike face recognition ('Celebrity look alike face-recognition app')
+- slug: starcycle.ai
+  id: lst_3869c94f82c5c2690804df2e
+  hub: business
+  evidence: Business dissolution service ('Starcycle | Business Dissolution Service for Founders')
+- slug: studycrumb.com
+  id: lst_cd6fbabc56e9de5a55863835
+  hub: writing
+  tags:
+  - ai-paraphrasing-tool
+  evidence: 'The link lands on StudyCrumb''s AI paraphrasing tool (''Paraphraser Tool for Students''); #349 held it as mainly a human writing service, but the listed tool is the paraphraser'
+- slug: swapp.ai
+  id: lst_0336f5fa96ed4fd22ec30111
+  hub: image-design
+  evidence: AI architectural documentation and BIM automation ('AI Architectural Documentation & BIM Automation')
+- slug: syntheticstandard.com
+  id: lst_d1d90900c2f4ca4fa3899c41
+  hub: writing
+  retire: not-a-product
+  evidence: 'An AI-written news site (''Artificially intelligent news and images''): a publication, not a tool (#333 flag)'
+- slug: tabirim.co
+  id: lst_54ef83b5d63b946ec90517ed
+  hub: lifestyle
+  retire: wrong-copy
+  evidence: A live Turkish AI dream interpreter ('akıllı rüya tabircisi'), but its copy is an essay on dream symbolism that never describes it (#340 keep-rewrite)
+- slug: textomap.com
+  id: lst_6c07f687d7070a9a30fdc7c1
+  hub: productivity
+  evidence: Interactive maps from text ('Generate Interactive Maps from Text')
+- slug: thankyounote.app
+  id: lst_be31e49b52438f2741f182bd
+  hub: lifestyle
+  evidence: AI thank-you note writer ('Write a Thank You Note')
+- slug: thisworddoesnotexist.com
+  id: lst_200ecaca53e20a4ecb2f2513
+  hub: lifestyle
+  evidence: Invented words with AI definitions ('This Word Does Not Exist')
+- slug: towardsdatascience.com
+  id: lst_949757868520edabed992c0b
+  hub: chatbots-agents
+  retire: not-a-product
+  evidence: A Towards Data Science article on Wu Dao 2.0, not a product (#333 flag)
+- slug: travelfeed.com
+  id: lst_b28dac22a9f6999f870c4c94
+  hub: writing
+  tags:
+  - ai-content-creator
+  evidence: AI travel blog writer for its bloggers ('AI Travel Blog Writer That Works From Your Own Photos')
+- slug: uniqode.com
+  id: lst_d19afffcf9b7c82472f13cec
+  hub: marketing
+  evidence: QR codes and digital business cards for businesses ('QR Code Generator for Businesses')
+- slug: unite.com
+  id: lst_1db5d53ad9bb9620f01c4b0e
+  hub: image-design
+  retire: hijacked
+  evidence: The domain now serves an unrelated AI romance site ('Love fantasies by AI'), not Mosaic's photo collages
+- slug: unpromptedgame.com
+  id: lst_11de59565c0a2c913873258e
+  hub: lifestyle
+  evidence: 'A game of guessing the prompts behind AI images (''Unprompted: an A.I. Image Guessing Game'')'
+- slug: uploadvr.com
+  id: lst_78e3ae75ecdaf00627dde6a8
+  hub: lifestyle
+  retire: not-a-product
+  evidence: An UploadVR news article on a GPT-3 NPC demo, not a product (#333 flag)
+- slug: useslingshot.com
+  id: lst_f5d6fe4089dddcc4ad5225f4
+  hub: marketing
+  evidence: Swag and branded merchandise platform; the link lands on SwagAI ('Use SwagAI to generate smarter swag ideas')
+- slug: vecteezy.com
+  id: lst_3ff077029e043d8bdb32791b
+  hub: image-design
+  evidence: Stock vectors, photos and video ('Download Free Vectors, Images, Photos & Videos')
+- slug: velo.ai
+  id: lst_4658391166f861d268e01222
+  hub: lifestyle
+  evidence: Copilot, a smart safety camera for bikes ('Meet Copilot, smart tech for your bike')
+- slug: vice.com
+  id: lst_e91939971d24849a53f9f1fa
+  hub: developer-tools
+  retire: not-a-product
+  evidence: A Vice article about CodeVox, filed under the slug vice.com, not a product (#333 flag)
+- slug: vocalremover.com
+  id: lst_e9eb1b7053f10c8393d4fb92
+  hub: audio
+  evidence: AI vocal removal ('Remove vocal from any music track')
+- slug: vocalremover.org
+  id: lst_f4e9b1916300eb61eadd1d2b
+  hub: audio
+  evidence: AI vocal remover and isolation ('Vocal Remover and Isolation [AI]')
+- slug: watercoolertrivia.com
+  id: lst_135b9cf2a6b439a08393dad4
+  hub: education
+  retire: not-a-product
+  evidence: A blog post pitting GPT-3 against trivia players, not a product (#333 flag)
+- slug: wewritecards.com
+  id: lst_77ae684cc2eadf6a913e6c0d
+  hub: lifestyle
+  retire: dead
+  evidence: '#340 held it for a recheck (a maintenance page); still no product (Cloudflare error 1027), and its copy describes Lazy Cards'
+- slug: wishesai.com
+  id: lst_95546321da94053fbcce0d64
+  hub: lifestyle
+  evidence: AI-generated birthday wishes ('Wishes AI | Send unique wishes generated by AI')
+unpublished:
+- slug: autoportrait.ai
+  id: lst_f00afae9bdf428c53af4fd05
+  hub: image-design
+  basis: its name and description
+- slug: autoreviews.ai
+  id: lst_9a0b151d58241705baa5f6c8
+  hub: marketing
+  basis: its name and description
+- slug: autoslide.ai
+  id: lst_7b1a45c0619fb97c7c304e7e
+  hub: productivity
+  basis: its name and description
+- slug: autotextgenie.com
+  id: lst_b713896c8f2e26729d336a28
+  hub: writing
+  basis: its name and description
+- slug: auxworld.app
+  id: lst_5f6f2cffeb3e720033b6293b
+  hub: lifestyle
+  basis: '#340 audit category ai-game-generator'
+- slug: avanz.ai
+  id: lst_acfb4bdefeb78908ee851cce
+  hub: business
+  basis: its name and description
+- slug: avatarize.club
+  id: lst_47f858aa9db42c693c80275d
+  hub: image-design
+  basis: its name and description
+- slug: aylien.com
+  id: lst_b2793b388b2e79618604847a
+  hub: data-analytics
+  basis: its name and description
+- slug: babbl.dev
+  id: lst_9acb5ffb4584099383f51123
+  hub: business
+  basis: its name and description
+- slug: babble-ai.com
+  id: lst_0583310ad20a39ca29071981
+  hub: chatbots-agents
+  basis: its name and description
+- slug: babylonhealth.com
+  id: lst_6429d2ac7680c27bbd76e732
+  hub: lifestyle
+  basis: its name and description
+- slug: banterai.business
+  id: lst_b37f8e7f660409b59c4cad74
+  hub: chatbots-agents
+  basis: its name and description
+- slug: baseplate.ai
+  id: lst_c55f2d9870d1d0ea046e1e05
+  hub: developer-tools
+  basis: its name and description
+- slug: bashsenpai.com
+  id: lst_093b390c4dfcdc5e3073342d
+  hub: developer-tools
+  basis: its name and description
+- slug: bbva.com
+  id: lst_1155e368a2b3ce2b9bc406d5
+  hub: business
+  basis: its name and description
+- slug: bec-ai.com
+  id: lst_f08f8b2a824c9e7d5d746ee8
+  hub: productivity
+  basis: its name and description
+- slug: beemerdocs.com
+  id: lst_9b54a5e9e2a0884f7117d021
+  hub: productivity
+  basis: '#340 audit category ai-presentation-maker'
+- slug: bettertravel.ai
+  id: lst_896f24b6e5753f1d006ba2f7
+  hub: lifestyle
+  basis: its name and description
+- slug: bgrem.ai
+  id: lst_88beb484a3ff756cce46b6e0
+  hub: image-design
+  basis: its name and description
+- slug: bigspeak.ai
+  id: lst_46959dbbf8193771fccb3277
+  hub: data-analytics
+  basis: its name and description
+- slug: bizway.io
+  id: lst_6a6146c4c5e60e26dc7a5d33
+  hub: chatbots-agents
+  basis: its name and description
+- slug: bladerunner.ai
+  id: lst_402b78b74295830d56113487
+  hub: writing
+  basis: its name and description
+- slug: blinkn.shop
+  id: lst_44c6bab698e83c48df3762ec
+  hub: lifestyle
+  basis: its name and description
+- slug: blobr.io
+  id: lst_4422b878e6cabe614c60f822
+  hub: marketing
+  basis: its name and description
+- slug: blockbot.ai
+  id: lst_afa491d51c544d35481eb291
+  hub: developer-tools
+  basis: its name and description
+- slug: blogassistant.co
+  id: lst_27ceaa3989fe1fc5b1cb3396
+  hub: writing
+  basis: its name and description
+- slug: bloop.ai
+  id: lst_4f8f6ba79ad5451a7a77bb98
+  hub: developer-tools
+  basis: its name and description
+- slug: bookhero.ai
+  id: lst_6bcc5fd4189ff3cea0108d0b
+  hub: writing
+  basis: '#340 audit category ai-book-writer'
+- slug: boolv.tech
+  id: lst_075635fbfe38949b40f9310d
+  hub: image-design
+  basis: its name and description
+- slug: brandfort.co
+  id: lst_089638c17961b929e6524223
+  hub: marketing
+  basis: its name and description
+- slug: brevity.sh
+  id: lst_5b9d0bd8b09ce53a24b488d5
+  hub: writing
+  basis: its name and description
+- slug: browsegpt.ai
+  id: lst_661111087adaeb437f24c109
+  hub: productivity
+  basis: '#340 audit category ai-automation-tools'
+- slug: builtin.com
+  id: lst_180026526d1b535cd7080e46
+  hub: video
+  basis: its name and description
+- slug: businessinsider.in
+  id: lst_2f5b449253e96531bd433a2c
+  hub: writing
+  basis: its name and description
+- slug: buzzfeed.com
+  id: lst_b917e08eb26f2af9ddeab347
+  hub: lifestyle
+  basis: its name and description
+- slug: byautomata.io
+  id: lst_c4379c44b78e925dd45d274b
+  hub: marketing
+  basis: its name and description
+- slug: bypeers.ai
+  id: lst_0cc022677b43293dee135c2c
+  hub: business
+  basis: its name and description
+- slug: campari.com
+  id: lst_25b448bfdf296ace3f929e62
+  hub: video
+  basis: its name and description
+- slug: candideai.com
+  id: lst_a4f3aa19e80c4761171cd51d
+  hub: education
+  basis: its name and description
+- slug: capeprivacy.com
+  id: lst_25c7b91c4016c39983c3a683
+  hub: developer-tools
+  basis: its name and description
+- slug: captionit.ai
+  id: lst_fe37a8a5cbddbbc1e2f1a64c
+  hub: image-design
+  basis: its name and description
+- slug: cardinalapp.io
+  id: lst_b2dfe48f7723467fb584e1a2
+  hub: productivity
+  basis: its name and description
+- slug: careerpen.org
+  id: lst_933e62a4b3d20c4f925a7eeb
+  hub: careers
+  basis: its name and description
+- slug: casehopper.com
+  id: lst_36bdf307aeed50e30dcbe22e
+  hub: lifestyle
+  basis: its name and description
+- slug: casper.so
+  id: lst_a44353f4e0ee7e21ca21950f
+  hub: productivity
+  basis: its name and description
+- slug: catverse.app
+  id: lst_44e52d7e604bee603f938c80
+  hub: lifestyle
+  basis: its name and description
+- slug: censius.ai
+  id: lst_4c3768427a691fe543bd911a
+  hub: developer-tools
+  basis: its name and description
+- slug: certainly.io
+  id: lst_4af8f2cf23b138fb3b804d3d
+  hub: chatbots-agents
+  basis: its name and description
+- slug: cfrexplorer.com
+  id: lst_e43313cc85b8834b970876bf
+  hub: business
+  basis: its name and description
+- slug: characterlingo.com
+  id: lst_dddd3f5c762101ec77ecb2e7
+  hub: writing
+  basis: its name and description
+- slug: chatable.cc
+  id: lst_0f568e9c69a528f6c714c271
+  hub: writing
+  basis: its name and description
+- slug: chatgod.ai
+  id: lst_b073a1377cedf8501ca82e16
+  hub: chatbots-agents
+  basis: its name and description
+- slug: chatgpt-phantom.com
+  id: lst_2302df1c3e9ca30165fedcb0
+  hub: chatbots-agents
+  basis: its name and description
+- slug: chatgptdemo.net
+  id: lst_14404f2d302aecdc516ceb6c
+  hub: chatbots-agents
+  basis: its name and description
+- slug: chatness.ai
+  id: lst_956c408ddce3d58a646633c8
+  hub: chatbots-agents
+  basis: its name and description
+- slug: chattysurvey.com
+  id: lst_4f261be6ec6df080a926f331
+  hub: productivity
+  basis: its name and description
+- slug: chatwithdocs.co
+  id: lst_64261277839deb0c5967e676
+  hub: productivity
+  basis: '#340 audit category ai-document-tools'
+- slug: chatworm.com
+  id: lst_f1aaec3b491292846c210ae6
+  hub: chatbots-agents
+  basis: '#340 audit category ai-chatbots'
+- slug: cheapnft.art
+  id: lst_f6aa21ced31302f1c43cd7ba
+  hub: image-design
+  basis: its name and description
+- slug: cheesecakewizard.ai
+  id: lst_6a89885724dd7c1395933035
+  hub: lifestyle
+  basis: its name and description
+- slug: chord.pub
+  id: lst_dac1c63c8178e3a25896bf61
+  hub: audio
+  basis: its name and description
+- slug: clarifyze.ai
+  id: lst_178a3c394c6236db94434258
+  hub: education
+  basis: its name and description
+- slug: clickable.so
+  id: lst_8be0318eeea23d21fd5f7f9a
+  hub: marketing
+  basis: its name and description
+- slug: clip.audio
+  id: lst_46e586b88ad547c2938271b5
+  hub: video-downloaders
+  basis: its name and description
+- slug: codableai.com
+  id: lst_6b8702bba7c88451de28cb19
+  hub: developer-tools
+  basis: its name and description
+- slug: code-genius.dev
+  id: lst_6dcb9c2a084a03e30f7e5e2a
+  hub: developer-tools
+  basis: its name and description
+- slug: codeassist.tech
+  id: lst_6b0a93989b18b0f184b17d0e
+  hub: developer-tools
+  basis: its name and description
+- slug: codedamn.com
+  id: lst_8df3a77bd639d01014b0b291
+  hub: developer-tools
+  basis: its name and description
+- slug: codefy.ai
+  id: lst_4ed41993764c6f86c247eff2
+  hub: developer-tools
+  basis: its name and description
+- slug: codementorgpt.com
+  id: lst_993bfdf2dbd4a86e1b4641a7
+  hub: developer-tools
+  basis: its name and description
+- slug: codesquire.ai
+  id: lst_af2c99a6351eff7b07920c4c
+  hub: developer-tools
+  basis: its name and description
+- slug: cognifystudio.com
+  id: lst_77c359ae60f8ad556d597774
+  hub: writing
+  basis: its name and description
+- slug: cognitivemill.com
+  id: lst_0e61e0fdbe71c1673d84878f
+  hub: video
+  basis: its name and description
+- slug: cognosys.ai
+  id: lst_006e7c97dc13ee5b03b30dad
+  hub: chatbots-agents
+  basis: its name and description
+- slug: comaker.ai
+  id: lst_43b6416d2757c4e8b4cb67c9
+  hub: writing
+  basis: its name and description
+- slug: commentsanalytics.com
+  id: lst_55d6d0fc3a5ea5493eb09360
+  hub: data-analytics
+  basis: its name and description
+- slug: communion.so
+  id: lst_5abe381d7f1a48f616ada6f9
+  hub: productivity
+  basis: its name and description
+- slug: connectyai.com
+  id: lst_b8438df285dbd5844f06ce0d
+  hub: data-analytics
+  basis: its name and description
+- slug: contenda.co
+  id: lst_e60ef7de89143fdf088f3850
+  hub: writing
+  basis: its name and description
+- slug: contentgeni.com
+  id: lst_c5eaee6105cea215f598ff99
+  hub: writing
+  basis: its name and description
+- slug: contlo.ai
+  id: lst_93044c21671c460d22248c33
+  hub: marketing
+  basis: its name and description
+- slug: contractreader.io
+  id: lst_ef3784c483e678e16633d42b
+  hub: developer-tools
+  basis: '#340 audit category ai-developer-tools'
+- slug: coolgiftideas.io
+  id: lst_8943cfd783321a23347689b9
+  hub: ecommerce
+  basis: '#340 audit category ai-shopping-assistants'
+- slug: copernicai.com
+  id: lst_2d31bf3f2631a4c8ce8b25ba
+  hub: image-design
+  basis: its name and description
+- slug: copycraftai.com
+  id: lst_dd4203f6a5928714bf1f8dc6
+  hub: writing
+  basis: its name and description
+- slug: copylime.com
+  id: lst_ad67c4d0410bc6e2340069c1
+  hub: writing
+  basis: '#340 audit category ai-writing-assistants'
+- slug: coqui.ai
+  id: lst_f121062e501253580ad061fb
+  hub: audio
+  basis: its name and description
+- slug: cosonify.com
+  id: lst_b21f84e0b5754fca097ac19a
+  hub: audio
+  basis: its name and description
+- slug: coverletterwrite.com
+  id: lst_ec6b6907a2bfe632f3256ae9
+  hub: careers
+  basis: '#340 audit category ai-cover-letter-generator'
+- slug: coverquick.co
+  id: lst_01f35ba4e215a1fc56430576
+  hub: careers
+  basis: its name and description
+- slug: cpumade.com
+  id: lst_092bc7e35869c6be8f9f327a
+  hub: writing
+  basis: its name and description
+- slug: crear.ai
+  id: lst_d2ca31e07c1b99a2e847388c
+  hub: writing
+  basis: its name and description
+- slug: creativai.io
+  id: lst_4b2cf1006605c53c95815a8f
+  hub: writing
+  basis: its name and description
+- slug: crito.design
+  id: lst_90084d48cc93b960683a0522
+  hub: image-design
+  basis: its name and description
+- slug: crowdprisma.com
+  id: lst_3fe2f42294fd7d08c00b73d4
+  hub: productivity
+  basis: its name and description
+- slug: csm.ai
+  id: lst_baa50fff382b770bf487fe95
+  hub: image-design
+  basis: its name and description
+- slug: curaihealth.com
+  id: lst_2990348d63566133229bac88
+  hub: lifestyle
+  basis: '#340 audit category ai-doctor'
+- slug: dashai.xyz
+  id: lst_0dac6d7a44f101a71e180c8c
+  hub: productivity
+  basis: its name and description
+- slug: databorg.ai
+  id: lst_931a3af89ec9d5fb91b64bef
+  hub: data-analytics
+  basis: its name and description
+- slug: datachat.ai
+  id: lst_e5f6fa43dcb206688e9ad933
+  hub: data-analytics
+  basis: its name and description
+- slug: datagpt.com
+  id: lst_74eb47c60441ad7038b18a4a
+  hub: data-analytics
+  basis: its name and description
+- slug: datalang.io
+  id: lst_edf22e5e809826b7aaa15254
+  hub: chatbots-agents
+  basis: its name and description
+- slug: dbsensei.com
+  id: lst_3c5798a201e7eca5fe67325d
+  hub: developer-tools
+  basis: its name and description
+- slug: dearflow.ai
+  id: lst_70cf4c6f0a9abde29505b38c
+  hub: productivity
+  basis: its name and description
+- slug: deepmind.google
+  id: lst_60cd25ea97f789bebeccbbeb
+  hub: video
+  basis: its name and description
+- slug: deflekt.ai
+  id: lst_65bf3a45aa8d73f4623a8b9c
+  hub: chatbots-agents
+  basis: its name and description
+- slug: delineate.co
+  id: lst_b06828d7f5df6b18a4141f51
+  hub: data-analytics
+  basis: its name and description
+- slug: designsparks.io
+  id: lst_cec8a8d863c8a886e789bc60
+  hub: image-design
+  basis: its name and description
+- slug: deskflow.ai
+  id: lst_cee32e6d888d9d00b58e84ad
+  hub: chatbots-agents
+  basis: its name and description
+- slug: desksense.com
+  id: lst_9d231c88ef2d39c873914cee
+  hub: writing
+  basis: its name and description
+- slug: detangle.ai
+  id: lst_100de91ad39ef1d481615e77
+  hub: business
+  basis: '#333 held category ai-lawyer'
+- slug: dev-radar.com
+  id: lst_d6e3af78fcf56ee30a8cd2f6
+  hub: productivity
+  basis: '#333 cluster ai-news'
+- slug: devassistant.ai
+  id: lst_168d3bb288518bd21d9a70f2
+  hub: developer-tools
+  basis: its name and description
+- slug: devoid.pics
+  id: lst_9c78edc9a1146f69544e8009
+  hub: image-design
+  basis: its name and description
+- slug: dialoqai.com
+  id: lst_df10908c6b83e11bd93f7668
+  hub: developer-tools
+  basis: its name and description
+- slug: dipsway.com
+  id: lst_4d446d21cff900b1433b4d6d
+  hub: business
+  basis: its name and description
+- slug: docsai.app
+  id: lst_38cdc15cde1ea0ef02f348c1
+  hub: chatbots-agents
+  basis: its name and description
+- slug: doctrina.ai
+  id: lst_1896b8cec3e5c64c4967949b
+  hub: education
+  basis: its name and description
+- slug: docudo.xyz
+  id: lst_87ea89956788621ff9d499c6
+  hub: developer-tools
+  basis: its name and description
+- slug: domainwoohoo.com
+  id: lst_53aac9c1a92ae2d405973aaf
+  hub: business
+  basis: its name and description
+- slug: doodletale.me
+  id: lst_06651add36f42280c7c27ce2
+  hub: education
+  basis: its name and description
+- slug: dora.run
+  id: lst_fc60f89139942e4c334f9ea3
+  hub: developer-tools
+  basis: its name and description
+- slug: drafthorseai.com
+  id: lst_f6104fe4186e8b7f81a55d08
+  hub: writing
+  basis: its name and description
+- slug: dreamcard.ai
+  id: lst_548ed1a5e46884de448cd05f
+  hub: image-design
+  basis: its name and description
+- slug: dreamtapp.uk
+  id: lst_4568942237f2141c9de32432
+  hub: lifestyle
+  basis: its name and description
+- slug: earningscall.ai
+  id: lst_e41fa6f53c3dbf173400bc25
+  hub: business
+  basis: '#340 audit category ai-financial-advisor'
+- slug: easymessage.ai
+  id: lst_8cecc6c21d87398db1bb68b0
+  hub: writing
+  basis: its name and description
+- slug: ecommerceprompts.com
+  id: lst_b7ef70fe32504c64bc6a273c
+  hub: ecommerce
+  basis: its name and description
+- slug: eddyai.com
+  id: lst_17bc0dd2e450be33cf9c2c94
+  hub: chatbots-agents
+  basis: its name and description
+- slug: edward.ai
+  id: lst_80970ad26957ab787d90fa53
+  hub: business
+  basis: its name and description
+- slug: elaborate.ai
+  id: lst_b30de71bdf407dee20295863
+  hub: writing
+  basis: its name and description
+- slug: eloise.ai
+  id: lst_9d1585fd9f3b7c988a2c494d
+  hub: writing
+  basis: its name and description
+- slug: elusidate.app
+  id: lst_45441cbd45221ad435eece82
+  hub: data-analytics
+  basis: its name and description
+- slug: emailcomposer.ai
+  id: lst_ad1c22670c856720f5f78838
+  hub: writing
+  basis: its name and description
+- slug: emailmagic.ai
+  id: lst_1a9a8ff7eb75a9e7f0160da7
+  hub: writing
+  basis: its name and description
+- slug: embra.ai
+  id: lst_22ee062cf2eb619218df1adc
+  hub: productivity
+  basis: its name and description
+- slug: emdash.ai
+  id: lst_5160dfb6ec27c2bd986c46d5
+  hub: education
+  basis: its name and description
+- slug: emogpt.com
+  id: lst_2ca99e4b6307ed552c4ceb0a
+  hub: writing
+  basis: its name and description
+- slug: enzyme.so
+  id: lst_6f2d81b9cc89c541205041d2
+  hub: developer-tools
+  basis: its name and description
+- slug: epicurusapp.com
+  id: lst_755d76504f504754bb4a5f1b
+  hub: lifestyle
+  basis: its name and description
+- slug: eplant.bio
+  id: lst_f6d1e4b00195fb8069ad07b2
+  hub: data-analytics
+  basis: its name and description
+- slug: essaywriters.ai
+  id: lst_200354ee6d99cc882cf96231
+  hub: writing
+  basis: '#340 audit category ai-writing-assistants'
+- slug: essense.io
+  id: lst_c3ce851285cb8b8ad8cdb870
+  hub: data-analytics
+  basis: its name and description
+- slug: evabot.com
+  id: lst_26e0e512951586ad40533352
+  hub: business
+  basis: its name and description
+- slug: evebyte.com
+  id: lst_0deb75f4d741fbe03ed6921e
+  hub: productivity
+  basis: its name and description
+- slug: everyprompt.com
+  id: lst_09dd5efa1cc3399980504be3
+  hub: developer-tools
+  basis: its name and description
+- slug: evintersection.com
+  id: lst_d5c89c7198f2d967643e7230
+  hub: lifestyle
+  basis: its name and description
+- slug: exactbuyer.com
+  id: lst_ae30026ca891ce121ba35f4f
+  hub: careers
+  basis: its name and description
+- slug: excelly-ai.io
+  id: lst_78a6e67fd446a834c9e690fc
+  hub: productivity
+  basis: its name and description
+- slug: extrapolate.app
+  id: lst_0151927a284dc3ec31aae926
+  hub: image-design
+  basis: '#340 audit category ai-photo-editors'
+- slug: eyen.fr
+  id: lst_32ccc0dc12737d78beedeb74
+  hub: productivity
+  basis: its name and description
+- slug: ezdubs.ai
+  id: lst_0ba6a13adca811dd78848807
+  hub: audio
+  basis: its name and description
+- slug: ezmail.ai
+  id: lst_05e87195e41d161404f69125
+  hub: writing
+  basis: its name and description
+- slug: fabfab.ai
+  id: lst_4cf552f372504d77969e3be7
+  hub: ecommerce
+  basis: its name and description
+- slug: fabric.so
+  id: lst_fb706ee091f854530c2c5c15
+  hub: productivity
+  basis: '#340 audit category ai-knowledge-management'
+- slug: faithforward.app
+  id: lst_58ce441870f3e6cee2e563d0
+  hub: lifestyle
+  basis: its name and description
+- slug: fama.one
+  id: lst_0238f70fd8ba0c3392b6d656
+  hub: business
+  basis: its name and description
+- slug: fathom.video
+  id: lst_f9d6c0ea1f127a79dbb09d50
+  hub: productivity
+  basis: its name and description
+- slug: ferret.ai
+  id: lst_9a23188064d3326269f37915
+  hub: business
+  basis: its name and description
+- slug: feyn.ai
+  id: lst_2d1867617fe0f43d79e68ce4
+  hub: education
+  basis: its name and description
+- slug: fgeneds.com
+  id: lst_c0aadeefa42334af82659911
+  hub: education
+  basis: '#340 audit category ai-education'
+- slug: fiction.com
+  id: lst_159a57154c70db211a3af18c
+  hub: writing
+  basis: its name and description
+- slug: fictiongpt.xyz
+  id: lst_13d8026a2f1eff20bcd224ef
+  hub: writing
+  basis: its name and description
+- slug: fig.io
+  id: lst_8e367a32497a19e742504912
+  hub: developer-tools
+  basis: its name and description
+- slug: figma.com
+  id: lst_eb2eb75ce38971b317bc4b46
+  hub: image-design
+  basis: '#340 audit category ai-design'
+- slug: financebrain.ai
+  id: lst_16fdff0edd214351897faf6c
+  hub: education
+  basis: '#340 audit category ai-tutor'
+- slug: findgiftsfor.com
+  id: lst_692155562a3ec71d881c94b9
+  hub: ecommerce
+  basis: '#340 audit category ai-shopping-assistants'
+- slug: finiite.com
+  id: lst_3499f325b71461901b35703d
+  hub: ecommerce
+  basis: its name and description
+- slug: flapper.ai
+  id: lst_1fccd923aceaa257bd36e072
+  hub: writing
+  basis: its name and description
+- slug: flexos.work
+  id: lst_d94d392151ee20f82b1e4eb4
+  hub: productivity
+  basis: '#340 audit category ai-productivity-tools'
+- slug: flipped.ai
+  id: lst_9e5b6ba1460b0c5a2b6918e7
+  hub: careers
+  basis: '#340 audit category ai-recruiting'
+- slug: flowrite.com
+  id: lst_abfe947189d1a2c36bfc30bd
+  hub: writing
+  basis: '#333 held category ai-email-writing-assistants'
+- slug: framedrop.ai
+  id: lst_d86e06fa8095493f899fd07a
+  hub: video
+  basis: its name and description
+- slug: freebeat.ai
+  id: lst_2488ec9a080057fc7a5815bb
+  hub: video
+  basis: '#340 audit category ai-video-generators'
+- slug: functime.ai
+  id: lst_96d1a2e8b7b2417ea6f98d03
+  hub: data-analytics
+  basis: its name and description
+- slug: furwee.ai
+  id: lst_f124b0c88fdc8c8733fd0806
+  hub: education
+  basis: its name and description
+- slug: futurism.com
+  id: lst_733ce9e7037e300d90670f6f
+  hub: marketing
+  basis: its name and description
+- slug: fuups.ai
+  id: lst_b83edbd83db9a52194c8d7f6
+  hub: image-design
+  basis: its name and description
+- slug: fyli.ai
+  id: lst_0787b4b71b08782803a0e28e
+  hub: marketing
+  basis: its name and description
+- slug: galactica.org
+  id: lst_b4aefee35c84fc247bc2be0a
+  hub: education
+  basis: its name and description
+- slug: garson.io
+  id: lst_6628b7980620dd2a587186f5
+  hub: writing
+  basis: its name and description
+- slug: gems.so
+  id: lst_ed623e45f614ed9cbc000eaf
+  hub: productivity
+  basis: '#340 audit category ai-knowledge-management'
+- slug: genly.ai
+  id: lst_7e131eb9c0cd98a3edf844ec
+  hub: image-design
+  basis: its name and description
+- slug: getchunky.io
+  id: lst_c88519c73bddb939411702d4
+  hub: chatbots-agents
+  basis: '#340 audit category ai-chatbots'
+- slug: getcovey.com
+  id: lst_76aaa6afd92a52806eadf5e3
+  hub: careers
+  basis: its name and description
+- slug: getessential.app
+  id: lst_67e6c3b47240c94b97c73e29
+  hub: developer-tools
+  basis: its name and description
+- slug: getflux.io
+  id: lst_e67371d8bd0bec2641634b9c
+  hub: productivity
+  basis: its name and description
+- slug: getliner.com
+  id: lst_e2753dcdd67e8205881f18b1
+  hub: productivity
+  basis: its name and description
+- slug: getmindguide.com
+  id: lst_cc0a13a08d17a3e60c2a6480
+  hub: lifestyle
+  basis: '#333 cluster ai-health'
+- slug: getmumu.com
+  id: lst_b2d55d519e35388ec5c2cdb5
+  hub: productivity
+  basis: its name and description
+- slug: getslate.ai
+  id: lst_e1f97383042d765ad2fad2a4
+  hub: writing
+  basis: '#340 audit category ai-writing-assistants'
+- slug: getzuro.com
+  id: lst_b50056d12a6793a753ae8cfb
+  hub: chatbots-agents
+  basis: '#340 audit category ai-agents'
+- slug: giftbox.co
+  id: lst_b0fd1a1cb800bcb33dff99e5
+  hub: ecommerce
+  basis: '#340 audit category ai-shopping-assistants'
+- slug: gistvid.com
+  id: lst_76ffd86ae42ae275bb20c2ad
+  hub: video
+  basis: its name and description
+- slug: glyf.in
+  id: lst_e6dd8701a58d74b3ccbc1960
+  hub: image-design
+  basis: its name and description
+- slug: gocharlie.ai
+  id: lst_9e643bd841e746886c644f24
+  hub: writing
+  basis: its name and description
+- slug: gomarketplan.io
+  id: lst_a3ef55d0c1e280c092be6697
+  hub: marketing
+  basis: its name and description
+- slug: google.com
+  id: lst_a24eed247152530e567d4b7c
+  hub: chatbots-agents
+  basis: its name and description
+- slug: gpdf.cloud
+  id: lst_8b3696d628bde41140e145c9
+  hub: productivity
+  basis: its name and description
+- slug: gpt6.ai
+  id: lst_bbd1f45bfd751ae712e0d851
+  hub: chatbots-agents
+  basis: its name and description
+- slug: gpthotline.com
+  id: lst_b24e6cb550aa3886bbf133cb
+  hub: chatbots-agents
+  basis: its name and description
+- slug: gptprompttuner.com
+  id: lst_cf00305198a37d130ac08871
+  hub: chatbots-agents
+  basis: its name and description
+- slug: gptservice.app
+  id: lst_25482329d627b97208e07c0e
+  hub: chatbots-agents
+  basis: its name and description
+- slug: greatheadlines.ai
+  id: lst_890b59b8cf69365204147f91
+  hub: writing
+  basis: its name and description
+- slug: growparabolic.com
+  id: lst_18a541a887f23a4a64e747ae
+  hub: chatbots-agents
+  basis: its name and description
+- slug: habitdriven.ai
+  id: lst_8f06365bb4d83ae20c9b3e71
+  hub: lifestyle
+  basis: its name and description
+- slug: halist.ai
+  id: lst_1bd27901ed18f411531a8c32
+  hub: productivity
+  basis: its name and description
+- slug: happyaccidents.ai
+  id: lst_279b3daf42dc43a4a4a0f585
+  hub: image-design
+  basis: its name and description
+- slug: headlime.com
+  id: lst_3181e3545f1555f3a2b97584
+  hub: writing
+  basis: '#340 audit category ai-copywriting'
+- slug: hearbitz.app
+  id: lst_3702cabfbcca8af5f2589f1c
+  hub: audio
+  basis: its name and description
+- slug: hello.podium.page
+  id: lst_8bec07a278ff084b0f64333f
+  hub: audio
+  basis: its name and description
+- slug: helper.email
+  id: lst_1a03eb839a8195714aa2170c
+  hub: writing
+  basis: its name and description
+- slug: henchman.io
+  id: lst_998248d9d2fd7d5c81f8ec73
+  hub: business
+  basis: its name and description
+- slug: henshu.ai
+  id: lst_46f3a93fab87e9991efe28c0
+  hub: writing
+  basis: its name and description
+- slug: hereafter.ai
+  id: lst_745c724331f5fb84115a10f7
+  hub: lifestyle
+  basis: its name and description
+- slug: heroguide.ai
+  id: lst_0fead6f869bf0b5685e44e3d
+  hub: marketing
+  basis: '#340 audit category ai-marketing-tools'
+- slug: heykona.com
+  id: lst_ab40cc57e762bc07f55c7058
+  hub: careers
+  basis: its name and description
+- slug: heythere.ai
+  id: lst_8381ad6056cb5f5f540b242a
+  hub: writing
+  basis: its name and description
+- slug: hirable.fyi
+  id: lst_e3e9c3b636cce031afdbe4f2
+  hub: careers
+  basis: its name and description
+- slug: hirematch.app
+  id: lst_5d817efe264f489481157c2c
+  hub: careers
+  basis: its name and description
+- slug: hotball.ai
+  id: lst_a78794cff206ef513559a7f8
+  hub: business
+  basis: its name and description
+- slug: hourone.ai
+  id: lst_c1ec0d557b71682742eb128e
+  hub: video
+  basis: its name and description
+- slug: how2terminal.com
+  id: lst_0f26e05aba0eac670c715936
+  hub: developer-tools
+  basis: its name and description
+- slug: hub.plexo.app
+  id: lst_a3310c30ac31a2739b605ecd
+  hub: productivity
+  basis: its name and description
+- slug: i18ncore.com
+  id: lst_9b6151659060212f04e6d3a2
+  hub: developer-tools
+  basis: its name and description
+- slug: iatextos.com
+  id: lst_02ac9f14834df7f7fd690c6a
+  hub: writing
+  basis: its name and description
+- slug: icon.me
+  id: lst_541b58169b6d9a4cab1523a7
+  hub: marketing
+  basis: its name and description
+- slug: il.ly
+  id: lst_59edce7642b39c54683ffbc4
+  hub: marketing
+  basis: '#333 held category ai-marketing-tools'
+- slug: imageai.app
+  id: lst_e928e30db511e3a3797a3828
+  hub: image-design
+  basis: its name and description
+- slug: imaginary.dev
+  id: lst_429d519616cbc28340ddd0ae
+  hub: developer-tools
+  basis: its name and description
+- slug: incribo.com
+  id: lst_6c85f63fee98f5de11b03e2d
+  hub: developer-tools
+  basis: its name and description
+- slug: infomail.ai
+  id: lst_9f4a8b061b65d3fdae0c2b90
+  hub: writing
+  basis: its name and description
+- slug: ingestai.io
+  id: lst_2b6e8391f24f8f569156bffc
+  hub: developer-tools
+  basis: its name and description
+- slug: inkdrop.ai
+  id: lst_779ffab4cb1cedf3a87f7fee
+  hub: developer-tools
+  basis: its name and description
+- slug: inkforall.com
+  id: lst_58759c538769da1b110511b6
+  hub: marketing
+  basis: its name and description
+- slug: insightbase.ai
+  id: lst_cc182d2e6c6b9b5f823a37be
+  hub: data-analytics
+  basis: its name and description
+- slug: insightful.page
+  id: lst_cf244bd28b39e1ca309d430e
+  hub: careers
+  basis: its name and description
+- slug: instant-portrait.com
+  id: lst_9dc79868e5357394ceeaf5e8
+  hub: image-design
+  basis: '#340 audit category ai-avatar'
+- slug: instantanswers.xyz
+  id: lst_a220842dfe0d2c474acab48d
+  hub: chatbots-agents
+  basis: its name and description
+- slug: institutionalinvestor.com
+  id: lst_3eca7e30ed63d6e1e7187d61
+  hub: chatbots-agents
+  basis: its name and description
+- slug: insyte.tech
+  id: lst_be15b445c59ccb7baada1e0b
+  hub: developer-tools
+  basis: its name and description
+- slug: intellecs.ai
+  id: lst_572895c0da43b89e7dedfc6b
+  hub: education
+  basis: its name and description
+- slug: interflexion.com
+  id: lst_26f1d1e47b825f8a0aee8c64
+  hub: careers
+  basis: '#340 audit category ai-career-coach'
+- slug: invictai.io
+  id: lst_544a1b144e3768f5418db7a5
+  hub: chatbots-agents
+  basis: its name and description
+- slug: ipso.ai
+  id: lst_7709eb6c5836f52d130c19ba
+  hub: data-analytics
+  basis: its name and description
+- slug: irmoai.com
+  id: lst_22c26314c034b0506b9e10d2
+  hub: image-design
+  basis: '#340 audit category ai-photo-editors'
+- slug: ironiq.app
+  id: lst_f7a176ab183e35c921768be3
+  hub: lifestyle
+  basis: its name and description
+- slug: itagpt.it
+  id: lst_4be133e3afd65933d651dea0
+  hub: chatbots-agents
+  basis: its name and description
+- slug: itraveledthere.io
+  id: lst_b40d1965a9afbd5b5a9b6644
+  hub: image-design
+  basis: its name and description
+- slug: ival-mbzuai.com
+  id: lst_fb14571415892d9252646bd2
+  hub: video
+  basis: its name and description
+- slug: ivy.ai
+  id: lst_6db5fa5f9739c00330650eae
+  hub: chatbots-agents
+  basis: '#340 audit category ai-chatbots'
+- slug: jaqnjil.ai
+  id: lst_f08aae1aa7b64bbced2df5ca
+  hub: marketing
+  basis: its name and description
+- slug: jarvis-lyrics.com
+  id: lst_a8e1e91be492de548786692f
+  hub: audio
+  basis: its name and description
+- slug: jarvis.tel
+  id: lst_77080cb7da380d1f98fe4d6e
+  hub: chatbots-agents
+  basis: its name and description
+- slug: jessezhang.org
+  id: lst_e8a8194c24cdf98a41854bac
+  hub: education
+  basis: its name and description
+- slug: jibewith.com
+  id: lst_416dd15af21618986adfda76
+  hub: writing
+  basis: its name and description
+- slug: jobtitlesai.com
+  id: lst_6fd27d15e7ab15d2f94db7c1
+  hub: careers
+  basis: its name and description
+- slug: joinmilo.com
+  id: lst_d01278b663069eb4dd118da8
+  hub: lifestyle
+  basis: its name and description
+- slug: joinsquad.co
+  id: lst_21c54d39c669ee0db1f92feb
+  hub: productivity
+  basis: '#340 audit category ai-productivity-tools'
+- slug: jokelub.com
+  id: lst_b529ba1aae074baac7b9e905
+  hub: writing
+  basis: its name and description
+- slug: jotgenius.com
+  id: lst_954a2f519ff402ecef657ab4
+  hub: writing
+  basis: its name and description
+- slug: juji.io
+  id: lst_fa3cdc3d3d74bba85e9a8f27
+  hub: chatbots-agents
+  basis: its name and description
+- slug: junilearning.com
+  id: lst_74c7a0c98676f6cfaa89d6fa
+  hub: education
+  basis: its name and description
+- slug: kaiber.ai
+  id: lst_ca8f70fd1b9778d1678449c1
+  hub: video
+  basis: '#340 audit category ai-video-generators'
+- slug: kalendar.ai
+  id: lst_f76673ea8c725e0eb4503a6c
+  hub: business
+  basis: its name and description
+- slug: kamaraapp.com
+  id: lst_e187bd1246ba1555202b9cd5
+  hub: productivity
+  basis: its name and description
+- slug: kleap.co
+  id: lst_43ecde23c619be17d8569b3e
+  hub: developer-tools
+  basis: '#340 audit category ai-website-builders'
+- slug: kleverkreatorai.com
+  id: lst_c2a068963d670410f03a5d07
+  hub: image-design
+  basis: its name and description
+- slug: klynk.ai
+  id: lst_c402e8563e7c2725905c9962
+  hub: business
+  basis: '#340 audit category ai-sales-tools'
+- slug: komandi.app
+  id: lst_2247bd0f206ec5d4d6e9785c
+  hub: developer-tools
+  basis: its name and description
+- slug: korewa.ai
+  id: lst_66fa7b65e6de3a5ea8131ff2
+  hub: chatbots-agents
+  basis: '#340 audit category ai-chatbots'
+- slug: kotaku.com
+  id: lst_e5c385731eea4cf758a44cea
+  hub: lifestyle
+  basis: its name and description
+- slug: kreateable.com
+  id: lst_399e2ceef4848a59f232241d
+  hub: image-design
+  basis: its name and description
+- slug: lamini.ai
+  id: lst_482e352ad4b23b4214fca020
+  hub: developer-tools
+  basis: its name and description
+- slug: lavo.ai
+  id: lst_3982f291783854f823ce7f0e
+  hub: data-analytics
+  basis: its name and description
+- slug: learnsmarter.ai
+  id: lst_d90d75142056f0882408cdb1
+  hub: education
+  basis: its name and description
+- slug: leaselens.ai
+  id: lst_0fbbbc99277b058084af7223
+  hub: business
+  basis: its name and description
+- slug: letsflyai.com
+  id: lst_c82143dd03a7d448667e1cb5
+  hub: chatbots-agents
+  basis: its name and description
+- slug: letsfoodie.com
+  id: lst_80f38e54e082d555c03e7016
+  hub: lifestyle
+  basis: '#340 audit category ai-recipe-generators'
+- slug: lettergram.net
+  id: lst_338c141ed6c9432a9f3db504
+  hub: writing
+  basis: its name and description
+- slug: lifecastvr.com
+  id: lst_bf14c5e714c577d4b48299bf
+  hub: video
+  basis: its name and description
+- slug: lifesight.io
+  id: lst_c3685bbd8f03a485050b86f8
+  hub: marketing
+  basis: '#333 held category ai-marketing-tools'
+- slug: linktr.ee
+  id: lst_3697ffd0390be1797de944d2
+  hub: business
+  basis: its name and description
+- slug: lintrule.com
+  id: lst_d43fa8b27a7e42275c51faa4
+  hub: developer-tools
+  basis: its name and description
+- slug: livehealthily.com
+  id: lst_2d5cc113fdd2a79b04dc0cb3
+  hub: lifestyle
+  basis: its name and description
+- slug: localio.io
+  id: lst_35a530e88738613e879e0f01
+  hub: marketing
+  basis: its name and description
+- slug: lodown.io
+  id: lst_3699f4ebc79c871760d96f94
+  hub: education
+  basis: its name and description
+- slug: logicloop.com
+  id: lst_127af197ad2f3d3a264ef70b
+  hub: productivity
+  basis: its name and description
+- slug: looti.io
+  id: lst_0bbd146004755f6edc358661
+  hub: business
+  basis: its name and description
+- slug: lovelacestudio.com
+  id: lst_49aeeb51a957c870506947e6
+  hub: image-design
+  basis: its name and description
+- slug: lovo.ai
+  id: lst_691d6cc2d8bd8b9313213334
+  hub: audio
+  basis: its name and description
+- slug: loyae.com
+  id: lst_ee77468d45e0a25afe9ea8e7
+  hub: marketing
+  basis: its name and description
+- slug: lunabrain.com
+  id: lst_7c5419a2cd06520d8931f1fa
+  hub: productivity
+  basis: its name and description
+- slug: maax.ai
+  id: lst_852c46c7f5100de388722ee2
+  hub: chatbots-agents
+  basis: its name and description
+- slug: madisonai.org
+  id: lst_41ea06e3925556dee0c4dbde
+  hub: business
+  basis: its name and description
+- slug: magical.so
+  id: lst_8250b7e98ab4961ec79ab00a
+  hub: productivity
+  basis: '#333 held category ai-meeting-assistant'
+- slug: magician.design
+  id: lst_9faae3d0534287c5798c508b
+  hub: image-design
+  basis: its name and description
+- slug: magicsalesbot.com
+  id: lst_409efac80cc8a38d4fb4e42e
+  hub: business
+  basis: its name and description
+- slug: maimovie.com
+  id: lst_2b0efadd844d1c6c5dae69a6
+  hub: lifestyle
+  basis: its name and description
+- slug: maker.ai
+  id: lst_74335d94c606bda7f2f8296b
+  hub: ecommerce
+  basis: its name and description
+- slug: maketafi.com
+  id: lst_455f49805c60ee0cc8bf35e7
+  hub: image-design
+  basis: its name and description
+- slug: makeyourwp.com
+  id: lst_b5273f3c9cb3a203b52450d0
+  hub: developer-tools
+  basis: its name and description
+- slug: mangatv.shop
+  id: lst_0667e9795987cbef0f0d6773
+  hub: image-design
+  basis: its name and description
+- slug: marcusaurelius.ai
+  id: lst_8a0c74d783730a931d20c13f
+  hub: chatbots-agents
+  basis: its name and description
+- slug: marketology.ai
+  id: lst_d5de8d01b0d7ee4347bcce14
+  hub: marketing
+  basis: its name and description
+- slug: masterpiecestudio.com
+  id: lst_9e59fd25a7911b88d115020c
+  hub: image-design
+  basis: its name and description
+- slug: mateai.io
+  id: lst_4c8f3d7c417b8f29c9c9d6cd
+  hub: marketing
+  basis: its name and description
+- slug: maths.ai
+  id: lst_077f15553b9a44aea7cd59f9
+  hub: education
+  basis: its name and description
+- slug: meddipop.com
+  id: lst_13fe96f6ea0474bab9548eed
+  hub: marketing
+  basis: its name and description
+- slug: medium.com
+  id: lst_1911071766bbc41a9e8e013f
+  hub: business
+  basis: its name and description
+- slug: medoo.life
+  id: lst_0f4e09a8bbca94f66fc3e136
+  hub: lifestyle
+  basis: its name and description
+- slug: meetz.ai
+  id: lst_a8fd0b466766f98445ad8131
+  hub: business
+  basis: its name and description
+- slug: meiro.cc
+  id: lst_0c970e9b0f6faca5ce1300c3
+  hub: marketing
+  basis: '#340 audit category ai-marketing-tools'
+- slug: mentum.ai
+  id: lst_d1914766ff040426ecdd2463
+  hub: ecommerce
+  basis: its name and description
+- slug: metagenieai.com
+  id: lst_b628163c8d271e11910eaf2f
+  hub: marketing
+  basis: its name and description
+- slug: mgrworkbench.ai
+  id: lst_e52bef682d1fe105b158f585
+  hub: careers
+  basis: its name and description
+- slug: mightygpt.com
+  id: lst_f74379e9d00329dbdb62d408
+  hub: chatbots-agents
+  basis: its name and description
+- slug: mikeai.co
+  id: lst_e9c853a2b4c577c4f52c6089
+  hub: lifestyle
+  basis: '#340 audit category ai-nutritionist'
+- slug: mindsum.org
+  id: lst_975c152109791249d78f5162
+  hub: lifestyle
+  basis: its name and description
+- slug: mirrorthink.ai
+  id: lst_d9b7038019521350945ec598
+  hub: education
+  basis: '#340 audit category ai-research-assistants'
+- slug: moly.ai
+  id: lst_2414db042fdc86610bd0d962
+  hub: business
+  basis: its name and description
+- slug: multilings.com
+  id: lst_304ab0565f4ce4ff8de4efad
+  hub: writing
+  basis: its name and description
+- slug: mutinyhq.com
+  id: lst_414adeabaecab8db594c8c29
+  hub: business
+  basis: '#340 audit category ai-sales-tools'
+- slug: muze.one
+  id: lst_8fb482da1a9ab293ca378183
+  hub: audio
+  basis: its name and description
+- slug: mynd.so
+  id: lst_5a79da39350f6b5cfb7c0242
+  hub: lifestyle
+  basis: '#340 audit category ai-health'
+- slug: nack.ai
+  id: lst_82ab9300bd4c1e2323a8a374
+  hub: developer-tools
+  basis: its name and description
+- slug: namelyai.com
+  id: lst_f4eebe99eb569a99e17a804b
+  hub: chatbots-agents
+  basis: '#340 audit category ai-voice-bots'
+- slug: nameverse.org
+  id: lst_ac34a2f708ed9695bad3990f
+  hub: developer-tools
+  basis: its name and description
+- slug: narrative.bi
+  id: lst_10a7e90670ed2036134fd7ec
+  hub: data-analytics
+  basis: its name and description
+- slug: nat.dev
+  id: lst_b1633a2d3f4c546d83981b5e
+  hub: developer-tools
+  basis: its name and description
+- slug: nautilushomeschool.com
+  id: lst_5dcb90595dbd5cd6f3aa781b
+  hub: education
+  basis: '#333 cluster ai-education'
+- slug: neuralblender.com
+  id: lst_8533141d6b146dc62d1f557f
+  hub: image-design
+  basis: its name and description
+- slug: neuronmake.com
+  id: lst_3b448f479539b802d266f08f
+  hub: writing
+  basis: its name and description
+- slug: neus.ai
+  id: lst_6b377f5ca088805efb90e58c
+  hub: chatbots-agents
+  basis: its name and description
+- slug: noowai.com
+  id: lst_07f1a0db8ea301ede42dd26b
+  hub: education
+  basis: its name and description
+- slug: nostalgia.photo
+  id: lst_78b34d822937934ae1ea2de1
+  hub: image-design
+  basis: its name and description
+- slug: notably.ai
+  id: lst_538b79eeed1c2679d92d7509
+  hub: data-analytics
+  basis: its name and description
+- slug: notepd.com
+  id: lst_a8b275a1d9b4092d4474f6e3
+  hub: writing
+  basis: '#340 audit category ai-writing-assistants'
+- slug: notey.ai
+  id: lst_bee06a20ea5369cc0053b9f1
+  hub: writing
+  basis: its name and description
+- slug: nourishingsoftware.com
+  id: lst_a3a7b0ac3de6e92997424afa
+  hub: productivity
+  basis: '#333 held category ai-productivity-tools'
+- slug: nutshellapp.com
+  id: lst_7bf94eaad07e1d335820c592
+  hub: productivity
+  basis: its name and description
+- slug: obfuscat.com
+  id: lst_945cfc5069e6e23d44f086ce
+  hub: developer-tools
+  basis: its name and description
+- slug: octavia.one
+  id: lst_dfe24122b77fa797428f55b8
+  hub: chatbots-agents
+  basis: its name and description
+- slug: onetask.me
+  id: lst_be0db4b7d9c5ff6589f93827
+  hub: productivity
+  basis: '#340 audit category ai-productivity-tools'
+- slug: onetone.ai
+  id: lst_ffc2af48ba616ebf0ba6eed3
+  hub: chatbots-agents
+  basis: its name and description
+- slug: opax.ai
+  id: lst_6b5a29630a2d13068e9d92fe
+  hub: marketing
+  basis: its name and description
+- slug: opinio.ai
+  id: lst_274a11fa0b9355614da0ca3c
+  hub: data-analytics
+  basis: its name and description
+- slug: opinionate.io
+  id: lst_78198934430b9fb1eac7b110
+  hub: education
+  basis: its name and description
+- slug: opnbx.ai
+  id: lst_df80ae7b17ba9316e346f388
+  hub: business
+  basis: its name and description
+- slug: ora.ai
+  id: lst_05cb99f9e2832e8d9a46dc86
+  hub: marketing
+  basis: '#340 audit category ai-seo'
+- slug: outboundly.app
+  id: lst_e3d0d89cb7a9fef11e63eaee
+  hub: business
+  basis: its name and description
+- slug: outline.ai
+  id: lst_02b79ff220cf93f08f7af028
+  hub: productivity
+  basis: its name and description
+- slug: paintbytext.chat
+  id: lst_fbfd68be2c1aa97141fb6ba9
+  hub: image-design
+  basis: its name and description
+- slug: pandarocket.ai
+  id: lst_f9b04093641d4291b911e6ae
+  hub: ecommerce
+  basis: its name and description
+- slug: parallelgpt.ai
+  id: lst_1d58a516ef8e041cee3860e5
+  hub: productivity
+  basis: its name and description
+- slug: parrot.ai
+  id: lst_abcb2561bdd315d6cbb379cf
+  hub: productivity
+  basis: its name and description
+- slug: patience.ai
+  id: lst_12372c25aad05a4063218a26
+  hub: chatbots-agents
+  basis: its name and description
+- slug: pawmenow.com
+  id: lst_a645e25da37f96825b96fef2
+  hub: lifestyle
+  basis: its name and description
+- slug: paxo.ai
+  id: lst_af0304a8344dc594b86cecc5
+  hub: productivity
+  basis: its name and description
+- slug: pdfai.io
+  id: lst_03cc850191fa10e41363bd3c
+  hub: productivity
+  basis: its name and description
+- slug: peech-ai.com
+  id: lst_3f8cb71465044b0d86902e42
+  hub: video
+  basis: its name and description
+- slug: penparrot.com
+  id: lst_f9aaa7c2210f6a2abed7fffe
+  hub: chatbots-agents
+  basis: its name and description
+- slug: permar.ai
+  id: lst_2e6e104c59354330cb61ad1c
+  hub: marketing
+  basis: its name and description
+- slug: pezzo.ai
+  id: lst_b1d4a1ee80fda782ef0e3781
+  hub: developer-tools
+  basis: its name and description
+- slug: phenaki.video
+  id: lst_14ffff39dcd2c38369ed6ca9
+  hub: video
+  basis: its name and description
+- slug: philosophy.fyi
+  id: lst_d1c47389617fd3b00190a007
+  hub: chatbots-agents
+  basis: '#340 audit category ai-chatbots'
+- slug: phind.com
+  id: lst_f85fb1cfc33e09bc79317046
+  hub: developer-tools
+  basis: its name and description
+- slug: phosus.com
+  id: lst_ec93fef07beac7f3af4941a4
+  hub: image-design
+  basis: its name and description
+- slug: photoleaf.ai
+  id: lst_0e912d86b2bc89ff1bbdebee
+  hub: image-design
+  basis: its name and description
+- slug: phrasee.co
+  id: lst_520c843ef16b99939a10de32
+  hub: writing
+  basis: '#333 held category ai-copywriting'
+- slug: picaii.com
+  id: lst_e4ab51b7971d4853fdcd9c81
+  hub: image-design
+  basis: its name and description
+- slug: picsenhancer.com
+  id: lst_7569ec4d1abd3bec7a0cacb5
+  hub: image-design
+  basis: its name and description
+- slug: pictodream.com
+  id: lst_53177942e4a0fe40432862c5
+  hub: writing
+  basis: its name and description
+- slug: pictureperfect.ai
+  id: lst_2879e1c5650baf29d0900086
+  hub: image-design
+  basis: its name and description
+- slug: pixelpet.io
+  id: lst_7a18def41fb4c64840652dc7
+  hub: image-design
+  basis: its name and description
+- slug: plantrips.net
+  id: lst_7c07fff1ceb3fff1a0ab5a70
+  hub: lifestyle
+  basis: '#333 held category ai-travel-agent'
+- slug: play.ht
+  id: lst_0453d1e00c6b00c9d562ff18
+  hub: audio
+  basis: its name and description
+- slug: plumy.app
+  id: lst_a90c59c8f06369ed4a61cb92
+  hub: ecommerce
+  basis: its name and description
+- slug: pluto.fi
+  id: lst_26ce79d3d706ef45daf273f2
+  hub: business
+  basis: its name and description
+- slug: podcast.ai
+  id: lst_c92adb8aea803052609ddf3f
+  hub: audio
+  basis: its name and description
+- slug: podcastworld.io
+  id: lst_49b36ab05426dce4b3af20df
+  hub: audio
+  basis: its name and description
+- slug: pollwatcher.ai
+  id: lst_40d6d831ea85ad2235fdb28c
+  hub: data-analytics
+  basis: its name and description
+- slug: postaga.com
+  id: lst_efa8281a586b66e06d2e569c
+  hub: marketing
+  basis: its name and description
+- slug: posterstudio.ai
+  id: lst_013d6d610d70fa50ea8c2ac9
+  hub: image-design
+  basis: its name and description
+- slug: pragma.ai
+  id: lst_c34236f407c5b2f8b6a61aa4
+  hub: productivity
+  basis: its name and description
+- slug: predibase.com
+  id: lst_0bc5ef415475fa89251810ad
+  hub: developer-tools
+  basis: its name and description
+- slug: prettysmart.co
+  id: lst_b40ce12bf42930afad296c1e
+  hub: marketing
+  basis: its name and description
+- slug: printnanny.ai
+  id: lst_0b96948a4efc1d9ecf2b9eef
+  hub: image-design
+  basis: its name and description
+- slug: profilepro.ai
+  id: lst_dc9c30f5f546f6c5592ede8c
+  hub: image-design
+  basis: its name and description
+- slug: profitwell.com
+  id: lst_6fe81a5e8814178ec7e1e174
+  hub: data-analytics
+  basis: its name and description
+- slug: projectelectricsheep.com
+  id: lst_0014567943df417a5def4e5d
+  hub: image-design
+  basis: its name and description
+- slug: prompthero.com
+  id: lst_7b9eb63603e37a100a34740c
+  hub: chatbots-agents
+  basis: '#340 audit category ai-prompt-generator'
+- slug: prompts.ai
+  id: lst_aa994ab82b20f971f6cde6a7
+  hub: productivity
+  basis: '#340 audit category ai-automation-tools'
+- slug: promptvibes.com
+  id: lst_803b1a0f1bae12d07b616288
+  hub: chatbots-agents
+  basis: its name and description
+- slug: pyqai.com
+  id: lst_a23a74b78fe32c6b36e69c0b
+  hub: productivity
+  basis: its name and description
+- slug: qatalog.com
+  id: lst_8e5d9a68164b67fc48cae1b0
+  hub: productivity
+  basis: its name and description
+- slug: quench.ai
+  id: lst_30b69c0e88f6c71716a8ae6d
+  hub: education
+  basis: its name and description
+- slug: quest.ai
+  id: lst_4364ab47cee1f1c570a02617
+  hub: developer-tools
+  basis: its name and description
+- slug: question-aid.com
+  id: lst_71d2760fca9652cf7a87bf0b
+  hub: education
+  basis: '#340 audit category ai-education'
+- slug: quillnow.ai
+  id: lst_c15f89f39c1ec790a80cf38e
+  hub: writing
+  basis: its name and description
+- slug: quino.ai
+  id: lst_6c7b0c7299222e8d2453cd14
+  hub: education
+  basis: '#340 audit category ai-education'
+- slug: quinv.io
+  id: lst_32e4e05fb000fad62e01233a
+  hub: productivity
+  basis: its name and description
+- slug: rapideditor.org
+  id: lst_4275884092ff11a244ddc555
+  hub: developer-tools
+  basis: its name and description
+- slug: raplyrics.eu
+  id: lst_048fc38286c84531cfc79405
+  hub: audio
+  basis: '#340 audit category ai-rap-generator'
+- slug: raregenie.com
+  id: lst_8f351e59c98a57031b74a475
+  hub: writing
+  basis: its name and description
+- slug: rawshorts.com
+  id: lst_44dc543fc2d0b39cfa54d651
+  hub: video
+  basis: its name and description
+- slug: react.dev
+  id: lst_9c69952e69ab3057da6774ab
+  hub: developer-tools
+  basis: '#333 cluster ai-developer-tools'
+- slug: readtrellis.com
+  id: lst_99b9e8c6dd111324c0a1df79
+  hub: education
+  basis: its name and description
+- slug: readyplayer.me
+  id: lst_3c87e0fc81e8d20b6c0da417
+  hub: image-design
+  basis: its name and description
+- slug: rebuff.ai
+  id: lst_c45d7f1024a317219b4eaf0d
+  hub: developer-tools
+  basis: its name and description
+- slug: recolorai.com
+  id: lst_0cd46714784eb4ee0cc3bb88
+  hub: image-design
+  basis: its name and description
+- slug: reinforz.ai
+  id: lst_b0745c0d33c16107fac6085d
+  hub: education
+  basis: its name and description
+- slug: releasesnotes.dev
+  id: lst_b549da02c7d11cd2675903cd
+  hub: developer-tools
+  basis: its name and description
+- slug: replicastudios.com
+  id: lst_3a91b52697350d7e952e7c0a
+  hub: audio
+  basis: its name and description
+- slug: replix.ai
+  id: lst_410f1938a0804e4dc106715c
+  hub: writing
+  basis: its name and description
+- slug: reprompt.dev
+  id: lst_1724c43ac224ca7eaf788ee5
+  hub: developer-tools
+  basis: its name and description
+- slug: repromptify.com
+  id: lst_562f516cfb5bd9eb9ce2449d
+  hub: chatbots-agents
+  basis: its name and description
+- slug: reroom.ai
+  id: lst_2a2a252bb0118ce7668b1dd4
+  hub: image-design
+  basis: '#340 audit category ai-interior-design'
+- slug: resume-ai.me
+  id: lst_2eb53f3ae9f07260c9449eaa
+  hub: careers
+  basis: its name and description
+- slug: reviewwriter.ai
+  id: lst_74814c8aad067133a02e6668
+  hub: marketing
+  basis: its name and description
+- slug: reword.com
+  id: lst_88c90daa1b46864c885d5ae3
+  hub: writing
+  basis: its name and description
+- slug: rewritewise.com
+  id: lst_c3c7d5bf1019553574b4fa8a
+  hub: marketing
+  basis: its name and description
+- slug: riffusion.com
+  id: lst_d18bb5bd94d45912b957eef4
+  hub: audio
+  basis: '#340 audit category ai-music-generators'
+- slug: riogpt.com
+  id: lst_d63eeb22dc5a32c96514ef87
+  hub: writing
+  basis: '#340 audit category ai-email-writing-assistants'
+- slug: roblox.com
+  id: lst_0225b131dfae5a0f7ec1353d
+  hub: lifestyle
+  basis: '#340 audit category ai-game-generator'
+- slug: roboweb.app
+  id: lst_cb9c8ab457bcdc525b179d7b
+  hub: developer-tools
+  basis: its name and description
+- slug: salespitch.pro
+  id: lst_ef54578f215d3ffc8d8f8351
+  hub: business
+  basis: its name and description
+- slug: salley.co
+  id: lst_ac7d8b7bc8ff1d40e833a485
+  hub: business
+  basis: '#340 audit category ai-risk-management'
+- slug: save.day
+  id: lst_758ad5b10cbef4b022de956e
+  hub: productivity
+  basis: its name and description
+- slug: scholarturbo.com
+  id: lst_2a73fc2a60565d8cf9b52707
+  hub: education
+  basis: its name and description
+- slug: scrap.so
+  id: lst_d728f0a993cf9357683f529c
+  hub: developer-tools
+  basis: its name and description
+- slug: scribblediffusion.com
+  id: lst_bfa52442934b40aaecccde2b
+  hub: image-design
+  basis: its name and description
+- slug: seek.ai
+  id: lst_eb3cebc4f3d68193a8f53cbb
+  hub: data-analytics
+  basis: its name and description
+- slug: seekwell.io
+  id: lst_5773633b81f037817110be3b
+  hub: data-analytics
+  basis: its name and description
+- slug: semiform.ai
+  id: lst_74cc218f97e6206419d19a4c
+  hub: data-analytics
+  basis: its name and description
+- slug: seo.app
+  id: lst_8423ce602d5591eedcaefb66
+  hub: marketing
+  basis: its name and description
+- slug: serper.dev
+  id: lst_d16531f2468cffa7d520320e
+  hub: developer-tools
+  basis: '#340 audit category serp-api'
+- slug: seths.blog
+  id: lst_62dbd4f799836d0e7833fe41
+  hub: chatbots-agents
+  basis: its name and description
+- slug: shakespearetoolbar.com
+  id: lst_3f963634ced0f0f81e6aa342
+  hub: writing
+  basis: its name and description
+- slug: sharefable.com
+  id: lst_5ec82f5f0d13224d7a5f6711
+  hub: marketing
+  basis: its name and description
+- slug: shello-ai.com
+  id: lst_353ad6a655ecb829238bb883
+  hub: chatbots-agents
+  basis: its name and description
+- slug: shotrate.com
+  id: lst_35f09354b155707f9c88cfb5
+  hub: image-design
+  basis: its name and description
+- slug: sibylia.io
+  id: lst_3cf167d5f6adfd0823e33f5e
+  hub: writing
+  basis: its name and description
+- slug: siddharthverma.in
+  id: lst_6e135bc447fca1273d50cdc7
+  hub: writing
+  basis: its name and description
+- slug: signature.ai
+  id: lst_a7160df1cf553c1f9c86b744
+  hub: marketing
+  basis: its name and description
+- slug: silatus.com
+  id: lst_26221bba8143c0bfbdd8702f
+  hub: education
+  basis: its name and description
+- slug: simplemail.ai
+  id: lst_f5b7ec3261d4febbd597c379
+  hub: writing
+  basis: its name and description
+- slug: simulai.co
+  id: lst_23a4e3fc8ba41711c57e48de
+  hub: productivity
+  basis: its name and description
+- slug: sketchpro.ai
+  id: lst_2f6d4577a08133c3860df9f1
+  hub: image-design
+  basis: '#340 audit category ai-design'
+- slug: skufetch.com
+  id: lst_39868285f71f7bc5842152fc
+  hub: ecommerce
+  basis: its name and description
+- slug: skyglass.com
+  id: lst_8316854914caf6868f7a07d2
+  hub: video
+  basis: its name and description
+- slug: slait.school
+  id: lst_5131d33a02588707dcedba93
+  hub: education
+  basis: its name and description
+- slug: slashdreamer.com
+  id: lst_9b669e386179257df16f65b3
+  hub: image-design
+  basis: '#333 held category ai-image-generators'
+- slug: slayerai.com
+  id: lst_5c89d8f6822546cdbc56b2c5
+  hub: audio
+  basis: its name and description
+- slug: slideas.ai
+  id: lst_3354e993ed89fd3538e734ec
+  hub: productivity
+  basis: its name and description
+- slug: smartdreams.ai
+  id: lst_d2391bfe138f0232bcfc59e7
+  hub: education
+  basis: its name and description
+- slug: smarterthangpt.com
+  id: lst_4c8bf7993f7f0d4c9c470f15
+  hub: lifestyle
+  basis: its name and description
+- slug: smartflowai.com
+  id: lst_113360cefffd65a04905ccff
+  hub: productivity
+  basis: its name and description
+- slug: smitty.ai
+  id: lst_306b67760513889af55821f1
+  hub: chatbots-agents
+  basis: its name and description
+- slug: socialiteai.com
+  id: lst_a6f0e9211a6316b867e1d7fc
+  hub: writing
+  basis: its name and description
+- slug: socratic.org
+  id: lst_4c95fae1842aa606b5eda28f
+  hub: education
+  basis: its name and description
+- slug: socraticworks.com
+  id: lst_972c1b643563be16f60513e7
+  hub: developer-tools
+  basis: its name and description
+- slug: solidgrids.com
+  id: lst_e0ace061284db0a453534683
+  hub: ecommerce
+  basis: its name and description
+- slug: sonara.ai
+  id: lst_a7df8d2ac3018f4d2486469b
+  hub: careers
+  basis: its name and description
+- slug: soniclink.com
+  id: lst_b01a39fc31c2b13b3526ca6f
+  hub: chatbots-agents
+  basis: its name and description
+- slug: soundbite.ai
+  id: lst_66851137f4215ab525897a34
+  hub: chatbots-agents
+  basis: its name and description
+- slug: sourceai.dev
+  id: lst_6960092252aa169084f85865
+  hub: developer-tools
+  basis: its name and description
+- slug: sparkbase.ai
+  id: lst_cf1a7e887bbd8714f0c51d17
+  hub: business
+  basis: its name and description
+- slug: sparktraffic.com
+  id: lst_f6db3c974a96aee30012736f
+  hub: marketing
+  basis: its name and description
+- slug: speechllect.com
+  id: lst_8caea8063fae12d846addd72
+  hub: audio
+  basis: its name and description
+- slug: spiritme.tech
+  id: lst_6e12b1a68a9f574be058c356
+  hub: video
+  basis: its name and description
+- slug: spoke.app
+  id: lst_ccc2d470b78a5af8e929df2a
+  hub: productivity
+  basis: its name and description
+- slug: spreadsheet.com
+  id: lst_2980339a19852f3bf6ff8754
+  hub: productivity
+  basis: its name and description
+- slug: starsky.pro
+  id: lst_5cb312f0661d7fc9aef2a243
+  hub: writing
+  basis: its name and description
+- slug: staypia.com
+  id: lst_03eaadfc4ae45549332ba611
+  hub: lifestyle
+  basis: its name and description
+- slug: stellarapp.io
+  id: lst_fb3170b8f12a75f09a6e4fd5
+  hub: productivity
+  basis: its name and description
+- slug: stellaris-ai.com
+  id: lst_d6a1a608675d099c6f80003f
+  hub: chatbots-agents
+  basis: its name and description
+- slug: steno.ai
+  id: lst_0940e0a8e3ac40d94be4aa4e
+  hub: chatbots-agents
+  basis: '#340 audit category ai-chatbots'
+- slug: storypear.com
+  id: lst_12b213bd138e9d1441f80a3f
+  hub: education
+  basis: its name and description
+- slug: storytell.ai
+  id: lst_8e97b32a40019c6a99ff523d
+  hub: data-analytics
+  basis: its name and description
+- slug: summarize.tech
+  id: lst_c78e7064e088ec199e997ec7
+  hub: writing
+  basis: its name and description
+- slug: supermanage.ai
+  id: lst_de04ce8cc40f853146b1d6f6
+  hub: careers
+  basis: '#333 cluster ai-hr-tools'
+- slug: supertranslate.ai
+  id: lst_c1395a38ea9a9945770203db
+  hub: video
+  basis: its name and description
+- slug: supportagent.ai
+  id: lst_5da218a318b8915945de9776
+  hub: chatbots-agents
+  basis: its name and description
+- slug: sweephy.com
+  id: lst_79f243a39d59441d48ba65c2
+  hub: business
+  basis: its name and description
+- slug: symbl.ai
+  id: lst_c0f13998300d957e2a683ea0
+  hub: data-analytics
+  basis: its name and description
+- slug: synexr.com
+  id: lst_6b0a4492baa479f10c0ff396
+  hub: lifestyle
+  basis: its name and description
+- slug: tammy.ai
+  id: lst_c33dec36a835d096b9a6f772
+  hub: writing
+  basis: its name and description
+- slug: tangoagreements.com
+  id: lst_66e8ac9a383c828a7e70feab
+  hub: business
+  basis: its name and description
+- slug: tappy.ai
+  id: lst_c428844a08efea064ef3c821
+  hub: marketing
+  basis: its name and description
+- slug: teameet.cc
+  id: lst_7851f855e53e35b3f0317f14
+  hub: productivity
+  basis: '#340 audit category ai-meeting-assistant'
+- slug: telechat.ai
+  id: lst_16a84c85ee951720df1e3c1e
+  hub: chatbots-agents
+  basis: its name and description
+- slug: tended.ai
+  id: lst_65034c5f7e769662f05dbe5b
+  hub: chatbots-agents
+  basis: its name and description
+- slug: texti.app
+  id: lst_809f3470d04ab6e2d78782ca
+  hub: writing
+  basis: its name and description
+- slug: thegigabrain.com
+  id: lst_fedefdc09e0c332841fd285a
+  hub: productivity
+  basis: its name and description
+- slug: thekeys.ai
+  id: lst_1d2037843b7f0bb94b66186d
+  hub: writing
+  basis: its name and description
+- slug: therocketbrew.com
+  id: lst_3585160212177e3fdb3238b5
+  hub: business
+  basis: its name and description
+- slug: thinktask.io
+  id: lst_12153b22b196f08b84410376
+  hub: productivity
+  basis: '#340 audit category ai-project-management'
+- slug: tiipe.ai
+  id: lst_7be76ee4ec7d5f6dd091e9a2
+  hub: ecommerce
+  basis: its name and description
+- slug: timecomplexity.ai
+  id: lst_12051c8372fe6f55caa96816
+  hub: developer-tools
+  basis: '#340 audit category ai-coding'
+- slug: timworks.com
+  id: lst_40a10209584d6e57aed0988f
+  hub: chatbots-agents
+  basis: its name and description
+- slug: todobot.ai
+  id: lst_9c3a11b6ada2e4775d03d9c8
+  hub: productivity
+  basis: its name and description
+- slug: toolbuilder.ai
+  id: lst_c896efc454d989e6b4789139
+  hub: developer-tools
+  basis: its name and description
+- slug: topseokit.com
+  id: lst_817dae924e0cfd20bf75c38b
+  hub: marketing
+  basis: its name and description
+- slug: toptal.com
+  id: lst_c5eb74d3a5b1552e3053b613
+  hub: careers
+  basis: '#333 held category ai-recruiting'
+- slug: totemotech.com
+  id: lst_1b8b02fc8639ba2296b92ac3
+  hub: lifestyle
+  basis: its name and description
+- slug: towords.io
+  id: lst_6bd308870a06c69246f46ea6
+  hub: writing
+  basis: its name and description
+- slug: tractatus.ai
+  id: lst_cf95737bab3c69a6accae12b
+  hub: chatbots-agents
+  basis: its name and description
+- slug: trafficbotpro.com
+  id: lst_8ff2452e604429a9ac8cf274
+  hub: marketing
+  basis: its name and description
+- slug: trajectdata.com
+  id: lst_7cccdaebce54e5ccc387136b
+  hub: developer-tools
+  basis: '#333 held category serp-api'
+- slug: transkrip.xyz
+  id: lst_9d07564d525863952c348da8
+  hub: audio
+  basis: '#340 audit category ai-transcription'
+- slug: translateaudio.com
+  id: lst_6d56449fb4caec53edf0b053
+  hub: audio
+  basis: its name and description
+- slug: travelgpt.art
+  id: lst_5095f842122776192d850fee
+  hub: lifestyle
+  basis: its name and description
+- slug: trendmate.xyz
+  id: lst_a03c54fa16df3954eb5001a8
+  hub: marketing
+  basis: its name and description
+- slug: tribescaler.com
+  id: lst_94a83fb050540f134708e27f
+  hub: marketing
+  basis: its name and description
+- slug: triplewhale.com
+  id: lst_4a8b8006361d29300b80f3de
+  hub: ecommerce
+  basis: '#340 audit category ecommerce-analytics-tools'
+- slug: trustfinta.com
+  id: lst_98d348511e769332b3d28049
+  hub: business
+  basis: '#340 audit category ai-sales-tools'
+- slug: tryastral.com
+  id: lst_e20903258bb816edc882e2d9
+  hub: writing
+  basis: its name and description
+- slug: trychart.com
+  id: lst_795ef4aec773c35b3a889240
+  hub: business
+  basis: '#340 audit category ai-accounting'
+- slug: trykai.app
+  id: lst_70b06cbf874323fa578fc620
+  hub: writing
+  basis: '#340 audit category ai-writing-assistants'
+- slug: trynara.com
+  id: lst_7531566226542229d982ef53
+  hub: chatbots-agents
+  basis: its name and description
+- slug: trypika.com
+  id: lst_8c9dd0252c7802d45a0a02c1
+  hub: chatbots-agents
+  basis: its name and description
+- slug: trypromptly.com
+  id: lst_34aee839994bd339855f11a8
+  hub: developer-tools
+  basis: its name and description
+- slug: trysidekick.io
+  id: lst_6a01336469852cd77967246a
+  hub: productivity
+  basis: its name and description
+- slug: twain.ai
+  id: lst_1aa53dfc89bdec73e738beef
+  hub: business
+  basis: '#340 audit category ai-sales-tools'
+- slug: typeblock.co
+  id: lst_1dc73ba63ac1ba4664e1c206
+  hub: developer-tools
+  basis: '#340 audit category ai-app-builders'
+- slug: ulog.ai
+  id: lst_d616541bc319bbf807ad3ed6
+  hub: productivity
+  basis: '#340 audit category ai-productivity-tools'
+- slug: unrealme.io
+  id: lst_68b2b84e8c8cc975d53c98de
+  hub: image-design
+  basis: its name and description
+- slug: up.codes
+  id: lst_45c9d56de66e6927a0c31051
+  hub: education
+  basis: '#340 audit category ai-research-assistants'
+- slug: upword.ai
+  id: lst_6766b4b72dc88928db0be4af
+  hub: productivity
+  basis: its name and description
+- slug: urbansportsnetwork.com
+  id: lst_b9624d4137c23977109ce64f
+  hub: chatbots-agents
+  basis: its name and description
+- slug: useclarity.com
+  id: lst_3f08ab7d1460d22c8ead75ae
+  hub: productivity
+  basis: its name and description
+- slug: usedouble.com
+  id: lst_9eb86fa44ddd6cdc89ec0b9b
+  hub: business
+  basis: '#340 audit category ai-sales-tools'
+- slug: usemeru.com
+  id: lst_654f5db4eea3cc7ac92ef593
+  hub: lifestyle
+  basis: its name and description
+- slug: useskillflow.com
+  id: lst_5df7eb72a68a572062a87a58
+  hub: education
+  basis: its name and description
+- slug: usestyle.ai
+  id: lst_f188582b639947fc362be011
+  hub: marketing
+  basis: its name and description
+- slug: variart.ai
+  id: lst_5c755ae5f9164a9bc44c2af2
+  hub: image-design
+  basis: its name and description
+- slug: veedo.ai
+  id: lst_1dd1c2caf22ec4abaa87e21c
+  hub: video
+  basis: its name and description
+- slug: versational.ai
+  id: lst_0204078c4430f48f1973cb0f
+  hub: productivity
+  basis: its name and description
+- slug: versy.ai
+  id: lst_908cb59b33bde891eb1fb787
+  hub: business
+  basis: '#340 audit category ai-real-estate-agent'
+- slug: vidds.co
+  id: lst_4e244b3e7d897231917d44d4
+  hub: video
+  basis: its name and description
+- slug: viralviews.co
+  id: lst_df9e80be6fcaf19bdcf8b6e1
+  hub: marketing
+  basis: its name and description
+- slug: visus.ai
+  id: lst_0df9d8da7e9444769360a923
+  hub: productivity
+  basis: '#340 audit category ai-knowledge-management'
+- slug: vivid.lol
+  id: lst_21742cfea1edc78d758ea6a0
+  hub: developer-tools
+  basis: its name and description
+- slug: vogent.ai
+  id: lst_dba282aa0242c1e73fbc1590
+  hub: chatbots-agents
+  basis: '#340 audit category ai-voice-bots'
+- slug: voicera.co
+  id: lst_27998b235e3242ad6b8d8e92
+  hub: audio
+  basis: its name and description
+- slug: voicetype.io
+  id: lst_73525b9b7adffd68ba28df8e
+  hub: writing
+  basis: its name and description
+- slug: voxqube.com
+  id: lst_11983b4daf385802e59d6cee
+  hub: audio
+  basis: its name and description
+- slug: warmest.ai
+  id: lst_5def671957f327721d4f3256
+  hub: chatbots-agents
+  basis: its name and description
+- slug: wavechat.ai
+  id: lst_490518aeab0ddadd095a74cb
+  hub: chatbots-agents
+  basis: its name and description
+- slug: web3summary.com
+  id: lst_8ea2ca6b8649197bf41b40a8
+  hub: writing
+  basis: its name and description
+- slug: webquery.net
+  id: lst_bc082459984d538bc3b0080b
+  hub: writing
+  basis: '#340 audit category ai-summarizers'
+- slug: websitesummaryai.com
+  id: lst_e1d34b529f25aa6f6f36e330
+  hub: writing
+  basis: its name and description
+- slug: wepik.com
+  id: lst_0a1fc475d2ebe069d05208ab
+  hub: image-design
+  basis: its name and description
+- slug: whismer.com
+  id: lst_31fc8260d3de2ad7fde6c8a8
+  hub: writing
+  basis: its name and description
+- slug: windsor.io
+  id: lst_8dfc2f075c5c449ff71f3cf8
+  hub: video
+  basis: its name and description
+- slug: wiseone.io
+  id: lst_8239d45c25698bb1c685baf2
+  hub: productivity
+  basis: its name and description
+- slug: withpoly.com
+  id: lst_361c73d9369d39c27c3c2adc
+  hub: productivity
+  basis: '#340 audit category ai-productivity-tools'
+- slug: wiz.chat
+  id: lst_dd2e21700357ffbf55a374fb
+  hub: chatbots-agents
+  basis: '#340 audit category ai-chatbots'
+- slug: wnr.ai
+  id: lst_e2679b55281eb985e69245b7
+  hub: chatbots-agents
+  basis: its name and description
+- slug: wonderplan.ai
+  id: lst_6176283ba2033646b3fbba64
+  hub: lifestyle
+  basis: '#340 audit category ai-travel-agent'
+- slug: wordmax.ai
+  id: lst_99077d31ddd7ec11836404e6
+  hub: writing
+  basis: its name and description
+- slug: workflos.ai
+  id: lst_c27f8f835f9b56489c2ad2e5
+  hub: productivity
+  basis: its name and description
+- slug: wraithscribe.com
+  id: lst_b8db35e93561cddc19cf794e
+  hub: writing
+  basis: its name and description
+- slug: writegpt.ai
+  id: lst_4223e6f7ae54e5bb5b8da773
+  hub: writing
+  basis: its name and description
+- slug: writemyessays.ai
+  id: lst_b9fa8b0d8b223ebfafd0fc62
+  hub: writing
+  basis: its name and description
+- slug: writepanda.ai
+  id: lst_7506e4284cf646247968a59c
+  hub: video
+  basis: '#340 audit category ai-video-editor'
+- slug: writepaw.com
+  id: lst_06b2871c098329279341b86c
+  hub: writing
+  basis: '#340 audit category ai-writing-assistants'
+- slug: writewithlaika.com
+  id: lst_d1ae82761b5249172ad98b3d
+  hub: writing
+  basis: its name and description
+- slug: writio.com
+  id: lst_e5f1c8bcc2917c532d67fbc1
+  hub: writing
+  basis: its name and description
+- slug: xprt.is
+  id: lst_9c561f47fa97d1e6ec8d83e2
+  hub: careers
+  basis: its name and description
+- slug: yack.fyi
+  id: lst_bf575d032abd5da5db64737c
+  hub: chatbots-agents
+  basis: its name and description
+- slug: ycombinator.com
+  id: lst_7ab3ac3b9f6ac281166a386e
+  hub: data-analytics
+  basis: its name and description
+- slug: yesilhealth.com
+  id: lst_eecc7937b38e911c4bfe5e88
+  hub: lifestyle
+  basis: '#340 audit category ai-doctor'
+- slug: yobulk.dev
+  id: lst_bd4610b61e9280e3788a61ca
+  hub: data-analytics
+  basis: its name and description
+- slug: yoursearch.ai
+  id: lst_96bcf8728b85ea63ab330be1
+  hub: chatbots-agents
+  basis: its name and description
+- slug: yoursidekick.xyz
+  id: lst_26e4f1e4a0c00db3f6a3b5d6
+  hub: productivity
+  basis: its name and description
+- slug: zaplingo.com
+  id: lst_ec10fdd6092272db3d0bbd54
+  hub: education
+  basis: its name and description
+- slug: zeda.io
+  id: lst_ecf00a4d870d8936abaa6894
+  hub: productivity
+  basis: its name and description
+- slug: zeg.ai
+  id: lst_e03306b36233640f6adeb0a0
+  hub: image-design
+  basis: its name and description
+- slug: zenen.ai
+  id: lst_3430b862ec915b0c2756ae7d
+  hub: writing
+  basis: its name and description
+- slug: zerogptdetector.com
+  id: lst_f9f73e086b1bd76e2ced88a1
+  hub: writing
+  basis: its name and description
+- slug: zevi.ai
+  id: lst_851e3fa18c1e78bcd8040106
+  hub: ecommerce
+  basis: its name and description
+- slug: zizoto.com
+  id: lst_3fa8fadd5f00694fa8480b01
+  hub: image-design
+  basis: '#340 audit category ai-image-generators'
+leftInOther:
+- slug: imgnai.com
+  id: lst_b03d0534f14f6e26a4531b95
+  reason: 'adult (#260): its flagship tool is an NSFW image generator, unpublished by the owner''s decision of 2026-10-10 (2026-10-10-other-removals). Left in Other, it answers 404 once Other retires and can''t be relisted, as #260''s adult listings filed under Adult do'

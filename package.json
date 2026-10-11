@@ -17,6 +17,7 @@
     "catalog:downloader-links": "pnpm tsx scripts/downloader-links-manifest.ts",
     "catalog:mismatch": "pnpm tsx scripts/mismatch-manifests.ts",
     "catalog:other-categories": "pnpm tsx scripts/other-categories-manifest.ts",
+    "catalog:other-retirement": "pnpm tsx scripts/other-retirement.ts",
     "catalog:taxonomy": "pnpm tsx scripts/taxonomy-manifest.ts",
     "cf-typegen": "pnpm --filter web cf-typegen",
     "check": "pnpm tsx scripts/harness/runner.ts full",
