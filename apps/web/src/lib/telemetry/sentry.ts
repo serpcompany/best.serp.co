@@ -155,8 +155,25 @@ export function browserEnvironment(hostname: string): SiteEnvironment {
 /** Errors only: no session per page view (browser) or per isolate (Worker). */
 const SESSION_INTEGRATIONS = new Set(['BrowserSession', 'ProcessSession'])
 
-export function sentryOptions(environment: () => SiteEnvironment) {
-  const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN || undefined
+/** What the deploy build bakes in (#48): the public DSN and the deployed commit. */
+export interface SentryBuild {
+  commit?: string
+  dsn?: string
+}
+
+/**
+ * The Next.js build's values, inlined at build time. The Worker entry, which Wrangler bundles at
+ * deploy without them, reads the same values from the build output (`worker-errors.ts`, #210).
+ */
+function nextBuild(): SentryBuild {
+  return {
+    commit: process.env.NEXT_PUBLIC_SENTRY_RELEASE,
+    dsn: process.env.NEXT_PUBLIC_SENTRY_DSN
+  }
+}
+
+export function sentryOptions(environment: () => SiteEnvironment, build = nextBuild()) {
+  const dsn = build.dsn || undefined
   return {
     beforeSend<E extends { environment?: string }>(event: E): E {
       // Resolved per event too: on the Worker, vars reach process.env with the first request.
@@ -169,7 +186,7 @@ export function sentryOptions(environment: () => SiteEnvironment) {
     integrations: <I extends { name: string }>(defaults: I[]): I[] =>
       defaults.filter(integration => !SESSION_INTEGRATIONS.has(integration.name)),
     maxBreadcrumbs: 30,
-    release: sentryRelease(process.env.NEXT_PUBLIC_SENTRY_RELEASE),
+    release: sentryRelease(build.commit),
     sendDefaultPii: false,
     // Tracing stays off: no `tracesSampleRate` at all (0 would still make spans), and no trace
     // headers on the site's own requests.

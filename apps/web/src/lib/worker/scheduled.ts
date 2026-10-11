@@ -34,6 +34,7 @@ import { runDraftJobs } from '../submissions/draft-jobs'
 import { submissionBadgeVerificationTargets } from '../submissions/presentation'
 import { CodedError } from '../telemetry/coded-error'
 import { errorFields } from '../telemetry/error-fields'
+import type { ScheduledJobFailure } from '../telemetry/worker-errors'
 
 /** Hourly, on the hour: each draft reminder goes out within an hour of falling due. */
 export const DRAFT_JOBS_CRON = '0 * * * *'
@@ -208,14 +209,22 @@ function log(level: 'error' | 'info' | 'warn', entry: Record<string, unknown>): 
 }
 
 /**
+ * Reports a trigger's failed jobs to Sentry (`workerErrors().scheduled`, #210) and resolves once
+ * they are sent. It never rejects.
+ */
+export type ReportScheduledFailures = (failures: readonly ScheduledJobFailure[]) => Promise<void>
+
+/**
  * Runs every job of the trigger's cron expression, one after another. A failing job is logged
- * and does not stop the others; the invocation then fails, so the Cron Trigger shows it.
+ * and does not stop the others; the failures are then reported, and the invocation fails, so the
+ * Cron Trigger shows it.
  */
 export async function handleScheduled(
   event: ScheduledEvent,
   env: ScheduledEnv,
   context: ScheduledContext,
-  jobs: Readonly<Record<string, readonly ScheduledJob[]>> = scheduledJobs
+  jobs: Readonly<Record<string, readonly ScheduledJob[]>> = scheduledJobs,
+  reportFailures?: ReportScheduledFailures
 ): Promise<void> {
   const scheduled = jobs[event.cron]
   if (!scheduled) {
@@ -223,13 +232,13 @@ export async function handleScheduled(
     return
   }
   const now = new Date(event.scheduledTime)
-  const failures: unknown[] = []
+  const failures: ScheduledJobFailure[] = []
   for (const job of scheduled) {
     try {
       const result = await job.run({ context, env, now })
       log('info', { cron: event.cron, event: 'scheduled_job_finished', job: job.name, ...result })
     } catch (error) {
-      failures.push(error)
+      failures.push({ error, job: job.name })
       log('error', {
         cron: event.cron,
         event: 'scheduled_job_failed',
@@ -239,6 +248,10 @@ export async function handleScheduled(
     }
   }
   if (failures.length > 0) {
-    throw new AggregateError(failures, `${failures.length} scheduled job(s) failed.`)
+    await reportFailures?.(failures)
+    throw new AggregateError(
+      failures.map(failure => failure.error),
+      `${failures.length} scheduled job(s) failed.`
+    )
   }
 }

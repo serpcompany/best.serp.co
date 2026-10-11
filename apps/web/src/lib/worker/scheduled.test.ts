@@ -236,6 +236,42 @@ describe('scheduled handler', () => {
     ).rejects.toThrow(AggregateError)
     expect(second.run).toHaveBeenCalledOnce()
   })
+
+  it('reports the failed jobs to Sentry, then fails the invocation with them (#210)', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const boom = new Error('boom')
+    const report = vi.fn(async () => {
+      // The failures are logged first, so a report that hangs or fails loses nothing.
+      expect(errors).toHaveBeenCalledOnce()
+    })
+    const first: ScheduledJob = {
+      name: 'first',
+      run: async () => {
+        throw boom
+      }
+    }
+    const second: ScheduledJob = { name: 'second', run: async () => ({ done: true }) }
+    const failed = handleScheduled(
+      { cron: DRAFT_JOBS_CRON, scheduledTime: atHour(1) },
+      env(),
+      { waitUntil: () => undefined },
+      { [DRAFT_JOBS_CRON]: [first, second] },
+      report
+    )
+    await expect(failed).rejects.toThrow(AggregateError)
+    await expect(failed).rejects.toMatchObject({ errors: [boom] })
+    expect(report).toHaveBeenCalledExactlyOnceWith([{ error: boom, job: 'first' }])
+
+    report.mockClear()
+    await handleScheduled(
+      { cron: DRAFT_JOBS_CRON, scheduledTime: atHour(1) },
+      env(),
+      { waitUntil: () => undefined },
+      { [DRAFT_JOBS_CRON]: [second] },
+      report
+    )
+    expect(report).not.toHaveBeenCalled()
+  })
 })
 
 /** Monday 2026-10-05 03:15 UTC (the weekly trigger) and Tuesday 03:45 UTC (the daily one). */

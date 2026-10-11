@@ -264,7 +264,8 @@ listing only, with no price, and sends a draft left in checkout to the plan choi
 handles at most 100 of each and logs whether more remain. The same hourly trigger then continues
 the [badge program](./badge-program.md). The deploy that ships the Worker registers the
 triggers (the dashboard lists them under the Worker's Settings → Triggers), and each run logs
-`scheduled_job_finished` or `scheduled_job_failed` per job. The local preview runs Wrangler with
+`scheduled_job_finished` or `scheduled_job_failed` per job; a failed job also goes to Sentry
+([Telemetry](./telemetry.md#worker-entry-and-cron-errors)). The local preview runs Wrangler with
 `--test-scheduled`, so `/__scheduled?cron=<expression>` runs `scheduled()` on demand; the job's
 behavior is covered by `scheduled.test.ts` and `draft-jobs.test.ts` against SQLite.
 

@@ -38,14 +38,15 @@ no beacon.
 Sentry reports errors from the browser (`instrumentation-client.ts`) on every page, and from
 the Worker (`apps/web/src/instrumentation.ts`, server rendering and route handlers) on the
 signed-in and operational surfaces only: `/admin`, `/account`, `/submit`, `/login`, `/claims`
-and `/api` (#355). The settings and the scrubber are in `apps/web/src/lib/telemetry/sentry.ts`:
+and `/api` (#355). The Worker entry adds the errors Next.js never sees, from those same surfaces
+and from the cron jobs ([below](#worker-entry-and-cron-errors)). The settings and the scrubber are in `apps/web/src/lib/telemetry/sentry.ts`:
 errors only, with no PII, free-text error messages, query strings, cookies, headers, console
 output, logger data, sessions, tracing, or replay. Both deploy builds bake in
 `NEXT_PUBLIC_SENTRY_DSN` (repo variable `SENTRY_DSN`) and the commit as the release; with no DSN,
 Sentry stays off (E2E sets none).
 `SENTRY_AUTH_TOKEN` (repo secret, project releases scope) and the `SENTRY_PROJECT` variable
 only upload source maps. The owner creates the project and sets all three, then checks that the
-first staging error's stack frames resolve. Worker-entry and cron errors are #210.
+first staging error's stack frames resolve.
 
 ### Stable error codes, not messages
 
@@ -130,7 +131,8 @@ is made per request, at run time, by which modules the isolate evaluates.
   required, though, so an isolate that never imports the SDK carries its code but never
   evaluates it. `server-errors.test.ts` scans `apps/web/src` and `apps/web/worker.ts` for any
   static import, re-export, bare import or `require` of an `@sentry/*` package: only
-  `instrumentation-client.ts` and `server-sentry.ts` may have one.
+  `instrumentation-client.ts`, `server-sentry.ts` and the Worker entry's `worker-sentry.ts`
+  ([below](#worker-entry-and-cron-errors)) may have one.
 - **Two bundles share one switch.** The Worker entry (`apps/web/worker.ts`, bundled by Wrangler)
   sees every request first. Next.js runs `register()` once per isolate: OpenNext's
   instrumentation patch requires the built `instrumentation.js` statically, and Next.js awaits
@@ -166,6 +168,42 @@ is made per request, at run time, by which modules the isolate evaluates.
 started. A later public request in that isolate still only logs its request errors, because
 `onRequestError` routes by path.
 
-**The Worker entry outside `openNextWorker.fetch` and `scheduled()`** still report to no Sentry
-at all, as before (#210). A wrapper there, such as `@sentry/cloudflare`'s `withSentry`, would load
-the SDK for every request and undo this split, so #210 must keep it off public pages.
+### Worker-entry and cron errors
+
+Next.js reports only what happens inside it. Two kinds of error never reach `onRequestError`, so
+the Worker entry reports them itself (#210, `apps/web/src/lib/telemetry/worker-errors.ts`):
+- **A request's error that escapes the Worker's `fetch`:** the redirects, the staging and admin
+  gates, the edge HTML cache and the gone-listing render. It goes to Sentry only from the
+  signed-in and operational surfaces, as above, sent in `waitUntil`, and is rethrown either
+  way, so the response doesn't change. On a public page, the runtime's own log of the exception
+  stays its only record, as before.
+- **A cron job's failure** (`lib/worker/scheduled.ts`): one event per failed job, named
+  `<job> (cron <expression>)`, sent before the invocation ends. It is still logged as
+  `scheduled_job_failed` first. A cron isolate never starts Next.js, so before this it had no
+  Sentry at all.
+
+Each event has the error's type and stack, mechanism `cloudflare.fetch` or
+`cloudflare.scheduled`, and the same DSN, release, environment and scrubber as the Next.js
+side: `worker-sentry.ts` builds its client from `sentryOptions`. Its frames point into
+Wrangler's bundle, which isn't minified but whose source maps go only to Cloudflare.
+
+How it keeps #355's split:
+- **The SDK loads only to report.** `worker-errors.ts` imports no package; it reaches
+  `worker-sentry.ts`, which holds `@sentry/core`, through `import()` once there is an error to
+  report. Wrangler keeps that module's code behind a lazy initializer, so a public page, a cron
+  run that succeeds, and a build without a DSN never evaluate it. The code itself adds about
+  195 KiB (43 KiB gzipped) to the Worker's upload. `server-errors.test.ts` fails on a static
+  import of the SDK, or of either gated module, anywhere else.
+- **A client of its own.** It is never installed globally and adds no integration that patches
+  `fetch` or `console`, so it can't replace the Next.js server SDK's client in a shared isolate
+  or slow the isolate's later requests.
+- **Never twice.** OpenNext answers Next.js's own errors with the error page, so they don't
+  reach the Worker entry. One that did, after `onRequestError` reported it, carries the SDK's
+  captured marker on the error object, which every copy of the SDK reads and skips.
+- **The DSN and commit come from the build.** Next.js inlines them into its bundle at build
+  time, but Wrangler bundles the Worker entry later, at deploy or preview, without them. So
+  `pnpm worker:build` writes them to `.open-next/worker-sentry.json`
+  (`scripts/worker-sentry-build.ts`), and `worker-build-output.js` imports it. Without a DSN the
+  Worker entry reports nothing and loads nothing.
+- **Telemetry never fails the Worker.** A report that fails is logged as `worker_sentry_failed`
+  (code and name only), and the original error still throws.

@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SITEMAP_INDEX_PATH, sitemapPaths, siteRoutes } from '../site/site-routes'
 import {
@@ -242,10 +242,12 @@ describe('a public page error in the Worker logs (#355)', () => {
 const STATIC_SENTRY_IMPORT =
   /(?:^|[\s;])(?:import|export)\b[^'"();]*?['"]@sentry\/[^'"]*['"]|\brequire\(\s*['"]@sentry\//mu
 
+function withoutComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//gu, '').replace(/^\s*\/\/.*$/gmu, '')
+}
+
 function importsSentryStatically(source: string): boolean {
-  return STATIC_SENTRY_IMPORT.test(
-    source.replace(/\/\*[\s\S]*?\*\//gu, '').replace(/^\s*\/\/.*$/gmu, '')
-  )
+  return STATIC_SENTRY_IMPORT.test(withoutComments(source))
 }
 
 describe('where the Sentry SDK is imported (#355)', () => {
@@ -272,22 +274,41 @@ describe('where the Sentry SDK is imported (#355)', () => {
     }
   })
 
-  it('statically only in the browser entry and the gated Worker module', () => {
-    const web = join(import.meta.dirname, '../../..')
-    const files = [
-      'worker.ts',
-      ...(readdirSync(join(web, 'src'), { recursive: true }) as string[]).map(file =>
-        join('src', file)
-      )
-    ]
-    const importers = files
-      .filter(file => /\.(?:[cm]?js|jsx|ts|tsx)$/u.test(file) && !/\.test\.tsx?$/u.test(file))
-      .filter(file => importsSentryStatically(readFileSync(join(web, file), 'utf8')))
-      .map(file => relative(web, join(web, file)))
+  it('statically only in the browser entry and the two gated Worker modules', () => {
+    const importers = sourceFiles()
+      .filter(file => importsSentryStatically(readFileSync(join(WEB, file), 'utf8')))
       .sort()
     expect(importers).toEqual([
       'src/instrumentation-client.ts',
-      'src/lib/telemetry/server-sentry.ts'
+      'src/lib/telemetry/server-sentry.ts',
+      'src/lib/telemetry/worker-sentry.ts'
     ])
   })
+
+  it('and the gated modules only through import(), so a public page never evaluates them', () => {
+    // `server-sentry.ts` (Next.js, #355) and `worker-sentry.ts` (the Worker entry, #210): a static
+    // import of either evaluates the SDK with the module that holds it. `import type` is erased.
+    const STATIC_GATED_IMPORT =
+      /(?:^|[\s;])(?:import(?!\s+type\b)|export)\b[^'"();]*?['"][^'"]*\/(?:server|worker)-sentry['"]/mu
+    expect(STATIC_GATED_IMPORT.test("import { x } from './worker-sentry'")).toBe(true)
+    expect(STATIC_GATED_IMPORT.test("export * from '../telemetry/server-sentry'")).toBe(true)
+    expect(STATIC_GATED_IMPORT.test("await import('./worker-sentry')")).toBe(false)
+    expect(STATIC_GATED_IMPORT.test("import type { X } from './worker-sentry'")).toBe(false)
+    const importers = sourceFiles().filter(file =>
+      STATIC_GATED_IMPORT.test(withoutComments(readFileSync(join(WEB, file), 'utf8')))
+    )
+    expect(importers).toEqual([])
+  })
 })
+
+const WEB = join(import.meta.dirname, '../../..')
+
+/** `worker.ts` and every source module in `src`, tests excluded, relative to `apps/web`. */
+function sourceFiles(): string[] {
+  return [
+    'worker.ts',
+    ...(readdirSync(join(WEB, 'src'), { recursive: true }) as string[]).map(file =>
+      join('src', file)
+    )
+  ].filter(file => /\.(?:[cm]?js|jsx|ts|tsx)$/u.test(file) && !/\.test\.tsx?$/u.test(file))
+}
