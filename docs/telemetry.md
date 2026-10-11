@@ -72,7 +72,9 @@ values to its message. So:
   `SubmissionError`, and `CodedError` (`lib/telemetry/coded-error.ts`), which the fixed
   configuration and billing-invariant failures throw with one of `FAILURE_CODES`
   (`d1_binding_missing`, `billing_secrets_missing`, `refund_paid_order_missing`, and so on), as
-  does a page's account guard that could not read D1 (`auth_guard_failed`, #389). A code never
+  does a page's account guard that could not decide (`auth_guard_failed`, #389): it could not
+  read the session or the allowlist, because D1 failed or accounts are misconfigured (a missing
+  `DB`, a bad auth secret or URL), and its `auth_guard_error` line names the cause. A code never
   holds an id. A `CodedError`'s code is for Worker logs only: on a surface that reports to
   Sentry, an uncaught `CodedError` arrives as `Error: [redacted]` with its stack. The lines that
   spread in `errorFields` are `request_error`, `claim_failed`,

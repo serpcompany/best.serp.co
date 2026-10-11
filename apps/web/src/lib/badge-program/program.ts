@@ -40,10 +40,11 @@ import {
  * unreadable page, a page past the parser's limits) is inconclusive: recorded, never a miss.
  *
  * **Limits.** A run checks at most `BADGE_CHECK_LIMIT` sites, `BADGE_CHECK_CONCURRENCY` at a
- * time: each check is at most four fetches (three redirects) of 8 seconds and one bounded parse,
- * plus two or three D1 statements and its email, so a run stays far below the Workers
- * subrequest limit (1,000 on the Paid plan) and the 30-second CPU default. The rest wait for
- * the next hourly run; with 20 per hour a cycle covers about 3,000 listings a week.
+ * time (recording their rechecks one at a time): each check is at most four fetches (three
+ * redirects) of 8 seconds and one bounded parse, plus two or three D1 statements and its email,
+ * so a run stays far below the Workers subrequest limit (1,000 on the Paid plan) and the
+ * 30-second CPU default. The rest wait for the next hourly run; with 20 per hour a cycle covers
+ * about 3,000 listings a week.
  *
  * Every write is a compare-and-swap (`@/db/badge-program`) and every email
  * goes through the email ledger under a key per template and check, so an overlapping or

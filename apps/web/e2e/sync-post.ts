@@ -8,10 +8,11 @@ import { MessageChannel, receiveMessageOnPort, Worker } from 'node:worker_thread
  *
  * A thread that stops fails the next call at once, with the reason, instead of leaving every
  * later call to wait out its deadline (#389). One that stops with an error or `process.exit`
- * also wakes the call waiting on it.
+ * also wakes the call waiting on it: its exit counts as a reply, so a call that checked just
+ * before the exit still finds the count changed when it starts to wait (#402).
  */
 
-/** The thread's state: [0] the replies it has posted, [1] 1 once it is exiting. */
+/** The thread's state: [0] its replies, and 1 more once it exits; [1] 1 once it is exiting. */
 const REPLIES = 0
 const EXITING = 1
 
@@ -21,6 +22,7 @@ const { workerData } = require('node:worker_threads')
 const { port, state, timeoutMs } = workerData
 process.on('exit', () => {
   Atomics.store(state, ${EXITING}, 1)
+  Atomics.add(state, ${REPLIES}, 1)
   Atomics.notify(state, ${REPLIES})
 })
 port.on('message', async ({ body, id, url }) => {
