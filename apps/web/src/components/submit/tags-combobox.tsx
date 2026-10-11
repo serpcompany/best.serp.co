@@ -1,6 +1,9 @@
 'use client'
 
+import { Combobox as ComboboxPrimitive } from '@base-ui/react'
+import { XIcon } from 'lucide-react'
 import { useMemo } from 'react'
+import { Button } from '@/components/ui/button'
 import {
   Combobox,
   ComboboxChip,
@@ -102,7 +105,19 @@ export function TagsCombobox({
           {(chosen: TagChoice[]) => (
             <>
               {chosen.map(choice => (
-                <ComboboxChip key={choice.slug}>{choice.label}</ComboboxChip>
+                // The stock chip's remove button has no accessible name (#370), so each chip
+                // renders the same button itself, named after its tag.
+                <ComboboxChip key={choice.slug} showRemove={false}>
+                  {choice.label}
+                  <ComboboxPrimitive.ChipRemove
+                    render={<Button variant="ghost" size="icon-xs" />}
+                    className="-ml-1 opacity-50 hover:opacity-100"
+                    data-slot="combobox-chip-remove"
+                    aria-label={`Remove ${choice.label}`}
+                  >
+                    <XIcon className="pointer-events-none" />
+                  </ComboboxPrimitive.ChipRemove>
+                </ComboboxChip>
               ))}
               <ComboboxChipsInput id={id} aria-invalid={invalid || undefined} />
             </>
