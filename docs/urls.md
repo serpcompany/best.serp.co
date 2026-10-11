@@ -155,6 +155,12 @@ publisher's affected routes) build their URLs from it.
 - **Post-deploy gates.** After each deploy, `scripts/d1-preview-http-gates.ts` requests a live
   tag, a best page, and one retired category's 308 to its best page (`httpGateSamples`, #350),
   never one a committed manifest retires or points elsewhere.
+- **Gate samples stay put.** On either environment, don't rename, retire or unpublish an
+  `httpGateSamples` page in `/admin` (#405) until a merged PR has moved the samples to pages live
+  on both: the category `video-downloaders`, the tag `ai-chatbots`, the best pages `ai-chatbot`
+  and `ai-copywriting` (the retired category `ai-copywriting` 308s to it), and the listing
+  `123movies-downloader`. The next deploy's gates fail on the changed page, and a failed Deploy
+  Staging blocks promotion ([Release guards](./release-guards.md#staging-before-production)).
 
 ## Pagination
 

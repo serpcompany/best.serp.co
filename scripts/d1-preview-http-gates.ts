@@ -436,10 +436,26 @@ async function requireNonemptyBody(response: Response, label: string): Promise<v
   throw new Error(`${label} returned no content in its bounded body probe.`)
 }
 
-async function expectRoute(target: GateTarget, path: string): Promise<void> {
+/**
+ * Appended when a sample page (`httpGateSamples`) answers otherwise than expected: its likeliest
+ * cause is an admin's change to that page (#405), not the deploy, and the fix is another sample.
+ */
+export const SAMPLE_FAILURE_HINT =
+  'It is an HTTP gate sample (httpGateSamples in scripts/d1-preview-http-gates.ts): most likely it was renamed, retired or unpublished in /admin (#405). Name another page that is live on both staging and production there.'
+
+/** A route's failure message, with `SAMPLE_FAILURE_HINT` for a sample page. */
+function routeFailure(message: string, sample: boolean): Error {
+  return new Error(sample ? `${message} ${SAMPLE_FAILURE_HINT}` : message)
+}
+
+async function expectRoute(
+  target: GateTarget,
+  path: string,
+  { sample = false }: { sample?: boolean } = {}
+): Promise<void> {
   await boundedFetch(target, routeUrl(target.baseUrl, path), async response => {
     if (response.status < 200 || response.status >= 300)
-      throw new Error(`${target.mode} route ${path} returned ${response.status}.`)
+      throw routeFailure(`${target.mode} route ${path} returned ${response.status}.`, sample)
     await requireNonemptyBody(response, `${target.mode} route ${path}`)
   })
 }
@@ -560,7 +576,8 @@ function trustedAuthOrigin({ baseUrl, mode }: GateTarget): string {
 async function expectPermanentRedirect(
   target: GateTarget,
   path: string,
-  expectedPath: string
+  expectedPath: string,
+  { sample = false }: { sample?: boolean } = {}
 ): Promise<void> {
   const { baseUrl, mode } = target
   await boundedFetch(target, routeUrl(baseUrl, path), async response => {
@@ -569,8 +586,9 @@ async function expectPermanentRedirect(
     const observed = location ? new URL(location, baseUrl) : undefined
     const expected = routeUrl(baseUrl, expectedPath)
     if (response.status !== 308 || observed?.href !== expected.href)
-      throw new Error(
-        `${mode} route ${path} returned ${response.status} ${location ?? ''}, not a 308 to ${expectedPath}.`
+      throw routeFailure(
+        `${mode} route ${path} returned ${response.status} ${location ?? ''}, not a 308 to ${expectedPath}.`,
+        sample
       )
   })
 }
@@ -955,15 +973,17 @@ export async function runHttpGates(
   }
   await withTrailingSlashPolicy(target, listingSlug, [
     expectRoute(target, '/'),
-    expectRoute(target, categoryRoute(category)),
-    expectRoute(target, tagRoute(tag)),
-    expectRoute(target, bestRoute(bestPage)),
+    // The samples: fixed pages, so a routing regression on a known page fails the deploy.
+    expectRoute(target, categoryRoute(category), { sample: true }),
+    expectRoute(target, tagRoute(tag), { sample: true }),
+    expectRoute(target, bestRoute(bestPage), { sample: true }),
     expectPermanentRedirect(
       target,
       categoryRoute(movedCategory.category),
-      movedTargetRoute(movedCategory.to)
+      movedTargetRoute(movedCategory.to),
+      { sample: true }
     ),
-    expectRoute(target, listingRoute(listingSlug)),
+    expectRoute(target, listingRoute(listingSlug), { sample: true }),
     expectRoute(target, `/api/search?q=${encodeURIComponent(listingSlug)}`),
     expectRoute(target, '/rss.xml'),
     expectRoute(target, '/sitemap-index.xml'),
@@ -997,7 +1017,9 @@ export async function runHttpGates(
  * A committed manifest that unpublishes or renames the listing, takes the category off it,
  * retires every sample category, tag or best page, or moves every moved category elsewhere fails
  * `d1-preview-http-gates.test.ts`; name another live one then. An admin's rename or retirement
- * in `/admin` (#405) is no manifest: the next deploy's gates fail on it instead.
+ * in `/admin` (#405) is no manifest: the next deploy's gates fail on it instead, with
+ * `SAMPLE_FAILURE_HINT`, so `docs/urls.md` asks admins not to change these pages before a merged
+ * PR moves the samples.
  */
 export interface HttpGateSamples {
   /** Best pages, in order of preference: the first one no reviewed manifest retires. */

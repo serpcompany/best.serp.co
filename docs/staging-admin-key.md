@@ -36,6 +36,9 @@ issue or a pull request, and never set it on production.
 
 ## Use it
 
+Never rename, retire or unpublish a post-deploy gate sample with the key (the pages listed in
+[URLs](./urls.md#taxonomy-pages)): every later Deploy Staging fails, and promotion with it.
+
 Every call names staging's password (`staging:stagingpassword`,
 [Architecture](./architecture.md#environments-and-hosts)) and reads the key from that file:
 

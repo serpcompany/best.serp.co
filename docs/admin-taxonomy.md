@@ -26,6 +26,10 @@ below.
 
 ## Categories, tags, and best pages (#405)
 
+Don't rename or retire a post-deploy gate sample (`video-downloaders`, `ai-chatbots`,
+`ai-chatbot`, `ai-copywriting`) before a merged PR moves the samples
+([URLs](./urls.md#taxonomy-pages)).
+
 The owner's decision on #405 replaced #341's design default 12 (hubs, tags, and best pages through
 manifests only): admins create, edit, rename, and retire them here. `lib/admin/taxonomy-decisions.ts`
 sends each as `buildTaxonomyPlans` (`src/db/taxonomy-plans.ts`): the publisher's own operations and

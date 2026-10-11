@@ -29,6 +29,7 @@ import {
   httpGateSamples,
   liveSamples,
   runHttpGates,
+  SAMPLE_FAILURE_HINT,
   taxonomyChanges,
   waitForWorkerVersion
 } from './d1-preview-http-gates.ts'
@@ -357,21 +358,39 @@ describe('environment-specific HTTP gates', () => {
         `staging route ${movedPath} returned ${status}`
       )
     }
-    for (const path of [`/products/tags/${tag}/`, `/best/${bestPage}/`]) {
+    // Any sample that stops answering names the likeliest cause, an /admin change (#405), and the
+    // fix; a page that is no sample doesn't.
+    const failure = async (path: string, answer: () => Response) => {
       vi.stubGlobal(
         'fetch',
         vi.fn(async (input: string | URL | Request) => {
           const url = new URL(String(input))
-          return withCrawlPolicy(
-            url,
-            url.pathname === path ? new Response('gone', { status: 404 }) : successfulResponse(url)
-          )
+          return withCrawlPolicy(url, url.pathname === path ? answer() : successfulResponse(url))
         })
       )
-      await expect(gates('staging', stagingOrigin)).rejects.toThrow(
-        `staging route ${path} returned 404`
+      return gates('staging', stagingOrigin).then(
+        () => '',
+        (error: unknown) => (error instanceof Error ? error.message : String(error))
       )
     }
+    const renamed = () => new Response(null, { status: 308, headers: { location: '/best/x/' } })
+    for (const path of [
+      `/products/categories/${category}/`,
+      `/products/tags/${tag}/`,
+      `/best/${bestPage}/`,
+      `/products/${slug}/`
+    ]) {
+      const message = await failure(path, renamed)
+      expect(message, path).toBe(`staging route ${path} returned 308. ${SAMPLE_FAILURE_HINT}`)
+    }
+    expect(await failure(movedPath, renamed)).toBe(
+      `staging route ${movedPath} returned 308 /best/x/, not a 308 to /best/${bestPage}/. ${SAMPLE_FAILURE_HINT}`
+    )
+    expect(SAMPLE_FAILURE_HINT).toContain('httpGateSamples in scripts/d1-preview-http-gates.ts')
+    expect(SAMPLE_FAILURE_HINT).toContain('/admin (#405)')
+    expect(await failure('/rss.xml', () => new Response('failed', { status: 500 }))).toBe(
+      'staging route /rss.xml returned 500.'
+    )
   })
 
   it('never samples a tag, best page or moved category a reviewed manifest retires or moves (#350)', async () => {
