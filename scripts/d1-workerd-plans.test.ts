@@ -1865,6 +1865,32 @@ operations:
     }
   })
 
+  it('keeps a suggested category within its CHECKs and lists the open ones (#406)', async () => {
+    await insertDraft('sub-suggest', 'https://suggest.example/')
+    await choose('sub-suggest', 'free')
+    const set = (name: string | null, note: string | null) =>
+      db
+        .prepare(
+          `UPDATE listing_submissions SET suggested_category = ?, suggested_category_note = ?
+          WHERE id = 'sub-suggest'`
+        )
+        .bind(name, note)
+        .run()
+    await expect(set(null, 'A note alone')).rejects.toThrow(/CHECK constraint/u)
+    await expect(set('x'.repeat(61), null)).rejects.toThrow(/CHECK constraint/u)
+    await expect(set('Maps', 'x'.repeat(301))).rejects.toThrow(/CHECK constraint/u)
+    await set('Mind maps', 'Maps of ideas.')
+    expect(await all(Q.selectCategorySuggestionsPlan())).toContainEqual(
+      expect.objectContaining({
+        id: 'sub-suggest',
+        kind: 'submission',
+        name: 'Mind maps',
+        note: 'Maps of ideas.',
+        status: 'pending_badge'
+      })
+    )
+  })
+
   it('ran every exported plan builder on D1', () => {
     expect(builderNames.length).toBeGreaterThan(30)
     expect(builderNames.filter(name => !called.has(name))).toEqual([])

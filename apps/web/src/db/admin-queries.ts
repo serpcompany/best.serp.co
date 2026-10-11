@@ -2,7 +2,7 @@ import { selectAdminAllowlistPlan } from './admin-plans'
 import type { Database } from './client'
 import { toInstant } from './instants'
 import { listingWebsiteConflicts } from './listing-plans'
-import { parseTagSlugs, type StatementPlan } from './plan-support'
+import { type CategorySuggestion, parseTagSlugs, type StatementPlan } from './plan-support'
 import type {
   BadgeCheckOutcome,
   ListingLinkRel,
@@ -165,6 +165,7 @@ export function selectSubmissionReviewPlans(submissionId: string): StatementPlan
           s.badge_verified_at,s.reviewed_at,s.reviewed_by,s.reviewer_note,s.rejection_reason,
           s.rejection_category,s.withdrawal_reason,s.created_at,s.updated_at,s.content_version,
           s.listing_id,s.published_checksum,COALESCE(s.block_key,s.slug) AS block_key,s.tag_slugs,
+          s.suggested_category,s.suggested_category_note,
           u.id AS owner_user_id,u.email AS owner_email,u.created_at AS owner_created_at,
           (SELECT COUNT(*) FROM listing_submissions o
             WHERE o.owner_user_id=s.owner_user_id AND o.id!=s.id) AS owner_other_submissions,
@@ -219,7 +220,8 @@ export function selectRevisionReviewPlans(revisionId: string): StatementPlan[] {
           r.category_slug,c.name AS category_name,r.logo_url,r.video_url,r.reviewer_note,
           ${revisionHostedLogoKey('r')} AS logo_key,
           r.rejection_reason,r.reviewed_at,r.reviewed_by,r.created_at,r.updated_at,
-          r.content_version,r.tag_slugs,l.slug,l.website,l.name AS listing_name,
+          r.content_version,r.tag_slugs,r.suggested_category,r.suggested_category_note,l.slug,
+          l.website,l.name AS listing_name,
           l.checksum AS listing_checksum,
           l.link_rel AS listing_link_rel,
           CASE WHEN l.status='approved' AND l.is_active=1 AND l.published_at IS NOT NULL
@@ -624,6 +626,34 @@ export function selectAdminBestPagePlans(slug: string): StatementPlan[] {
   ]
 }
 
+/** The most open category suggestions the admin page reads (#406), as the review queue's. */
+export const SUGGESTIONS_LIMIT = QUEUE_LIMIT
+
+/**
+ * Open category suggestions (#406): each submission or revision still on its way to a decision
+ * that suggests a category, with the record it came with, so repeats show side by side, at most
+ * `limit` of them in name order. Drafts aren't submitted yet, and decided ones are closed.
+ */
+export function selectCategorySuggestionsPlan(limit = SUGGESTIONS_LIMIT): StatementPlan {
+  if (!Number.isSafeInteger(limit) || limit < 1) throw new Error('A limit is a positive integer.')
+  return {
+    sql: `SELECT 'submission' AS kind,s.id AS id,s.name AS listing_name,s.status AS status,
+        s.suggested_category AS name,s.suggested_category_note AS note,
+        c.name AS category_name,s.created_at AS created_at
+      FROM listing_submissions s LEFT JOIN categories c ON c.slug=s.category_slug
+      WHERE s.suggested_category IS NOT NULL
+        AND s.status IN ('pending_badge','verified','paid_pending_review','changes_requested')
+      UNION ALL
+      SELECT 'revision',r.id,l.name,r.status,r.suggested_category,r.suggested_category_note,
+        c.name,r.created_at
+      FROM listing_revisions r JOIN listings l ON l.id=r.listing_id
+        LEFT JOIN categories c ON c.slug=r.category_slug
+      WHERE r.suggested_category IS NOT NULL AND r.status IN ('pending_review','changes_requested')
+      ORDER BY name COLLATE NOCASE,created_at,id LIMIT ?`,
+    params: [limit]
+  }
+}
+
 // ---------------------------------------------------------------------------------------------
 // DTOs and the read operations
 
@@ -751,6 +781,8 @@ export interface SubmissionReview {
   slug: string
   status: SubmissionStatus
   submitter: Submitter | null
+  /** A category the Creator suggests (#406), or null. */
+  suggestion: CategorySuggestion | null
   /** The Creator's suggested tags (#341), or null when none were given. */
   tagSlugs: string[] | null
   updatedAt: string | null
@@ -801,6 +833,8 @@ export interface RevisionReview {
   stale: boolean
   status: RevisionStatus
   submitter: Submitter | null
+  /** A category the owner suggests (#406), or null. */
+  suggestion: CategorySuggestion | null
   /** The owner's tags (#341), or null: approval then leaves the listing's tags as they are. */
   tagSlugs: string[] | null
   updatedAt: string | null
@@ -966,7 +1000,25 @@ export interface AdminBestPage extends AdminBestPageRow {
   pool: BestPageListing[]
 }
 
+/** One open category suggestion (#406) and the submission or revision it came with. */
+export interface CategorySuggestionRow {
+  /** The primary category the record names meanwhile. */
+  categoryName: string | null
+  createdAt: string | null
+  id: string
+  kind: 'revision' | 'submission'
+  listingName: string
+  name: string
+  note: string | null
+  status: string
+}
+
 type Row = Record<string, unknown>
+
+function suggestionOf(row: Row): CategorySuggestion | null {
+  const name = optionalText(row.suggested_category)
+  return name ? { name, note: optionalText(row.suggested_category_note) } : null
+}
 
 function parseListingTags(value: unknown): ListingTag[] {
   if (typeof value !== 'string' || !value) return []
@@ -1076,6 +1128,10 @@ export interface AdminReadOperations {
   listAdminBestPages(asOf: string): Promise<AdminBestPageRow[]>
   listAdminCategories(asOf: string): Promise<AdminCategory[]>
   listAdminTags(asOf: string): Promise<AdminTag[]>
+  /** Up to `limit` (500) open suggestions, and whether there are more. */
+  listCategorySuggestions(
+    limit?: number
+  ): Promise<{ rows: CategorySuggestionRow[]; truncated: boolean }>
   listReviewQueue(view: ReviewQueueView): Promise<ReviewQueueItem[]>
   reviewQueueCounts(): Promise<ReviewQueueCounts>
   searchListings(
@@ -1236,6 +1292,7 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
         stale: text(row.base_checksum) !== text(row.listing_checksum),
         status: text(row.status) as RevisionStatus,
         submitter: submitter(row),
+        suggestion: suggestionOf(row),
         tagSlugs: parseTagSlugs(row.tag_slugs),
         updatedAt: toInstant(row.updated_at),
         videoUrl: optionalText(row.video_url),
@@ -1301,6 +1358,7 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
         slug: text(row.slug),
         status: text(row.status) as SubmissionStatus,
         submitter: submitter(row),
+        suggestion: suggestionOf(row),
         tagSlugs: parseTagSlugs(row.tag_slugs),
         updatedAt: toInstant(row.updated_at),
         verificationAttempts: Number(row.verification_attempts ?? 0),
@@ -1373,6 +1431,24 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
     async listAdminTags(asOf) {
       const result = await statement(selectAdminTagsPlan(asOf)).all<Row>()
       return result.results.map(tagRow)
+    },
+
+    async listCategorySuggestions(limit = SUGGESTIONS_LIMIT) {
+      // One more than shown says whether there are more.
+      const result = await statement(selectCategorySuggestionsPlan(limit + 1)).all<Row>()
+      const rows = result.results.slice(0, limit).map(
+        (row): CategorySuggestionRow => ({
+          categoryName: optionalText(row.category_name),
+          createdAt: toInstant(row.created_at),
+          id: text(row.id),
+          kind: text(row.kind) === 'revision' ? 'revision' : 'submission',
+          listingName: text(row.listing_name),
+          name: text(row.name),
+          note: optionalText(row.note),
+          status: text(row.status)
+        })
+      )
+      return { rows, truncated: result.results.length > limit }
     },
 
     async listActiveCategories() {

@@ -425,6 +425,58 @@ describe('native submission intake', () => {
     expect(count('listing_submissions')).toBe(1)
   })
 
+  it('stores a suggested category with its note, keeps it through an edit, and clears it (#406)', async () => {
+    const stored = () =>
+      sqlite.database
+        .prepare('SELECT suggested_category, suggested_category_note FROM listing_submissions')
+        .get() as { suggested_category: string | null; suggested_category_note: string | null }
+    const saved = await draft({
+      suggestedCategory: '  Mind maps ',
+      suggestedCategoryNote: ' Tools that map ideas. '
+    })
+    expect(saved).toMatchObject({
+      suggestedCategory: 'Mind maps',
+      suggestedCategoryNote: 'Tools that map ideas.'
+    })
+    // It never replaces the primary category.
+    expect(saved.categorySlug).toBe(input.categorySlug)
+    const edit = (
+      suggestion: { suggestedCategory?: string; suggestedCategoryNote?: string },
+      version: number
+    ) =>
+      operations().updateDraft({
+        content: { ...input, ...suggestion },
+        expectedContentVersion: version,
+        ownerUserId: OWNER,
+        submissionId: saved.id
+      })
+    // Left out, it stays; a name without a note keeps no note; an empty name clears it.
+    expect(await edit({}, 1)).toMatchObject({ suggestedCategory: 'Mind maps' })
+    expect(
+      await edit({ suggestedCategory: 'Mind maps', suggestedCategoryNote: '' }, 2)
+    ).toMatchObject({ suggestedCategoryNote: null })
+    expect(await edit({ suggestedCategory: '', suggestedCategoryNote: '' }, 3)).toMatchObject({
+      suggestedCategory: null,
+      suggestedCategoryNote: null
+    })
+    expect(stored()).toEqual({ suggested_category: null, suggested_category_note: null })
+    for (const [suggestion, code] of [
+      [{ suggestedCategory: '', suggestedCategoryNote: 'A note alone' }, 'invalid_suggestion'],
+      [{ suggestedCategory: 'x'.repeat(61) }, 'invalid_suggestion'],
+      [{ suggestedCategory: 'Tab\tbed' }, 'invalid_suggestion'],
+      [
+        { suggestedCategory: 'Maps', suggestedCategoryNote: 'x'.repeat(301) },
+        'invalid_suggestion_note'
+      ]
+    ] as const) {
+      const failure = await edit(suggestion, 4).catch(error => error)
+      expect(failure, JSON.stringify(suggestion)).toMatchObject({ code })
+      // Messages never repeat the input (#211).
+      expect(String(failure.message)).not.toContain('bed')
+    }
+    expect(stored()).toEqual({ suggested_category: null, suggested_category_note: null })
+  })
+
   it('chooses the free plan once and refuses an expired draft', async () => {
     const saved = await draft()
     const chosen = await operations().chooseFreePlan(saved.id, OWNER)

@@ -223,6 +223,42 @@ describe('admin review queue reads', () => {
   })
 })
 
+describe('category suggestions (#406)', () => {
+  it('reads a review’s suggestion and lists the open ones, decided and drafts left out', async () => {
+    const reads = fixture(`
+      UPDATE listing_submissions SET suggested_category = 'Mind maps',
+        suggested_category_note = 'Maps of ideas.' WHERE id = 'sub_quill';
+      UPDATE listing_submissions SET suggested_category = 'mind  maps' WHERE id = 'sub_old';
+      UPDATE listing_submissions SET suggested_category = 'Key shops' WHERE id = 'sub_keyb';
+      UPDATE listing_revisions SET suggested_category = 'Briefs' WHERE id = 'rev_brief';
+    `)
+    expect((await reads.getSubmissionReview('sub_quill'))?.suggestion).toEqual({
+      name: 'Mind maps',
+      note: 'Maps of ideas.'
+    })
+    expect((await reads.getSubmissionReview('sub_old'))?.suggestion).toEqual({
+      name: 'mind  maps',
+      note: null
+    })
+    expect((await reads.getRevisionReview('rev_brief'))?.suggestion).toEqual({
+      name: 'Briefs',
+      note: null
+    })
+    const open = await reads.listCategorySuggestions()
+    expect(open.truncated).toBe(false)
+    expect(open.rows.map(row => [row.kind, row.id, row.name, row.note])).toEqual([
+      ['revision', 'rev_brief', 'Briefs', null],
+      ['submission', 'sub_old', 'mind  maps', null],
+      ['submission', 'sub_quill', 'Mind maps', 'Maps of ideas.']
+    ])
+    // Capped like the review queue (500), saying when there are more.
+    const capped = await reads.listCategorySuggestions(2)
+    expect(capped.rows.map(row => row.id)).toEqual(['rev_brief', 'sub_old'])
+    expect(capped.truncated).toBe(true)
+    expect((await reads.listCategorySuggestions(3)).truncated).toBe(false)
+  })
+})
+
 describe('admin listing reads', () => {
   it('searches by name or slug, filters by derived state, and counts facets', async () => {
     const reads = fixture()

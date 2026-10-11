@@ -119,8 +119,9 @@ owner except filling in the form; the anonymous capability-token flow is gone.
 1. **`/submit/`** (screen 2). The form works signed out. Required: website, name, short
    description (160 characters at most), primary category (an active D1 category, a hub), and
    logo; Tags (up to three active D1 tags, the chosen category's listed first, no free text,
-   [below](#tags-and-retired-categories-341)) and the long description are optional, and FAQs
-   and links come later from the dashboard (#65). Signed out,
+   [Submission categories](./submission-taxonomy.md)), a suggested category (the same) and the
+   long description are optional, and FAQs and links come later from the dashboard (#65).
+   Signed out,
    the form is kept in this browser's `localStorage` (`bsc_submit_draft_v1`: only what was
    typed, never a token or an id), "Sign in and continue" goes to
    `/login/?callbackUrl=/submit/`, and the login card says the draft is waiting. Signed in, the
@@ -204,19 +205,10 @@ owner except filling in the form; the anonymous capability-token flow is gone.
    to the submitter and "ready for review" to `EMAIL_ADMIN_RECIPIENT`, both keyed
    `submission-verified:<id>` in the email ledger.
 
-### Tags and retired categories (#341)
+### Categories, tags, and suggestions
 
-A Creator may suggest up to three active tags (on `/submit/` and the owner's listing edit),
-stored in `tag_slugs`: null on a submission without tags, and on a revision whose tags equal the
-listing's own. Approval and payment (`createListingFromSubmissionPlans`) give the new listing
-the suggested tags still active, numbered from 0 in order. A revision approval replaces its
-tags only when `tag_slugs` is not null; a paid listing's live approval never writes tags, since
-payment did and an admin may have changed them since. A row saved before its narrow category
-retired still goes live: `resolveStagedCategorySql` (`plan-support.ts`) files it under an
-active category with that slug, else the hub of the active tag with that slug, else whatever the
-old category's `taxonomy_redirects` row leads to (a merged slug's tag, a best page's tag or
-category, or a category). The tag it finds comes first in a new or replaced set, or after a
-revision's listing's own tags. New saves still require an active category.
+The tags a Creator suggests, how a row naming a retired category still goes live, and the category
+a Creator may suggest are in [Submission categories](./submission-taxonomy.md).
 
 ### Fetching submitters' sites
 

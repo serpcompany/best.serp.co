@@ -88,10 +88,17 @@ function useTaxonomyForm<V extends { slug: string }>(input: {
   mode: Mode
   nameOf: (values: V) => string
   onSaved?: (slug: string) => void
+  /** What a create's slug follows until it is typed: the name, or a best page's keyword. */
+  slugFrom: (values: V) => string
   updateBody: (values: V, expected: V) => unknown
 }) {
   const router = useRouter()
-  const start = { ...input.empty, ...input.initial }
+  const given = { ...input.empty, ...input.initial }
+  // A create opened with a name (#406, a suggested category) starts with its slug.
+  const start =
+    input.mode === 'create' && !given.slug
+      ? { ...given, slug: slugify(input.slugFrom(given)) }
+      : given
   const [values, setValues] = useState<V>(start)
   const [slugTyped, setSlugTyped] = useState(input.mode === 'edit' || Boolean(input.initial?.slug))
   const [busy, setBusy] = useState(false)
@@ -156,6 +163,7 @@ function FormCard({
   busy,
   children,
   description,
+  embedded = false,
   error,
   formId,
   onSubmit,
@@ -165,12 +173,37 @@ function FormCard({
   busy: boolean
   children: ReactNode
   description?: string
+  /** Inside a dialog that names it: the fields and the button, without the card. */
+  embedded?: boolean
   error: string | null
   formId: string
   onSubmit: () => void
   submitLabel: string
   title: string
 }) {
+  if (embedded) {
+    return (
+      <form
+        id={formId}
+        className="flex flex-col gap-6"
+        onSubmit={event => {
+          event.preventDefault()
+          onSubmit()
+        }}
+      >
+        <FieldGroup>
+          {children}
+          {error ? <FieldError>{error}</FieldError> : null}
+        </FieldGroup>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <Button type="submit" disabled={busy}>
+            {submitLabel}
+          </Button>
+          <FieldDescription>{SAVE_NOTE}</FieldDescription>
+        </div>
+      </form>
+    )
+  }
   return (
     <Card>
       <CardHeader>
@@ -232,10 +265,13 @@ function SlugField({
 }
 
 export function CategoryForm({
+  embedded = false,
   initial,
   mode,
   onSaved
 }: {
+  /** Inside a dialog (#406): no card of its own. */
+  embedded?: boolean
   initial?: Partial<CategoryValues>
   mode: Mode
   onSaved?: (slug: string) => void
@@ -249,6 +285,7 @@ export function CategoryForm({
     mode,
     nameOf: values => values.name,
     onSaved,
+    slugFrom: values => values.name,
     updateBody: (category, expected) => ({ category, expected })
   })
   const { values } = form
@@ -258,6 +295,7 @@ export function CategoryForm({
       description={
         mode === 'create' ? 'Its page shows once a live listing is filed under it.' : undefined
       }
+      embedded={embedded}
       error={form.error}
       formId={`${id}-form`}
       onSubmit={() => void form.save()}
@@ -339,10 +377,13 @@ function CategorySelect({
 
 export function TagForm({
   categories,
+  embedded = false,
   initial,
   mode,
   onSaved
 }: {
+  /** Inside a dialog (#406): no card of its own. */
+  embedded?: boolean
   /** The active categories, one of which is the tag's hub. */
   categories: readonly CategoryChoice[]
   initial?: Partial<TagValues>
@@ -358,6 +399,7 @@ export function TagForm({
     mode,
     nameOf: values => values.name,
     onSaved,
+    slugFrom: values => values.name,
     updateBody: (tag, expected) => ({ expected, tag })
   })
   const { values } = form
@@ -365,6 +407,7 @@ export function TagForm({
     <FormCard
       busy={form.busy}
       description={mode === 'create' ? 'Its page shows once a live listing carries it.' : undefined}
+      embedded={embedded}
       error={form.error}
       formId={`${id}-form`}
       onSubmit={() => void form.save()}
@@ -429,6 +472,7 @@ export function BestPageForm({
     mode,
     nameOf: values => values.title,
     onSaved,
+    slugFrom: values => values.keyword,
     updateBody: (page, expected) => ({ expected, page })
   })
   const { values } = form

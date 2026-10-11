@@ -32,14 +32,16 @@ Column meanings and constraints are commented in `schema.ts`. By area:
   category's, or both, and `best_page_listings` pins the top positions and excludes listings that
   don't fit. `taxonomy_redirects` sends a retired or renamed category, tag, or best page URL to its
   target, held as a foreign key so a later rename keeps it current. Submissions and revisions keep
-  a Creator's suggested tags in `tag_slugs` (a JSON array of at most three, or null). The
+  a Creator's suggested tags in `tag_slugs` (a JSON array of at most three, or null), and a
+  category they suggest in `suggested_category` with an optional `suggested_category_note`
+  (#406), which only the admin reads. The
   publisher writes the taxonomy tables ([Catalog publication](./catalog-publication.md#taxonomy-operations)),
-  and so does the admin panel on the same statements ([Admin panel](./admin-panel.md#categories-tags-and-best-pages-405)),
+  and so does the admin panel on the same statements ([Admin taxonomy](./admin-taxonomy.md#categories-tags-and-best-pages-405)),
   and the catalog reads them (#345: [Public catalog](./public-catalog.md#reads)). In the app,
-  an admin sets a listing's tags ([Admin panel](./admin-panel.md#tags-341)), and approvals,
+  an admin sets a listing's tags ([Admin taxonomy](./admin-taxonomy.md#tags-341)), and approvals,
   payments, and revisions write `tag_slugs` to the listing, resolving a retired narrow
   `category_slug` through its tag or its `taxonomy_redirects` row
-  ([Submission flow](./submission-flow.md#tags-and-retired-categories-341)).
+  ([Submission categories](./submission-taxonomy.md#tags-and-retired-categories-341)).
   Write tags and memberships with `UPDATE`, or
   `INSERT … SELECT … WHERE is_active = 1`, never an upsert: SQLite fires a `BEFORE INSERT`
   trigger on an upsert's attempted insert even when it becomes an update, so the taxonomy

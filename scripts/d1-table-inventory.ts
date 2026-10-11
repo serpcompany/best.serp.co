@@ -169,7 +169,9 @@ export const applicationColumnInventory = {
     'block_covers_subdomains',
     'published_checksum',
     'content_version',
-    'tag_slugs'
+    'tag_slugs',
+    'suggested_category',
+    'suggested_category_note'
   ],
   listing_submission_resource_links: ['id', 'submission_id', 'label', 'url', 'sort_order'],
   listing_submission_faqs: ['id', 'submission_id', 'question', 'answer', 'sort_order'],
@@ -257,7 +259,9 @@ export const applicationColumnInventory = {
     'created_at',
     'updated_at',
     'content_version',
-    'tag_slugs'
+    'tag_slugs',
+    'suggested_category',
+    'suggested_category_note'
   ],
   listing_revision_resource_links: ['id', 'revision_id', 'label', 'url', 'sort_order'],
   listing_revision_faqs: ['id', 'revision_id', 'question', 'answer', 'sort_order'],

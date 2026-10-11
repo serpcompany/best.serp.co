@@ -1,4 +1,4 @@
-import { MAX_SUGGESTED_TAGS } from './schema'
+import { CATEGORY_SUGGESTION_LIMITS, MAX_SUGGESTED_TAGS } from './schema'
 
 /**
  * Credential-free statement plans (serpcompany/best.serp.co#62). A plan is an ordered list of
@@ -382,7 +382,36 @@ export interface StagedListingContent {
    * revision then leaves the listing's tags as they are). Omitted, the stored value is kept.
    */
   tagSlugs?: readonly string[] | null
+  /**
+   * A category the Creator suggests (#406), stored as `suggested_category` and its note: null for
+   * none. Omitted, the stored suggestion is kept. It never files the listing anywhere.
+   */
+  suggestedCategory?: CategorySuggestion | null
   videoUrl?: string | null
+}
+
+/** A suggested category (#406): its name, and an optional note. */
+export interface CategorySuggestion {
+  name: string
+  note: string | null
+}
+
+/** A suggestion's two columns, `[suggested_category, suggested_category_note]`, checked. */
+export function suggestionColumns(
+  suggestion: CategorySuggestion | null
+): [string | null, string | null] {
+  if (suggestion === null) return [null, null]
+  const name = suggestion.name.trim()
+  const note = suggestion.note?.trim() || null
+  if (!name || name.length > CATEGORY_SUGGESTION_LIMITS.name) {
+    throw new Error(
+      `A suggested category has a name of 1 to ${CATEGORY_SUGGESTION_LIMITS.name} characters.`
+    )
+  }
+  if (note !== null && note.length > CATEGORY_SUGGESTION_LIMITS.note) {
+    throw new Error(`A suggestion's note is at most ${CATEGORY_SUGGESTION_LIMITS.note} characters.`)
+  }
+  return [name, note]
 }
 
 /** `tag_slugs` as stored: a JSON array of tag slugs, or null (not given). */

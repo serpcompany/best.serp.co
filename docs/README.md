@@ -12,6 +12,7 @@ Each doc covers one topic. Open the one whose "read it when" matches the task.
 | [Submission and ownership data](./submission-data.md) | Submission, ownership, revision, and payment invariants; URL keys and prohibited-URL blocks | You touch a submission, owner, revision or payment table, or how URLs are keyed and blocked |
 | [Development](./development.md) | Local data, Worker preview, schema changes | You set up a checkout, run the Worker locally, or change the schema |
 | [Submission flow](./submission-flow.md) | Public intake, badge verification, review | You change `/submit` or how a submission reaches review |
+| [Submission categories](./submission-taxonomy.md) | A submission's category, suggested tags, retired-category resolution, suggested categories | You change what a submission or revision is filed under, or what a Creator may suggest |
 | [Claims](./claims.md) | Claiming an existing listing: domain-email code, badge or payment | You change the claim link, its checks, or ownership |
 | [Badge program](./badge-program.md) | Weekly badge checks, rechecks, unpublishing, ownership removal | You change the badge crons or what a failed check does |
 | [Listing media](./media.md) | Hosted logos and images: R2 keys, D1 records, rendering, local media | You add, host or move a listing image |
@@ -24,6 +25,7 @@ Each doc covers one topic. Open the one whose "read it when" matches the task.
 | [Submitter dashboard](./account-dashboard.md) | `/account`: statuses, edits, revisions, the badge panel | You change a `/account` screen |
 | [Accounts](./accounts.md) | Better Auth sign-in codes, admins, Cloudflare Access | You change sign-in, sessions, the dashboard shell, or the admin gate |
 | [Admin panel](./admin-panel.md) | `/admin` screens, decisions, the production-write exception | You change an `/admin` screen or a decision it writes |
+| [Admin taxonomy](./admin-taxonomy.md) | A listing's tags, creating and retiring categories, tags, and best pages, and category suggestions in `/admin` | You change how `/admin` edits the taxonomy, or how a suggested category is created |
 | [Staging admin key](./staging-admin-key.md) | Agents' admin API key on staging: what it allows, where it lives, use, rotation | You call staging's admin API as an agent, or change or rotate the key |
 | [Deploy runbook](./deploy-runbook.md) | Environments, workflows and their guards, production release, recovery, post-deploy checks | Before any Cloudflare operation or release, or when a deploy gate fails |
 | [Deploy credentials](./deploy-credentials.md) | The Cloudflare API token, the GitHub environments that hold it, what a leak reaches | You create, rotate or narrow the token or an environment's secrets |

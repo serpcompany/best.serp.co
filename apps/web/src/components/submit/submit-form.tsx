@@ -46,6 +46,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { featureCopy } from '@/lib/feature-copy'
 import {
   type Availability,
+  categorySuggestionErrors,
   descriptionLengthMessage,
   fieldErrors,
   hostOf,
@@ -59,6 +60,7 @@ import {
   type SubmissionSummary
 } from '@/lib/submissions/contract'
 import { cn } from '@/lib/utils'
+import { CategorySuggestionFields } from './category-suggestion'
 import {
   clearLocalDraft,
   type LocalSubmitDraft,
@@ -112,6 +114,8 @@ const FIELD_LABELS: Record<SubmissionField, string> = {
   description: 'Short description',
   logoUrl: 'Logo',
   name: 'Name',
+  suggestedCategory: 'Suggested category',
+  suggestedCategoryNote: 'Note',
   tagSlugs: 'Tags',
   website: 'Website URL'
 }
@@ -121,6 +125,8 @@ const FIELD_ORDER: SubmissionField[] = [
   'name',
   'categorySlug',
   'tagSlugs',
+  'suggestedCategory',
+  'suggestedCategoryNote',
   'description',
   'logoUrl',
   'content'
@@ -191,6 +197,10 @@ export function SubmitForm({
   const [name, setName] = useState(editing?.name ?? '')
   const [categorySlug, setCategorySlug] = useState(editing?.categorySlug ?? '')
   const [tagSlugs, setTagSlugs] = useState<string[]>(editing?.tagSlugs ?? [])
+  const [suggestion, setSuggestion] = useState({
+    name: editing?.suggestedCategory ?? '',
+    note: editing?.suggestedCategoryNote ?? ''
+  })
   const [description, setDescription] = useState(editing?.description ?? '')
   const [content, setContent] = useState(editing?.content ?? '')
   const [logoChoice, setLogoChoice] = useState<LogoChoice | null>(editing ? 'url' : null)
@@ -294,6 +304,7 @@ export function SubmitForm({
       setName(local.name)
       setCategorySlug(local.categorySlug)
       setTagSlugs(local.tagSlugs)
+      setSuggestion({ name: local.suggestedCategory, note: local.suggestedCategoryNote })
       setDescription(local.description)
       setContent(local.content)
       setLogoChoice(local.logoChoice)
@@ -324,6 +335,8 @@ export function SubmitForm({
         name,
         siteIcon,
         socialImage,
+        suggestedCategory: suggestion.name,
+        suggestedCategoryNote: suggestion.note,
         tagSlugs,
         website
       }
@@ -342,6 +355,7 @@ export function SubmitForm({
     restored,
     siteIcon,
     socialImage,
+    suggestion,
     tagSlugs,
     website
   ])
@@ -382,10 +396,18 @@ export function SubmitForm({
       description,
       logoUrl,
       name,
+      suggestedCategory: suggestion.name,
+      suggestedCategoryNote: suggestion.note,
       tagSlugs,
       website: normalizeWebsiteInput(website)
     })
-    const found = parsed.success ? {} : fieldErrors(parsed.error)
+    const found = {
+      ...(parsed.success ? {} : fieldErrors(parsed.error)),
+      ...categorySuggestionErrors({
+        suggestedCategory: suggestion.name,
+        suggestedCategoryNote: suggestion.note
+      })
+    }
     // Logos are hotlinked on https pages, so the address must be https (PR #84 review 1).
     const logoProblem = logoUrl ? logoUrlProblem(logoUrl, allowInsecureLogos) : null
     if (logoProblem && !found.logoUrl) found.logoUrl = logoProblem
@@ -416,6 +438,8 @@ export function SubmitForm({
           name,
           siteIcon,
           socialImage,
+          suggestedCategory: suggestion.name,
+          suggestedCategoryNote: suggestion.note,
           tagSlugs,
           website: normalizeWebsiteInput(website)
         },
@@ -425,7 +449,16 @@ export function SubmitForm({
       return
     }
     setPending(true)
-    const fields = { categorySlug, content, description, logoUrl, name, tagSlugs }
+    const fields = {
+      categorySlug,
+      content,
+      description,
+      logoUrl,
+      name,
+      suggestedCategory: suggestion.name,
+      suggestedCategoryNote: suggestion.note,
+      tagSlugs
+    }
     const response = editing
       ? await updateDraft(editing.id, {
           ...fields,
@@ -686,6 +719,21 @@ export function SubmitForm({
                   />
                   {errors.tagSlugs ? <FieldError>{errors.tagSlugs}</FieldError> : null}
                 </Field>
+
+                <CategorySuggestionFields
+                  id="submit-suggestion"
+                  errors={{
+                    name: errors.suggestedCategory,
+                    note: errors.suggestedCategoryNote
+                  }}
+                  name={suggestion.name}
+                  note={suggestion.note}
+                  onChange={next => {
+                    setSuggestion(next)
+                    clearError('suggestedCategory')
+                    clearError('suggestedCategoryNote')
+                  }}
+                />
 
                 <Field data-invalid={errors.description || descriptionTooLong ? true : undefined}>
                   <TaggedLabel htmlFor="submit-description" tag={sourceTag(filled.description)}>

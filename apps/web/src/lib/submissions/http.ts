@@ -133,6 +133,8 @@ export function toSummary(submission: OwnSubmission, now = new Date()): Submissi
     plan: submission.plan,
     slug: submission.slug,
     status: submission.status,
+    suggestedCategory: submission.suggestedCategory ?? '',
+    suggestedCategoryNote: submission.suggestedCategoryNote ?? '',
     tagSlugs: submission.tagSlugs,
     verificationAttempts: submission.verificationAttempts,
     website: submission.website
@@ -164,6 +166,8 @@ const FIELD_BY_CODE: Record<string, SubmissionField> = {
   invalid_description: 'description',
   invalid_logo: 'logoUrl',
   invalid_name: 'name',
+  invalid_suggestion: 'suggestedCategory',
+  invalid_suggestion_note: 'suggestedCategoryNote',
   invalid_url: 'website'
 }
 

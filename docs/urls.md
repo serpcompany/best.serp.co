@@ -112,7 +112,7 @@ publisher's affected routes) build their URLs from it.
 - **Admins manage them** in `/admin` (#405), on the publisher's operations: a rename keeps the
   page's row under its new slug and redirects its old URL there, and a retirement redirects its URL
   to the page the admin picks, so every old URL keeps answering one 308
-  ([Admin panel](./admin-panel.md#categories-tags-and-best-pages-405)).
+  ([Admin taxonomy](./admin-taxonomy.md#categories-tags-and-best-pages-405)).
 - **Rendering wins over a redirect.** A page answers its 308 only when it has nothing to show, so
   a redirect row published before its listings move takes over the moment the old page empties.
 - **A redirect never leads to a 404.** A moved URL is followed only to a target whose own page

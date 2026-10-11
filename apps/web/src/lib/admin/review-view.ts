@@ -72,6 +72,7 @@ export function submissionView(review: SubmissionReview, mediaBaseUrl: string): 
           otherSubmissions: review.submitter.otherSubmissions
         }
       : null,
+    suggestion: review.suggestion,
     tagSlugs: review.tagSlugs,
     website: review.website
   }
@@ -119,6 +120,7 @@ export function revisionView(review: RevisionReview, mediaBaseUrl: string): Revi
           otherSubmissions: review.submitter.otherSubmissions
         }
       : null,
+    suggestion: review.suggestion,
     tagSlugs: review.tagSlugs,
     website: review.website
   }
@@ -226,7 +228,22 @@ export interface ReviewView {
   stale: boolean
   status: string
   submitter: { createdAt: string | null; email: string; otherSubmissions: number } | null
+  /** A category the Creator suggests (#406), and its note, or null. */
+  suggestion: { name: string; note: string | null } | null
   /** The Creator's suggested tags (#341), or null when none were given. */
   tagSlugs: string[] | null
   website: string
+}
+
+/**
+ * The edits' tags with a tag just created from a suggested category (#406) added last, or null
+ * when they already hold `limit` and can't take it. A tag they hold already stays where it is.
+ */
+export function withCreatedTag(
+  tags: readonly string[],
+  slug: string,
+  limit: number
+): string[] | null {
+  if (tags.includes(slug)) return [...tags]
+  return tags.length >= limit ? null : [...tags, slug]
 }
