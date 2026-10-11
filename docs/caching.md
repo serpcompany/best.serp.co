@@ -82,7 +82,7 @@ read-only copies in other regions, which only reads through the Sessions API use
 itself always reads the primary.
 
 - **Only public catalog reads for an edge cache miss use a session:** the Worker entry's epoch
-  read (`withSession('first-unconstrained')`, `lib/worker/catalog.ts`) and the render of the miss
+  read (`withSession('first-primary')`, `lib/worker/catalog.ts`) and the render of the miss
   (`withSession(<bookmark>)`, `lib/catalog/repository.ts`). Writes, the admin panel, accounts,
   submissions, claims, billing, auth, the cron jobs, the entry's redirect and gone-listing seeks,
   and every bypassed render (signed in, `/search`, `/api`) read the primary;
@@ -91,9 +91,12 @@ itself always reads the primary.
   the bookmark of the read that returned that epoch, and D1 answers each statement from a copy at
   least that new (the primary while the nearest replica lags). Rows newer than the epoch can be
   read, as without replicas when a publication lands mid-render, and the next epoch replaces them.
-- **What can lag is the epoch:** a replica may answer its read, so a publication reaches pages
-  after that replica's lag plus the memo's age. An epoch shared without a bookmark (by a Worker
-  version from before #382) renders from the primary.
+- **Every epoch is the primary's:** its read starts on the primary, so a publication reaches pages
+  as fast as before, and a bypassed render, which reuses the isolate's epoch for the data cache,
+  never keys it on a lagging replica's older one (#382 review). A render reads the nearest replica
+  once that replica has caught up to the epoch read's bookmark, which the 30-second reuse leaves
+  time for, and the primary until then. An epoch shared without a bookmark (by a Worker version
+  from before #382) renders from the primary.
 - **Without replication** every statement runs on the primary: the same rows, round trips (the
   epoch read, then one batch per uncached listing) and latency as through the binding.
 - **Telemetry:** `d1_query` events carry `servedByPrimary` and `servedByRegion` where remote D1

@@ -127,23 +127,29 @@ afterEach(() => {
 describe('D1 read replication (#382)', () => {
   it('never caches rows from a lagging replica under a newer epoch', async () => {
     db.write(PUBLICATION)
-    // A Worker next to the primary reads the new epoch first and shares it with its bookmark.
-    const nearPrimary = isolate('primary')
-    expect(await nearPrimary('/products/alpha/')).toEqual({ state: 'MISS', text: 'alpha listing' })
-    // Its epoch read starts anywhere; its render, at the epoch read's bookmark.
-    expect(db.sessions).toEqual(['first-unconstrained', '00000002'])
-
-    // Another isolate in that data center reads through the replica, which still lacks the
-    // publication. It reuses the shared epoch, and its render starts at the shared bookmark, so
-    // the replica (older than the bookmark) is passed over for the primary.
+    // A Worker whose nearest copy is a replica that still lacks the publication. Its epoch read
+    // starts on the primary (epoch 2), and its render at that read's bookmark, so the replica
+    // (older than the bookmark) is passed over for the primary.
     const nearReplica = isolate('replica')
     const served = await servedDuring(async () => {
       expect(await nearReplica('/products/charlie/')).toEqual({ state: 'MISS', text: RENAMED })
     })
-    expect(db.sessions).toEqual(['first-unconstrained', '00000002', '00000002'])
+    expect(db.sessions).toEqual(['first-primary', '00000002'])
     expect(served.length).toBeGreaterThan(0)
     expect(served.every(copy => copy === 'primary')).toBe(true)
     expect(cachedDetailNames('charlie')).toEqual({ '2': RENAMED })
+
+    // Another isolate in that data center reuses the shared epoch and its bookmark: no epoch
+    // read, and its render starts at the same bookmark.
+    const sameDataCenter = isolate('replica')
+    const sharedServed = await servedDuring(async () => {
+      expect(await sameDataCenter('/products/delta/')).toEqual({
+        state: 'MISS',
+        text: 'delta listing'
+      })
+    })
+    expect(db.sessions).toEqual(['first-primary', '00000002', '00000002'])
+    expect(sharedServed.every(copy => copy === 'primary')).toBe(true)
   })
 
   it('would cache the replica’s older rows under that epoch without the bookmark', async () => {
@@ -167,23 +173,40 @@ describe('D1 read replication (#382)', () => {
     const served = await servedDuring(async () => {
       expect(await nearReplica('/products/charlie/')).toEqual({ state: 'MISS', text: RENAMED })
     })
-    expect(served.every(copy => copy === 'replica')).toBe(true)
-    // The epoch read, then the listing's one batch (#378), both on the replica.
-    expect(db.replica.roundTrips).toEqual([
-      { kind: 'statement', sql: expect.stringContaining('publication_state') },
-      { kind: 'batch', size: 4 }
+    // The epoch read on the primary, then the listing's one batch (#378) on the replica.
+    expect(served).toEqual(['primary', 'replica', 'replica', 'replica', 'replica'])
+    expect(db.primary.roundTrips).toEqual([
+      { kind: 'statement', sql: expect.stringContaining('publication_state') }
     ])
-    expect(db.primary.roundTrips).toEqual([])
+    expect(db.replica.roundTrips).toEqual([{ kind: 'batch', size: 4 }])
     expect(cachedDetailNames('charlie')).toEqual({ '2': RENAMED })
   })
 
-  it('keeps an epoch a lagging replica answered with that replica’s rows', async () => {
-    // The replica answers the epoch read too: the page is the one from before the publication,
-    // under the epoch from before it, until the replica catches up.
+  // #382 review: a bypassed render reads the primary but reuses the isolate's epoch, so that
+  // epoch must be the primary's too, or the data cache would hand a signed-in visitor the rows a
+  // lagging replica gave an anonymous miss under its older epoch.
+  it('shows signed-in visitors the primary’s data after a miss near a lagging replica', async () => {
     db.write(PUBLICATION)
     const nearReplica = isolate('replica')
-    expect((await nearReplica('/products/charlie/')).text).toBe('charlie listing')
-    expect(cachedDetailNames('charlie')).toEqual({ '1': 'charlie listing' })
+    expect((await nearReplica('/products/charlie/')).state).toBe('MISS')
+    const signedIn = { headers: { cookie: 'better-auth.session_token=a.b' } }
+    expect(await nearReplica('/products/charlie/', signedIn)).toEqual({
+      state: 'BYPASS',
+      text: RENAMED
+    })
+
+    // A newer publication the replica also lacks reaches signed-in pages once the isolate's
+    // shared epoch ages out (30 seconds), as before #382: the render reads its own epoch, on the
+    // primary.
+    db.write(`UPDATE listings SET name = 'charlie again' WHERE slug = 'charlie';
+      UPDATE publication_state SET version = version + 1 WHERE id = 1;`)
+    const later = Date.now() + 31_000
+    vi.spyOn(Date, 'now').mockReturnValue(later)
+    expect(await nearReplica('/products/charlie/', signedIn)).toEqual({
+      state: 'BYPASS',
+      text: 'charlie again'
+    })
+    expect(Object.keys(cachedDetailNames('charlie')).sort()).toEqual(['2', '3'])
   })
 
   it('reads the primary for signed-in and bypassed requests', async () => {

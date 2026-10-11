@@ -64,18 +64,19 @@ describe('catalogEpochReader (#165)', () => {
     expect(epoch.shareCatalogEpochToken).toHaveBeenCalledWith('epoch-of-a')
   })
 
-  // #382: any copy of the database may answer the epoch read; its bookmark travels with the epoch.
-  it('reads the epoch through a session any copy may answer, and keeps its bookmark', async () => {
+  // #382: the epoch read starts on the primary, so every shared epoch is the primary's (#382
+  // review); its bookmark travels with the epoch.
+  it('reads the epoch through a session that starts on the primary, and keeps its bookmark', async () => {
     const database = binding('replicated')
     const read = catalogEpochReader({ D1_RUNTIME_ENV: 'staging', DB: database }, cache(), observe)
     expect(await read(context)).toEqual({
       bookmark: 'bookmark-of-replicated',
       token: 'epoch-of-replicated'
     })
-    expect(database.withSession).toHaveBeenCalledExactlyOnceWith('first-unconstrained')
+    expect(database.withSession).toHaveBeenCalledExactlyOnceWith('first-primary')
     expect(epoch.readCatalogEpoch).toHaveBeenCalledWith(
       expect.objectContaining({
-        client: { database: 'replicated', session: 'first-unconstrained' }
+        client: { database: 'replicated', session: 'first-primary' }
       })
     )
   })

@@ -1071,11 +1071,11 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
   }, 120_000)
 
   // #382: workerd's own Sessions API under the catalog: the Worker entry's epoch read through a
-  // session any copy may answer, then a render's reads through a session at its bookmark, Drizzle
-  // queries and the listing batch included. Local D1 has no replicas, so this checks the API and
-  // the rows, not the routing (`read-replication.test.ts` covers that).
+  // session that starts on the primary, then a render's reads through a session at its bookmark,
+  // Drizzle queries and the listing batch included. Local D1 has no replicas, so this checks the
+  // API and the rows, not the routing (`read-replication.test.ts` covers that).
   it('reads the catalog through a D1 session at the epoch read’s bookmark (#382)', async () => {
-    const epochSession = checked(db).withSession('first-unconstrained')
+    const epochSession = checked(db).withSession('first-primary')
     expect(epochSession.getBookmark()).toBeNull()
     const epoch = await readCatalogEpoch({
       asOf: NOW.toISOString(),

@@ -50,10 +50,13 @@ const epochSources = new WeakMap<D1Database, EpochSource>()
  * `null` without a valid binding: the cache then stays out of the way, and the Next.js catalog
  * adapter fails closed exactly as it does without this entry.
  *
- * The epoch is read through a D1 session that any copy of the database may answer: with read
- * replication on, the nearest replica, so the epoch can trail the primary by that replica's lag,
- * as it already trails a publication by up to the memo's age. The render of a miss then reads at
- * that bookmark or newer (`catalogRenderer`). Without replication the primary answers, as before.
+ * The epoch is read through a D1 session whose first statement goes to the primary
+ * (`first-primary`), so every epoch the edge cache, the data center's share and this isolate's
+ * renders key on is the primary's, as before #382: a bypassed render, which reuses it and reads the
+ * primary, never keys the data cache on a lagging replica's older epoch (#382 review). The render
+ * of a miss then reads at the read's bookmark or newer (`catalogRenderer`): from the nearest replica
+ * once it has caught up to that bookmark, which the epoch's 30-second reuse leaves time for, and
+ * from the primary until then. Without replication the primary answers everything, as before.
  */
 export function catalogEpochReader(
   env: CatalogWorkerEnv,
@@ -69,7 +72,7 @@ export function catalogEpochReader(
       memo: new EpochMemo(async () => {
         const { cache: latestCache, observe: latestObserve } = created.latest
         const read = await loadSharedEpoch(latestCache, async () => {
-          const session = database.withSession('first-unconstrained')
+          const session = database.withSession('first-primary')
           const epoch = await readCatalogEpoch({
             asOf: new Date().toISOString(),
             client: createSessionDatabase(session),
