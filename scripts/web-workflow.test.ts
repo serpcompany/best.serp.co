@@ -372,7 +372,31 @@ describe('web workflow', () => {
   it('installs Playwright browsers without sudo-only system dependency escalation', () => {
     const runs = (workflow.jobs.e2e?.steps ?? []).map(candidate => candidate.run).filter(Boolean)
     expect(runs).toContain('pnpm --filter web test:install')
-    expect(runs).toContain('pnpm test:e2e')
+    expect(step('e2e', 'Run Playwright tests').run?.trim().split('\n').at(-1)).toBe('pnpm test:e2e')
     expect(source).not.toContain('--with-deps')
+  })
+
+  it('probes the runner beside the suite and keeps the probe when the suite fails (#393)', () => {
+    // In the suite's own step, so its lines reach the log a runner shutdown keeps; stopped when
+    // the step ends, and the suite's exit status is the step's.
+    const run = String(step('e2e', 'Run Playwright tests').run)
+    expect(run).toContain('bash scripts/e2e-resource-probe.sh "$RUNNER_TEMP/resource-probe" &')
+    expect(run).toContain(`trap 'kill "$probe" 2>/dev/null || true' EXIT`)
+    expect(run.indexOf('e2e-resource-probe.sh')).toBeLessThan(run.indexOf('pnpm test:e2e'))
+    const afterSuite =
+      "always() && steps.receipt.outcome == 'success' && steps.receipt.outputs.skip != 'true'"
+    expect(step('e2e', 'Upload test results').if).toBe(afterSuite)
+    expect(step('e2e', 'Report runner resources')).toMatchObject({
+      if: afterSuite,
+      run: 'bash scripts/e2e-resource-probe.sh --report "$RUNNER_TEMP/resource-probe"'
+    })
+    expect(step('e2e', 'Upload the resource probe')).toMatchObject({
+      if: afterSuite,
+      uses: 'actions/upload-artifact@v7',
+      with: {
+        name: `e2e-resource-probe-${expression('github.run_attempt')}`,
+        path: `${expression('runner.temp')}/resource-probe/`
+      }
+    })
   })
 })

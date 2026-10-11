@@ -525,6 +525,12 @@ describe('D1 data stays in Cloudflare', () => {
       paths: [`${expression('runner.temp')}/receipt.txt`]
     },
     {
+      // The E2E job's resource probe (web.yml, #393): memory, disk and process samples.
+      action: /^actions\/upload-artifact@/u,
+      name: /^e2e-resource-probe-\$\{\{ github\.run_attempt \}\}$/u,
+      paths: [`${expression('runner.temp')}/resource-probe/`]
+    },
+    {
       action: /^actions\/upload-artifact@/u,
       name: /^staging-smoke-\$\{\{ github\.sha \}\}-\$\{\{ github\.run_attempt \}\}$/u,
       paths: ['apps/web/playwright-report/', 'apps/web/test-results/']
