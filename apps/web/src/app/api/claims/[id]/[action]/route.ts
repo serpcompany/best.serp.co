@@ -14,6 +14,7 @@ import {
 } from '@/lib/submissions/http'
 import { badgeCheckRateLimitRules } from '@/lib/submissions/limits'
 import { submissionBadgeVerificationTargets } from '@/lib/submissions/presentation'
+import { errorFields } from '@/lib/telemetry/error-fields'
 
 export const dynamic = 'force-dynamic'
 
@@ -84,7 +85,7 @@ export async function POST(
     console.error(
       JSON.stringify({
         event: 'claim_failed',
-        message: error instanceof Error ? error.message : String(error)
+        ...errorFields(error)
       })
     )
     return apiError(500, 'claim_failed', 'Unable to update the claim.')

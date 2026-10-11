@@ -32,6 +32,8 @@ import { runMediaCron } from '../media/worker-media'
 import { verifyFeaturedBadge } from '../submissions/badge-verifier'
 import { runDraftJobs } from '../submissions/draft-jobs'
 import { submissionBadgeVerificationTargets } from '../submissions/presentation'
+import { CodedError } from '../telemetry/coded-error'
+import { errorFields } from '../telemetry/error-fields'
 
 /** Hourly, on the hour: each draft reminder goes out within an hour of falling due. */
 export const DRAFT_JOBS_CRON = '0 * * * *'
@@ -100,9 +102,14 @@ function sequentialEmail(context: ScheduledContext, env: ScheduledEnv) {
 }
 
 function database(env: ScheduledEnv): D1Database {
-  if (!env.DB) throw new Error('D1 binding DB is required for scheduled jobs.')
+  if (!env.DB) {
+    throw new CodedError('d1_binding_missing', 'D1 binding DB is required for scheduled jobs.')
+  }
   if (!runtimeEnvironments.has(env.D1_RUNTIME_ENV ?? '')) {
-    throw new Error('A valid D1_RUNTIME_ENV is required for scheduled jobs.')
+    throw new CodedError(
+      'd1_runtime_env_invalid',
+      'A valid D1_RUNTIME_ENV is required for scheduled jobs.'
+    )
   }
   return env.DB
 }
@@ -227,7 +234,7 @@ export async function handleScheduled(
         cron: event.cron,
         event: 'scheduled_job_failed',
         job: job.name,
-        message: error instanceof Error ? error.message : String(error)
+        ...errorFields(error)
       })
     }
   }

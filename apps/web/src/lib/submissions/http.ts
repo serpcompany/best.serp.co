@@ -2,6 +2,7 @@ import 'server-only'
 
 import { NextResponse } from 'next/server'
 import type { Authorization } from '@/lib/auth/guards'
+import { errorFields } from '@/lib/telemetry/error-fields'
 import {
   type ApiError,
   type Availability,
@@ -178,7 +179,7 @@ export function submissionFailure(error: unknown, fallback: string) {
   console.error(
     JSON.stringify({
       event: 'submission_request_failed',
-      message: error instanceof Error ? error.message : String(error)
+      ...errorFields(error)
     })
   )
   return apiError(500, 'internal_error', fallback)

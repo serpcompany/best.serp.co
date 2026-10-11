@@ -11,6 +11,7 @@
 import type { LegacyRootTarget } from '@/db/catalog-epoch'
 import type { TaxonomyTarget } from '@/db/contracts'
 import { getRoute } from '@/lib/routing/routes'
+import { errorFields } from '@/lib/telemetry/error-fields'
 
 /**
  * Where `/<slug>` moved, from D1 (`legacyRootTarget`): a public listing (also through a retired
@@ -181,7 +182,7 @@ export async function legacyRootRedirect(
     console.error(
       JSON.stringify({
         event: 'legacy_root_lookup_failed',
-        message: error instanceof Error ? error.message : String(error)
+        ...errorFields(error)
       })
     )
     return lookupUnavailable()

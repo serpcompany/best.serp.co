@@ -909,6 +909,11 @@ describe('fresh Drizzle D1 history', () => {
         '--var',
         'LOCAL_CLAIMS:on'
       ])
+      // The claims suite's fixed test secret (#200).
+      expect(localPreviewVarArgs('BETTER_AUTH_SECRET=e2e-test-secret')).toEqual([
+        '--var',
+        'BETTER_AUTH_SECRET:e2e-test-secret'
+      ])
       for (const refused of [
         'SITE_ENVIRONMENT=production',
         'D1_RUNTIME_ENV=production',

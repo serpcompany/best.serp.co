@@ -1,5 +1,6 @@
 import { billing } from '@/lib/billing/runtime'
 import { handleWebhook } from '@/lib/billing/service'
+import { errorFields } from '@/lib/telemetry/error-fields'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,7 +42,7 @@ export async function POST(request: Request): Promise<Response> {
     console.error(
       JSON.stringify({
         event: 'billing_webhook_failed',
-        message: error instanceof Error ? error.message : String(error)
+        ...errorFields(error)
       })
     )
     // Unprocessed: the provider retries, and the retry runs the event again.

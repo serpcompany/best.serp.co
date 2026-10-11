@@ -1,6 +1,12 @@
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
-import { adminSuiteEnabled, localD1, runStatements, type SuiteServer } from './admin-fixture'
+import {
+  adminSuiteEnabled,
+  LOCAL_EXPLORER_ENV,
+  localD1,
+  runStatements,
+  type SuiteServer
+} from './admin-fixture'
 import { listingStatements, suiteCatalogStatements } from './fixture-seed'
 
 /**
@@ -49,7 +55,7 @@ export function stagingAccessServerCommand(): string {
     `rm -rf "${state}"`,
     `mkdir -p "${state}"`,
     `HARNESS_D1_STATE_DIRECTORY="${state}" pnpm db:migrate:local`,
-    `HARNESS_D1_STATE_DIRECTORY="${state}" LOCAL_PREVIEW_VARS=${vars} PORT=${stagingAccessServer.port} pnpm tsx scripts/d1-local-preview.ts`
+    `HARNESS_D1_STATE_DIRECTORY="${state}" LOCAL_PREVIEW_VARS=${vars} ${LOCAL_EXPLORER_ENV} PORT=${stagingAccessServer.port} pnpm tsx scripts/d1-local-preview.ts`
   ].join(' && ')
 }
 

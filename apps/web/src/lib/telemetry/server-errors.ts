@@ -16,8 +16,10 @@
  *   through `registerServerSentryStarter`.
  *
  * Whichever runs second starts the SDK, so a reporting request never renders without it. This
- * module imports nothing but `./sentry` (itself import-free), so neither bundle pays for Sentry.
+ * module imports no package, only `./sentry` and `./error-fields`, which import none either, so
+ * neither bundle pays for Sentry.
  */
+import { errorFields, stackFrames } from './error-fields'
 import { stripQuery } from './sentry'
 
 /**
@@ -104,7 +106,8 @@ const loggedErrors = new WeakSet<object>()
  * A request error, as one JSON line on `console.error` for Workers Observability: `event` is
  * always `request_error`, and `digest` is the id the browser's error carries (React's "error
  * in the Server Components render", #204). Like a Sentry report it carries the error and the
- * route, never user data: the path without its query string, and no headers.
+ * route, never user data: the path without its query string, no headers, and the error's code,
+ * name and stack frames but not its message (#211).
  */
 export function logRequestError(
   error: unknown,
@@ -127,9 +130,8 @@ export function logRequestError(
       renderSource: context.renderSource,
       revalidateReason: context.revalidateReason,
       digest: typeof digest === 'string' ? digest : undefined,
-      name: thrown?.name,
-      message: thrown ? thrown.message : String(error),
-      stack: thrown?.stack
+      ...errorFields(error),
+      stack: thrown ? stackFrames(thrown) : undefined
     })
   )
 }

@@ -15,7 +15,8 @@ export function filterAndSortEntries(entries: SearchResult[], query: string): Se
       try {
         return matchesSearchQuery(entry, query)
       } catch (matchError) {
-        logger.error('Error matching entry:', {
+        logger.error('search_query_match_failed', {
+          cause: matchError,
           data: { matchError, entry },
           tags: { type: 'component' }
         })
@@ -44,7 +45,8 @@ export function validateEntries(entries: SearchResult[]): SearchResult[] {
     try {
       return canTransformToWebsiteMetadata(entry)
     } catch (validationError) {
-      logger.error('Error validating entry:', {
+      logger.error('search_entry_check_failed', {
+        cause: validationError,
         data: { validationError, entry },
         tags: { type: 'component' }
       })
@@ -59,7 +61,8 @@ export function transformAndSanitizeEntries(entries: SearchResult[]): SearchWebs
       try {
         return transformToWebsiteMetadata(entry)
       } catch (transformError) {
-        logger.error('Error transforming entry:', {
+        logger.error('search_entry_transform_failed', {
+          cause: transformError,
           data: { transformError, entry },
           tags: { type: 'component' }
         })
@@ -105,7 +108,8 @@ export function tryLenientProcessing(entries: SearchResult[]): SearchWebsiteMeta
       })
       .filter((item): item is SearchWebsiteMetadata => item !== null && item !== undefined)
   } catch (lenientError) {
-    logger.error('Error during lenient processing:', {
+    logger.error('search_lenient_processing_failed', {
+      cause: lenientError,
       data: lenientError,
       tags: { type: 'component' }
     })

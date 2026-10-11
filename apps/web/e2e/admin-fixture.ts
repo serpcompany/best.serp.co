@@ -48,6 +48,12 @@ export const accountServer: SuiteServer = {
   stateDirectory: resolve(tmpdir(), `best-serp-co-e2e-account-${playwrightPort + 5}`)
 }
 
+/**
+ * What a suite Worker's preview needs for `suiteD1`: Wrangler's Local Explorer API on (its
+ * default today, set so a change of default can't switch it off), and no Wrangler metrics.
+ */
+export const LOCAL_EXPLORER_ENV = 'X_LOCAL_EXPLORER=true WRANGLER_SEND_METRICS=false'
+
 export function adminOrigin(server: SuiteServer = adminServer): string {
   return `http://127.0.0.1:${server.port}`
 }
@@ -67,7 +73,7 @@ export function adminServerCommand(server: SuiteServer = adminServer): string {
     `rm -rf "${state}"`,
     `mkdir -p "${state}"`,
     `HARNESS_D1_STATE_DIRECTORY="${state}" pnpm db:migrate:local`,
-    `HARNESS_D1_STATE_DIRECTORY="${state}" ${previewVars}PORT=${server.port} pnpm tsx scripts/d1-local-preview.ts`
+    `HARNESS_D1_STATE_DIRECTORY="${state}" ${previewVars}${LOCAL_EXPLORER_ENV} PORT=${server.port} pnpm tsx scripts/d1-local-preview.ts`
   ].join(' && ')
 }
 
@@ -95,13 +101,14 @@ interface Requester {
 interface Reply {
   error?: string
   id: number
+  status?: number
   text?: string
 }
 
 let requester: Requester | undefined
 let requests = 0
 
-/** Posts JSON, replies with the body text or the error, then counts the reply. */
+/** Posts JSON, replies with the status and body text or the error, then counts the reply. */
 const REQUESTER_SOURCE = `
 const { workerData } = require('node:worker_threads')
 const { port, replies } = workerData
@@ -113,7 +120,7 @@ port.on('message', async ({ body, id, url }) => {
       headers: { 'content-type': 'application/json' },
       method: 'POST'
     })
-    reply = { id, text: await response.text() }
+    reply = { id, status: response.status, text: await response.text() }
   } catch (error) {
     reply = { error: String(error), id }
   }
@@ -138,7 +145,7 @@ function startRequester(): Requester {
  * POSTs JSON synchronously, as the helpers here are synchronous: one worker thread per test
  * process makes each request while this thread waits for its reply.
  */
-function postSync(url: string, body: string): string {
+function postSync(url: string, body: string): { status: number; text: string } {
   requester ??= startRequester()
   const { port, replies } = requester
   const id = ++requests
@@ -152,7 +159,7 @@ function postSync(url: string, body: string): string {
       // A late reply to a request that timed out.
       if (reply.id !== id) continue
       if (reply.text === undefined) throw new Error(`${url} failed: ${reply.error}`)
-      return reply.text
+      return { status: reply.status ?? 0, text: reply.text }
     }
     const remaining = deadline - Date.now()
     if (remaining <= 0) throw new Error(`No answer from ${url} in 30 seconds.`)
@@ -162,92 +169,116 @@ function postSync(url: string, body: string): string {
 
 interface D1QueryAnswer {
   errors?: { message?: string }[]
-  result?: { results?: { columns: string[]; rows: unknown[][] } }[] | null
+  result?: { results?: { columns?: string[]; rows?: unknown[][] } }[] | null
   success?: boolean
 }
 
 /**
- * Runs SQL on a suite Worker's local D1 through the Worker's own Miniflare: Wrangler's local
- * explorer API (`/cdn-cgi/local/explorer/api/d1/database/<id>/raw`), which reaches the same D1
- * Durable Object as the Worker's binding, so the two take turns. Never the SQLite file from this
- * process: Miniflare fails a Worker's D1 query, as "internal error", when another process writes
- * the file at the same moment, and the admin pages showed it as React #441 (#204). A `sql` of
- * several statements runs as one batch; so does `batch`, in one transaction.
+ * A seed statement with its values written in as SQL literals: the Local Explorer binds strings
+ * only. It reads SQL as `fixture-seed.ts`'s builders write it, plain `?` placeholders and
+ * single-quoted strings, and refuses anything it could misread (a comment, a quoted identifier,
+ * a numbered or named parameter) rather than guess.
  */
-function suiteD1(server: SuiteServer, body: { batch: { sql: string }[] } | { sql: string }) {
-  const url = `${adminOrigin(server)}/cdn-cgi/local/explorer/api/d1/database/${LOCAL_D1_DATABASE_ID}/raw`
-  const output = postSync(url, JSON.stringify(body))
-  let answer: D1QueryAnswer
-  try {
-    answer = JSON.parse(output) as D1QueryAnswer
-  } catch {
-    throw new Error(`Local D1 on port ${server.port} answered ${output.slice(0, 200)}`)
+function inlined(statement: SeedStatement): string {
+  const refuse = (problem: string): never => {
+    throw new Error(`Local D1 can't inline ${problem}: ${statement.sql}`)
   }
-  if (!answer.success || !answer.result) {
-    const reasons = answer.errors?.map(error => error.message).join('; ')
-    throw new Error(`Local D1 on port ${server.port} refused the query: ${reasons || output}`)
-  }
-  return answer.result
-}
-
-/** `value` as SQL: the explorer API binds only text, so numbers and NULL are written inline. */
-function sqlLiteral(value: SeedValue): string {
-  if (value === null) return 'NULL'
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) throw new Error(`Cannot write ${value} to local D1.`)
-    return String(value)
-  }
-  return q(value)
-}
-
-/** The statement with each `?` outside quoted text replaced by its parameter's literal. */
-function inlineParameters({ params, sql }: SeedStatement): string {
-  let quote: string | null = null
-  let next = 0
-  let inlined = ''
-  for (const character of sql) {
-    if (quote) {
-      if (character === quote) quote = null
-    } else if (character === "'" || character === '"') {
-      quote = character
-    } else if (character === '?') {
-      if (next >= params.length) throw new Error(`Too few parameters for: ${sql}`)
-      inlined += sqlLiteral(params[next++] as SeedValue)
+  const values = [...statement.params]
+  let quoted = false
+  let sql = ''
+  for (let index = 0; index < statement.sql.length; index += 1) {
+    const char = statement.sql[index] as string
+    const next = statement.sql[index + 1] ?? ''
+    if (char === "'") quoted = !quoted
+    if (quoted || char === "'") {
+      sql += char
       continue
     }
-    inlined += character
+    if (char === '"' || char === '`' || char === '[') refuse('a quoted identifier')
+    if ((char === '-' && next === '-') || (char === '/' && next === '*')) refuse('a comment')
+    if ((char === '?' && /\d/u.test(next)) || (/[:@$]/u.test(char) && /\w/u.test(next))) {
+      refuse('a numbered or named parameter')
+    }
+    if (char !== '?') {
+      sql += char
+      continue
+    }
+    if (values.length === 0) refuse('more placeholders than values')
+    const value = values.shift() as SeedValue
+    if (typeof value === 'number' && !Number.isFinite(value)) refuse(`the number ${value}`)
+    sql += value === null ? 'NULL' : typeof value === 'number' ? String(value) : q(value)
   }
-  if (next !== params.length) throw new Error(`Too many parameters for: ${sql}`)
-  return inlined
+  if (quoted) refuse('an unterminated string')
+  if (values.length > 0) refuse('more values than placeholders')
+  return sql
 }
 
 /**
- * Runs SQL on a suite Worker's local D1 (the admin Worker's by default) and returns the rows of a
- * single query. Rows built from values go through `runStatements` instead.
+ * Runs SQL on a suite Worker's local D1 through the Worker's own D1 Durable Object, the one its
+ * `DB` binding queries: Wrangler's Local Explorer API (`/cdn-cgi/local/explorer/api`), which
+ * every local preview serves, so this process's queries queue behind the Worker's. Never the
+ * SQLite file: workerd waits for no lock, so a Worker query that met a write from this process
+ * failed at once with a 500 "internal error", which the admin pages showed as React #441 (#200,
+ * #204). A string may hold several statements; an array runs as one batch, in one transaction.
+ * Returns the last statement's rows. Synchronous, so `localD1` and `runStatements` stay so.
+ */
+function suiteD1<T>(server: SuiteServer, statements: string | readonly SeedStatement[]): T[] {
+  const queries =
+    typeof statements === 'string'
+      ? [{ sql: statements.trim() }]
+      : statements.map(statement => ({ sql: inlined(statement) }))
+  const { status, text } = postSync(
+    `${adminOrigin(server)}/cdn-cgi/local/explorer/api/d1/database/${LOCAL_D1_DATABASE_ID}/raw`,
+    JSON.stringify(queries.length === 1 ? queries[0] : { batch: queries })
+  )
+  let answer: D1QueryAnswer | null = null
+  try {
+    answer = JSON.parse(text) as D1QueryAnswer
+  } catch {
+    // Reported below with the status.
+  }
+  if (status !== 200 || !answer?.success) {
+    const reasons = answer?.errors?.map(error => error.message).join('; ') || text.slice(0, 200)
+    const hint =
+      status === 404
+        ? " Is Wrangler's Local Explorer API on for this Worker (X_LOCAL_EXPLORER=true)?"
+        : ''
+    throw new Error(
+      `Local D1 query through Wrangler's Local Explorer API on port ${server.port} failed (${status}): ${reasons}.${hint}`
+    )
+  }
+  const { columns = [], rows = [] } = answer.result?.at(-1)?.results ?? {}
+  return rows.map(row => Object.fromEntries(columns.map((column, i) => [column, row[i]])) as T)
+}
+
+/** `suiteD1` for specs that await it (the claims suites, #200). */
+export async function workerD1<T = Record<string, unknown>>(
+  server: SuiteServer,
+  statements: string | readonly SeedStatement[]
+): Promise<T[]> {
+  return suiteD1<T>(server, statements)
+}
+
+/**
+ * Runs SQL on a suite Worker's local D1 (the admin Worker's by default), through `suiteD1`, and
+ * returns the last statement's rows. Rows built from values go through `runStatements` instead.
  */
 export function localD1<T = Record<string, unknown>>(
   sql: string,
   server: SuiteServer = adminServer
 ): T[] {
-  const trimmed = sql.trim()
-  const [answer] = suiteD1(server, { sql: trimmed })
-  if (!/^(?:SELECT|WITH)\b/iu.test(trimmed) || trimmed.replace(/;\s*$/u, '').includes(';')) {
-    return []
-  }
-  const { columns, rows } = answer?.results ?? { columns: [], rows: [] }
-  return rows.map(row => Object.fromEntries(columns.map((name, i) => [name, row[i]])) as T)
+  return suiteD1<T>(server, sql)
 }
 
 /**
  * Runs bound statements (`fixture-seed.ts`'s builders) on a suite Worker's local D1, in one
- * transaction, the way `localD1` reaches it.
+ * transaction, through `suiteD1`.
  */
 export function runStatements(
   statements: readonly SeedStatement[],
   server: SuiteServer = adminServer
 ): void {
-  if (statements.length === 0) return
-  suiteD1(server, { batch: statements.map(statement => ({ sql: inlineParameters(statement) })) })
+  if (statements.length > 0) suiteD1(server, statements)
 }
 
 /** SQL string literal. */
@@ -260,7 +291,7 @@ export function unique(): string {
 }
 
 /** A documentation-range client IP per request context, for the local sign-in limits. */
-function uniqueIp(): string {
+export function uniqueIp(): string {
   const octet = () => Math.floor(Math.random() * 250) + 1
   return `198.19.${octet()}.${octet()}`
 }

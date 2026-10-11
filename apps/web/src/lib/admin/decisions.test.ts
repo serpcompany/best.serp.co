@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createAdminReadOperations } from '@/db/admin-queries'
 import { createDatabase } from '@/db/client'
 import { insertPublishedListing, SqliteD1 } from '@/db/test-support'
+import { BillingProviderError } from '../billing/provider'
 import {
   type AdminContext,
   addAdmin,
@@ -390,7 +391,9 @@ describe('submission decisions', () => {
     // pending, and a replay of the rejection retries it.
     const refundRejectedSubmission = vi
       .fn<(input: { actor: string; submissionId: string }) => Promise<void>>()
-      .mockRejectedValueOnce(new Error('provider down'))
+      .mockRejectedValueOnce(
+        new BillingProviderError('Stripe is unreachable.', 'provider_unreachable', 503)
+      )
       .mockResolvedValue(undefined)
     const reject = () =>
       rejectSubmission(context({ refunds: { refundRejectedSubmission } }), {
@@ -405,6 +408,10 @@ describe('submission decisions', () => {
       refunded: false,
       replayed: false
     })
+    // The failure's code, never its message (#211).
+    expect(error.mock.calls.map(([line]) => JSON.parse(String(line)))).toEqual([
+      { code: 'provider_unreachable', event: 'admin_refund_failed', name: 'BillingProviderError' }
+    ])
     error.mockRestore()
     expect(row("SELECT is_active FROM listings WHERE id='lst_brief'")).toEqual({ is_active: 0 })
     expect(

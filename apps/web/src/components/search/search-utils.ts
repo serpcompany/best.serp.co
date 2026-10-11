@@ -29,7 +29,8 @@ export function canTransformToWebsiteMetadata(entry: SearchResult): boolean {
 
     return true
   } catch (error) {
-    logger.error('Error checking entry validity:', {
+    logger.error('search_entry_check_failed', {
+      cause: error,
       data: { error, entry },
       tags: { type: 'component' }
     })
@@ -60,7 +61,8 @@ export function transformToWebsiteMetadata(entry: SearchResult): SearchWebsiteMe
       publishedAt: ''
     }
   } catch (error) {
-    logger.error('Error transforming entry:', {
+    logger.error('search_entry_transform_failed', {
+      cause: error,
       data: { error, entry },
       tags: { type: 'component' }
     })
@@ -97,7 +99,8 @@ export function matchesSearchQuery(entry: SearchResult, query: string): boolean 
 
     return searchTerms.every(term => searchableFields.some(field => field?.includes(term)))
   } catch (error) {
-    logger.error('Error matching query:', {
+    logger.error('search_query_match_failed', {
+      cause: error,
       data: { error, entry, query },
       tags: { type: 'component' }
     })

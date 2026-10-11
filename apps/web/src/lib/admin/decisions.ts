@@ -70,6 +70,7 @@ import {
 } from '@/db/submission-plans'
 import { hasFileExtension } from '@/lib/file-extensions'
 import { isReservedListingSlug } from '@/lib/site/site-routes'
+import { errorFields } from '@/lib/telemetry/error-fields'
 import type { AppEmailTemplates } from '../email/registry'
 import type { EmailRequest } from '../email/service'
 import type { TemplateInput } from '../email/templates'
@@ -378,7 +379,7 @@ async function afterRejection(
       return { refundPending: false, refunded: true }
     } catch (error) {
       log(context, 'refund_rejected_submission', submissionId, 'refund_pending')
-      console.error(error)
+      console.error(JSON.stringify({ event: 'admin_refund_failed', ...errorFields(error) }))
       return { refundPending: true, refunded: false }
     }
   }

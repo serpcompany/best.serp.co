@@ -50,12 +50,14 @@ describe('instrumentation (#48, #355)', () => {
     expect(sentry.captureRequestError).not.toHaveBeenCalled()
     const line = String(logged.mock.calls[0]?.[0])
     expect(JSON.parse(line)).toMatchObject({
+      code: 'UNKNOWN',
       event: 'request_error',
-      message: 'render failed',
+      name: 'Error',
       path: '/products/fixture-studio/',
       route: '/(site)/products/[slug]'
     })
     expect(line).not.toContain('session=1')
+    expect(line).not.toContain('render failed')
   })
 
   it('reports a signed-in or operational surface error to Sentry, and logs it', async () => {
@@ -72,11 +74,14 @@ describe('instrumentation (#48, #355)', () => {
     expect(sentry.startServerSentry).toHaveBeenCalled()
     expect(sentry.captureRequestError).toHaveBeenCalledWith(error, request, routeContext)
     expect(logged).toHaveBeenCalledTimes(1)
-    expect(JSON.parse(String(logged.mock.calls[0]?.[0]))).toMatchObject({
+    const line = String(logged.mock.calls[0]?.[0])
+    expect(JSON.parse(line)).toMatchObject({
+      code: 'UNKNOWN',
       event: 'request_error',
-      message: 'webhook failed',
+      name: 'Error',
       path: '/api/billing/webhook/'
     })
+    expect(line).not.toContain('webhook failed')
   })
 
   it('logs an admin render error with the digest the browser shows, Sentry or not (#204)', async () => {
@@ -103,16 +108,18 @@ describe('instrumentation (#48, #355)', () => {
       expect.anything()
     )
     expect(logged).toHaveBeenCalledTimes(1)
-    expect(JSON.parse(String(logged.mock.calls[0]?.[0]))).toMatchObject({
+    const line = String(logged.mock.calls[0]?.[0])
+    expect(JSON.parse(line)).toMatchObject({
+      code: 'UNKNOWN',
       digest: '2913577842',
       event: 'request_error',
-      message: 'Accounts are unavailable.',
       name: 'AuthConfigurationError',
       path: '/admin/listings/fixture-studio/',
       renderSource: 'react-server-components-payload',
       route: '/(dashboard)/admin/listings/[slug]',
       routeType: 'render'
     })
+    expect(line).not.toContain('Accounts are unavailable.')
   })
 
   it('logs a surface error whose Sentry SDK fails to start', async () => {
@@ -131,8 +138,8 @@ describe('instrumentation (#48, #355)', () => {
     expect(sentry.captureRequestError).not.toHaveBeenCalled()
     expect(logged).toHaveBeenCalledTimes(1)
     expect(JSON.parse(String(logged.mock.calls[0]?.[0]))).toMatchObject({
+      code: 'UNKNOWN',
       event: 'request_error',
-      message: 'admin render failed',
       path: '/admin/listings/'
     })
   })

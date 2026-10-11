@@ -1513,8 +1513,10 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
       if (!results.every(result => result.success)) throw new Error('D1 catalog query failed.')
       return null
     }
-    // Every statement is reported before anything can refuse the rows. The related statement's
-    // placeholder row (nothing related) is not a result row.
+    // Every statement whose shape is known is reported before anything can refuse the rows. The
+    // related statement's shape is unknown only for a listing without a primary category, which
+    // the triggers prevent; it is not reported then. Its placeholder row (nothing related) is not
+    // a result row.
     const relatedShape = relatedQueryShape(relatedResult.results[0])
     observe(queryEvent('listing-detail', 'listing-detail', detailResult, wallDurationMs))
     if (relatedShape) {

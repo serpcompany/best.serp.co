@@ -1,4 +1,5 @@
 import { site } from '@/lib/site'
+import { CodedError } from '../../telemetry/coded-error'
 import { isLocalWorker, type OrdersEnv } from '../flags'
 import type { BillingProvider } from '../provider'
 import { createStripeProvider, type StripePrices } from './stripe'
@@ -57,9 +58,17 @@ export function stripeKeyAllowed(key: string, environment: string | undefined): 
 
 function stripeApiBase(env: ProviderEnv): string | undefined {
   if (!env.LOCAL_STRIPE_MOCK_PORT) return undefined
-  if (!isLocalWorker(env)) throw new Error('LOCAL_STRIPE_MOCK_PORT is for a local Worker only.')
+  if (!isLocalWorker(env)) {
+    throw new CodedError(
+      'billing_mock_port_not_local',
+      'LOCAL_STRIPE_MOCK_PORT is for a local Worker only.'
+    )
+  }
   if (!/^\d{2,5}$/u.test(env.LOCAL_STRIPE_MOCK_PORT)) {
-    throw new Error('LOCAL_STRIPE_MOCK_PORT must be a port number.')
+    throw new CodedError(
+      'billing_mock_port_invalid',
+      'LOCAL_STRIPE_MOCK_PORT must be a port number.'
+    )
   }
   return `http://127.0.0.1:${env.LOCAL_STRIPE_MOCK_PORT}`
 }
@@ -68,15 +77,21 @@ export function createConfiguredProvider(env: ProviderEnv): BillingProvider {
   const secretKey = env.STRIPE_SECRET_KEY?.trim() ?? ''
   const webhookSecret = env.STRIPE_WEBHOOK_SECRET?.trim() ?? ''
   if (!secretKey || !webhookSecret) {
-    throw new Error(`${STRIPE_SECRET_KEY_SECRET} and ${STRIPE_WEBHOOK_SECRET_SECRET} are required.`)
+    throw new CodedError(
+      'billing_secrets_missing',
+      `${STRIPE_SECRET_KEY_SECRET} and ${STRIPE_WEBHOOK_SECRET_SECRET} are required.`
+    )
   }
   if (!stripeKeyAllowed(secretKey, env.D1_RUNTIME_ENV)) {
-    throw new Error(`${STRIPE_SECRET_KEY_SECRET} is not a key for this environment.`)
+    throw new CodedError(
+      'billing_secret_key_wrong_mode',
+      `${STRIPE_SECRET_KEY_SECRET} is not a key for this environment.`
+    )
   }
   if (site.submissions.automaticTax) {
     // Tax changes what Stripe charges, and the ledger refuses a charge that doesn't match the
     // order (and refunds it), so Stripe Tax stays off until billing handles it.
-    throw new Error('Stripe Tax is not supported by billing yet.')
+    throw new CodedError('billing_tax_unsupported', 'Stripe Tax is not supported by billing yet.')
   }
   const live = env.D1_RUNTIME_ENV === 'production'
   return createStripeProvider({

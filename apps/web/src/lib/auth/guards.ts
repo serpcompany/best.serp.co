@@ -10,6 +10,7 @@
  * revokes admin access on the next request.
  */
 import type { AdminStatus } from '@/db/auth'
+import { errorFields } from '@/lib/telemetry/error-fields'
 
 export interface SessionUser {
   email: string
@@ -74,7 +75,7 @@ function log(reason: string, error: unknown): void {
   console.error(
     JSON.stringify({
       event: 'auth_guard_error',
-      message: error instanceof Error ? error.message : String(error),
+      ...errorFields(error),
       reason
     })
   )
