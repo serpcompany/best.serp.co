@@ -134,7 +134,7 @@ describe('a cached listing content tree (#334)', () => {
 
   it('scans a long bare URL once, so hostile runs stay fast (#379 review)', () => {
     // Each run, 20 KB without whitespace, is followed by 200 emails. Checking the text before
-    // each email for a URL took about 11 s on this body; one forward scan takes milliseconds.
+    // each email for a URL took about 19 s on this body; one forward scan takes milliseconds.
     const emails = Array.from({ length: 200 }, (_, index) => `u${index}@example.test`).join(' ')
     const body = `${'www.'.repeat(5000)} ${emails}\n\n${'http://'.repeat(3000)}?to=sales@example.test ${emails}`
     const markup = renderToStaticMarkup(cached(body, false))
