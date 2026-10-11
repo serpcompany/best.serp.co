@@ -37,12 +37,13 @@
 #                                      and plusdocs.com for the owner to pick; the default keeps the listing #333
 #                                      already categorized and #349 tagged (notion.ai, plusai.com), so nothing live
 #                                      moves.
-#   Kept although #333 or #349 flagged them (no owner rule removes them): hardware (eightsleep.com), academic-integrity
-#   flags (collegetools.io, gptinf.com, studycrumb.com), betting predictions (sportsprediction.ai), and a collection of
-#   AI entertainment tools whose copy mentions virtual girlfriends (boredhumans.com, not built for adult content under
-#   the owner's 2026-10-09 #260 decision). Open owner call: graydient.ai (Pirate Diffusion), which permits NSFW image
-#   generation once activated; kept until the owner decides. A listing is filed by what its link lands on when that
-#   is the product (studycrumb.com, flyingdog.de). Retirements never feature in a sample.
+#   Kept although #333 or #349 flagged them, as the owner decided on 2026-10-12 (#404): hardware (eightsleep.com),
+#   academic-integrity flags (collegetools.io, gptinf.com, studycrumb.com), betting predictions (sportsprediction.ai),
+#   a collection of AI entertainment tools whose copy mentions virtual girlfriends (boredhumans.com, not built for adult
+#   content under the owner's 2026-10-09 #260 decision), and graydient.ai (Pirate Diffusion), which permits NSFW image
+#   generation once activated. The same decision keeps notion.ai and plusai.com over their duplicates. A listing is
+#   filed by what its link lands on when that is the product (studycrumb.com, flyingdog.de). Retirements never feature
+#   in a sample.
 # unpublished: each of the 585 unpublished listings filed under Other but one, re-filed under a hub with no tags
 #   (design 1.5: unpublished approved listings are re-filed, so their 410 doesn't become a 404 and Republish keeps
 #   working). basis is where the hub comes from: #340's audit category, then #333's cluster or held category, mapped
@@ -319,7 +320,7 @@ listings:
   hub: image-design
   tags:
   - ai-image-generators
-  evidence: 'Pirate Diffusion, a Stable Diffusion image generator; the link ends on piratediffusion.com, the same product, which mentions lifting ''the NSFW restrictions'' once a bot is activated. #333 held it for that flag: an open owner call under the no-adult rule (#260), kept until the owner decides'
+  evidence: 'Pirate Diffusion, a Stable Diffusion image generator; the link ends on piratediffusion.com, the same product, which mentions lifting ''the NSFW restrictions'' once a bot is activated. #333 held it for that flag; the owner decided on 2026-10-12 (#404) to keep it under the no-adult rule (#260)'
 - slug: handyplugins.co
   id: lst_c240fb9ef00b72f8100876c1
   hub: developer-tools
