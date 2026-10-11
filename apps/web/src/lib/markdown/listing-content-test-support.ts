@@ -1,7 +1,8 @@
 /**
  * Listing bodies for the content tree tests (#334): every Markdown construct a body can hold,
  * including the ones react-markdown rewrites (raw HTML, unsafe URLs) or GitHub-flavored Markdown
- * adds (tables, footnotes, task lists, autolinks, strikethrough). Hosts are `.test` (#311).
+ * adds (tables, footnotes, task lists, strikethrough), and bare URLs, which stay text (#377).
+ * Hosts are `.test` (#311).
  */
 export const KITCHEN_SINK_BODY = String.raw`# Fixture Studio Review
 
@@ -16,7 +17,8 @@ Links: [inline](https://studio.test/a "With a title"), [relative](/products/fixt
 [anchor](#what-this-page-shows), [mail](mailto:hello@studio.test),
 [short link](https://serp.ly/fixture-studio), [short link with query](https://serp.ly/x?y=1#z),
 [already tagged](https://serp.ly/a?via=other), [script](javascript:alert(1)), [reference][ref],
-<https://auto.test/path>, www.literal.test, https://bare.test/x?y=1 and hello@studio.test.
+<https://auto.test/path>, www.literal.test, https://bare.test/x?y=1 and hello@studio.test, and
+an escaped https://bare.test/engines/\[model\]/run?aff=YOUR\_CODE.
 
 [ref]: https://ref.test/page "Ref title"
 
