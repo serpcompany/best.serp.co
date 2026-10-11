@@ -41,7 +41,6 @@ import {
   retryPublicationRace,
   WORKFLOW
 } from './decisions'
-import { isFeatureListing } from './feature-listings'
 import { isTaxonomySlug, TAXONOMY_LIMITS } from './taxonomy-fields'
 
 /** One row of `selectTaxonomyStatePlan`. */
@@ -951,18 +950,19 @@ async function setBestPagePinsOnce(
   if (input.pins.length > item.listSize) {
     return failure(422, 'invalid_pins', `Pin at most ${item.listSize} listings.`)
   }
-  if (input.pins.some(pin => isFeatureListing(pin.id))) {
+  const page = await createAdminReadOperations({ client: context.client }).getAdminBestPage(
+    input.slug
+  )
+  const pool = new Map(page?.pool.map(listing => [listing.id, listing]))
+  // D1's `is_feature_listing` (#409), set by reviewed manifests from #349's mapping.
+  if (input.pins.some(pin => pool.get(pin.id)?.featureListing)) {
     return failure(
       422,
       'feature_listing',
       'A listing that names a feature of a larger site can’t be pinned.'
     )
   }
-  const page = await createAdminReadOperations({ client: context.client }).getAdminBestPage(
-    input.slug
-  )
-  const pool = new Map(page?.pool.map(listing => [listing.id, listing.slug]))
-  if (input.pins.some(pin => pool.get(pin.id) !== pin.slug)) {
+  if (input.pins.some(pin => pool.get(pin.id)?.slug !== pin.slug)) {
     return failure(
       422,
       'invalid_pins',

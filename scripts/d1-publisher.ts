@@ -481,6 +481,24 @@ const operation = z.discriminatedUnion('action', [
     })
     .strict(),
   /**
+   * Marks a listing as naming one feature, add-on, model, or sub-tool of a larger site, or clears
+   * the mark (#409: #349's `featureListings`, which a best page never pins), compared and swapped
+   * on its slug and current flag (`expected`), so it is row-level. The flag changes no public page
+   * and no content that revisions and admin edits compare, so, like `listing-tags-set`, it keeps
+   * the listing's checksum and `updated_at` and allows a listing whose own submission is in review.
+   * Refused when the listing isn't approved.
+   */
+  z
+    .object({
+      action: z.literal('listing-feature-listing-set'),
+      id: listingId,
+      slug: existingSlug,
+      reason: z.string().trim().min(1).max(200),
+      expected: z.boolean(),
+      featureListing: z.boolean()
+    })
+    .strict(),
+  /**
    * Holds a listing's instant claim for the owner's review (#67, #108 review round 3): #100's
    * owner-review sets, or one an admin names. Row-level guarded: the listing must still have this
    * slug and, with `expected`, this website. An active hold is left as it is; a cleared one is
@@ -793,9 +811,9 @@ export const manifestConcurrency = ['publication', 'rows'] as const
  * category (#333: its insert refuses the batch when the slug exists, retired or not), a slug
  * redirect (#338: an unpublished source, a live target, no redirect for the slug, no chain or
  * loop, all still true at the end of the batch), a listing's name, short description, and website
- * (#340: `expected`), a listing's resource links (#376: `expected`, every link in order), and
- * every taxonomy operation (#344: each compares the tag, best page, listing, or redirect it
- * changes).
+ * (#340: `expected`), a listing's resource links (#376: `expected`, every link in order), its
+ * feature-of-a-larger-site flag (#409: `expected`), and every taxonomy operation (#344: each
+ * compares the tag, best page, listing, or redirect it changes).
  */
 const rowLevelActions = new Set<string>([
   'listing-media-update',
@@ -804,6 +822,7 @@ const rowLevelActions = new Set<string>([
   'listing-categories-set',
   'listing-details-set',
   'listing-resources-set',
+  'listing-feature-listing-set',
   'listing-content-remove-suffix',
   'listing-unpublish',
   'listing-claim-hold-add',
@@ -841,7 +860,7 @@ export const manifestSchema = z
           context.addIssue({
             code: z.ZodIssueCode.custom,
             message:
-              'A row-level manifest holds only listing-media-update, listing-categories-add/-remove/-set, listing-details-set, listing-resources-set, listing-content-remove-suffix, listing-unpublish, listing-claim-hold-add/-clear, listing-slug-redirect, category-create/-unpublish, and taxonomy (tag-*, listing-tags-set, best-page-*, taxonomy-redirect-set) operations.',
+              'A row-level manifest holds only listing-media-update, listing-categories-add/-remove/-set, listing-details-set, listing-resources-set, listing-feature-listing-set, listing-content-remove-suffix, listing-unpublish, listing-claim-hold-add/-clear, listing-slug-redirect, category-create/-unpublish, and taxonomy (tag-*, listing-tags-set, best-page-*, taxonomy-redirect-set) operations.',
             path: ['operations', index, 'action']
           })
         }
@@ -970,6 +989,12 @@ export const manifestSchema = z
             })
         })
       }
+      if (op.action === 'listing-feature-listing-set' && op.featureListing === op.expected)
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'The listing already has this flag.',
+          path: ['operations', index, 'featureListing']
+        })
       if (op.action === 'listing-media-update') {
         const keyed = [
           ...(op.media.logo ? [['logo', op.media.logo.key] as const] : []),
@@ -1777,6 +1802,30 @@ export function buildPublicationPlan(
         )
       )
       routes.add(listingRoute(op.slug))
+    }
+    if (op.action === 'listing-feature-listing-set') {
+      statements.push(
+        // Compared and swapped on the slug and the flag. No public page changes, so neither the
+        // checksum nor `updated_at` (sitemap lastmod) moves, and no route is recorded. Bound as
+        // 1 or 0: D1's REST API takes bindings as JSON, where a boolean isn't a SQLite integer.
+        statement(
+          "UPDATE listings SET is_feature_listing=? WHERE id=? AND slug=? AND status='approved' AND is_feature_listing=?",
+          op.featureListing ? 1 : 0,
+          op.id,
+          op.slug,
+          op.expected ? 1 : 0
+        ),
+        changedOne(
+          `listing-feature-listing-set ${op.slug}: the listing is not approved, or its slug or feature flag changed since the manifest`
+        ),
+        // The admin panel's activity record for an edit (#64): "Details edited: feature listing".
+        statement(
+          "INSERT INTO listing_events (listing_id,event_type,detail,actor) VALUES (?,'edited',?,?)",
+          op.id,
+          JSON.stringify({ fields: ['feature listing'], manifest: manifest.id, reason: op.reason }),
+          manifest.provenance.actor
+        )
+      )
     }
     if (op.action === 'listing-media-update') {
       const expected = expectedMediaJson(op.expected)

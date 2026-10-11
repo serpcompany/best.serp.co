@@ -37,7 +37,8 @@ export const applicationColumnInventory = {
     'updated_at',
     'display_order',
     'source',
-    'link_rel'
+    'link_rel',
+    'is_feature_listing'
   ],
   listing_categories: ['listing_id', 'category_id', 'sort_order', 'is_primary'],
   tags: [
