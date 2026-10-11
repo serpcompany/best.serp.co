@@ -23,7 +23,7 @@ catalog's data moves, through reviewed files (#349). The operations are in
   out: listings under a retired category, the listings #337, #358, and `other-removals` retire, and
   the held listings. A slug redirect source filed under a narrow category is re-filed without tags,
   or the category could never retire (#337's `lambdalabs.com` and `timelyapp.com`). The rest of
-  Other stays there until #351.
+  Other stays there until [Retiring Other](#retiring-other-351) moves it.
 - **Manifests.** `pnpm catalog:taxonomy` (`scripts/taxonomy-manifest.ts`) writes
   `d1/publications/2026-10-10-taxonomy-*.yaml`, each planning at most 2,000 statements, in three
   phases ([Taxonomy operations](./catalog-publication.md#taxonomy-operations)): `-01a-create` (hubs,
@@ -78,3 +78,66 @@ apps/web/wrangler.jsonc --command "<check>"`, where the database is `best-serp-c
 A refused batch writes nothing. If it refused only because of the review queue or a revision, clear
 that and publish the same manifest again. Regenerate only when a listing itself changed: it keeps
 its batch, so only that batch's file changes.
+
+## Retiring Other (#351)
+
+Step 10 of #341 files what the taxonomy left in Other under hubs, then retires Other with a
+permanent redirect to `/products/`, through the same kind of reviewed files.
+
+- **Inventory.** `d1/hygiene/2026-10-11-other-residue-inventory.json`: the 726 approved listings the
+  committed manifests leave filed under Other (141 live, 585 unpublished), from the reviewed catalog
+  above replayed through the manifests `otherRetirementInputManifests` names (this page's 25, and
+  #376's links). Each has its copy, #333's proposal and flag, #340's verdict, the manifest that
+  unpublished it, and, if live, what its website showed (the [listing domain
+  check](./catalog-hygiene.md#the-check)'s fetcher and classifier). Staging D1 matched it on
+  2026-10-11. `pnpm catalog:other-retirement -- inventory` rebuilds it, keeping the recorded
+  checks; `-- inventory --check` checks the websites again.
+- **Mapping.** `d1/hygiene/2026-10-11-other-residue.yaml`: each live listing moves to a hub, with
+  the existing tags it squarely fits, or retires, each with its evidence. Retirements follow the
+  owner's decisions for the same kind of listing: #340's decision 1 (dead, hijacked, not a
+  product), the owner's removal of traffic bots as spam (#333), #340's decision 2 (wrong copy,
+  `unowned`), and #332's duplicates (`unowned`, then a slug redirect to the listing that stays).
+  Each unpublished listing is re-filed under a hub, so its 410 stays a 410 (design 1.5), but the
+  adult listing, which stays in Other and answers 404 as #260's do. The header records the rules.
+- **Manifests.** `pnpm catalog:other-retirement` (`scripts/other-retirement.ts`) writes
+  `d1/publications/2026-10-11-other-retirement-*.yaml`, each planning at most 2,000 statements:
+  `-01-removals` (`listing-unpublish` of the retirements, then `taxonomy-redirect-set` of
+  `/products/categories/other/` to the directory), `-02-move-NN` (`listing-categories-set` to the
+  hub alone, and `listing-tags-set` for a listing that stays live), and `-03-retire` (the
+  duplicates' `listing-slug-redirect`, then `category-unpublish other`). A listing keeps its `-02`
+  batch when they are regenerated. Other's page renders over its redirect while it has a public
+  listing, so it turns into a 308 the moment the last one moves.
+- **Tests.** `scripts/other-retirement.test.ts` keeps the inventory and manifests identical to what
+  the committed files generate, and replays every phase on the fixture and scale catalogs and on the
+  reviewed catalog after this page's manifests: Other ends retired, empty but for the listings the
+  mapping leaves there, redirected to `/products/`, every published listing has one category, the
+  counts are the mapping's, and each duplicate's slug redirects. It runs the checks below as
+  written here.
+
+### Publishing the retirement
+
+Publish it on an environment after that environment has every manifest above, in file order, in
+one sitting: `-01-removals`, every `-02-move-NN`, then `-03-retire`. Before it, run these read-only
+checks the same way as the ones above and expect no rows:
+
+1. **No submission in review** and **no owner revision open**, the two checks above, for the same
+   reasons: a move refuses the first and gives the listing a new checksum.
+2. **Nothing in flight names Other.** Once Other retires, a submission or revision that names it
+   can't go live: a paid draft fails at payment. Approve each in `/admin` with a hub, or reject it:
+
+   ```sql
+   SELECT 'submission' AS kind, id, slug, status FROM listing_submissions WHERE category_slug='other' AND status IN ('draft','pending_badge','verified','paid_pending_review','changes_requested') UNION ALL SELECT 'revision', r.id, l.slug, r.status FROM listing_revisions r JOIN listings l ON l.id=r.listing_id WHERE r.category_slug='other' AND r.status IN ('pending_review','changes_requested') ORDER BY 1, 3
+   ```
+
+3. **Before `-03-retire`: nothing filed under Other that `category-unpublish` refuses**, a live
+   listing or a slug redirect source. A listing approved into Other since the inventory would show
+   here: file it under its hub first.
+
+   ```sql
+   SELECT l.slug, l.is_active FROM listing_categories lc JOIN categories c ON c.id=lc.category_id JOIN listings l ON l.id=lc.listing_id WHERE c.slug='other' AND ((l.status='approved' AND l.is_active=1) OR EXISTS (SELECT 1 FROM listing_slug_redirects r WHERE r.old_slug=l.slug)) ORDER BY l.slug
+   ```
+
+The wrong-copy and duplicate removals are `unowned`: if one of them was claimed or paid for since,
+`-01-removals` refuses whole and writes nothing. Move that listing to the mapping's moves and
+regenerate; only the files whose listings changed are rewritten. The same goes for any listing
+that changed since the inventory.

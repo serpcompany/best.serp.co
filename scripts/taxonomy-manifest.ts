@@ -550,6 +550,53 @@ export function moveStatements(move: ListingMove): number {
   return (move.tags.length > 0 ? 5 + 2 * move.tags.length : 0) + 10
 }
 
+/**
+ * Fixed-membership batches (#342 review): each item keeps the batch `assignments` gives it (by id),
+ * and the rest, in the order given, fill new batches after the last assigned one, as few as the
+ * statement ceiling allows, evened out: a batch closes once the items so far reach its share of the
+ * total, or the next one would pass the ceiling. Returns `[batch, items]` in batch order.
+ */
+export function packBatches<T extends { id: string }>(
+  items: readonly T[],
+  statementsOf: (item: T) => number,
+  assignments: BatchAssignments = new Map()
+): Array<[number, T[]]> {
+  const batches = new Map<number, T[]>()
+  const unassigned: T[] = []
+  for (const item of items) {
+    const batch = assignments.get(item.id)
+    if (batch === undefined) unassigned.push(item)
+    else batches.set(batch, [...(batches.get(batch) ?? []), item])
+  }
+  let next = Math.max(0, ...assignments.values()) + 1
+  const total = unassigned.reduce((sum, item) => sum + statementsOf(item), 0)
+  // Room for one item that doesn't fit: a batch rarely ends exactly at the ceiling.
+  const largest = Math.max(0, ...unassigned.map(statementsOf))
+  const count = Math.ceil(total / (STATEMENT_CEILING - MANIFEST_OVERHEAD - largest))
+  let current: T[] = []
+  let size = MANIFEST_OVERHEAD
+  let done = 0
+  let closed = 0
+  for (const item of unassigned) {
+    const statements = statementsOf(item)
+    if (
+      current.length > 0 &&
+      (size + statements > STATEMENT_CEILING || done >= ((closed + 1) * total) / count)
+    ) {
+      batches.set(next++, current)
+      closed += 1
+      current = []
+      size = MANIFEST_OVERHEAD
+    }
+    current.push(item)
+    size += statements
+    done += statements
+  }
+  if (current.length > 0) batches.set(next++, current)
+  if (Math.max(0, ...batches.keys()) > 99) throw new Error('More than 99 batches.')
+  return [...batches].sort(([a], [b]) => a - b)
+}
+
 export interface TaxonomyOptions {
   /** Manifest ids are `<date>-taxonomy-*`. */
   date: string
@@ -559,7 +606,7 @@ export interface TaxonomyOptions {
 const provenance = { actor: 'devinschumacher', workflow: 'github/publish-d1' }
 
 /** A row-level manifest the publisher accepts, planned to check it, with its statement count. */
-function manifestSource(
+export function manifestSource(
   prefix: string,
   id: string,
   operations: readonly unknown[]
@@ -706,42 +753,7 @@ export function buildTaxonomyManifests(
       categories: [move.hub]
     }
   ]
-  const batches = new Map<number, ListingMove[]>()
-  const unassigned: ListingMove[] = []
-  for (const move of plan.moves) {
-    const batch = assignments.get(move.id)
-    if (batch === undefined) unassigned.push(move)
-    else batches.set(batch, [...(batches.get(batch) ?? []), move])
-  }
-  // As few new batches as the ceiling allows, evened out: a batch closes once the listings so far
-  // reach its share of the total, or the next one would pass the ceiling.
-  let next = Math.max(0, ...assignments.values()) + 1
-  const total = unassigned.reduce((sum, move) => sum + moveStatements(move), 0)
-  // Room for one listing that doesn't fit: a batch rarely ends exactly at the ceiling.
-  const largest = Math.max(0, ...unassigned.map(moveStatements))
-  const count = Math.ceil(total / (STATEMENT_CEILING - MANIFEST_OVERHEAD - largest))
-  let current: ListingMove[] = []
-  let size = MANIFEST_OVERHEAD
-  let done = 0
-  let closed = 0
-  for (const move of unassigned) {
-    const statements = moveStatements(move)
-    if (
-      current.length > 0 &&
-      (size + statements > STATEMENT_CEILING || done >= ((closed + 1) * total) / count)
-    ) {
-      batches.set(next++, current)
-      closed += 1
-      current = []
-      size = MANIFEST_OVERHEAD
-    }
-    current.push(move)
-    size += statements
-    done += statements
-  }
-  if (current.length > 0) batches.set(next++, current)
-  if (Math.max(0, ...batches.keys()) > 99) throw new Error('More than 99 phase-2 batches.')
-  for (const [batch, moves] of [...batches].sort(([a], [b]) => a - b)) {
+  for (const [batch, moves] of packBatches(plan.moves, moveStatements, assignments)) {
     moves.sort((a, b) => (a.slug < b.slug ? -1 : 1))
     add(
       ids.move(batch),
