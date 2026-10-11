@@ -15,6 +15,9 @@ and top bar since #261); pages set their breadcrumb with `AdminCrumbs`.
 | Listings | `/admin/listings/` (`?q=`, `status`, `source`, `link`, `page`, `size`) | `selectAdminListingsPlans` |
 | Listing | `/admin/listings/<slug>/` | `selectAdminListingPlans`, `selectActiveTagsPlan` |
 | Admins | `/admin/admins/` | `selectAdminAllowlistPlan` |
+| Categories (#405) | `/admin/categories/`, `/admin/categories/<slug>/` | `selectAdminCategoriesPlan` |
+| Tags (#405) | `/admin/tags/`, `/admin/tags/<slug>/` | `selectAdminTagsPlan`, `selectActiveCategoriesPlan` |
+| Best pages (#405) | `/admin/best-pages/`, `/admin/best-pages/<slug>/` | `selectAdminBestPagesPlan`, `selectAdminBestPagePlans`, `selectActiveTagsPlan` |
 | Orders (#68) | `/admin/orders/` | `selectAdminOrdersPlan` (`src/db/billing.ts`) |
 
 The reads are statement plans in `apps/web/src/db/admin-queries.ts`; `apps/web/src/lib/admin/`
@@ -40,6 +43,12 @@ forbids `'use server'`): an action id is reachable from any path, so no path gat
 | `/api/admin/listings/<id>/link-rel` | `linkRel` | `setListingLinkRel` |
 | `/api/admin/listings/<id>/{transfer-owner,remove-owner}` | `email`, `expectedOwnerUserId` | `transferListingOwner`, `removeListingOwner` |
 | `/api/admin/admins` (`POST` adds, `DELETE` removes) | `email` | `addAdmin`, `removeAdmin` |
+| `/api/admin/categories` | `name`, `slug`, `description`, `order` | `createCategory` |
+| `/api/admin/tags` | `name`, `slug`, `description`, `category` | `createTag` |
+| `/api/admin/best-pages` | `keyword`, `slug`, `title`, `intro`, `tag` | `createBestPage` |
+| `/api/admin/{categories,tags,best-pages}/<slug>/update` | `category`, `tag` or `page` (the form's fields), and `expected` | `updateCategory`, `updateTag`, `updateBestPage` |
+| `/api/admin/best-pages/<slug>/pins` | `pins`, `expectedPins` (each `id`, `slug`) | `setBestPagePins` |
+| `/api/admin/{categories,tags,best-pages}/<slug>/retire` | `redirect`: `{kind, slug}` or `{kind: 'directory'}` | `retireCategory`, `retireTag`, `retireBestPage` |
 | `/api/admin/orders/<id>/refund` | none | `refundOrder` ([Billing](./billing.md)) |
 
 Every request passes, in order: the Worker's Cloudflare Access and session-cookie gate
@@ -67,7 +76,8 @@ below), and otherwise sends the reviewed statement plans as one D1 batch:
   published in between, while this item is as it was read) runs once more on fresh state, so
   two admins on different listings don't see a false 409.
 - **Publication.** Anything that changes public output (approve, reject a live listing,
-  unpublish, republish, link, details, tags, ownership) goes through `prepareCatalogPublication` and
+  unpublish, republish, link, details, tags, ownership, the taxonomy) goes through
+  `prepareCatalogPublication` and
   records a `publication_runs` row (`actor` = the admin's email, `workflow = 'app/admin'`),
   advancing the catalog epoch, so cached pages turn over within about a minute.
 - **Audit.** Submission decisions are `listing_submission_events` (actor, note or reason and
@@ -150,8 +160,53 @@ them (payment already wrote its suggested tags). The field takes at most `MAX_LI
 The review screens show the Creator's suggested tags (`tag_slugs`), and "Edit, then approve"
 on a submission not yet live edits them as `edits.tagSlugs` (up to three active tags), logged as
 `tags` among the edited fields. A paid submission already live, or a revision, has no tag edit
-at review: set the listing's tags here. Hubs, tags, and best pages themselves change only through manifests
-([Catalog publication](./catalog-publication.md#taxonomy-operations)).
+at review: set the listing's tags here. Hubs, tags, and best pages themselves change through
+manifests ([Catalog publication](./catalog-publication.md#taxonomy-operations)) and the screens
+below.
+
+## Categories, tags, and best pages (#405)
+
+The owner's decision on #405 replaced #341's design default 12 (hubs, tags, and best pages through
+manifests only): admins create, edit, rename, and retire them here. `lib/admin/taxonomy-decisions.ts`
+sends each as `buildTaxonomyPlans` (`src/db/taxonomy-plans.ts`): the publisher's own operations and
+guards ([Taxonomy operations](./catalog-publication.md#taxonomy-operations)) with their `expected`
+checks, between a publication that advances the catalog version and records the run, plus four
+it lacks: `category-edit` (compared and swapped), `category-retire`, `taxonomy-rename`, and
+`best-page-pins-check`.
+
+- **Forms** (`components/admin/taxonomy-forms.tsx`, stock `Card` and `Field`s). A category has a
+  name, slug, description, and order; a tag a name, slug, category, and description (its order
+  stays); a best page a keyword, slug, title (its H1 too, unless a manifest set them apart), intro,
+  and the tag it ranks, with a manifest's defaults for the rest (list size 10). A page a manifest
+  set on a category alone (`video-downloader`) keeps it and may stay without a tag. A new or changed
+  slug is lowercase words joined by hyphens (`lib/admin/taxonomy-fields.ts`), not taken by any row
+  of its kind, active or retired, and not a URL that already redirects. A create form takes initial
+  values, as props or from its list page's query (`?name=`), so another screen can open it filled
+  in (#406).
+- **Pages show as before.** A new category's page shows once a live listing is filed under it, a
+  tag's once a live listing carries it, and a best page follows #346's rules: it renders with an
+  entry, and is indexed and in `sitemap-best.xml` from five ([URLs](./urls.md#taxonomy-pages)).
+- **Rename.** A new slug keeps the row, so its listings, pins, and the redirects aimed at it follow
+  its id, and its old URL answers one 308 to the new one (`taxonomy_redirects`; for a category, the
+  root-level `/<old>` too). An old URL that already had a redirect of its own (a tag that a tag-only
+  best page took over) keeps it. Renaming back removes the redirect that would point at itself. A
+  submission or revision still naming a renamed category resolves through that redirect at
+  approval; a suggested tag naming a renamed tag is dropped, as a retired one is.
+- **Retire.** The URL redirects to the page the admin picks: another category, tag, or best page
+  whose page renders now (a redirect is followed only to one, #346), or `/products/`. Every redirect
+  aimed at it is re-pointed there, and a page whose own URL redirects elsewhere can't be picked. A
+  category can't retire while a live listing, an active tag, or an active best page is filed under
+  it or draws on it, or a listing filed under it is a slug redirect's source (`category-unpublish`'s
+  guards), or an unpublished listing is: its 410 would become a 404 that Republish can't undo
+  (#260), so it is filed under another category first. A tag can't retire while a best page ranks
+  it. A retired tag's listings keep it as a retired membership, as `tag-unpublish` leaves them.
+- **Pins** (`components/admin/best-page-pins.tsx`). In order, at most the page's list size, each a
+  live listing of its pool (its tag's listings, in its category when it names one too), never one
+  it excludes or a listing that names a feature of a larger site: `lib/admin/feature-listings.ts`,
+  the reviewed mapping's `featureListings` (#349), which a test keeps equal. A pin the page keeps
+  keeps its blurb; its exclusions stay as manifests set them. Pins join a page's pool, so its tag
+  changes only while every pin is in the new pool; otherwise the admin unpins those first. Both
+  batches end with `best-page-pins-check`, which refuses a pin outside the pool.
 
 ## Unpublished listings answer 410
 
@@ -179,8 +234,8 @@ listing screen shows why instead of Republish, `republishListing` answers 409
 
 The repository rule is that production data changes only through protected GitHub Actions. The
 admin panel is the one exception (#59, #64): on production, a decision made in `/admin` writes
-production D1 from the Worker, without a workflow, a reviewer approval, or a bookmark. Its
-guards instead:
+production D1 from the Worker, without a workflow, a reviewer approval, or a bookmark, the
+taxonomy's included since #405. Its guards instead:
 
 - the Cloudflare Access application on `/admin*` and `/api/admin*`, plus an admin session whose
   verified email is on the D1 allowlist, re-checked on every request;
@@ -255,12 +310,13 @@ leak, rotate or revoke.
 
 ## Tests
 
-`apps/web/src/db/{admin-plans,admin-queries,listing-plans}.test.ts` and
-`apps/web/src/lib/admin/{decisions,staging-agent}.test.ts` (node:sqlite; the second is the staging
-admin key through the route handlers), `scripts/d1-workerd-plans.test.ts` (every
-plan builder and read on Wrangler-local D1), and `apps/web/e2e/admin-panel.spec.ts`
-(Playwright: the gate, approve, request changes, reject, allow resubmission, unpublish with 410
-and republish, a redirected duplicate's 308 (#338), the Tags field (#341), the allowlist, and a
-replay of each decision). The suite runs on its own local Worker and empty D1 (`PLAYWRIGHT_PORT` + 3, started by
+`apps/web/src/db/{admin-plans,admin-queries,listing-plans,taxonomy-plans}.test.ts` and
+`apps/web/src/lib/admin/{decisions,taxonomy-decisions,staging-agent}.test.ts` (node:sqlite; the
+last is the staging admin key through the route handlers),
+`scripts/d1-workerd-plans.test.ts` (every plan builder and read on Wrangler-local D1), and
+`apps/web/e2e/admin-panel.spec.ts` (Playwright: the gate, approve, request changes, reject, allow
+resubmission, unpublish with 410 and republish, a redirected duplicate's 308 (#338), the Tags field
+(#341), a category, tag, and best page created, renamed, and retired with their 308s (#405), the
+allowlist, and a replay of each decision). The suite runs on its own local Worker and empty D1 (`PLAYWRIGHT_PORT` + 3, started by
 `playwright.suites.config.ts` from the same build), because it publishes listings and the smoke suite
 counts the fixture seed's listings exactly.

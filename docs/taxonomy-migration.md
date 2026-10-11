@@ -6,6 +6,10 @@ catalog's data moves, through reviewed files (#349). The operations are in
 [Catalog publication](./catalog-publication.md#taxonomy-operations), and the design is in #341's
 "Design (1/3)" to "(3/3)" comments.
 
+Since #405, admins also create, edit, rename, and retire hubs, tags, and best pages in `/admin`, on
+the same operations ([Admin panel](./admin-panel.md#categories-tags-and-best-pages-405)); this
+migration's manifests stay the record of how the catalog moved.
+
 - **Mapping.** `d1/hygiene/2026-10-10-taxonomy.yaml`: the hubs, the tags under them with the
   categories each one merges, the best pages (keyword and Ahrefs volume, intro, pins with the
   evidence that ranked them, exclusions), the listings that name a feature of a larger site (never

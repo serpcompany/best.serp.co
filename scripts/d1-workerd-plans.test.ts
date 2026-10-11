@@ -24,6 +24,7 @@ import { prepareCatalogPublication, type StatementPlan } from '../apps/web/src/d
 import * as revisionPlansModule from '../apps/web/src/db/revision-plans'
 import { assertD1StatementLimits } from '../apps/web/src/db/sql-limits'
 import * as submissionPlansModule from '../apps/web/src/db/submission-plans'
+import * as taxonomyPlansModule from '../apps/web/src/db/taxonomy-plans'
 import type { UrlKey } from '../apps/web/src/lib/url-key'
 import { assertD1Compatible } from './d1-compat'
 import {
@@ -78,6 +79,7 @@ const M = tracked(mediaPlansModule)
 const R = tracked(revisionPlansModule)
 const S = tracked(submissionPlansModule)
 const B = tracked(billingModule)
+const T = tracked(taxonomyPlansModule)
 
 let stateDirectory: string
 let proxyDispose: (() => Promise<void>) | undefined
@@ -1700,6 +1702,167 @@ operations:
       )
     ).rejects.toThrow(/malformed JSON/u)
     expect(await tagsOf('lst-narrow')).toEqual(['helper:0'])
+  })
+
+  it('runs the admin taxonomy plans and reads on D1 (#405)', async () => {
+    await db.batch([
+      db.prepare("INSERT INTO categories (slug, name) VALUES ('admin-tax-hub', 'Admin tax hub')"),
+      db.prepare(
+        `INSERT INTO listings (id, slug, name, description, website, status, source_kind,
+          source_identity, checksum) VALUES ('lst_admin_tax', 'admin-tax.example', 'Admin tax',
+          'd', 'https://admin-tax.example/', 'draft', 'workerd', 'admin-tax', 'c')`
+      ),
+      db.prepare(
+        `INSERT INTO listing_categories (listing_id, category_id, sort_order, is_primary)
+          SELECT 'lst_admin_tax', id, 0, 1 FROM categories WHERE slug = 'admin-tax-hub'`
+      ),
+      db
+        .prepare(
+          "UPDATE listings SET status = 'approved', published_at = ? WHERE id = 'lst_admin_tax'"
+        )
+        .bind(NOW)
+    ])
+    const decide = async (...operations: taxonomyPlansModule.TaxonomyOperation[]) =>
+      run(T.buildTaxonomyPlans({ operations, publication: await publication('taxonomy', 'admin') }))
+    const listingRef = { id: 'lst_admin_tax', slug: 'admin-tax.example' }
+    await decide({
+      action: 'category-create',
+      category: { description: '', name: 'Admin hub', order: 7, slug: 'admin-hub' }
+    })
+    await decide(
+      { action: 'taxonomy-rename', kind: 'category', slug: 'admin-hub', to: 'admin-hub-2' },
+      {
+        action: 'category-edit',
+        category: { description: 'Edited.', name: 'Admin hub 2', order: 8 },
+        expected: { description: '', name: 'Admin hub', order: 7 },
+        slug: 'admin-hub-2'
+      }
+    )
+    await decide({
+      action: 'tag-create',
+      tag: {
+        category: 'admin-tax-hub',
+        description: '',
+        name: 'Admin tag',
+        order: 0,
+        slug: 'admin-tag'
+      }
+    })
+    await run(
+      L.buildSetListingTagsPlans({
+        expectedTags: [],
+        listingId: 'lst_admin_tax',
+        publication: await publication('listing-tags', 'lst_admin_tax'),
+        tags: ['admin-tag']
+      })
+    )
+    const page = {
+      category: null,
+      heading: 'Best Admin',
+      intro: 'Admin tools.',
+      keyword: 'admin',
+      keywordCheckedAt: null,
+      keywordVolume: null,
+      listSize: 10,
+      order: 0,
+      tag: 'admin-tag',
+      title: 'Best Admin'
+    }
+    await decide(
+      { action: 'best-page-create', page: { ...page, slug: 'admin-best' } },
+      {
+        action: 'best-page-listings-set',
+        exclude: [],
+        expected: { exclude: [], pins: [] },
+        pins: [listingRef],
+        slug: 'admin-best'
+      }
+    )
+    await decide({ action: 'taxonomy-rename', kind: 'tag', slug: 'admin-tag', to: 'admin-tag-2' })
+    // A refusal names its reason, and writes nothing.
+    await expect(
+      decide({ action: 'category-retire', redirect: { kind: 'directory' }, slug: 'admin-tax-hub' })
+    ).rejects.toThrow(/category-retire admin-tax-hub: an active tag is filed under it/u)
+    await decide({
+      action: 'category-retire',
+      redirect: { kind: 'category', slug: 'admin-tax-hub' },
+      slug: 'admin-hub-2'
+    })
+    expect(
+      (
+        await db
+          .prepare(
+            `SELECT r.source_kind || ' ' || r.source_slug || ' -> ' || r.target_kind || ' ' ||
+              COALESCE(c.slug, t.slug, b.slug) AS redirect FROM taxonomy_redirects r
+              LEFT JOIN categories c ON c.id = r.target_category_id
+              LEFT JOIN tags t ON t.id = r.target_tag_id
+              LEFT JOIN best_pages b ON b.id = r.target_best_page_id
+              WHERE r.source_slug LIKE 'admin-%' ORDER BY 1`
+          )
+          .all<{ redirect: string }>()
+      ).results.map(row => row.redirect)
+    ).toEqual([
+      'category admin-hub -> category admin-tax-hub',
+      'category admin-hub-2 -> category admin-tax-hub',
+      'tag admin-tag -> tag admin-tag-2'
+    ])
+
+    expect(await all(Q.selectAdminCategoriesPlan(NOW, 'admin-tax-hub'))).toEqual([
+      expect.objectContaining({ listing_count: 1, renders: 1, slug: 'admin-tax-hub', tag_count: 1 })
+    ])
+    expect((await all(Q.selectAdminCategoriesPlan(NOW))).length).toBeGreaterThan(1)
+    expect(await all(Q.selectAdminTagsPlan(NOW, 'admin-tag-2'))).toEqual([
+      expect.objectContaining({
+        category: 'admin-tax-hub',
+        listing_count: 1,
+        renders: 1,
+        slug: 'admin-tag-2'
+      })
+    ])
+    expect(await all(Q.selectAdminTagsPlan(NOW))).toContainEqual(
+      expect.objectContaining({ slug: 'admin-tag-2' })
+    )
+    expect(await all(Q.selectAdminBestPagesPlan(NOW))).toContainEqual(
+      expect.objectContaining({ pin_count: 1, renders: 1, slug: 'admin-best', tag: 'admin-tag-2' })
+    )
+    // Rendering is judged at the instant given: before the listing's publication, nothing renders.
+    expect(
+      await all(Q.selectAdminCategoriesPlan('2020-01-01T00:00:00.000Z', 'admin-tax-hub'))
+    ).toEqual([expect.objectContaining({ renders: 0 })])
+    expect(
+      await all(
+        Q.selectListingsInPoolPlan({
+          category: 'admin-tax-hub',
+          ids: ['lst_admin_tax', 'lst_nope'],
+          tag: 'admin-tag-2'
+        })
+      )
+    ).toEqual([{ id: 'lst_admin_tax' }])
+    expect(
+      await all(Q.selectListingsInPoolPlan({ category: null, ids: ['lst_admin_tax'], tag: 'nope' }))
+    ).toEqual([])
+    // Every pin is a live listing of the page's pool.
+    await decide({ action: 'best-page-pins-check', slug: 'admin-best' })
+    const [rows, pins, exclude, pool] = await Promise.all(
+      Q.selectAdminBestPagePlans('admin-best').map(plan => all<Record<string, unknown>>(plan))
+    )
+    expect(rows).toEqual([expect.objectContaining({ list_size: 10, tag: 'admin-tag-2' })])
+    expect(pins).toEqual([expect.objectContaining({ id: 'lst_admin_tax', live: 1 })])
+    expect(exclude).toEqual([])
+    expect(pool).toEqual([{ id: 'lst_admin_tax', name: 'Admin tax', slug: 'admin-tax.example' }])
+    for (const [kind, slug] of [
+      ['category', 'admin-hub-2'],
+      ['tag', 'admin-tag-2'],
+      ['best', 'admin-best']
+    ] as const) {
+      const [state] = await all<{ item: string; redirect: string | null }>(
+        T.selectTaxonomyStatePlan(kind, slug, NOW)
+      )
+      expect(JSON.parse(state?.item ?? 'null'), kind).toMatchObject({
+        renders: kind === 'category' ? 0 : 1,
+        slug
+      })
+    }
   })
 
   it('ran every exported plan builder on D1', () => {

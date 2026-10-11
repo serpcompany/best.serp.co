@@ -173,9 +173,10 @@ export type Decision<T extends object = object> =
   | ({ ok: true; replayed: boolean } & T)
   | DecisionFailure
 
-const WORKFLOW = 'app/admin'
+/** The workflow every admin publication records (shared with `taxonomy-decisions.ts`). */
+export const WORKFLOW = 'app/admin'
 
-function failure(
+export function failure(
   status: DecisionFailure['status'],
   error: string,
   message: string
@@ -183,8 +184,8 @@ function failure(
   return { error, message, ok: false, status }
 }
 
-const notFound = (what: string) => failure(404, 'not_found', `That ${what} doesn't exist.`)
-const changed = failure(
+export const notFound = (what: string) => failure(404, 'not_found', `That ${what} doesn't exist.`)
+export const changed = failure(
   409,
   'conflict',
   'This changed since you opened it. Reload the page and try again.'
@@ -199,7 +200,7 @@ const changed = failure(
 const PUBLICATION_RACE = failure(409, 'publication_race', changed.message)
 
 /** What a catalog decision read: its item's snapshot, with the publication state joined in. */
-interface PublicationRead<S extends { version: number }> {
+export interface PublicationRead<S extends { version: number }> {
   /** The snapshot keys that belong to `publication_state` rather than to the item. */
   global: ReadonlyArray<keyof S & string>
   read: () => Promise<S | null>
@@ -227,7 +228,7 @@ async function lostPublicationRace<S extends { version: number }>(
 }
 
 /** Runs a catalog decision, and once more when it lost only the publication race. */
-async function retryPublicationRace<T extends object>(
+export async function retryPublicationRace<T extends object>(
   decide: () => Promise<Decision<T>>
 ): Promise<Decision<T>> {
   const first = await decide()
@@ -236,11 +237,11 @@ async function retryPublicationRace<T extends object>(
   return second === PUBLICATION_RACE ? changed : second
 }
 
-function nowIso(context: AdminContext): string {
+export function nowIso(context: AdminContext): string {
   return (context.now?.() ?? new Date()).toISOString()
 }
 
-function log(context: AdminContext, action: string, target: string, outcome: string): void {
+export function log(context: AdminContext, action: string, target: string, outcome: string): void {
   console.info(
     JSON.stringify({ action, actor: context.actor, event: 'admin_decision', outcome, target })
   )
@@ -251,7 +252,7 @@ function log(context: AdminContext, action: string, target: string, outcome: str
  * decision already holds (an identical request won the race) it is a replay; if only the
  * publication version moved (`publication`), it lost the publication race; otherwise 409.
  */
-async function commit<T extends object, S extends { version: number }>(
+export async function commit<T extends object, S extends { version: number }>(
   context: AdminContext,
   plans: StatementPlan[],
   settled: () => Promise<boolean>,
