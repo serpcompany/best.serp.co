@@ -106,6 +106,16 @@ function digestsEqual(left: ArrayBuffer, right: ArrayBuffer): boolean {
   return difference === 0
 }
 
+/**
+ * True when `given` is exactly `expected`, compared as SHA-256 digests in constant time, so the
+ * time taken says nothing about how much of a secret matched, or how long it is. Staging's
+ * password and its admin key (`lib/auth/staging-admin-key.ts`, #408) use it.
+ */
+export async function secretsEqual(given: string, expected: string): Promise<boolean> {
+  const [givenDigest, expectedDigest] = await Promise.all([sha256(given), sha256(expected)])
+  return digestsEqual(givenDigest, expectedDigest)
+}
+
 /** True when the request's Basic password is exactly `expected`; false when either is missing. */
 export async function stagingPasswordMatches(
   request: Request,
@@ -114,8 +124,7 @@ export async function stagingPasswordMatches(
   if (!expected) return false
   const given = basicAuthPassword(request.headers.get('authorization'))
   if (given === null) return false
-  const [givenDigest, expectedDigest] = await Promise.all([sha256(given), sha256(expected)])
-  return digestsEqual(givenDigest, expectedDigest)
+  return secretsEqual(given, expected)
 }
 
 /** The 401 that asks for the password. Never cached by anyone. */

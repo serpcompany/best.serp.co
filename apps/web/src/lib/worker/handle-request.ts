@@ -17,7 +17,8 @@
  * 6. Outside public production, `/robots.txt` disallows every crawler; a Worker that serves as
  *    staging also lets its auditor in, with best.serp.co's rules (#359).
  * 7. `/admin` and `/api/admin`: Cloudflare Access (production) and a session cookie, else
- *    503, 403, or 401 (`lib/auth/admin-gate.ts`); pages and handlers then require an admin.
+ *    503, 403, or 401 (`lib/auth/admin-gate.ts`); pages and handlers then require an admin. On
+ *    staging, `/api/admin/*` also takes the admin key from a request that passed step 2 (#408).
  * 8. The local dev endpoints (`/api/dev/*`, `/api/auth/dev/*`) answer 404 unless the Worker was
  *    reached on a local host (#164). This uses the Worker's own URL: inside OpenNext a client's
  *    `X-Forwarded-Host` becomes `Host`, so a check there alone could be talked past.
@@ -32,8 +33,8 @@
  * before the cache, so nothing stored is ever served to a request without it, and a 401 is
  * never stored.
  */
-import { adminGate } from '../auth/admin-gate'
-import type { AccessEnv, VerifyAccessOptions } from '../auth/cloudflare-access'
+import { type AdminGateEnv, adminGate } from '../auth/admin-gate'
+import type { VerifyAccessOptions } from '../auth/cloudflare-access'
 import { isLocalRequestHost } from '../environment/local-host'
 import {
   isPublicProduction,
@@ -49,7 +50,7 @@ import { type CanonicalHostEnv, canonicalHostRedirect } from '../routing/canonic
 import { retiredPathResponse } from '../routing/retired-paths'
 import { trailingSlashRedirect } from '../routing/trailing-slash'
 
-export interface WorkerRequestEnv extends CanonicalHostEnv, AccessEnv, StagingAccessEnv {
+export interface WorkerRequestEnv extends CanonicalHostEnv, AdminGateEnv, StagingAccessEnv {
   CF_VERSION_METADATA?: { id?: string }
 }
 
@@ -89,7 +90,9 @@ export async function handleWorkerRequest(
     (await pipeline.legacyRoot?.(admitted)) ??
     trailingSlashRedirect(admitted, pipeline.configRedirects) ??
     (publicProduction ? null : nonProductionRobotsTxt(admitted, robotsTxt)) ??
-    (await adminGate(admitted, env, pipeline.access)) ??
+    (await adminGate(admitted, env, pipeline.access, {
+      passedStagingGate: access.gate === 'passed'
+    })) ??
     devEndpointGate(admitted) ??
     (await pipeline.serve(admitted))
   return headers(response, access.gate === 'passed')

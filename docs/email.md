@@ -219,8 +219,10 @@ its own port (`pnpm agent:manifest` → `webUrl`), so swap the port when followi
 
 ## Owner prerequisites
 
-These are useSend dashboard and Cloudflare secret changes; agents do not make them. Merging
-before they are done is safe: email is then disabled and logged.
+These are useSend dashboard and Cloudflare secret changes; agents do not make them. (The one
+owner-authorized exception to "agents don't change Cloudflare secrets" is the lead agent rotating
+staging's `STAGING_ADMIN_TOKEN`, #408: [Staging admin key](./staging-admin-key.md#rotate-or-revoke).)
+Merging before they are done is safe: email is then disabled and logged.
 
 1. **Done (2026-10-06): `USESEND_API_KEY`.** One API key per environment, created in
    app.usesend.com → Developer settings → API keys and set as a Worker secret on

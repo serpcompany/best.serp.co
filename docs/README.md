@@ -24,6 +24,7 @@ Each doc covers one topic. Open the one whose "read it when" matches the task.
 | [Submitter dashboard](./account-dashboard.md) | `/account`: statuses, edits, revisions, the badge panel | You change a `/account` screen |
 | [Accounts](./accounts.md) | Better Auth sign-in codes, admins, Cloudflare Access | You change sign-in, sessions, the dashboard shell, or the admin gate |
 | [Admin panel](./admin-panel.md) | `/admin` screens, decisions, the production-write exception | You change an `/admin` screen or a decision it writes |
+| [Staging admin key](./staging-admin-key.md) | Agents' admin API key on staging: what it allows, where it lives, use, rotation | You call staging's admin API as an agent, or change or rotate the key |
 | [Deploy runbook](./deploy-runbook.md) | Environments, workflows and their guards, production release, recovery, post-deploy checks | Before any Cloudflare operation or release, or when a deploy gate fails |
 | [Deploy credentials](./deploy-credentials.md) | The Cloudflare API token, the GitHub environments that hold it, what a leak reaches | You create, rotate or narrow the token or an environment's secrets |
 | [Production cutover](./production-cutover.md) | The finished move of best.serp.co from GitHub Pages to the Worker, and the canonical-host switch | Code or a gate mentions the cutover or the canonical-host switch |

@@ -541,7 +541,14 @@ describe('single-site D1-only repository architecture', () => {
         `${project.sourceDirectory}/app/(dashboard)/admin/layout.tsx`,
         `${project.sourceDirectory}/app/(dashboard)/admin/page.tsx`,
         `${project.sourceDirectory}/app/(dashboard)/admin/[...path]/page.tsx`,
-        `${project.sourceDirectory}/app/api/admin/[[...path]]/route.ts`
+        `${project.sourceDirectory}/app/api/admin/[[...path]]/route.ts`,
+        // #405's taxonomy routes, which staging's admin key (#408) reaches through the guard.
+        `${project.sourceDirectory}/app/api/admin/categories/route.ts`,
+        `${project.sourceDirectory}/app/api/admin/categories/[id]/[action]/route.ts`,
+        `${project.sourceDirectory}/app/api/admin/tags/route.ts`,
+        `${project.sourceDirectory}/app/api/admin/tags/[id]/[action]/route.ts`,
+        `${project.sourceDirectory}/app/api/admin/best-pages/route.ts`,
+        `${project.sourceDirectory}/app/api/admin/best-pages/[id]/[action]/route.ts`
       ])
     )
     for (const file of adminRoutes) {
@@ -550,6 +557,51 @@ describe('single-site D1-only repository architecture', () => {
         /await (?:requireAdmin|authorizeAdminRequest)\(/u
       )
     }
+  })
+
+  // Staging's admin key for agents (#408): one module reads the secret and the header and accepts
+  // a key only on staging, in constant time, without logging, and never on the allowlist; only
+  // the Worker's admin gate and `authorizeAdminRequest()` use it, so no page or other route can
+  // honor the key.
+  it('keeps the staging admin key in one module that accepts it only on staging (#408)', () => {
+    const keyModule = `${project.sourceDirectory}/lib/auth/staging-admin-key.ts`
+    const appSources = trackedFiles().filter(
+      file =>
+        /\.(?:ts|tsx)$/u.test(file) &&
+        file.startsWith(`${project.appDirectory}/`) &&
+        !file.startsWith(`${project.appDirectory}/e2e/`) &&
+        !file.includes('.test.') &&
+        !file.endsWith('.d.ts') &&
+        existsSync(resolve(file))
+    )
+    const readers = appSources.filter(file =>
+      /STAGING_ADMIN_TOKEN|x-staging-admin-token/iu.test(readFileSync(resolve(file), 'utf8'))
+    )
+    expect(readers).toEqual([keyModule])
+    const users = appSources.filter(file =>
+      /from '[^']*\/staging-admin-key'/u.test(readFileSync(resolve(file), 'utf8'))
+    )
+    expect(users.sort()).toEqual([
+      `${project.sourceDirectory}/lib/auth/admin-gate.ts`,
+      `${project.sourceDirectory}/lib/auth/server.ts`
+    ])
+    const source = readFileSync(resolve(keyModule), 'utf8')
+    expect(source).toContain(
+      "env.SITE_ENVIRONMENT !== 'staging' || env.D1_RUNTIME_ENV !== 'staging'"
+    )
+    expect(source).toContain('secretsEqual(given, expected)')
+    expect(source).not.toMatch(/\bconsole\.|\blogger\./u)
+    expect(source).not.toMatch(/set-cookie|setCookie|createSession/iu)
+    // Only a person's session changes the allowlist: the key is 403 there, by path and by route.
+    expect(source).toContain("const ALLOWLIST_API_PATH = '/api/admin/admins'")
+    const allowlistRoute = readFileSync(
+      resolve(project.sourceDirectory, 'app/api/admin/admins/route.ts'),
+      'utf8'
+    )
+    expect(allowlistRoute).toContain('authorization.ok && authorization.sessionId === null')
+    expect(allowlistRoute).not.toMatch(
+      /await authorizeAdminRequest\(request\)\s*\n\s*if \(!authorization/u
+    )
   })
 
   // The submitter dashboard (#65): every page and write is scoped to the signed-in user, and its
