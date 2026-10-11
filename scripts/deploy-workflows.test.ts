@@ -159,15 +159,19 @@ describe('staging deploy job', () => {
       'pnpm tsx scripts/cloudflare-release.ts deploy staging',
       'pnpm tsx scripts/d1-preview-http-gates.ts staging "$STAGING_ORIGIN"',
       'pnpm --filter web test:install',
-      'pnpm --filter web test:e2e:smoke'
+      'pnpm tsx scripts/worker-readiness.ts "$STAGING_REVIEW_ORIGIN"',
+      'pnpm --filter web test:e2e:smoke',
+      'bash scripts/smoke-latency-probe.sh --report "$RUNNER_TEMP/smoke-latency-probe"'
     ]
     const tip = job.steps?.find(step => step.id === 'tip')
     expect(tip?.run).toContain('git ls-remote --exit-code origin refs/heads/staging')
     expect(tip?.run).toContain('if [ "$tip" = "$GITHUB_SHA" ]')
+    // Each step's command is its last line (the smoke step starts its latency probe first).
     expect(
       runs(job)
         .filter(run => run !== tip?.run)
         .slice(1)
+        .map(run => run.trim().split('\n').at(-1))
     ).toEqual(commands)
     // The tip is compared after the build and before anything changes staging.
     const names = (job.steps ?? []).map(step => step.name)
@@ -185,6 +189,37 @@ describe('staging deploy job', () => {
     const evidence = job.steps?.find(step => step.uses === 'actions/upload-artifact@v7')
     expect(evidence?.if).toBe(`always() && ${tipGate}`)
     expect(String(evidence?.with?.path)).toContain('apps/web/playwright-report/')
+  })
+
+  // #417: the smoke stalled for minutes on some runners' paths to Cloudflare while the Worker
+  // answered in milliseconds.
+  it('waits for the deployed Worker to be ready, then probes latency beside the smoke', () => {
+    const names = (job.steps ?? []).map(step => step.name)
+    const smoke = names.indexOf('Run Playwright smoke against staging')
+    // Directly before the smoke, after the Chromium install, against the smoke's own origin.
+    expect(names.slice(smoke - 2, smoke + 2)).toEqual([
+      'Install Chromium',
+      'Wait for the staging Worker to be ready',
+      'Run Playwright smoke against staging',
+      'Report smoke latency'
+    ])
+    expect(stepRunning(job, 'worker-readiness.ts')).toMatchObject({
+      env: { WRANGLER_OUTPUT_FILE_PATH: `${expression('runner.temp')}/wrangler-output.ndjson` },
+      if: tipGate,
+      run: 'pnpm tsx scripts/worker-readiness.ts "$STAGING_REVIEW_ORIGIN"'
+    })
+    // The probe starts before the suite and stops with the step; the suite's status is the step's.
+    const run = String(stepRunning(job, 'test:e2e:smoke').run)
+    expect(run).toContain(
+      'bash scripts/smoke-latency-probe.sh "$RUNNER_TEMP/smoke-latency-probe" "$PLAYWRIGHT_BASE_URL" &'
+    )
+    expect(run).toContain(`trap 'kill "$probe" 2>/dev/null || true' EXIT`)
+    expect(run.trim().split('\n').at(-1)).toBe('pnpm --filter web test:e2e:smoke')
+    // Its report is a diagnostic: it runs after a failed smoke and never fails the deploy.
+    expect(job.steps?.[smoke + 1]).toMatchObject({
+      'continue-on-error': true,
+      if: `always() && ${tipGate}`
+    })
   })
 
   it('names the steps production requires as proof that staging verified a commit', () => {
@@ -394,14 +429,16 @@ describe('version-pinned HTTP gates', () => {
       const job = loadWorkflow(file).jobs[jobName] as WorkflowJob
       const deploy = stepRunning(job, `cloudflare-release.ts deploy ${environment}`)
       const gates = stepRunning(job, 'd1-preview-http-gates.ts')
-      expect(deploy.env?.WRANGLER_OUTPUT_FILE_PATH, file).toBe(wranglerOutput)
-      expect(gates.env?.WRANGLER_OUTPUT_FILE_PATH, file).toBe(wranglerOutput)
+      // Staging waits for the same version again just before its smoke (#417).
+      const readiness = environment === 'staging' ? [stepRunning(job, 'worker-readiness.ts')] : []
+      for (const step of [deploy, gates, ...readiness])
+        expect(step.env?.WRANGLER_OUTPUT_FILE_PATH, `${file}: ${step.name}`).toBe(wranglerOutput)
       expect(
         (job.steps ?? [])
           .filter(step => step.env?.WRANGLER_OUTPUT_FILE_PATH !== undefined)
           .map(step => step.name),
         file
-      ).toEqual([deploy.name, gates.name])
+      ).toEqual([deploy.name, gates.name, ...readiness.map(step => step.name)])
       expect(stepIndex(job, 'd1-preview-http-gates.ts'), file).toBeGreaterThan(
         stepIndex(job, `cloudflare-release.ts deploy ${environment}`)
       )

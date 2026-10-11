@@ -34,6 +34,12 @@ One workflow, `web.yml` (#182), checks pull requests into `staging` (the base br
   cancels a waiting deploy or catalog publication. It builds, checks the tip again (a partial
   re-run reuses the old `tip` output), then runs the staging release steps
   ([deploy runbook](./deploy-runbook.md#workflows)).
+- Right before its Playwright smoke, `deploy-staging` waits until the deployed Worker is ready on
+  the workers.dev host the smoke uses (`scripts/worker-readiness.ts`, #417): five probes of
+  `/robots.txt` in a row answered 200 by the deployed version in under 2 s, within 3 minutes,
+  each one logged. A latency probe (`scripts/smoke-latency-probe.sh`) runs beside the suite, and
+  the step after it reports the slow samples without ever failing the job
+  ([Staging smoke readiness](#staging-smoke-readiness)).
 - `changes` compares with `--no-renames`, so code moved into `docs/` still counts as code.
 
 Three branch rulesets apply: `staging` (24491650), `main pull requests` (24716331), and `main`
@@ -66,6 +72,38 @@ After a pull request merges, the push run checks the exact resulting revision ag
 merged up to date its tree is the one the pull request tested, so only the quick checks repeat.
 `deploy-production.yml` releases each `main` push after reviewer approval, and only a tree
 `deploy-staging` verified (see [Release guards](./release-guards.md#staging-before-production)).
+
+## Staging smoke readiness
+
+Three staging smokes on 2026-10-11 (runs 38116684327, 38163330039 and 38172083196) timed out on
+page loads and API requests, and each passed when the deploy job was re-run (#417):
+
+- **Not a window after the deploy.** The HTTP gates had already had three answers in a row from
+  the new version before each smoke, and the timeouts ran from the first tests to the last,
+  4.5 to 6.4 minutes after the deploy.
+- **Not the Worker.** During run 38163330039's smoke (18:32–18:40Z), Workers Observability
+  logged 1,154 invocations with wall time p50 10 ms and p99 535 ms. Most requests that timed out
+  after 15 or 30 s never reached the Worker.
+- **The runner's path.** All three failing smokes ran on GitHub-hosted runners in Iowa (Azure
+  Central US; Observability's `cf.region`), whose requests entered Cloudflare at MSP, at MEM
+  and DTW, and at MEM and MCI. The 17 passing smokes checked between 2026-10-10 17:06Z and
+  2026-10-11 20:43Z, the two re-runs among them, came from Virginia (IAD), Arizona (LAX),
+  California, Washington, Ohio and Illinois, and one from Iowa that entered at ORD.
+
+So the stalls sat between those runners and Cloudflare, outside this repository. What CI does:
+
+- The readiness wait runs just before the smoke, and the HTTP gates wait the same way after each
+  staging and production deploy, with three answers in a row (`waitForWorkerReadiness` in
+  `scripts/d1-preview-http-gates.ts`). A runner whose path stays slow for 3 minutes fails there,
+  with every probe's time in the log, instead of in minutes of timeouts. Re-run the job: a new
+  runner usually takes another path.
+- The latency probe times `/cdn-cgi/trace`, which Cloudflare answers without the Worker, and
+  `/robots.txt`, which runs it, every 5 s with curl's phases and the colo that answered. A slow
+  `edge` sample means the network path; a fast edge beside a slow `worker` first byte means the
+  Worker or its start-up. The report is in the job summary; compare it with Observability.
+- The smoke keeps two Playwright workers. The stalls hit single requests whatever the load, and
+  one worker took 106 s against 47 s for two (the same suite against staging, run from a laptop
+  on 2026-10-11): about a minute more per deploy for no expected gain.
 
 ## Runners
 

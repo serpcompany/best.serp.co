@@ -28,7 +28,7 @@ import {
   httpGateSamples,
   retiredCategorySlugs,
   runHttpGates,
-  waitForWorkerVersion
+  waitForWorkerReadiness
 } from './d1-preview-http-gates.ts'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -863,6 +863,7 @@ describe('smoke-test header and deployed Worker version', () => {
   const pinned = (clock = virtualClock()) => ({
     clock,
     expectedVersion: deployed,
+    log: () => {},
     versionPollIntervalMs: 1_000
   })
 
@@ -916,15 +917,85 @@ describe('smoke-test header and deployed Worker version', () => {
     const requests = stubVersioned(() => previous)
     const clock = virtualClock()
     await expect(
-      gates('staging', stagingOrigin, undefined, { ...pinned(clock), versionWaitMs: 10_000 })
+      gates('staging', stagingOrigin, undefined, { ...pinned(clock), readinessWaitMs: 10_000 })
     ).rejects.toThrow(
-      `Worker version ${deployed} did not answer ${stagingOrigin} within 10 s (last answer: ${previous})`
+      `Worker version ${deployed} was not ready on ${stagingOrigin} within 10 s: 0 of the 3 answers in a row it needs (200 from that version in under 2000 ms) over 11 probe(s); the last was 200 from version ${previous} in 0 ms`
     )
     expect(requests).toHaveLength(11)
     expect(clock.elapsed()).toBe(10_000)
     await expect(
-      waitForWorkerVersion(new URL(stagingOrigin), deployed, { waitMs: 60_001 })
+      waitForWorkerReadiness(new URL(stagingOrigin), deployed, { waitMs: 180_001 })
+    ).rejects.toThrow('at most 180 seconds')
+    await expect(
+      gates('staging', stagingOrigin, undefined, { ...pinned(), versionWaitMs: 60_001 })
     ).rejects.toThrow('at most 60 seconds')
+  })
+
+  // #417: the staging smoke stalled for minutes behind slow answers, so readiness needs a fast
+  // 200 from the deployed version, several in a row, and logs every probe's time.
+  it('waits for fast 200s from the deployed version in a row, logging every probe', async () => {
+    const clock = virtualClock()
+    // Probe by probe: slow, a 503, fast, slow again (which resets the run), then three fast.
+    const answers: Array<[number, number]> = [
+      [200, 2_500],
+      [503, 100],
+      [200, 300],
+      [200, 2_000],
+      [200, 300],
+      [200, 1_999],
+      [200, 10]
+    ]
+    const probes: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const url = new URL(String(input))
+        probes.push(url.href)
+        expect(new Headers(init?.headers).get(SMOKE_TEST_HEADER)).toBe('1')
+        const [status, latencyMs] = answers[probes.length - 1] ?? [200, 0]
+        await clock.sleep(latencyMs)
+        return withHeader(new Response('ok', { status }), WORKER_VERSION_HEADER, deployed)
+      })
+    )
+    const lines: string[] = []
+    await expect(
+      waitForWorkerReadiness(new URL(stagingOrigin), deployed, {
+        clock,
+        intervalMs: 1_000,
+        log: line => lines.push(line)
+      })
+    ).resolves.toEqual({ probes: 7 })
+    expect(probes).toEqual(Array(7).fill(`${stagingOrigin}/robots.txt`))
+    expect(lines).toEqual([
+      'Readiness probe 1 at +0.0 s: 200 from the deployed version in 2500 ms, not ready.',
+      'Readiness probe 2 at +3.5 s: 503 from the deployed version in 100 ms, not ready.',
+      'Readiness probe 3 at +4.6 s: 200 from the deployed version in 300 ms, ready (1/3 in a row).',
+      'Readiness probe 4 at +5.9 s: 200 from the deployed version in 2000 ms, not ready.',
+      'Readiness probe 5 at +8.9 s: 200 from the deployed version in 300 ms, ready (1/3 in a row).',
+      'Readiness probe 6 at +10.2 s: 200 from the deployed version in 1999 ms, ready (2/3 in a row).',
+      'Readiness probe 7 at +13.2 s: 200 from the deployed version in 10 ms, ready (3/3 in a row).',
+      `Worker version ${deployed} is ready on ${stagingOrigin}: 3 answers in a row under 2000 ms, after 7 probe(s) in 13.2 s (slowest 2500 ms).`
+    ])
+
+    // A wait that never sees enough fast answers in a row names the longest run and the slowest.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        await clock.sleep(2_500)
+        return withHeader(new Response('ok'), WORKER_VERSION_HEADER, deployed)
+      })
+    )
+    await expect(
+      waitForWorkerReadiness(new URL(stagingOrigin), deployed, {
+        clock,
+        confirmations: 5,
+        intervalMs: 1_000,
+        log: () => {},
+        waitMs: 10_000
+      })
+    ).rejects.toThrow(
+      `Worker version ${deployed} was not ready on ${stagingOrigin} within 10 s: 0 of the 5 answers in a row it needs (200 from that version in under 2000 ms) over 3 probe(s); the last was 200 from the deployed version in 2500 ms, the slowest took 2500 ms. The previous deployment may still be serving, or this runner's path to Cloudflare is slow`
+    )
   })
 
   // PR #47 review: one answer from an isolate still on the previous version must not turn a
@@ -946,11 +1017,11 @@ describe('smoke-test header and deployed Worker version', () => {
     await expect(
       gates('production', origin, undefined, { ...pinned(clock), versionWaitMs: 20_000 })
     ).rejects.toThrow(
-      `production route /rss.xml was answered by Worker version ${previous}, not the deployed ${deployed}, on all 19 attempt(s) before the 20 s version budget ran out`
+      `production route /rss.xml was answered by Worker version ${previous}, not the deployed ${deployed}, on all 21 attempt(s) before the 20 s version budget ran out`
     )
-    // The wait spent 2 s of the shared budget (three probes 1 s apart); the retries the rest.
-    expect(clock.elapsed()).toBe(20_000)
-    expect(requests.filter(request => request.url.pathname === '/rss.xml')).toHaveLength(19)
+    // The readiness wait took 2 s (three probes 1 s apart); the retries then had their own 20 s.
+    expect(clock.elapsed()).toBe(22_000)
+    expect(requests.filter(request => request.url.pathname === '/rss.xml')).toHaveLength(21)
   })
 
   it('reads the deployed version from Wrangler output', () => {
