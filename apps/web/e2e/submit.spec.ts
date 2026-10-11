@@ -432,6 +432,7 @@ test.describe('submit v2', () => {
 
     // A prohibited block covers the registrable domain and its subdomains.
     executeLocalD1(
+      baseURL,
       `INSERT INTO listing_submission_url_blocks (url_key,covers_subdomains,reason,blocked_by,blocked_at) VALUES ('prohibited-${id}.example',1,'Prohibited by the Terms','e2e','${new Date().toISOString()}')`
     )
     await typeWebsite(page, `https://go.prohibited-${id}.example/`)

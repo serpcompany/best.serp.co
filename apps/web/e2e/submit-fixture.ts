@@ -1,9 +1,7 @@
-import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { resolve } from 'node:path'
 import { deflateSync } from 'node:zlib'
+import { localD1 } from './admin-fixture'
 import { featuredBadgeUrls, listingPath, site } from './site-fixture'
 
 /**
@@ -15,8 +13,6 @@ import { featuredBadgeUrls, listingPath, site } from './site-fixture'
  * resolve to 127.0.0.1, so the local Worker reaches this server while the address still passes
  * the submit flow's public-URL check (which refuses `localhost` and private IP literals).
  */
-
-const repositoryRoot = resolve(__dirname, '../../..')
 
 const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
   let c = n
@@ -146,42 +142,16 @@ export async function startFixtureSite(): Promise<FixtureSite> {
   }
 }
 
-/** The local D1 state directory the preview Worker uses (`scripts/d1-local-state.ts`). */
-function localD1StateDirectory(): string {
-  if (process.env.HARNESS_D1_STATE_DIRECTORY) {
-    return resolve(process.env.HARNESS_D1_STATE_DIRECTORY, 'drizzle', 'best-serp-co')
+/**
+ * Runs one SQL command on the local D1 of the preview Worker at `baseURL`, the one every spec
+ * without a Worker of its own shares, through the Worker's own D1 (`localD1` in
+ * `admin-fixture.ts`). Not `wrangler d1 execute --local`, which started a second Miniflare on the
+ * same SQLite file: a Worker query that met its write failed (#200, #204, #389).
+ */
+export function executeLocalD1(baseURL: string | undefined, command: string): void {
+  const { hostname, port } = new URL(baseURL ?? 'about:blank')
+  if (hostname !== '127.0.0.1' || !port) {
+    throw new Error(`Local D1 needs a local preview Worker on 127.0.0.1, not ${baseURL}.`)
   }
-  const manifestPath = resolve(repositoryRoot, '.runtime/manifest.json')
-  if (existsSync(manifestPath)) {
-    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
-      d1StateDirectory?: string
-      repositoryPath?: string
-    }
-    if (manifest.d1StateDirectory && resolve(manifest.repositoryPath ?? '') === repositoryRoot) {
-      return resolve(manifest.d1StateDirectory, 'drizzle', 'best-serp-co')
-    }
-  }
-  return resolve(repositoryRoot, '.wrangler/drizzle-state', 'best-serp-co')
-}
-
-/** Runs one SQL command against the local D1 the preview Worker serves. */
-export function executeLocalD1(command: string): void {
-  execFileSync(
-    'pnpm',
-    [
-      'exec',
-      'wrangler',
-      'd1',
-      'execute',
-      'best-serp-co-local',
-      '--command',
-      command,
-      '--local',
-      '--persist-to',
-      localD1StateDirectory(),
-      '--config',
-      'apps/web/wrangler.jsonc'
-    ],
-    { cwd: repositoryRoot, stdio: 'ignore' }
-  )
+  localD1(command, { port: Number(port) })
 }

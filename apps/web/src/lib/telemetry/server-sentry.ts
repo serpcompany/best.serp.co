@@ -10,8 +10,8 @@ let started = false
 
 /**
  * Starts Sentry in this isolate, once; it stays off without a DSN. An `init` that throws leaves it
- * unstarted and throws again on the next call, so `onRequestError` logs that request's error
- * instead of handing it to a client that never started.
+ * unstarted and throws again on the next call, so `onRequestError` skips Sentry for that request
+ * (it logs every request error first) rather than hand it to a client that never started.
  */
 export function startServerSentry(): void {
   if (started) return
