@@ -23,14 +23,12 @@ import {
   sitemapPaths,
   sitemapRoutePaths
 } from '@/lib/site'
-import { getActiveCategories } from '../directory/category-navigation'
 import { getRoute } from '../routing/routes'
 import { siteConfig } from '../site/site-config'
 import { absoluteUrl } from './canonical-url'
 import { siteOrigin } from './seo-config'
 import {
   isBestPageIndexable,
-  isCategoryIndexable,
   isTagIndexable,
   linkedTags,
   listedBestPages
@@ -185,11 +183,10 @@ function getCategoryEntries(websites: WebsiteSitemapEntry[]): SitemapEntry[] {
       if (!latest || lastmod > latest) latestBySlug.set(slug, lastmod)
     }
   }
-  return getActiveCategories(websites)
-    .filter(isCategoryIndexable)
-    .map(category => ({
-      lastmod: latestBySlug.get(category.slug),
-      loc: toAbsoluteUrl(getRoute('category.page', { category: category.slug }))
+  return [...latestBySlug]
+    .map(([slug, lastmod]) => ({
+      lastmod,
+      loc: toAbsoluteUrl(getRoute('category.page', { category: slug }))
     }))
     .sort(byLocation)
 }

@@ -208,12 +208,15 @@ describe('staging deploy job', () => {
       if: tipGate,
       run: 'pnpm tsx scripts/worker-readiness.ts "$STAGING_REVIEW_ORIGIN"'
     })
-    // The probe starts before the suite and stops with the step; the suite's status is the step's.
+    // The probe starts before the suite and stops with the step, which waits for it to record its
+    // request in flight (#418 review); the suite's status is the step's.
     const run = String(stepRunning(job, 'test:e2e:smoke').run)
     expect(run).toContain(
       'bash scripts/smoke-latency-probe.sh "$RUNNER_TEMP/smoke-latency-probe" "$PLAYWRIGHT_BASE_URL" &'
     )
-    expect(run).toContain(`trap 'kill "$probe" 2>/dev/null || true' EXIT`)
+    expect(run).toContain(
+      `trap 'kill "$probe" 2>/dev/null || true; wait "$probe" 2>/dev/null || true' EXIT`
+    )
     expect(run.trim().split('\n').at(-1)).toBe('pnpm --filter web test:e2e:smoke')
     // Its report is a diagnostic: it runs after a failed smoke and never fails the deploy.
     expect(job.steps?.[smoke + 1]).toMatchObject({

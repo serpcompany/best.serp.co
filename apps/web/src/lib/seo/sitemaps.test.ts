@@ -18,8 +18,8 @@ const websites = [
     publishedAt: '2026-05-16',
     slug: 'autoenhance.ai'
   },
-  // The transitional catch-all hub renders noindex, so its sitemap leaves it out (#341).
-  { category: 'other', publishedAt: '2026-05-17', slug: 'example-product' },
+  // Every category with a listing is in its sitemap: no catch-all is left out any more (#350).
+  { category: 'audio', publishedAt: '2026-05-17', slug: 'example-product' },
   { category: 'writing', publishedAt: '2026-05-18', slug: 'example-writer' },
   // A secondary category counts too: it moves `writing`'s lastmod.
   {
@@ -114,6 +114,7 @@ describe('sitemaps and absolute URLs', () => {
       await (await createTaxonomiesSitemapResponse({ getWebsites: () => websites })).text()
     )
     expect(categories).toEqual([
+      `${origin}/products/categories/audio/`,
       `${origin}/products/categories/video-downloaders/`,
       `${origin}/products/categories/writing/`
     ])
@@ -190,6 +191,7 @@ describe('sitemaps and absolute URLs', () => {
     })
     // A category's newest listing, its secondary listings included.
     expect(entries(await (await createTaxonomiesSitemapResponse(loaders)).text())).toEqual({
+      [`${origin}/products/categories/audio/`]: '2026-05-17T00:00:00.000Z',
       [`${origin}/products/categories/video-downloaders/`]: '2026-09-30T12:00:00.000Z',
       [`${origin}/products/categories/writing/`]: '2026-08-01T00:00:00.000Z'
     })

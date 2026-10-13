@@ -10,8 +10,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { getCategoryBySlug, resolveCategories } from '../../lib/directory/categories'
-import { getCategoryDisplayName } from '../../lib/directory/category-display'
+import { categoryNameFromSlug, getCategoryIcon } from '../../lib/directory/categories'
 
 interface SearchFiltersProps {
   selectedCategories: string[]
@@ -27,7 +26,7 @@ export function SearchFilters({
 }: SearchFiltersProps) {
   const [isOpen, setIsOpen] = useState(false)
 
-  const relevantCategories = resolveCategories([...availableCategories, ...selectedCategories])
+  const relevantCategories = [...new Set([...availableCategories, ...selectedCategories])]
 
   const handleCategoryToggle = (categorySlug: string, checked: boolean) => {
     if (checked) {
@@ -74,29 +73,29 @@ export function SearchFilters({
               )}
             </div>
             <div className="space-y-3 max-h-64 sm:max-h-80 overflow-y-auto">
-              {relevantCategories.map(category => {
-                const isSelected = selectedCategories.includes(category.slug)
+              {relevantCategories.map(categorySlug => {
+                const isSelected = selectedCategories.includes(categorySlug)
                 const categoryCount = availableCategories.filter(
-                  availableCategory => availableCategory === category.slug
+                  availableCategory => availableCategory === categorySlug
                 ).length
-                const Icon = category.icon
+                const Icon = getCategoryIcon(categorySlug)
 
                 return (
-                  <div key={category.slug} className="flex items-center space-x-2">
+                  <div key={categorySlug} className="flex items-center space-x-2">
                     <Checkbox
-                      id={category.slug}
+                      id={categorySlug}
                       checked={isSelected}
                       onCheckedChange={checked =>
-                        handleCategoryToggle(category.slug, checked as boolean)
+                        handleCategoryToggle(categorySlug, checked as boolean)
                       }
                     />
                     <label
-                      htmlFor={category.slug}
+                      htmlFor={categorySlug}
                       className="flex items-center gap-2 text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1"
                     >
                       <Icon className="h-4 w-4 text-muted-foreground" />
-                      <span className="flex-1">{getCategoryDisplayName(category.slug)}</span>
-                      {availableCategories.includes(category.slug) && (
+                      <span className="flex-1">{categoryNameFromSlug(categorySlug)}</span>
+                      {availableCategories.includes(categorySlug) && (
                         <span className="text-xs text-muted-foreground">({categoryCount})</span>
                       )}
                     </label>
@@ -111,18 +110,19 @@ export function SearchFilters({
       {activeFiltersCount > 0 && (
         <div className="flex items-center gap-1 flex-wrap">
           {selectedCategories.map(categorySlug => {
-            const category = getCategoryBySlug(categorySlug)
+            const Icon = getCategoryIcon(categorySlug)
+            const name = categoryNameFromSlug(categorySlug)
 
             return (
               <Badge key={categorySlug} variant="secondary" className="pr-0.5">
-                <category.icon />
-                {getCategoryDisplayName(category.slug)}
+                <Icon />
+                {name}
                 <Button
                   variant="ghost"
                   size="icon-xs"
                   onClick={() => handleCategoryToggle(categorySlug, false)}
                   className="size-4"
-                  aria-label={`Remove ${getCategoryDisplayName(category.slug)} filter`}
+                  aria-label={`Remove ${name} filter`}
                 >
                   <X />
                 </Button>

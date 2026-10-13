@@ -13,7 +13,7 @@ import { siteOrigin } from '../../lib/seo/seo-config'
 
 /**
  * Directory and category listings are paginated with a `?page=N` query parameter on the
- * existing URL (`/products/?page=2`, `/products/categories/other/?page=3`). Page 1 is the
+ * existing URL (`/products/?page=2`, `/products/categories/writing/?page=3`). Page 1 is the
  * bare URL, so every existing URL, canonical, and sitemap entry is unchanged; pages 2+
  * are linked with plain anchors for crawlers, canonicalize to themselves, and are
  * `noindex, follow` so they pass link equity without competing with page 1.

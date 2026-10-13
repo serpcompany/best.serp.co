@@ -95,6 +95,43 @@ describe('staging smoke latency probe (#417)', () => {
     expect(report.stdout).toMatch(/ edge {3}000 colo - dns .* curl 7$/mu)
   })
 
+  // PR #418 review: a stop that arrives while a request is in flight must still record it, since
+  // a slow or failed request is the sample the report most needs.
+  it('records the request in flight when it is stopped, then exits', async () => {
+    let arrived: () => void = () => {}
+    const inFlight = new Promise<void>(done => {
+      arrived = done
+    })
+    const server: Server = createServer((request, response) => {
+      response.setHeader('cf-ray', '8f00aa11bb22cc33-MEM')
+      arrived()
+      setTimeout(() => response.end(`colo=MEM ${request.url}\n`), 600)
+    })
+    await new Promise<void>(done => server.listen(0, '127.0.0.1', done))
+    cleanups.push(() => server.close())
+    const samples = join(directory(), 'probe')
+    const child = spawn('bash', [
+      probe,
+      samples,
+      `http://127.0.0.1:${(server.address() as AddressInfo).port}`,
+      '1'
+    ])
+    const exited = new Promise<number | null>((done, reject) => {
+      child.on('error', reject)
+      child.on('close', done)
+    })
+    await inFlight
+    child.kill('SIGTERM')
+    expect(await exited).toBe(0)
+    const rows = readFileSync(join(samples, 'samples.tsv'), 'utf8').trim().split('\n')
+    // The edge request answered 600 ms after the stop; the probe sent nothing after it.
+    expect(rows).toHaveLength(2)
+    const edge = rows[1]?.split('\t')
+    expect(edge?.slice(2, 5)).toEqual(['edge', '200', 'MEM'])
+    expect(Number(edge?.[10])).toBeGreaterThanOrEqual(0.5)
+    expect(edge?.[11]).toBe('0')
+  })
+
   it('reports nothing to see when the probe never sampled', () => {
     const report = spawnSync('bash', [probe, '--report', directory()], { encoding: 'utf8' })
     expect(report.status).toBe(0)

@@ -972,7 +972,7 @@ function detailStatement(slug: string, asOf: string): CompiledQuery {
  *   listing's own categories (bounded by the size of those categories), then name and slug.
  * - No tags, one category, and a tagged listing whose tags yield fewer than four: its hub (primary
  *   category) fills the rest with score 0 and the same keyset (design 3.2, #331), so two listings
- *   in one large category (the catch-all `other`) link onward to different neighbours. `fill.plan`
+ *   in one large category link onward to different neighbours. `fill.plan`
  *   picks how: through the hub's members when it has at most `RELATED_MEMBER_SCAN_LIMIT` public
  *   members (a probe that stops at one more), else by walking the public name index from the
  *   listing's own name, where a dense category yields four members almost immediately, then from

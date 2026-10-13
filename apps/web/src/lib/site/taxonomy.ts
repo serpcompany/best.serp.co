@@ -15,9 +15,3 @@ export const TAG_LINK_MIN_LISTINGS = 3
 
 /** A listing page names at most this many best pages under "Featured in" (design 5.3). */
 export const FEATURED_IN_MAX_PAGES = 3
-
-/**
- * Categories that stay as transitional catch-all hubs (design 1.5): noindex, follow, and left out
- * of `sitemap-categories.xml`, until they retire with a redirect (build step 10).
- */
-export const TRANSITIONAL_CATEGORY_SLUGS: ReadonlySet<string> = new Set(['other'])

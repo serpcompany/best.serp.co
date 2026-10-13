@@ -107,8 +107,8 @@ async function readLiveSample(request: APIRequestContext): Promise<CatalogSample
     deployedCatalog.maximumCategoryCount
   )
 
-  // Only the categories the sitemap lists are samples: an indexable one, never the transitional
-  // `other` (noindex and out of the sitemap, #346), which the specs expect to find there.
+  // Only the categories the sitemap lists are samples: indexable ones, which the specs expect to
+  // find there.
   const indexable = new Set(
     listedCategories.map(location => new URL(location).pathname.split('/').at(-2) ?? '')
   )

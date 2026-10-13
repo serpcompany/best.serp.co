@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
-import { getCategoryDisplayName } from '../../lib/directory/category-display'
+import { categoryNameFromSlug } from '../../lib/directory/categories'
 import { getRoute } from '../../lib/routing/routes'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
@@ -165,7 +165,7 @@ export function SearchResults() {
                 size="sm"
                 onClick={() => setSelectedCategories([category])}
               >
-                {getCategoryDisplayName(category)} ({count})
+                {categoryNameFromSlug(category)} ({count})
               </Button>
             ))}
           </div>

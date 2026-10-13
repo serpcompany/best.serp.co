@@ -79,7 +79,12 @@ format='%{http_code} %{time_namelookup} %{time_connect} %{time_appconnect} %{tim
 headers="$directory/headers.txt"
 start=$(date +%s)
 
-trap 'exit 0' TERM INT
+# Stopping waits for the request in flight (#418 review): a slow or failed request is the sample
+# the report needs most. Bash runs the trap only once curl returns (within its 30 s bound), then
+# the loop records the sample and exits; `wait` returns at once, so a stop mid-sleep is immediate.
+stop=0
+pause=
+trap 'stop=1' TERM INT
 
 # The value of one response header in the dump, or nothing.
 header() {
@@ -103,12 +108,17 @@ sample() {
     "${first:--}" "${total:--}" "$status" >>"$samples"
 }
 
-while :; do
+while [ "$stop" = 0 ]; do
   elapsed=$(($(date +%s) - start))
   stamp=$(printf '+%02d:%02d' $((elapsed / 60)) $((elapsed % 60)))
   now=$(date -u +%FT%TZ)
   sample edge "$origin/cdn-cgi/trace" "$stamp" "$now"
+  [ "$stop" = 0 ] || break
   sample worker "$origin/robots.txt" "$stamp" "$now" -H 'x-best-serp-co-smoke-test: 1'
+  [ "$stop" = 0 ] || break
   sleep "$interval" &
-  wait $!
+  pause=$!
+  wait "$pause"
 done
+[ -z "$pause" ] || kill "$pause" 2>/dev/null
+exit 0

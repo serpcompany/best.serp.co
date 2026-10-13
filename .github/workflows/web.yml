@@ -379,11 +379,12 @@ jobs:
           PLAYWRIGHT_BASE_URL: ${{ env.STAGING_REVIEW_ORIGIN }}
           PLAYWRIGHT_EXTERNAL_SERVER: '1'
         # The latency probe (#417) times Cloudflare's edge and the Worker from this runner every
-        # 5 s while the suite runs; the suite's exit status is the step's.
+        # 5 s while the suite runs; the suite's exit status is the step's. Stopped, the probe
+        # records its request in flight (at most 30 s) before it exits, so the step waits for it.
         run: |
           bash scripts/smoke-latency-probe.sh "$RUNNER_TEMP/smoke-latency-probe" "$PLAYWRIGHT_BASE_URL" &
           probe=$!
-          trap 'kill "$probe" 2>/dev/null || true' EXIT
+          trap 'kill "$probe" 2>/dev/null || true; wait "$probe" 2>/dev/null || true' EXIT
           pnpm --filter web test:e2e:smoke
 
       # Diagnostics only: never fails the deploy.

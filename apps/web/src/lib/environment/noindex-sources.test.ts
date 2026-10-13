@@ -61,7 +61,7 @@ const taxonomy = vi.hoisted(() => {
   return {
     bestPages: [page('ai-writer', null, 5), page('ai-chatbot', 'ai-chatbots', 40)],
     categories: [
-      { count: 841, description: '', name: 'Other', order: 0, slug: 'other' },
+      { count: 84, description: '', name: 'Writing', order: 0, slug: 'writing' },
       { count: 63, description: '', name: 'Video Downloaders', order: 1, slug: 'video-downloaders' }
     ],
     smallBestPage: page('ai-summarizer', 'ai-summaries', 4),
@@ -290,9 +290,9 @@ describe('the taxonomy pages’ robots (#346; #341 design 2.3)', () => {
   const tagPage = () => import('../../app/(site)/products/tags/[tag]/page')
   const bestPage = () => import('../../app/(site)/best/[keyword]/page')
 
-  it('keeps the transitional Other category noindex, follow and out of its sitemap', async () => {
-    expect(await robotsOf(categoryPage, { category: 'other' })).toEqual(noindexFollow)
-    expect(noindexIn(await robotsOf(categoryPage, { category: 'video-downloaders' }))).toBe(false)
+  it('indexes every category page that renders and lists it in its sitemap (#350)', async () => {
+    for (const { slug } of taxonomy.categories)
+      expect(noindexIn(await robotsOf(categoryPage, { category: slug })), slug).toBe(false)
     const { createTaxonomiesSitemapResponse } = await import('../seo/sitemaps')
     const sitemap = await (
       await createTaxonomiesSitemapResponse({
@@ -304,10 +304,8 @@ describe('the taxonomy pages’ robots (#346; #341 design 2.3)', () => {
           }))
       })
     ).text()
-    expect(sitemap).toContain(
-      '<loc>https://best.serp.co/products/categories/video-downloaders/</loc>'
-    )
-    expect(sitemap).not.toContain('/products/categories/other/')
+    for (const { slug } of taxonomy.categories)
+      expect(sitemap).toContain(`<loc>https://best.serp.co/products/categories/${slug}/</loc>`)
   })
 
   it('indexes a tag from 10 listings, unless a best page ranks it alone', async () => {

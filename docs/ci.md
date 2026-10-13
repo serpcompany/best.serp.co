@@ -96,11 +96,14 @@ So the stalls sat between those runners and Cloudflare, outside this repository.
   staging and production deploy, with three answers in a row (`waitForWorkerReadiness` in
   `scripts/d1-preview-http-gates.ts`). A runner whose path stays slow for 3 minutes fails there,
   with every probe's time in the log, instead of in minutes of timeouts. Re-run the job: a new
-  runner usually takes another path.
+  runner usually takes another path. Each probe gets only the time left before the deadline, and
+  an answer after it doesn't count, so the wait never outlasts its 3 minutes.
 - The latency probe times `/cdn-cgi/trace`, which Cloudflare answers without the Worker, and
   `/robots.txt`, which runs it, every 5 s with curl's phases and the colo that answered. A slow
   `edge` sample means the network path; a fast edge beside a slow `worker` first byte means the
   Worker or its start-up. The report is in the job summary; compare it with Observability.
+  Stopping the probe lets its request in flight finish (curl gives up after 30 s) and records it,
+  since a slow or failed request is the sample the report needs most; the smoke step waits for it.
 - The smoke keeps two Playwright workers. The stalls hit single requests whatever the load, and
   one worker took 106 s against 47 s for two (the same suite against staging, run from a laptop
   on 2026-10-11): about a minute more per deploy for no expected gain.
