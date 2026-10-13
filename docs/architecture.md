@@ -160,13 +160,15 @@ host alone. A test (`apps/web/src/lib/environment/site-environment.test.ts`) pin
   (`CF_VERSION_METADATA.id`) and `x-site-environment` (the configured `SITE_ENVIRONMENT`, or
   `unset`). Given the deployed version (`EXPECTED_WORKER_VERSION`, or the `deploy` entry
   Wrangler writes to `WRANGLER_OUTPUT_FILE_PATH`), the HTTP gates
-  (`scripts/d1-preview-http-gates.ts`) wait until it answers three probes in a row (logging
-  `Worker version <id> answered N probe(s)`), then require it on every response, retrying an
-  answer from the previous version within the same 60-second budget; they assume
+  (`scripts/d1-preview-http-gates.ts`) wait until the Worker is ready: three probes in a row
+  answered 200 by that version in under 2 s, within 3 minutes, each probe logged, then
+  `Worker version <id> is ready on <origin>` (#417). They then require it on every response,
+  retrying an answer from the previous version for up to 60 seconds; they assume
   `wrangler deploy` to 100% of traffic. Staging is gated the same way on its platform host
   (`staging https://staging.best.serp.co` goes through workers.dev with the smoke-test header,
   then requires the 308 to staging.best.serp.co without it), and the Playwright smoke runs
-  there with the header. Production is gated on its platform host with the
+  there with the header, after waiting for five ready answers in a row
+  ([CI](./ci.md#staging-smoke-readiness)). Production is gated on its platform host with the
   smoke-test header (non-production policy, `x-site-environment: production`, and the 308 once
   the switch is `on`), then on best.serp.co itself without it: no noindex, robots.txt lists the
   sitemap index, Google Tag Manager loads. Every answer from the Worker is enforced. Only
@@ -183,7 +185,7 @@ host alone. A test (`apps/web/src/lib/environment/site-environment.test.ts`) pin
   public https://best.serp.co` runs the same best.serp.co checks without skipping anything. Then
   `curl -sI https://best.serp.co/` must show `x-site-environment: production` and an
   `x-worker-version` equal to the version Deploy Production deployed: the id its gate log
-  prints (`Worker version <id> answered N probe(s)`), or the active deployment under Workers &
+  prints (`Worker version <id> is ready on <origin>`), or the active deployment under Workers &
   Pages → `best-serp-co-production` → Deployments in the Cloudflare dashboard.
 
 ## URLs and caching

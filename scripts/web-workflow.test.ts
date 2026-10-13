@@ -121,15 +121,19 @@ describe('web workflow', () => {
     expect(draft.if).toBe('github.event.pull_request.draft == true')
     expect(runStep(String(draft.run), '', {}).status).toBe(1)
     expect(draft.run).toContain('draft: mark ready to run e2e')
-    // continue-on-error would let a failed step leave the job green: only the resource probe's
-    // diagnostics carry it (#393), never a job or any other step.
+    // continue-on-error would let a failed step leave the job green: only the probes'
+    // diagnostics carry it (#393, #417), never a job or any other step.
     const tolerant = Object.entries(workflow.jobs).flatMap(([job, definition]) => [
       ...('continue-on-error' in definition ? [job] : []),
       ...(definition.steps ?? [])
         .filter(candidate => 'continue-on-error' in candidate)
         .map(candidate => `${job}: ${candidate.name}`)
     ])
-    expect(tolerant).toEqual(['e2e: Report runner resources', 'e2e: Upload the resource probe'])
+    expect(tolerant).toEqual([
+      'e2e: Report runner resources',
+      'e2e: Upload the resource probe',
+      'deploy-staging: Report smoke latency'
+    ])
     // Every later step either needs the earlier ones to succeed or checks the receipt step ran.
     for (const later of steps.slice(1)) {
       if (/always\(\)|failure\(\)|cancelled\(\)/u.test(later.if ?? '')) {

@@ -27,9 +27,10 @@
  * instead of redirecting to its canonical host (#42 decision e, #323); the redirect itself is
  * checked with one request without it.
  *
- * When the deploy's Worker version is known, the gates first wait until that version answers
- * three probes in a row, then require it on every response, retrying a response from another
- * version until the same 60 s budget runs out. They therefore never pass or fail against the
+ * When the deploy's Worker version is known, the gates first wait until the Worker is ready:
+ * that version answers `/robots.txt` with a 200 in under 2 s three times in a row, within
+ * 3 minutes (`waitForWorkerReadiness`, #417). They then require it on every response, retrying
+ * a response from another version for up to 60 s. They therefore never pass or fail against the
  * previous deployment while the edge still serves it; they assume a deploy to 100% of traffic
  * (`wrangler deploy`), not a gradual split. The version comes from `EXPECTED_WORKER_VERSION`,
  * or from the `deploy` entry Wrangler writes to `WRANGLER_OUTPUT_FILE_PATH` when the deploy
@@ -63,8 +64,12 @@ export type HttpGateMode = 'staging' | 'production' | 'public'
 const defaultRequestTimeoutMs = 15_000
 const maxVersionWaitMs = 60_000
 const defaultVersionPollIntervalMs = 2_000
-/** Consecutive probes the expected version must answer before the gates start. */
+/** Consecutive ready answers the Worker must give before the gates start. */
 const versionConfirmations = 3
+/** The longest the gates, and the staging smoke, wait for the deployed Worker to be ready. */
+const maxReadinessWaitMs = 180_000
+/** A ready answer takes less than this (#417). */
+const defaultReadyLatencyMs = 2_000
 const maxBodyProbeBytes = 4_096
 // Enough for robots.txt and for the <head> of the home page (its robots meta sits near 6 KB).
 const maxTextProbeBytes = 131_072
@@ -100,13 +105,17 @@ export interface HttpGateOptions {
   clock?: GateClock
   /** The deployed Worker version; gates wait for it and require it on every response. */
   expectedVersion?: string
+  /** Where the readiness wait logs each probe; `console.info` by default. */
+  log?: (line: string) => void
   /** The reviewed manifests whose retired pages the gates never sample (#260, #350). */
   publicationsDirectory?: string
+  /** Budget for the deployed Worker to be ready before the gates start (≤ 180 s). */
+  readinessWaitMs?: number
   /** The listing and taxonomy pages the gates request; `httpGateSamples` by default. */
   samples?: HttpGateSamples
   timeoutMs?: number
   versionPollIntervalMs?: number
-  /** Budget for the expected version to answer, shared by the wait and every retry (≤ 60 s). */
+  /** Once the Worker is ready, the budget for retrying an answer from another version (≤ 60 s). */
   versionWaitMs?: number
   /** Wrangler config whose `CANONICAL_HOST_REDIRECT` per environment decides the host-redirect gate. */
   wranglerConfigPath?: string
@@ -328,45 +337,112 @@ async function boundedFetch<T>(
 }
 
 /**
- * Waits until `expectedVersion` answers `versionConfirmations` probes in a row, for at most
- * `waitMs`, and returns the probes it took and the deadline of the version budget that the
- * gate requests then share. Right after `wrangler deploy` the edge can still run the previous
- * version for a few seconds (Deploy Staging once gated it about 4 s after the deploy).
+ * How to wait for a deployed Worker to be ready (`waitForWorkerReadiness`). Every field has a
+ * default: three ready answers in a row, 2 s apart, each under 2 s, within 180 s.
  */
-export async function waitForWorkerVersion(
+export interface ReadinessOptions {
+  clock?: GateClock
+  /** Ready answers needed in a row. */
+  confirmations?: number
+  intervalMs?: number
+  /** Where each probe is logged; `console.info` by default. */
+  log?: (line: string) => void
+  /** A ready answer takes less than this. */
+  maxLatencyMs?: number
+  /** The bound on one probe (15 s by default), cut to the time left before the deadline. */
+  timeoutMs?: number
+  /** The whole wait (≤ 180 s). */
+  waitMs?: number
+}
+
+const seconds = (milliseconds: number) => (milliseconds / 1000).toFixed(1)
+
+/**
+ * Waits until the Worker on `baseUrl` is ready: `confirmations` probes of `/robots.txt` in a
+ * row (with the smoke-test header) answered 200 by `expectedVersion` in under `maxLatencyMs`,
+ * within `waitMs`. Every probe's status, version and time is logged. Right after `wrangler
+ * deploy` the edge can still run the previous version for a few seconds (Deploy Staging once
+ * gated it about 4 s after the deploy), and fresh isolates load the Worker; and the staging
+ * smoke stalled for minutes behind slow answers on some runners' paths to Cloudflare (#417).
+ * So a slow answer is not ready either, and a wait that never sees one fails with the longest
+ * ready run and the slowest answer rather than letting a suite time out behind it.
+ */
+export async function waitForWorkerReadiness(
   baseUrl: URL,
   expectedVersion: string,
-  options: {
-    clock?: GateClock
-    intervalMs?: number
-    timeoutMs?: number
-    waitMs?: number
-  } = {}
-): Promise<{ deadline: number; probes: number }> {
-  const waitMs = options.waitMs ?? maxVersionWaitMs
+  options: ReadinessOptions = {}
+): Promise<{ probes: number }> {
+  const waitMs = options.waitMs ?? maxReadinessWaitMs
   const intervalMs = options.intervalMs ?? defaultVersionPollIntervalMs
+  const confirmations = options.confirmations ?? versionConfirmations
+  const maxLatencyMs = options.maxLatencyMs ?? defaultReadyLatencyMs
   const clock = options.clock ?? realClock
-  const timeoutMs = Math.min(options.timeoutMs ?? defaultRequestTimeoutMs, waitMs)
-  if (!Number.isSafeInteger(waitMs) || waitMs < 1 || waitMs > maxVersionWaitMs)
-    throw new Error('Worker version wait must be a positive integer of at most 60 seconds.')
-  const deadline = clock.now() + waitMs
+  const log = options.log ?? ((line: string) => console.info(line))
+  if (!Number.isSafeInteger(waitMs) || waitMs < 1 || waitMs > maxReadinessWaitMs)
+    throw new Error('Worker readiness wait must be a positive integer of at most 180 seconds.')
+  if (!Number.isSafeInteger(confirmations) || confirmations < 1)
+    throw new Error('Worker readiness needs a positive whole number of answers in a row.')
+  if (!Number.isSafeInteger(maxLatencyMs) || maxLatencyMs < 1)
+    throw new Error('Worker readiness latency must be a positive integer of milliseconds.')
+  const timeoutMs = options.timeoutMs ?? defaultRequestTimeoutMs
+  const started = clock.now()
+  const deadline = started + waitMs
   const probe = routeUrl(baseUrl, '/robots.txt')
-  let confirmed = 0
-  let observed = '(no answer)'
+  let inARow = 0
+  let longestRun = 0
+  let last = '(no probe)'
+  let slowestMs = 0
   let probes = 0
-  while (true) {
+  // The wait never outlasts its budget (#418 review): each probe gets only the time left before
+  // the deadline, and an answer that lands after it doesn't count, however fast it was.
+  while (deadline - clock.now() > 0) {
     probes += 1
-    observed = await boundedRequest(probe, timeoutMs, async response => {
-      await response.body?.cancel().catch(() => undefined)
-      return response.headers.get(WORKER_VERSION_HEADER) ?? '(none)'
-    }).catch((error: unknown) => `(${error instanceof Error ? error.message : String(error)})`)
-    confirmed = observed === expectedVersion ? confirmed + 1 : 0
-    if (confirmed >= versionConfirmations) return { deadline, probes }
-    if (clock.now() + intervalMs > deadline) break
+    const sent = clock.now()
+    const answer = await boundedRequest(
+      probe,
+      Math.min(timeoutMs, deadline - sent),
+      async response => {
+        await response.body?.cancel().catch(() => undefined)
+        return {
+          status: response.status,
+          version: response.headers.get(WORKER_VERSION_HEADER) ?? '(none)'
+        }
+      }
+    ).catch((error: unknown) => ({
+      error: error instanceof Error ? error.message : String(error)
+    }))
+    const answered = clock.now()
+    const latencyMs = answered - sent
+    const late = answered > deadline
+    slowestMs = Math.max(slowestMs, latencyMs)
+    const ready =
+      !late &&
+      'status' in answer &&
+      answer.status === 200 &&
+      answer.version === expectedVersion &&
+      latencyMs < maxLatencyMs
+    inARow = ready ? inARow + 1 : 0
+    longestRun = Math.max(longestRun, inARow)
+    last = `${
+      'status' in answer
+        ? `${answer.status} from ${answer.version === expectedVersion ? 'the deployed version' : `version ${answer.version}`} in ${latencyMs} ms`
+        : `no answer in ${latencyMs} ms (${answer.error})`
+    }${late ? ' (after the deadline)' : ''}`
+    log(
+      `Readiness probe ${probes} at +${seconds(sent - started)} s: ${last}, ${ready ? `ready (${inARow}/${confirmations} in a row)` : 'not ready'}.`
+    )
+    if (inARow >= confirmations) {
+      log(
+        `Worker version ${expectedVersion} is ready on ${baseUrl.origin}: ${confirmations} answers in a row under ${maxLatencyMs} ms, after ${probes} probe(s) in ${seconds(clock.now() - started)} s (slowest ${slowestMs} ms).`
+      )
+      return { probes }
+    }
+    // A probe sent at the deadline would have no time left to answer.
+    if (clock.now() + intervalMs >= deadline) break
     await clock.sleep(intervalMs)
   }
   throw new Error(
-    `Worker version ${expectedVersion} did not answer ${baseUrl.origin} within ${waitMs / 1000} s (last answer: ${observed}); the previous deployment may still be serving.`
+    `Worker version ${expectedVersion} was not ready on ${baseUrl.origin} within ${waitMs / 1000} s: ${longestRun} of the ${confirmations} answers in a row it needs (200 from that version in under ${maxLatencyMs} ms) over ${probes} probe(s); the last was ${last}, the slowest took ${slowestMs} ms. The previous deployment may still be serving, or this runner's path to Cloudflare is slow (docs/ci.md#staging-smoke-readiness).`
   )
 }
 
@@ -955,14 +1031,22 @@ export async function runHttpGates(
     const clock = options.clock ?? realClock
     const intervalMs = options.versionPollIntervalMs ?? defaultVersionPollIntervalMs
     const budgetMs = options.versionWaitMs ?? maxVersionWaitMs
-    const { deadline, probes } = await waitForWorkerVersion(baseUrl, options.expectedVersion, {
+    if (!Number.isSafeInteger(budgetMs) || budgetMs < 1 || budgetMs > maxVersionWaitMs)
+      throw new Error('Worker version budget must be a positive integer of at most 60 seconds.')
+    await waitForWorkerReadiness(baseUrl, options.expectedVersion, {
       clock,
       intervalMs,
+      log: options.log,
       timeoutMs,
-      waitMs: budgetMs
+      waitMs: options.readinessWaitMs
     })
-    target.version = { budgetMs, clock, deadline, expected: options.expectedVersion, intervalMs }
-    console.info(`Worker version ${options.expectedVersion} answered ${probes} probe(s).`)
+    target.version = {
+      budgetMs,
+      clock,
+      deadline: clock.now() + budgetMs,
+      expected: options.expectedVersion,
+      intervalMs
+    }
   }
   if (mode === 'public') {
     await expectPublicPolicy(target, listingRoute(listingSlug), {
