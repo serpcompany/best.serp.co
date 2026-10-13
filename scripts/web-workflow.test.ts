@@ -47,7 +47,7 @@ function step(job: string, name: string): WorkflowStep {
   return found
 }
 
-/** Runs a step's script with `git` and `gh` replaced by shell functions; returns its outputs. */
+/** Runs a step's script with commands (`git`, `gh`, ...) as shell functions; returns outputs. */
 function runStep(
   script: string,
   stubs: string,
@@ -319,6 +319,56 @@ describe('web workflow', () => {
     expect(guard(0, 'def456\trefs/heads/staging\n')).toEqual({ outputs: {}, status: 0 })
     expect(guard(128, '').status).not.toBe(0)
     expect(guard(2, '').status).not.toBe(0)
+  })
+
+  // #418 review, #430: the smoke step exits with the suite's status, and only after the latency
+  // probe has recorded its request in flight.
+  it('runs the staging smoke beside the latency probe and waits for the probe to stop', () => {
+    const smoke = String(step('deploy-staging', 'Run Playwright smoke against staging').run)
+    // Stand-ins for `bash scripts/smoke-latency-probe.sh` and `pnpm`, which log to $LOG. Like the
+    // real probe, the stand-in handles TERM only after its request in flight (200 ms) returns,
+    // then records it; it closes the step's output so the test doesn't wait on it. The suite
+    // starts once the probe has, and exits with $SUITE.
+    const stubs = [
+      'bash() {',
+      '  exec >/dev/null 2>&1',
+      '  stop=0',
+      "  trap 'stop=1' TERM",
+      '  echo "probe $*" >> "$LOG"',
+      '  for ((i = 0; i < 15; i++)); do',
+      '    sleep 0.2',
+      '    if [ "$stop" = 1 ]; then echo "probe recorded its request in flight" >> "$LOG"; return; fi',
+      '  done',
+      '  echo "probe was never stopped" >> "$LOG"',
+      '}',
+      'pnpm() {',
+      '  for ((i = 0; i < 100; i++)); do grep -q "^probe " "$LOG" 2>/dev/null && break; sleep 0.02; done',
+      '  echo "suite $*" >> "$LOG"',
+      '  return "$SUITE"',
+      '}'
+    ].join('\n')
+    const directory = mkdtempSync(join(tmpdir(), 'staging-smoke-'))
+    try {
+      const origin = project.remote.staging.reviewOrigin
+      for (const suite of [0, 1, 3]) {
+        const log = join(directory, `log-${suite}`)
+        const result = runStep(smoke, stubs, {
+          LOG: log,
+          PLAYWRIGHT_BASE_URL: origin,
+          RUNNER_TEMP: directory,
+          SUITE: String(suite)
+        })
+        expect(result.status, `suite exit ${suite}`).toBe(suite)
+        // Read as soon as the step exits: the probe's last line is there only if the step waited.
+        expect(readFileSync(log, 'utf8').trim().split('\n'), `suite exit ${suite}`).toEqual([
+          `probe scripts/smoke-latency-probe.sh ${directory}/smoke-latency-probe ${origin}`,
+          'suite --filter web test:e2e:smoke',
+          'probe recorded its request in flight'
+        ])
+      }
+    } finally {
+      rmSync(directory, { force: true, recursive: true })
+    }
   })
 
   it('accepts pull requests into main only from a hotfix branch of this repository', () => {

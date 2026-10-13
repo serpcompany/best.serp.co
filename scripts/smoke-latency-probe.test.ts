@@ -62,9 +62,12 @@ describe('staging smoke latency probe (#417)', () => {
       'time\telapsed\ttarget\tcode\tcolo\tversion\tdns\tconnect\ttls\tfirst_byte\ttotal\tcurl_exit'
     )
     const [edge, worker] = rows.slice(1).map(row => row.split('\t'))
-    expect(edge?.slice(1, 6)).toEqual(['+00:00', 'edge', '200', 'ORD', '-'])
+    // Whole seconds from `date +%s`, so a loaded runner can stamp the first sample +00:01 (#433).
+    expect(edge?.[1]).toMatch(/^\+\d{2}:\d{2}$/u)
+    expect(edge?.slice(2, 6)).toEqual(['edge', '200', 'ORD', '-'])
     // The Worker request carries the smoke-test header, so it gets the 200.
-    expect(worker?.slice(1, 6)).toEqual(['+00:00', 'worker', '200', 'ORD', 'v-deployed'])
+    expect(worker?.[1]).toMatch(/^\+\d{2}:\d{2}$/u)
+    expect(worker?.slice(2, 6)).toEqual(['worker', '200', 'ORD', 'v-deployed'])
     for (const row of [edge, worker]) {
       expect(row?.slice(6, 11).every(time => /^\d+\.\d+$/u.test(time))).toBe(true)
       expect(row?.[11]).toBe('0')
