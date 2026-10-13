@@ -76,7 +76,11 @@ merged up to date its tree is the one the pull request tested, so only the quick
 ## Staging smoke readiness
 
 Three staging smokes on 2026-10-11 (runs 38116684327, 38163330039 and 38172083196) timed out on
-page loads and API requests, and each passed when the deploy job was re-run (#417):
+page loads and API requests (#417). Runs 38163330039 and 38172083196 passed when the deploy job
+was re-run, with no code change. Run 38116684327 was never re-run: the next staging deploy
+(run 38117027619, #377), whose tree included that commit, passed its smoke.
+
+What the three failures showed:
 
 - **Not a window after the deploy.** The HTTP gates had already had three answers in a row from
   the new version before each smoke, and the timeouts ran from the first tests to the last,
@@ -96,8 +100,10 @@ So the stalls sat between those runners and Cloudflare, outside this repository.
   staging and production deploy, with three answers in a row (`waitForWorkerReadiness` in
   `scripts/d1-preview-http-gates.ts`). A runner whose path stays slow for 3 minutes fails there,
   with every probe's time in the log, instead of in minutes of timeouts. Re-run the job: a new
-  runner usually takes another path. Each probe gets only the time left before the deadline, and
-  an answer after it doesn't count, so the wait never outlasts its 3 minutes.
+  runner usually takes another path. In Deploy Production the new Worker is already live by
+  then, so follow [Production gates not ready](./deploy-runbook.md#production-gates-not-ready)
+  instead. Each probe gets only the time left before the deadline, and an answer after it doesn't
+  count, so the wait never outlasts its 3 minutes.
 - The latency probe times `/cdn-cgi/trace`, which Cloudflare answers without the Worker, and
   `/robots.txt`, which runs it, every 5 s with curl's phases and the colo that answered. A slow
   `edge` sample means the network path; a fast edge beside a slow `worker` first byte means the

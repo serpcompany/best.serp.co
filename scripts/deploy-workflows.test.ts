@@ -166,12 +166,15 @@ describe('staging deploy job', () => {
     const tip = job.steps?.find(step => step.id === 'tip')
     expect(tip?.run).toContain('git ls-remote --exit-code origin refs/heads/staging')
     expect(tip?.run).toContain('if [ "$tip" = "$GITHUB_SHA" ]')
-    // Each step's command is its last line (the smoke step starts its latency probe first).
+    // Each step's command is exact, so nothing can run before it (#430), except the smoke step's:
+    // it starts the latency probe first, so its command is its last line. The next test pins the
+    // rest of that step, and web-workflow.test.ts runs it.
+    const smoke = job.steps?.find(step => step.name === 'Run Playwright smoke against staging')
     expect(
-      runs(job)
-        .filter(run => run !== tip?.run)
+      (job.steps ?? [])
+        .filter(step => step.run && step.id !== 'tip')
         .slice(1)
-        .map(run => run.trim().split('\n').at(-1))
+        .map(step => (step === smoke ? step.run?.trim().split('\n').at(-1) : step.run))
     ).toEqual(commands)
     // The tip is compared after the build and before anything changes staging.
     const names = (job.steps ?? []).map(step => step.name)
@@ -209,7 +212,8 @@ describe('staging deploy job', () => {
       run: 'pnpm tsx scripts/worker-readiness.ts "$STAGING_REVIEW_ORIGIN"'
     })
     // The probe starts before the suite and stops with the step, which waits for it to record its
-    // request in flight (#418 review); the suite's status is the step's.
+    // request in flight (#418 review); the suite's status is the step's. web-workflow.test.ts runs
+    // the step to show both.
     const run = String(stepRunning(job, 'test:e2e:smoke').run)
     expect(run).toContain(
       'bash scripts/smoke-latency-probe.sh "$RUNNER_TEMP/smoke-latency-probe" "$PLAYWRIGHT_BASE_URL" &'
