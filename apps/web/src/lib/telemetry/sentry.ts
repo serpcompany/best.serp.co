@@ -193,3 +193,66 @@ export function sentryOptions(environment: () => SiteEnvironment, build = nextBu
     tracePropagationTargets: []
   }
 }
+
+/**
+ * Browser errors that are noise, not bugs (#422). The SDK's event filters match these on the
+ * raw message, before `beforeSend` redacts it; Sentry's inbound filters for the same errors
+ * match on the message they receive, so since #211 they no longer can.
+ */
+const BROWSER_IGNORE_ERRORS: Array<RegExp | string> = [
+  // A chunk that failed to load (Sentry's chunk-load filter): webpack's and Turbopack's.
+  'ChunkLoadError',
+  /Loading (?:CSS )?chunk \S+ failed/u,
+  /Failed to load chunk /u,
+  // React's hydration errors (Sentry's hydration filter), minified and not. Not 419: that is a
+  // Suspense boundary the server could not finish, and since #355 a public page's server errors
+  // reach only Workers Logs, so the browser's report is their one trace in Sentry.
+  /react\.dev\/errors\/(?:418|422|423|425)\b/u,
+  /Hydration failed/u,
+  /^ResizeObserver loop (?:limit exceeded|completed with undelivered notifications)/u
+]
+
+/** Errors whose innermost script is a browser extension's (#422). */
+const BROWSER_DENY_URLS: RegExp[] = [
+  /^chrome-extension:\/\//u,
+  /^moz-extension:\/\//u,
+  /^safari-(?:web-)?extension:\/\//u,
+  /^ms-browser-extension:\/\//u
+]
+
+/**
+ * Whether the error's outermost frame is code injected into the page (#422), as an automation
+ * script's `handlePageLoad` → `magicRPC` is. The SDK lists frames outermost first, and Chrome
+ * names evaluated code `<anonymous>:line:column`; a built-in's frame, such as
+ * `Array.forEach (<anonymous>)`, has no line, so a first-party stack cut off there still counts.
+ */
+function startsInInjectedScript(event: ScrubbableEvent): boolean {
+  // The error itself is the last exception with frames; its causes come before it.
+  const error = [...(event.exception?.values ?? [])]
+    .reverse()
+    .find(value => value.stacktrace?.frames?.length)
+  const outermost = error?.stacktrace?.frames?.[0]
+  return outermost?.filename === '<anonymous>' && typeof outermost.lineno === 'number'
+}
+
+/** A browser driven by automation, as a crawler's or a test's is. */
+function automatedBrowser(): boolean {
+  return typeof navigator !== 'undefined' && navigator.webdriver === true
+}
+
+/**
+ * The browser's settings: the shared ones, plus filters for noise that only the browser sees
+ * (#422). The Worker keeps `sentryOptions` as it is.
+ */
+export function browserSentryOptions(environment: () => SiteEnvironment, build = nextBuild()) {
+  const options = sentryOptions(environment, build)
+  return {
+    ...options,
+    beforeSend<E extends { environment?: string }>(event: E): E | null {
+      if (automatedBrowser() || startsInInjectedScript(event as ScrubbableEvent)) return null
+      return options.beforeSend(event)
+    },
+    denyUrls: BROWSER_DENY_URLS,
+    ignoreErrors: BROWSER_IGNORE_ERRORS
+  }
+}
