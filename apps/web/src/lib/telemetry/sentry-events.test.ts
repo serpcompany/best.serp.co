@@ -349,6 +349,16 @@ describe('what the browser drops before its messages are redacted (#422)', () =>
     ])
   })
 
+  it('still sends React error 419, a server render failure, with its message redacted', async () => {
+    const { seen, sent } = await throughFilters(browser, [
+      browserError('Error', minifiedReactError(419))
+    ])
+    expect(seen.map(event => event.exception?.values[0]?.value)).toEqual([minifiedReactError(419)])
+    expect(sent.map(event => event.exception?.values[0])).toEqual([
+      expect.objectContaining({ type: 'Error', value: REDACTED_MESSAGE })
+    ])
+  })
+
   it('drops every error from an automated browser', async () => {
     vi.stubGlobal('navigator', { webdriver: true })
     const { seen, sent } = await throughFilters(browser, [FIRST_PARTY])

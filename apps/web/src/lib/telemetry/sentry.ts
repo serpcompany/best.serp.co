@@ -204,8 +204,10 @@ const BROWSER_IGNORE_ERRORS: Array<RegExp | string> = [
   'ChunkLoadError',
   /Loading (?:CSS )?chunk \S+ failed/u,
   /Failed to load chunk /u,
-  // React's hydration errors (Sentry's hydration filter), minified and not.
-  /react\.dev\/errors\/(?:418|419|422|423|425)\b/u,
+  // React's hydration errors (Sentry's hydration filter), minified and not. Not 419: that is a
+  // Suspense boundary the server could not finish, and since #355 a public page's server errors
+  // reach only Workers Logs, so the browser's report is their one trace in Sentry.
+  /react\.dev\/errors\/(?:418|422|423|425)\b/u,
   /Hydration failed/u,
   /^ResizeObserver loop (?:limit exceeded|completed with undelivered notifications)/u
 ]

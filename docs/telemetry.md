@@ -62,11 +62,12 @@ values to its message. So:
   issues still group and point at the code.
 - **The browser drops its noise before that** (#422). Sentry's inbound filters for chunk-load
   and hydration errors match the message, which now arrives redacted. So the browser's
-  `browserSentryOptions` drops them itself: `ignoreErrors` (chunk-load, React hydration and
-  `ResizeObserver` errors) and `denyUrls` (extension scripts) match the raw message before
-  `beforeSend`, which then drops a stack that starts in an injected `<anonymous>` script and
-  every error from an automated browser (`navigator.webdriver`). The Worker keeps
-  `sentryOptions`.
+  `browserSentryOptions` drops them itself, before `beforeSend`: `ignoreErrors` (chunk-load,
+  React hydration and `ResizeObserver` errors) match the raw message, and `denyUrls` (extension
+  scripts) the script's URL. `beforeSend` then drops a stack that starts in an injected
+  `<anonymous>` script and every error from an automated browser (`navigator.webdriver`).
+  React error 419 is still sent: it is a server render failure, and the browser's report is its
+  only trace in Sentry; its cause is in Workers Logs. The Worker keeps `sentryOptions`.
 - **The shared logger takes a code.** `logger.error` (`apps/web/src/lib/logging`) accepts one of
   `ERROR_CODES` or an `Error`. The caught error goes in `cause`, so Sentry gets its type and
   stack under the code, with its message redacted; context goes in `data`, which stays in the
