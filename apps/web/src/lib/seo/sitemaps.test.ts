@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { generateBreadcrumbSchema, siteUrl } from './seo-config'
 import {
   createBestPagesSitemapResponse,
@@ -156,22 +156,22 @@ describe('sitemaps and absolute URLs', () => {
   it('lists the best index in the pages sitemap only while it lists something (#341)', async () => {
     const pages = locations(await (await createPagesSitemapResponse(loaders)).text())
     expect(pages).toContain(`${origin}/best/`)
-    // The tag index is in no sitemap, even while it lists tags: no page links it (#425).
+    // The tag index is in no sitemap, and the pages sitemap reads no tags (#425, #435).
     expect(pages).not.toContain(`${origin}/products/tags/`)
+    const getTags = vi.fn(() => tags)
+    await createPagesSitemapResponse({ ...loaders, getTags } as typeof loaders)
+    expect(getTags).not.toHaveBeenCalled()
     const before = locations(await (await createPagesSitemapResponse(noTaxonomy)).text())
-    expect(before).not.toContain(`${origin}/products/tags/`)
     expect(before).not.toContain(`${origin}/best/`)
-    // Only unlinked tags (fewer than 3 listings) and empty best pages: still a 404.
+    // Only empty best pages: still a 404.
     const unlisted = locations(
       await (
         await createPagesSitemapResponse({
           ...noTaxonomy,
-          getBestPages: () => bestPages.filter(page => page.poolSize === 0),
-          getTags: () => tags.filter(tag => tag.count < 3)
+          getBestPages: () => bestPages.filter(page => page.poolSize === 0)
         })
       ).text()
     )
-    expect(unlisted).not.toContain(`${origin}/products/tags/`)
     expect(unlisted).not.toContain(`${origin}/best/`)
   })
 
