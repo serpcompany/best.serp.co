@@ -136,6 +136,46 @@ describe('a failed search reaches Sentry at most once per kind per page session 
   })
 })
 
+describe('a search the page abandons is not a failure (#440)', () => {
+  /** The window's page lifecycle: the module listens on it as it loads. */
+  let page: EventTarget
+  beforeEach(() => {
+    page = new EventTarget()
+    vi.stubGlobal('window', page)
+  })
+
+  it('reports nothing for a search cancelled as the visitor leaves the page', async () => {
+    const search = await pageSession()
+    fetch.mockImplementation(noAnswer)
+    page.dispatchEvent(new Event('pagehide'))
+    await search('fixture')
+    expect(logger.error).not.toHaveBeenCalled()
+  })
+
+  it('reports nothing for an aborted search', async () => {
+    const search = await pageSession()
+    fetch.mockImplementation(() => Promise.reject(new DOMException('aborted', 'AbortError')))
+    await search('fixture')
+    expect(logger.error).not.toHaveBeenCalled()
+  })
+
+  it('still reports a network failure on a page the visitor stays on, or comes back to', async () => {
+    const search = await pageSession()
+    fetch.mockImplementation(noAnswer)
+    await search('fixture')
+    expect(reportedCauses()).toEqual([['search_failed', 'TypeError']])
+
+    const restored = await pageSession()
+    page.dispatchEvent(new Event('pagehide'))
+    page.dispatchEvent(new Event('pageshow'))
+    await restored('fixture')
+    expect(reportedCauses()).toEqual([
+      ['search_failed', 'TypeError'],
+      ['search_failed', 'TypeError']
+    ])
+  })
+})
+
 describe('a response’s failed entries are one report (#401)', () => {
   it('collapses every failed entry of a response, at any step, into one event', async () => {
     const search = await pageSession()
