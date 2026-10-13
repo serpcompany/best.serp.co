@@ -11,7 +11,14 @@
  * same module list the copy held: the same module ids with the same factories, which the runtime
  * installs once per id either way. The rendered pages don't change.
  *
+ * The deploy builds set `SENTRY_AUTH_TOKEN`, so Sentry turns on Turbopack's debug IDs: each chunk
+ * then starts with a one-line debug-ID prologue and carries a `//# debugId=` comment. A debug ID
+ * is derived from the chunk's content, so the copies share it, and both lines stay in the
+ * compared content.
+ *
  * It edits the standalone copy of the server output, the one OpenNext bundles, and nothing else.
+ * It fails when it recognizes none of the chunks, so a change in Turbopack's chunk format fails
+ * the build instead of quietly shipping every copy again.
  */
 import { readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
@@ -20,6 +27,11 @@ import { project } from './project'
 
 /** Every Turbopack server chunk starts with its module list. */
 const CHUNK_PREFIX = 'module.exports=['
+/**
+ * With debug IDs on, the line before the module list: an IIFE that records the chunk's debug ID
+ * in `globalThis._debugIds` (`;!function(){try {…_debugIds…}catch(e){}}();`).
+ */
+const DEBUG_ID_PROLOGUE = /^;!function\(\)\{[^\n]*\._debugIds[^\n]*\n/u
 const SOURCE_MAP_COMMENT = /\n\/\/# sourceMappingURL=[^\n]*\n?$/u
 
 /** The server output OpenNext bundles: `next build`'s standalone copy of `.next/server`. */
@@ -47,9 +59,13 @@ export interface ChunkReplacement {
   bytes: number
 }
 
-/** A chunk's content without its source map comment, or null for a file that isn't a chunk. */
+/**
+ * A chunk's content without its source map comment, or null for a file that isn't a chunk. The
+ * debug-ID prologue and `//# debugId=` comment, when present, stay in it.
+ */
 export function chunkContent(source: string): string | null {
-  return source.startsWith(CHUNK_PREFIX) ? source.replace(SOURCE_MAP_COMMENT, '') : null
+  const moduleList = source.slice(DEBUG_ID_PROLOGUE.exec(source)?.[0].length ?? 0)
+  return moduleList.startsWith(CHUNK_PREFIX) ? source.replace(SOURCE_MAP_COMMENT, '') : null
 }
 
 /** The copies to replace: each chunk whose content an earlier-named chunk in its directory has. */
@@ -80,9 +96,18 @@ function chunkFiles(directory: string): ChunkFile[] {
   })
 }
 
-/** Rewrites the copies under `<serverDirectory>/chunks`; returns what it replaced. */
+/**
+ * Rewrites the copies under `<serverDirectory>/chunks`; returns what it replaced. Throws, before
+ * changing anything, when none of the `.js` files there is a chunk it recognizes.
+ */
 export function dedupeServerChunks(serverDirectory: string): ChunkReplacement[] {
-  const replacements = planChunkDedupe(chunkFiles(join(serverDirectory, 'chunks')))
+  const files = chunkFiles(join(serverDirectory, 'chunks'))
+  if (!files.some(({ source }) => chunkContent(source) !== null)) {
+    throw new Error(
+      `dedupe-server-chunks: none of the ${files.length} .js files under ${join(serverDirectory, 'chunks')} is a Turbopack chunk it recognizes; has the chunk format changed?`
+    )
+  }
+  const replacements = planChunkDedupe(files)
   for (const { canonical, path } of replacements) {
     // A new file, not a write through: the standalone output may hard-link `.next/server`.
     unlinkSync(path)

@@ -191,7 +191,9 @@ the Worker entry reports them itself (#210, `apps/web/src/lib/telemetry/worker-e
 - **A cron job's failure** (`lib/worker/scheduled.ts`): one event per failed job, named
   `<job> (cron <expression>)`, sent before the invocation ends. It is still logged as
   `scheduled_job_failed` first. A cron isolate never starts Next.js, so before this it had no
-  Sentry at all.
+  Sentry at all. The jobs' modules load when a trigger fires (`lib/worker/run-scheduled.ts`,
+  #424), so a failure to load them is reported and logged the same way, as the job
+  `load-scheduled-jobs`, and rethrown.
 
 Each event has the error's type and stack, mechanism `cloudflare.fetch` or
 `cloudflare.scheduled`, and the same DSN, release, environment and scrubber as the Next.js

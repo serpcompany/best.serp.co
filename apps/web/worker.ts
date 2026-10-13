@@ -13,8 +13,9 @@
  *
  * `scheduled()` serves the Cron Triggers in `wrangler.jsonc` (`triggers.crons`): the hourly draft
  * reminders and expiry (#63), the listing media queue every 15 minutes (#95), and the weekly
- * badge program (#66) with its daily rechecks, in `src/lib/worker/scheduled.ts`, which it loads
- * only when a trigger fires, so a new isolate's start-up evaluates just the request path (#424).
+ * badge program (#66) with its daily rechecks, in `src/lib/worker/scheduled.ts`, which
+ * `src/lib/worker/run-scheduled.ts` loads only when a trigger fires, so a new isolate's start-up
+ * evaluates just the request path (#424).
  *
  * Wrangler's `main` points here (OpenNext "custom worker" pattern). The build output it wires
  * in (`.open-next/worker.js`, `.next/routes-manifest.json`, `.open-next/worker-sentry.json`)
@@ -36,6 +37,7 @@ import {
   catalogRenderer
 } from './src/lib/worker/catalog'
 import { handleWorkerRequest } from './src/lib/worker/handle-request'
+import { runScheduled } from './src/lib/worker/run-scheduled'
 import type { ScheduledContext, ScheduledEnv, ScheduledEvent } from './src/lib/worker/scheduled'
 // The build output, typed by worker-build-output.d.ts (it exists only after a build).
 import openNextWorker, {
@@ -94,18 +96,18 @@ function log(event: object): void {
 }
 
 export default {
-  async scheduled(
+  scheduled(
     controller: ScheduledEvent,
     env: WorkerEnv & ScheduledEnv,
     context: ScheduledContext
   ): Promise<void> {
     // Loaded on the first trigger, not at start-up: the jobs' modules (email templates, billing,
     // the badge program, the media queue) were about a third of the JavaScript a new isolate ran at
-    // start-up (#424).
-    const { handleScheduled, scheduledJobs } = await import('./src/lib/worker/scheduled')
-    return handleScheduled(controller, env, context, scheduledJobs, failures =>
-      errors.scheduled(failures, controller.cron, env)
-    )
+    // start-up (#424). A failed load is reported like a failed job and rethrown.
+    return runScheduled(controller, env, context, {
+      load: () => import('./src/lib/worker/scheduled'),
+      reportFailures: failures => errors.scheduled(failures, controller.cron, env)
+    })
   },
 
   fetch(request: Request, env: WorkerEnv, context: WorkerExecutionContext): Promise<Response> {

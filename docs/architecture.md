@@ -43,13 +43,13 @@ change runs in a protected workflow.
   unrouted `/<slug>` moved (`lib/routing/legacy-root.ts`), and, after a listing page rendered
   404, whether that slug is unpublished (`lib/routing/gone-listing.ts`: the page is rendered
   again as the 410 gone page), all through `apps/web/src/db/`.
-  Its `scheduled()` handler loads `lib/worker/scheduled.ts` when a trigger fires (not at a new
-  isolate's start-up, #424), which maps each Cron Trigger to its
-  jobs: [draft reminders](./submission-flow.md#draft-reminders-and-expiry) and the
+  Its `scheduled()` handler loads `lib/worker/scheduled.ts` when a trigger fires
+  (`lib/worker/run-scheduled.ts`; not at a new isolate's start-up, #424), which maps each
+  Cron Trigger to its jobs: [draft reminders](./submission-flow.md#draft-reminders-and-expiry) and the
   [billing sweep](./billing.md) (hourly), and the [badge program](./badge-program.md).
   The Worker build keeps one copy of each server chunk Turbopack writes more than once
   (`scripts/dedupe-server-chunks.ts`, run by `apps/web/open-next.config.ts`), which cut the
-  Worker script by about 30% (#424).
+  Worker script by about 30% (#424), and fails if it recognizes none of the chunks.
 - `apps/web/src/lib/catalog/` acquires the binding, validates the runtime environment,
   and deduplicates reads per request. It also derives each listing body's Markdown tree
   through the epoch-keyed data cache, so a listing page renders it instead of parsing the
