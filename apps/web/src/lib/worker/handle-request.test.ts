@@ -464,7 +464,7 @@ describe('Worker request pipeline and the edge cache', () => {
               {
                 cache: cache as unknown as Cache,
                 deploymentId: version.id,
-                epoch: async () => ({ bookmark: null, token: 'e' })
+                epoch: async () => ({ read: { bookmark: null, token: 'e' } })
               },
               async forwarded => {
                 rendered.push(forwarded)
@@ -521,7 +521,7 @@ describe('Worker request pipeline and the edge cache', () => {
             {
               cache: cache as unknown as Cache,
               deploymentId: version.id,
-              epoch: async () => ({ bookmark: null, token: 'e' })
+              epoch: async () => ({ read: { bookmark: null, token: 'e' } })
             },
             async forwarded => {
               rendered.push(forwarded)

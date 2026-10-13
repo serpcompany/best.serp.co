@@ -20,6 +20,10 @@ export const HTML_CACHE_TTL_SECONDS = 24 * 60 * 60
 export const EPOCH_FRESH_MS = 30_000
 /** Past this age a request waits for a fresh epoch instead of using the last one. */
 export const EPOCH_MAX_STALE_MS = 5 * 60_000
+/** How long a request waits for its own epoch load before it falls back (#443). */
+export const EPOCH_LOAD_TIMEOUT_MS = 2_000
+/** How long a request waits for a Cache API lookup before it treats it as a miss (#443). */
+export const CACHE_MATCH_TIMEOUT_MS = 1_000
 
 export const EDGE_CACHE_HEADER = 'x-edge-cache'
 const ORIGINAL_CACHE_CONTROL_HEADER = 'x-edge-cache-origin-cache-control'
@@ -79,6 +83,22 @@ export interface EpochRead {
   token: string
 }
 
+/**
+ * Where a request's epoch came from: the isolate's memo while fresh, or while stale with a
+ * background refresh; the request's own load, from the data center's share or from D1; or the
+ * memo's last value at any age (none: the cache is bypassed) after that load timed out or failed.
+ */
+export type EpochSource = 'fresh' | 'stale' | 'shared' | 'd1' | 'timeout' | 'error'
+
+/** One request's answer from `EdgeCacheOptions.epoch`. */
+export interface EpochLookup {
+  /** The age of the last value a request fell back on after a timeout or a failure. */
+  ageMs?: number
+  /** The epoch to key on, or null when there is none: the cache is then bypassed. */
+  read: EpochRead | null
+  source?: EpochSource
+}
+
 export interface EdgeCacheOptions {
   /**
    * Cache API namespace for stored responses: the zone's cache, which staging's and production's
@@ -87,15 +107,39 @@ export interface EdgeCacheOptions {
   cache: Cache
   /** Identifies the deployed build (Worker version); markup and asset URLs change with it. */
   deploymentId: string
-  /** Current catalog epoch, or null when it cannot be read (the cache is bypassed). */
-  epoch: (context: EdgeCacheContext) => Promise<EpochRead | null>
+  /** Current catalog epoch; a null `read`, or a rejection, bypasses the cache. */
+  epoch: (context: EdgeCacheContext) => Promise<EpochLookup>
   observe?: (event: EdgeCacheEvent) => void
 }
 
+/**
+ * One line per request (`HIT`, `MISS` or `BYPASS`), plus one when a step fails or times out, logged
+ * as it happens. A cacheable request's lines carry how long the epoch took and where it came from,
+ * and how long the page lookup took (#443).
+ */
 export interface EdgeCacheEvent {
+  epochAgeMs?: number
+  epochMs?: number
+  epochSource?: EpochSource
   event: 'edge_cache'
-  state: EdgeCacheState | 'store-error' | 'epoch-error'
+  matchMs?: number
+  state: EdgeCacheState | 'store-error' | 'epoch-error' | 'epoch-timeout' | 'match-timeout'
   status?: number
+}
+
+const TIMED_OUT = Symbol('timed out')
+
+/** `promise`'s outcome, or `TIMED_OUT` if `ms` pass first; the timer never outlives the race. */
+async function settleWithin<T>(promise: Promise<T>, ms: number): Promise<T | typeof TIMED_OUT> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<typeof TIMED_OUT>(resolve => {
+    timer = setTimeout(() => resolve(TIMED_OUT), ms)
+  })
+  try {
+    return await Promise.race([promise, timeout])
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 export function isCacheableRequest(request: Request): boolean {
@@ -207,6 +251,9 @@ function servedCopy(cached: Response, method: string): Response {
  * `renderRequestFor(request)`, so what is stored depends only on the cache key; a bypassed
  * request is rendered as sent. Only the render of a miss gets the epoch its key names (#382); a
  * bypassed render (signed in, private paths, no epoch) gets none.
+ *
+ * Nothing before the render waits unbounded (#443): the epoch memo answers within
+ * `EPOCH_LOAD_TIMEOUT_MS`, and a page lookup slower than `CACHE_MATCH_TIMEOUT_MS` renders as a miss.
  */
 export async function withEdgeCache(
   request: Request,
@@ -221,26 +268,44 @@ export async function withEdgeCache(
   }
   const renderRequest = renderRequestFor(request)
 
-  let epoch: EpochRead | null = null
+  const epochStartedAt = Date.now()
+  let lookup: EpochLookup
   try {
-    epoch = await options.epoch(context)
+    lookup = await options.epoch(context)
   } catch {
-    observe({ event: 'edge_cache', state: 'epoch-error' })
+    lookup = { read: null, source: 'error' }
   }
+  const timing = { epochMs: Date.now() - epochStartedAt, epochSource: lookup.source }
+  if (lookup.source === 'timeout' || lookup.source === 'error') {
+    observe({
+      epochAgeMs: lookup.ageMs,
+      event: 'edge_cache',
+      state: lookup.source === 'timeout' ? 'epoch-timeout' : 'epoch-error',
+      ...timing
+    })
+  }
+  const epoch = lookup.read
   if (!epoch) {
-    observe({ event: 'edge_cache', state: 'BYPASS' })
+    observe({ event: 'edge_cache', state: 'BYPASS', ...timing })
     return withState(await render(renderRequest), 'BYPASS')
   }
 
   const key = await cacheKeyFor(request, options.deploymentId, epoch.token)
-  const cached = await options.cache.match(key).catch(() => undefined)
-  if (cached) {
-    observe({ event: 'edge_cache', state: 'HIT', status: cached.status })
-    return servedCopy(cached, request.method)
+  const matchStartedAt = Date.now()
+  const matched = await settleWithin(
+    options.cache.match(key).catch(() => undefined),
+    CACHE_MATCH_TIMEOUT_MS
+  )
+  const matchMs = Date.now() - matchStartedAt
+  if (matched === TIMED_OUT) {
+    observe({ event: 'edge_cache', matchMs, state: 'match-timeout', ...timing })
+  } else if (matched) {
+    observe({ event: 'edge_cache', matchMs, state: 'HIT', status: matched.status, ...timing })
+    return servedCopy(matched, request.method)
   }
 
   const response = await render(renderRequest, epoch)
-  observe({ event: 'edge_cache', state: 'MISS', status: response.status })
+  observe({ event: 'edge_cache', matchMs, state: 'MISS', status: response.status, ...timing })
   if (request.method !== 'GET' || !isCacheableResponse(response)) {
     return withState(response, 'MISS')
   }
@@ -256,46 +321,80 @@ export async function withEdgeCache(
 interface MemoEntry {
   fetchedAt: number
   read: EpochRead
+  /** When the load that returned it started: a load started earlier never replaces it. */
+  startedAt: number
+}
+
+/** One request's own load of the epoch, and where it found it. */
+export interface LoadedEpoch {
+  read: EpochRead
+  source: 'shared' | 'd1'
 }
 
 /**
  * Per-isolate memo of the catalog epoch (with its bookmark, #382) with stale-while-revalidate:
  * requests inside `freshMs` reuse it, requests inside `maxStaleMs` reuse it while one background
- * refresh runs, and older values are refreshed before answering. Concurrent refreshes share one
- * load, so a busy isolate reads the epoch at most once per `freshMs`.
+ * refresh runs, and older values are refreshed before answering.
+ *
+ * Requests share only the settled value, never a load in flight (#443). A load's I/O runs in the
+ * request that started it, and Workers drops its continuations when that request ends (its client
+ * disconnects, or `waitUntil`'s 30 seconds run out), so another request awaiting it could wait
+ * forever. Each load is therefore the calling request's own (`load` closes over its cache handle
+ * and logger), and a request waits for it for at most `timeoutMs`. After a timeout or a failure
+ * it falls back on the last value at any age, or on none, which bypasses the cache. A background
+ * refresh is claimed for `timeoutMs`, so a busy isolate starts about one per `freshMs`, and one
+ * whose request ended is retried once the claim lapses.
  */
 export class EpochMemo {
-  private inflight: Promise<EpochRead> | undefined
+  private refreshClaimedAt: number | undefined
   private value: MemoEntry | undefined
 
   constructor(
-    private readonly load: () => Promise<EpochRead>,
     private readonly now: () => number = Date.now,
     private readonly freshMs = EPOCH_FRESH_MS,
-    private readonly maxStaleMs = EPOCH_MAX_STALE_MS
+    private readonly maxStaleMs = EPOCH_MAX_STALE_MS,
+    private readonly timeoutMs = EPOCH_LOAD_TIMEOUT_MS
   ) {}
 
-  async current(context: EdgeCacheContext): Promise<EpochRead> {
+  async current(context: EdgeCacheContext, load: () => Promise<LoadedEpoch>): Promise<EpochLookup> {
     const value = this.value
-    const age = value ? this.now() - value.fetchedAt : Number.POSITIVE_INFINITY
-    if (value && age < this.freshMs) return value.read
+    const startedAt = this.now()
+    const age = value ? startedAt - value.fetchedAt : Number.POSITIVE_INFINITY
+    if (value && age < this.freshMs) return { read: value.read, source: 'fresh' }
     if (value && age < this.maxStaleMs) {
-      context.waitUntil(this.refresh().catch(() => undefined))
-      return value.read
+      const claimedAt = this.refreshClaimedAt
+      if (claimedAt === undefined || startedAt - claimedAt >= this.timeoutMs) {
+        this.refreshClaimedAt = startedAt
+        context.waitUntil(
+          settleWithin(this.loadInto(load, startedAt), this.timeoutMs).catch(() => undefined)
+        )
+      }
+      return { read: value.read, source: 'stale' }
     }
-    return this.refresh()
+    try {
+      const loaded = await settleWithin(this.loadInto(load, startedAt), this.timeoutMs)
+      return loaded === TIMED_OUT ? this.fallback('timeout') : loaded
+    } catch {
+      return this.fallback('error')
+    }
   }
 
-  private refresh(): Promise<EpochRead> {
-    this.inflight ||= this.load()
-      .then(read => {
-        this.value = { fetchedAt: this.now(), read }
-        return read
-      })
-      .finally(() => {
-        this.inflight = undefined
-      })
-    return this.inflight
+  /** The last value, which another request's load may have set meanwhile, or none. */
+  private fallback(source: 'timeout' | 'error'): EpochLookup {
+    const value = this.value
+    if (!value) return { read: null, source }
+    return { ageMs: this.now() - value.fetchedAt, read: value.read, source }
+  }
+
+  private async loadInto(
+    load: () => Promise<LoadedEpoch>,
+    startedAt: number
+  ): Promise<LoadedEpoch> {
+    const loaded = await load()
+    if (!this.value || this.value.startedAt <= startedAt) {
+      this.value = { fetchedAt: this.now(), read: loaded.read, startedAt }
+    }
+    return loaded
   }
 }
 
@@ -318,25 +417,35 @@ function epochCacheKey(environment: string): string {
  */
 const EPOCH_BOOKMARK_HEADER = 'x-d1-bookmark'
 
+async function readSharedEpoch(cache: Cache, key: string): Promise<EpochRead | undefined> {
+  const cached = await cache.match(key)
+  if (!cached) return undefined
+  const token = await cached.text()
+  return token ? { bookmark: cached.headers.get(EPOCH_BOOKMARK_HEADER) || null, token } : undefined
+}
+
 /**
  * Shares the epoch, and the bookmark it was read at, between the isolates of one data center
- * for `freshSeconds`, so the data center reads it from D1 at most that often.
+ * for `freshSeconds`, so the data center reads it from D1 at most that often. A share that fails,
+ * or takes longer than `CACHE_MATCH_TIMEOUT_MS`, reads D1 instead, and the share is stored in the
+ * background (#443).
  */
 export async function loadSharedEpoch(
   cache: Cache,
   environment: string,
   read: () => Promise<EpochRead>,
+  context: EdgeCacheContext,
   freshSeconds = EPOCH_FRESH_MS / 1000
-): Promise<EpochRead> {
+): Promise<LoadedEpoch> {
   const key = epochCacheKey(environment)
-  const cached = await cache.match(key).catch(() => undefined)
-  if (cached) {
-    const token = await cached.text()
-    if (token) return { bookmark: cached.headers.get(EPOCH_BOOKMARK_HEADER) || null, token }
-  }
+  const shared = await settleWithin(
+    readSharedEpoch(cache, key).catch(() => undefined),
+    CACHE_MATCH_TIMEOUT_MS
+  )
+  if (shared && shared !== TIMED_OUT) return { read: shared, source: 'shared' }
   const epoch = await read()
   const headers = new Headers({ 'cache-control': `public, max-age=${freshSeconds}` })
   if (epoch.bookmark) headers.set(EPOCH_BOOKMARK_HEADER, epoch.bookmark)
-  await cache.put(key, new Response(epoch.token, { headers })).catch(() => undefined)
-  return epoch
+  context.waitUntil(cache.put(key, new Response(epoch.token, { headers })).catch(() => undefined))
+  return { read: epoch, source: 'd1' }
 }

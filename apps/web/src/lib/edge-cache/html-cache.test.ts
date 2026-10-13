@@ -1,11 +1,16 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  CACHE_MATCH_TIMEOUT_MS,
   cacheKeyFor,
   EDGE_CACHE_HEADER,
   type EdgeCacheContext,
+  type EdgeCacheEvent,
+  EPOCH_LOAD_TIMEOUT_MS,
+  EPOCH_MAX_STALE_MS,
   EpochMemo,
   type EpochRead,
   isCacheableRequest,
+  type LoadedEpoch,
   loadSharedEpoch,
   renderRequestFor,
   withEdgeCache
@@ -59,7 +64,7 @@ function harness(options: { deploymentId?: string; epoch?: string | null } = {})
       {
         cache: cache as unknown as Cache,
         deploymentId,
-        epoch: async () => (epoch === null ? null : read(epoch))
+        epoch: async () => ({ read: epoch === null ? null : read(epoch) })
       },
       async () => {
         renders += 1
@@ -318,7 +323,11 @@ describe('edge HTML cache', () => {
     const poisoned = await withEdgeCache(
       page('/products/', { headers: { 'x-nonce': 'ATTACKER' } }),
       { waitUntil: promise => void promise },
-      { cache: edge.cache as unknown as Cache, deploymentId: 'v', epoch: async () => read('e') },
+      {
+        cache: edge.cache as unknown as Cache,
+        deploymentId: 'v',
+        epoch: async () => ({ read: read('e') })
+      },
       async request => reflect(request)
     )
     expect(poisoned.headers.get(EDGE_CACHE_HEADER)).toBe('MISS')
@@ -334,7 +343,11 @@ describe('edge HTML cache', () => {
     await withEdgeCache(
       page('/search/?q=x', { headers: { 'x-nonce': 'n', cookie: 'better-auth.session_token=a' } }),
       { waitUntil: () => {} },
-      { cache: edge.cache as unknown as Cache, deploymentId: 'v', epoch: async () => read('e') },
+      {
+        cache: edge.cache as unknown as Cache,
+        deploymentId: 'v',
+        epoch: async () => ({ read: read('e') })
+      },
       async request => {
         seen.push(request)
         return new Response('results')
@@ -372,7 +385,7 @@ describe('edge HTML cache', () => {
     const options = {
       cache: new MemoryCache() as unknown as Cache,
       deploymentId: 'v',
-      epoch: vi.fn(async () => epoch)
+      epoch: vi.fn(async () => ({ read: epoch }))
     }
     const seen: Array<EpochRead | undefined> = []
     const render = async (_request: Request, given?: EpochRead) => {
@@ -391,7 +404,7 @@ describe('edge HTML cache', () => {
     await withEdgeCache(
       page('/products/alpha/'),
       context,
-      { ...options, epoch: vi.fn(async () => null) },
+      { ...options, epoch: vi.fn(async () => ({ read: null })) },
       render
     )
     expect(seen).toEqual([epoch, undefined, undefined, undefined])
@@ -400,74 +413,291 @@ describe('edge HTML cache', () => {
   })
 })
 
+describe('edge HTML cache timeouts (#443)', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('renders a page lookup that never answers as a miss at the timeout, and logs it', async () => {
+    vi.useFakeTimers()
+    const events: EdgeCacheEvent[] = []
+    const cache = { match: vi.fn(() => new Promise(() => {})), put: vi.fn(async () => {}) }
+    const answer = withEdgeCache(
+      page(),
+      { waitUntil: () => {} },
+      {
+        cache: cache as unknown as Cache,
+        deploymentId: 'v',
+        epoch: async () => ({ read: read('e'), source: 'fresh' }),
+        observe: event => events.push(event)
+      },
+      async () => new Response('rendered')
+    )
+    await vi.advanceTimersByTimeAsync(CACHE_MATCH_TIMEOUT_MS)
+    const response = await answer
+    expect(response.headers.get(EDGE_CACHE_HEADER)).toBe('MISS')
+    expect(await response.text()).toBe('rendered')
+    const timing = { epochMs: 0, epochSource: 'fresh', matchMs: CACHE_MATCH_TIMEOUT_MS }
+    expect(events).toEqual([
+      { event: 'edge_cache', state: 'match-timeout', ...timing },
+      { event: 'edge_cache', state: 'MISS', status: 200, ...timing }
+    ])
+    expect(cache.put).toHaveBeenCalledTimes(1)
+  })
+
+  // The isolate's memo and its loads, as `catalogEpochReader` wires them, in front of a render.
+  function isolate() {
+    const cache = new MemoryCache()
+    const events: EdgeCacheEvent[] = []
+    const memo = new EpochMemo()
+    const pending: Promise<unknown>[] = []
+    const context = { waitUntil: (promise: Promise<unknown>) => pending.push(promise) }
+    const serve = (load: () => Promise<LoadedEpoch>) =>
+      withEdgeCache(
+        page(),
+        context,
+        {
+          cache: cache as unknown as Cache,
+          deploymentId: 'v',
+          epoch: requestContext => memo.current(requestContext, load),
+          observe: event => events.push(event)
+        },
+        async () => new Response('page')
+      )
+    return { events, pending, serve }
+  }
+
+  it('answers at the timeout when its epoch load never settles, and never leaves the isolate stuck', async () => {
+    vi.useFakeTimers()
+    const edge = isolate()
+    // A fresh isolate's first load never settles: the request bypasses the cache at the timeout.
+    const first = edge.serve(stuck)
+    await vi.advanceTimersByTimeAsync(EPOCH_LOAD_TIMEOUT_MS)
+    expect((await first).headers.get(EDGE_CACHE_HEADER)).toBe('BYPASS')
+    const timedOut = { epochMs: EPOCH_LOAD_TIMEOUT_MS, epochSource: 'timeout' }
+    expect(edge.events.splice(0)).toEqual([
+      { event: 'edge_cache', state: 'epoch-timeout', ...timedOut },
+      { event: 'edge_cache', state: 'BYPASS', ...timedOut }
+    ])
+
+    // The next request loads the epoch itself, and later ones reuse it.
+    const load = vi.fn(async () => loaded('e1'))
+    expect((await edge.serve(load)).headers.get(EDGE_CACHE_HEADER)).toBe('MISS')
+    await Promise.all(edge.pending.splice(0))
+    expect((await edge.serve(load)).headers.get(EDGE_CACHE_HEADER)).toBe('HIT')
+    expect(load).toHaveBeenCalledTimes(1)
+    expect(edge.events.splice(0)).toEqual([
+      {
+        epochMs: 0,
+        epochSource: 'd1',
+        event: 'edge_cache',
+        matchMs: 0,
+        state: 'MISS',
+        status: 200
+      },
+      {
+        epochMs: 0,
+        epochSource: 'fresh',
+        event: 'edge_cache',
+        matchMs: 0,
+        state: 'HIT',
+        status: 200
+      }
+    ])
+
+    // Past the stale window, a load that never settles falls back on the last epoch: still a hit.
+    vi.advanceTimersByTime(EPOCH_MAX_STALE_MS)
+    const late = edge.serve(stuck)
+    await vi.advanceTimersByTimeAsync(EPOCH_LOAD_TIMEOUT_MS)
+    expect((await late).headers.get(EDGE_CACHE_HEADER)).toBe('HIT')
+    expect(edge.events[0]).toEqual({
+      epochAgeMs: EPOCH_MAX_STALE_MS + EPOCH_LOAD_TIMEOUT_MS,
+      event: 'edge_cache',
+      state: 'epoch-timeout',
+      ...timedOut
+    })
+  })
+})
+
+/** One request's load of the epoch from D1, as the memo sees it. */
+const loaded = (token: string, bookmark: string | null = null): LoadedEpoch => ({
+  read: { bookmark, token },
+  source: 'd1'
+})
+
+/** A load whose request was canceled: its continuations never run, so it never settles (#443). */
+const stuck = () => new Promise<LoadedEpoch>(() => {})
+
 describe('catalog epoch memo', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('reuses a fresh epoch, revalidates a stale one in the background, and reloads old ones', async () => {
     let clock = 0
     let version = 1
-    const load = vi.fn(async () => read(`epoch-${version}`))
-    const memo = new EpochMemo(load, () => clock, 1_000, 10_000)
+    const load = vi.fn(async () => loaded(`epoch-${version}`))
+    const memo = new EpochMemo(() => clock, 1_000, 10_000)
     const background: Promise<unknown>[] = []
     const context = { waitUntil: (promise: Promise<unknown>) => background.push(promise) }
 
-    expect(await memo.current(context)).toEqual(read('epoch-1'))
+    expect(await memo.current(context, load)).toEqual({ read: read('epoch-1'), source: 'd1' })
     version = 2
     clock = 500
-    expect(await memo.current(context)).toEqual(read('epoch-1'))
+    expect(await memo.current(context, load)).toEqual({ read: read('epoch-1'), source: 'fresh' })
     expect(load).toHaveBeenCalledTimes(1)
 
     clock = 2_000
-    expect(await memo.current(context)).toEqual(read('epoch-1'))
+    expect(await memo.current(context, load)).toEqual({ read: read('epoch-1'), source: 'stale' })
     await Promise.all(background)
-    expect(await memo.current(context)).toEqual(read('epoch-2'))
+    expect(await memo.current(context, load)).toEqual({ read: read('epoch-2'), source: 'fresh' })
     expect(load).toHaveBeenCalledTimes(2)
 
     version = 3
     clock = 20_000
-    expect(await memo.current(context)).toEqual(read('epoch-3'))
+    expect((await memo.current(context, load)).read).toEqual(read('epoch-3'))
   })
 
   it('keeps each epoch with the bookmark it was read at (#382)', async () => {
     let clock = 0
     let version = 1
-    const load = vi.fn(async () => ({ bookmark: `bookmark-${version}`, token: `epoch-${version}` }))
-    const memo = new EpochMemo(load, () => clock, 1_000, 10_000)
+    const load = vi.fn(async () => loaded(`epoch-${version}`, `bookmark-${version}`))
+    const memo = new EpochMemo(() => clock, 1_000, 10_000)
     const background: Promise<unknown>[] = []
     const context = { waitUntil: (promise: Promise<unknown>) => background.push(promise) }
 
-    expect(await memo.current(context)).toEqual({ bookmark: 'bookmark-1', token: 'epoch-1' })
+    expect((await memo.current(context, load)).read).toEqual({
+      bookmark: 'bookmark-1',
+      token: 'epoch-1'
+    })
     version = 2
     clock = 2_000
     // The stale epoch is served with its own bookmark while the refresh runs, never mixed.
-    expect(await memo.current(context)).toEqual({ bookmark: 'bookmark-1', token: 'epoch-1' })
+    expect((await memo.current(context, load)).read).toEqual({
+      bookmark: 'bookmark-1',
+      token: 'epoch-1'
+    })
     await Promise.all(background)
-    expect(await memo.current(context)).toEqual({ bookmark: 'bookmark-2', token: 'epoch-2' })
+    expect((await memo.current(context, load)).read).toEqual({
+      bookmark: 'bookmark-2',
+      token: 'epoch-2'
+    })
   })
 
-  it('shares one load between concurrent requests', async () => {
-    let resolve: (value: EpochRead) => void = () => {}
-    const load = vi.fn(
+  // #443: a load's I/O belongs to the request that started it, so no other request awaits it.
+  it("never makes a request wait on another request's load", async () => {
+    let clock = 0
+    let finish: (value: LoadedEpoch) => void = () => {}
+    const memo = new EpochMemo(() => clock)
+    const context = { waitUntil: () => {} }
+    const slow = memo.current(
+      context,
       () =>
-        new Promise<EpochRead>(done => {
-          resolve = done
+        new Promise<LoadedEpoch>(done => {
+          finish = done
         })
     )
-    const memo = new EpochMemo(load)
-    const context = { waitUntil: () => {} }
-    const both = Promise.all([memo.current(context), memo.current(context)])
-    resolve(read('epoch-1'))
-    expect(await both).toEqual([read('epoch-1'), read('epoch-1')])
-    expect(load).toHaveBeenCalledTimes(1)
+    clock = 1
+    // A concurrent request loads for itself and answers while the first load is still out.
+    const concurrent = vi.fn(async () => loaded('epoch-2'))
+    expect(await memo.current(context, concurrent)).toEqual({ read: read('epoch-2'), source: 'd1' })
+    // The first load, started earlier, answers its own request but never replaces a newer epoch.
+    finish(loaded('epoch-1'))
+    expect((await slow).read).toEqual(read('epoch-1'))
+    expect(await memo.current(context, concurrent)).toEqual({
+      read: read('epoch-2'),
+      source: 'fresh'
+    })
+    expect(concurrent).toHaveBeenCalledTimes(1)
   })
 
+  it('answers at the timeout when a load never settles, and the next request loads again', async () => {
+    vi.useFakeTimers()
+    const memo = new EpochMemo()
+    const context = { waitUntil: () => {} }
+    const first = memo.current(context, stuck)
+    await vi.advanceTimersByTimeAsync(EPOCH_LOAD_TIMEOUT_MS)
+    // No epoch yet: the request bypasses the cache.
+    expect(await first).toEqual({ read: null, source: 'timeout' })
+    const load = vi.fn(async () => loaded('epoch-1'))
+    expect(await memo.current(context, load)).toEqual({ read: read('epoch-1'), source: 'd1' })
+  })
+
+  it('falls back on the last epoch at any age after a timeout or a failure', async () => {
+    vi.useFakeTimers()
+    let clock = 0
+    const memo = new EpochMemo(() => clock, 1_000, 10_000, 2_000)
+    const context = { waitUntil: () => {} }
+    await memo.current(context, async () => loaded('epoch-1'))
+    clock = 60_000
+    const timedOut = memo.current(context, stuck)
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(await timedOut).toEqual({ ageMs: 60_000, read: read('epoch-1'), source: 'timeout' })
+    const failing = async (): Promise<LoadedEpoch> => {
+      throw new Error('D1 unavailable')
+    }
+    expect(await memo.current(context, failing)).toEqual({
+      ageMs: 60_000,
+      read: read('epoch-1'),
+      source: 'error'
+    })
+    // Without an epoch, a failure bypasses the cache.
+    expect(await new EpochMemo().current(context, failing)).toEqual({ read: null, source: 'error' })
+  })
+
+  it('runs one background refresh at a time, bounded, and retries one whose request ended', async () => {
+    vi.useFakeTimers()
+    let clock = 0
+    const memo = new EpochMemo(() => clock, 1_000, 10_000, 2_000)
+    const background: Promise<unknown>[] = []
+    const context = { waitUntil: (promise: Promise<unknown>) => background.push(promise) }
+    await memo.current(context, async () => loaded('epoch-1'))
+
+    const refresh = vi.fn(stuck)
+    const stale = { read: read('epoch-1'), source: 'stale' }
+    clock = 1_500
+    expect(await memo.current(context, refresh)).toEqual(stale)
+    clock = 3_000
+    expect(await memo.current(context, refresh)).toEqual(stale)
+    expect(refresh).toHaveBeenCalledTimes(1)
+    // The background work ends at the timeout instead of holding the request for 30 seconds.
+    await vi.advanceTimersByTimeAsync(2_000)
+    await Promise.all(background)
+
+    // Once the claim lapses, the next stale request refreshes again.
+    clock = 3_500
+    const retry = vi.fn(async () => loaded('epoch-2'))
+    expect(await memo.current(context, retry)).toEqual(stale)
+    await Promise.all(background)
+    expect(await memo.current(context, retry)).toEqual({ read: read('epoch-2'), source: 'fresh' })
+    expect(retry).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('shared catalog epoch', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  /** One request's load through the share, with the share's background store finished. */
+  async function share(cache: Cache, environment: string, load: () => Promise<EpochRead>) {
+    const background: Promise<unknown>[] = []
+    const loadedEpoch = await loadSharedEpoch(cache, environment, load, {
+      waitUntil: promise => background.push(promise)
+    })
+    await Promise.all(background)
+    return loadedEpoch
+  }
+
   it('shares the epoch and its bookmark through the data-center cache', async () => {
-    const cache = new MemoryCache()
+    const cache = new MemoryCache() as unknown as Cache
     const load = vi.fn(async () => ({ bookmark: '00000042-abc', token: '4.2026-05-16' }))
     const shared = { bookmark: '00000042-abc', token: '4.2026-05-16' }
-    expect(await loadSharedEpoch(cache as unknown as Cache, 'production', load)).toEqual(shared)
-    expect(await loadSharedEpoch(cache as unknown as Cache, 'production', load)).toEqual(shared)
+    expect(await share(cache, 'production', load)).toEqual({ read: shared, source: 'd1' })
+    expect(await share(cache, 'production', load)).toEqual({ read: shared, source: 'shared' })
     expect(load).toHaveBeenCalledTimes(1)
     // The body stays the bare token, which a Worker version without #382 reads unchanged.
-    const [entry] = [...cache.entries.values()]
+    const [entry] = [...(cache as unknown as MemoryCache).entries.values()]
     expect(new TextDecoder().decode(entry?.body)).toBe('4.2026-05-16')
   })
 
@@ -478,20 +708,36 @@ describe('catalog epoch memo', () => {
       new Response('4.2026-05-16', { headers: { 'cache-control': 'public, max-age=30' } })
     )
     const load = vi.fn(async () => ({ bookmark: 'unused', token: 'unused' }))
-    expect(await loadSharedEpoch(cache as unknown as Cache, 'production', load)).toEqual(
+    expect((await share(cache as unknown as Cache, 'production', load)).read).toEqual(
       read('4.2026-05-16')
     )
     expect(load).not.toHaveBeenCalled()
   })
 
   it('shares an epoch read without a bookmark as one', async () => {
-    const cache = new MemoryCache()
+    const cache = new MemoryCache() as unknown as Cache
     const load = vi.fn(async () => read('4.2026-05-16'))
-    await loadSharedEpoch(cache as unknown as Cache, 'production', load)
-    expect(await loadSharedEpoch(cache as unknown as Cache, 'production', load)).toEqual(
-      read('4.2026-05-16')
-    )
+    await share(cache, 'production', load)
+    expect((await share(cache, 'production', load)).read).toEqual(read('4.2026-05-16'))
     expect(load).toHaveBeenCalledTimes(1)
+  })
+
+  // #443: neither Cache API call can hold the request; the store never runs in its path.
+  it('reads D1 when the share does not answer in time, and stores the share in the background', async () => {
+    vi.useFakeTimers()
+    const hung = {
+      match: vi.fn(() => new Promise(() => {})),
+      put: vi.fn(() => new Promise(() => {}))
+    }
+    const background: Promise<unknown>[] = []
+    const load = vi.fn(async () => read('4.2026-05-16'))
+    const answer = loadSharedEpoch(hung as unknown as Cache, 'production', load, {
+      waitUntil: promise => background.push(promise)
+    })
+    await vi.advanceTimersByTimeAsync(CACHE_MATCH_TIMEOUT_MS)
+    expect(await answer).toEqual({ read: read('4.2026-05-16'), source: 'd1' })
+    expect(hung.put).toHaveBeenCalledTimes(1)
+    expect(background).toHaveLength(1)
   })
 
   // #397: staging and production share the serp.co zone's cache.
@@ -504,11 +750,11 @@ describe('catalog epoch memo', () => {
     const production = vi.fn(async () => ({ bookmark: 'production-b', token: '18.2026-10-01' }))
 
     for (let round = 0; round < 2; round += 1) {
-      expect(await loadSharedEpoch(cache, 'staging', staging)).toEqual({
+      expect((await share(cache, 'staging', staging)).read).toEqual({
         bookmark: 'staging-b',
         token: '21.2026-10-10'
       })
-      expect(await loadSharedEpoch(cache, 'production', production)).toEqual({
+      expect((await share(cache, 'production', production)).read).toEqual({
         bookmark: 'production-b',
         token: '18.2026-10-01'
       })
@@ -526,7 +772,7 @@ describe('catalog epoch memo', () => {
     const zone = new MemoryCache()
     await zone.put(UNSCOPED_EPOCH_KEY, new Response('21.2026-10-10'))
     const load = vi.fn(async () => read('18.2026-10-01'))
-    await expect(loadSharedEpoch(zone as unknown as Cache, '', load)).rejects.toMatchObject({
+    await expect(share(zone as unknown as Cache, '', load)).rejects.toMatchObject({
       code: 'd1_runtime_env_invalid'
     })
     expect(load).not.toHaveBeenCalled()

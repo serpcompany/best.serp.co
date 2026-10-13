@@ -63,7 +63,7 @@ function worker(env: WorkerRequestEnv) {
           {
             cache: cache as unknown as Cache,
             deploymentId: 'v1',
-            epoch: async () => ({ bookmark: null, token: 'e1' })
+            epoch: async () => ({ read: { bookmark: null, token: 'e1' } })
           },
           async rendered => {
             // What OpenNext hands the root layout: the Worker's env and the forwarded headers.
