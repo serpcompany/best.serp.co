@@ -78,7 +78,9 @@ merged up to date its tree is the one the pull request tested, so only the quick
 Three staging smokes on 2026-10-11 (runs 38116684327, 38163330039 and 38172083196) timed out on
 page loads and API requests (#417). Runs 38163330039 and 38172083196 passed when the deploy job
 was re-run, with no code change. Run 38116684327 was never re-run: the next staging deploy
-(run 38117027619, #377), whose tree included that commit, passed its smoke:
+(run 38117027619, #377), whose tree included that commit, passed its smoke.
+
+What the three failures showed:
 
 - **Not a window after the deploy.** The HTTP gates had already had three answers in a row from
   the new version before each smoke, and the timeouts ran from the first tests to the last,

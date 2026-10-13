@@ -108,8 +108,10 @@ Deploy Production's HTTP gates first wait for the new Worker: three answers in a
 2 s, within 3 minutes ([Staging smoke readiness](./ci.md#staging-smoke-readiness)). When that
 wait fails (`Worker version <id> was not ready`), the new Worker already serves best.serp.co and
 any migration is applied, but the release is ungated. The error's advice, re-running the job, is
-staging's: here a re-run builds and deploys again. The owner decides each step below; an agent
-acts only on the owner's go for that release.
+staging's: here a re-run builds and deploys again. Only the owner re-runs Deploy Production or
+rolls back the production Worker ([Release guards](./release-guards.md#promotion),
+[D1 recovery](./d1-recovery.md)). When the owner asks, an agent runs step 1 and step 2's gates
+re-run, which write nothing, and reports what they show.
 
 1. Check the version and timing by hand from a maintainer machine, with the `<id>` from the
    error:
@@ -125,18 +127,32 @@ acts only on the owner's go for that release.
    ```
 
 2. Re-run the gates once. When every answer is a 200 from `<id>` in under 2 s, the runner's path
-   was slow: gate the live Worker from the same machine, without deploying again.
+   was slow: gate the live Worker from the same machine, without deploying again. Run them from
+   the root of a checkout of the released commit, the run's head (`main` at the deployed SHA),
+   as the workflow does. The gates read their checks, their samples (`d1/publications`) and
+   their expected config (`apps/web/wrangler.jsonc`) from the checkout they run in, and
+   `scripts/d1-preview-http-gates.ts` on `staging` is often ahead of `main`. From a `staging`
+   checkout they can fail on a check the release doesn't have, and from an older one pass
+   without a check it added. A detached worktree leaves your usual checkout alone:
 
    ```bash
+   git fetch origin
+   sha=$(gh run view <run-id> --json headSha --jq .headSha)
+   git worktree add --detach ../best.serp.co-release "$sha"
+   cd ../best.serp.co-release && pnpm install --frozen-lockfile
    EXPECTED_WORKER_VERSION=<id> pnpm tsx scripts/d1-preview-http-gates.ts production https://best.serp.co
    ```
 
-   When the previous version still answers, the deploy didn't take: re-run the failed job
-   (`gh run rerun <run-id> --failed`). The reviewers approve it again, and it deploys the same
-   commit, Worker only, since the migrations are applied.
-3. Roll back the Worker ([Bookmarks and recovery](#bookmarks-and-recovery)) when `<id>` answers
-   slowly or without a 200 from the maintainer machine too, or when the re-run gates fail. A
-   rollback does not undo a migration.
+   The gates send GET requests and one POST: a sign-in with an empty email, which the site
+   answers 400 `INVALID_EMAIL` before any rate-limit write, so no code is sent and the run
+   writes nothing. Remove the worktree afterwards (`git worktree remove ../best.serp.co-release`).
+
+   When the previous version still answers, the deploy didn't take: the owner re-runs the failed
+   job (`gh run rerun <run-id> --failed`). The reviewers approve it again, and it deploys the
+   same commit, Worker only, since the migrations are applied.
+3. The owner rolls back the Worker ([Bookmarks and recovery](#bookmarks-and-recovery)) when
+   `<id>` answers slowly or without a 200 from the maintainer machine too, or when the re-run
+   gates fail. A rollback does not undo a migration.
 
 ## Bookmarks and recovery
 
