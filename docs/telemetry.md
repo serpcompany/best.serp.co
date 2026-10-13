@@ -60,6 +60,13 @@ values to its message. So:
   `sentry.ts`. Anything else becomes `[redacted]`, from the logger, `onRequestError`, the
   browser's global handlers or `global-error.tsx`. The error's type, stack and route stay, so
   issues still group and point at the code.
+- **The browser drops its noise before that** (#422). Sentry's inbound filters for chunk-load
+  and hydration errors match the message, which now arrives redacted. So the browser's
+  `browserSentryOptions` drops them itself: `ignoreErrors` (chunk-load, React hydration and
+  `ResizeObserver` errors) and `denyUrls` (extension scripts) match the raw message before
+  `beforeSend`, which then drops a stack that starts in an injected `<anonymous>` script and
+  every error from an automated browser (`navigator.webdriver`). The Worker keeps
+  `sentryOptions`.
 - **The shared logger takes a code.** `logger.error` (`apps/web/src/lib/logging`) accepts one of
   `ERROR_CODES` or an `Error`. The caught error goes in `cause`, so Sentry gets its type and
   stack under the code, with its message redacted; context goes in `data`, which stays in the
