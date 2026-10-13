@@ -97,6 +97,20 @@ values to its message. So:
   binds only a date and a limit. The email logs keep `redactedErrorMessage` beside `errorCode`
   (`lib/email/senders.ts`).
 
+### One failure, one event
+
+Errors are Sentry's most expensive category, so a failure that repeats is reported once (#401):
+- **Search** (`components/search/use-search.ts`): a failed search is reported at most once per
+  page session, as `search_failed`. A 4xx is never reported: `/api/search` answers only 200 or a
+  server error, so a 4xx comes from in front of it (a 429 throttle, a challenge, staging's
+  password).
+- **Search entries** (`use-search-helpers.ts`): the entries one response fails on are one report,
+  the first failure's code, with every failed entry in the console line's `data`.
+- **Error pages** (`error-content.tsx`, `global-error.tsx`): an error with a Next.js `digest` came
+  from the server, and on a path that reports to Sentry `onRequestError` already sent it
+  (`reportedByServer` in `lib/telemetry/server-errors.ts`), so the page sends nothing. A public
+  page's server error is still reported from the browser.
+
 ### Public pages: Worker logs, not Sentry
 
 Every other path never loads the Worker's Sentry SDK: the home page, the catalog, search, the

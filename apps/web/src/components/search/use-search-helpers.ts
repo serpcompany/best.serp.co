@@ -1,4 +1,5 @@
 import { logger } from '@/lib/logging'
+import type { ErrorCode } from '@/lib/telemetry/sentry'
 import type { SearchResult } from '../../lib/directory/search-contract'
 import type { SearchWebsiteMetadata } from './search-utils'
 import {
@@ -7,7 +8,41 @@ import {
   transformToWebsiteMetadata
 } from './search-utils'
 
-export function filterAndSortEntries(entries: SearchResult[], query: string): SearchResult[] {
+interface EntryFailure {
+  code: ErrorCode
+  error: unknown
+  entry?: SearchResult
+}
+
+/**
+ * The entries one search response failed on (#401). A response holds up to 100 entries, and one
+ * bad shape fails each of them, so the helpers record each failure here, and `report()` sends one
+ * Sentry event for the response: the first failure's code, with its error as the cause. Every
+ * failure and its entry go in `data`, which stays in the browser console.
+ */
+export class EntryFailures {
+  private readonly failures: EntryFailure[] = []
+
+  record(code: ErrorCode, error: unknown, entry?: SearchResult): void {
+    this.failures.push({ code, error, ...(entry === undefined ? {} : { entry }) })
+  }
+
+  report(): void {
+    const [first] = this.failures
+    if (!first) return
+    logger.error(first.code, {
+      cause: first.error,
+      data: this.failures,
+      tags: { type: 'component' }
+    })
+  }
+}
+
+export function filterAndSortEntries(
+  entries: SearchResult[],
+  query: string,
+  failures: EntryFailures
+): SearchResult[] {
   const queryLower = query.toLowerCase()
 
   return entries
@@ -15,11 +50,7 @@ export function filterAndSortEntries(entries: SearchResult[], query: string): Se
       try {
         return matchesSearchQuery(entry, query)
       } catch (matchError) {
-        logger.error('search_query_match_failed', {
-          cause: matchError,
-          data: { matchError, entry },
-          tags: { type: 'component' }
-        })
+        failures.record('search_query_match_failed', matchError, entry)
         return false
       }
     })
@@ -40,32 +71,27 @@ export function filterAndSortEntries(entries: SearchResult[], query: string): Se
     })
 }
 
-export function validateEntries(entries: SearchResult[]): SearchResult[] {
+export function validateEntries(entries: SearchResult[], failures: EntryFailures): SearchResult[] {
   return entries.filter(entry => {
     try {
       return canTransformToWebsiteMetadata(entry)
     } catch (validationError) {
-      logger.error('search_entry_check_failed', {
-        cause: validationError,
-        data: { validationError, entry },
-        tags: { type: 'component' }
-      })
+      failures.record('search_entry_check_failed', validationError, entry)
       return false
     }
   })
 }
 
-export function transformAndSanitizeEntries(entries: SearchResult[]): SearchWebsiteMetadata[] {
+export function transformAndSanitizeEntries(
+  entries: SearchResult[],
+  failures: EntryFailures
+): SearchWebsiteMetadata[] {
   return entries
     .map(entry => {
       try {
         return transformToWebsiteMetadata(entry)
       } catch (transformError) {
-        logger.error('search_entry_transform_failed', {
-          cause: transformError,
-          data: { transformError, entry },
-          tags: { type: 'component' }
-        })
+        failures.record('search_entry_transform_failed', transformError, entry)
         return {
           url: '',
           slug: 'error',
@@ -96,23 +122,23 @@ export function transformAndSanitizeEntries(entries: SearchResult[]): SearchWebs
     })
 }
 
-export function tryLenientProcessing(entries: SearchResult[]): SearchWebsiteMetadata[] {
+export function tryLenientProcessing(
+  entries: SearchResult[],
+  failures: EntryFailures
+): SearchWebsiteMetadata[] {
   try {
     return entries
       .map(entry => {
         try {
           return transformToWebsiteMetadata(entry)
-        } catch {
+        } catch (transformError) {
+          failures.record('search_entry_transform_failed', transformError, entry)
           return null
         }
       })
       .filter((item): item is SearchWebsiteMetadata => item !== null && item !== undefined)
   } catch (lenientError) {
-    logger.error('search_lenient_processing_failed', {
-      cause: lenientError,
-      data: lenientError,
-      tags: { type: 'component' }
-    })
+    failures.record('search_lenient_processing_failed', lenientError)
     return []
   }
 }

@@ -8,7 +8,7 @@ import {
 } from '@sentry/core'
 import * as Sentry from '@sentry/nextjs'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { filterAndSortEntries } from '@/components/search/use-search-helpers'
+import { EntryFailures, filterAndSortEntries } from '@/components/search/use-search-helpers'
 import type { SearchResult } from '@/lib/directory/search-contract'
 import { logger } from '@/lib/logging'
 import { browserSentryOptions, ERROR_CODES, REDACTED_MESSAGE, sentryOptions } from './sentry'
@@ -113,7 +113,9 @@ describe('what reaches Sentry (#211)', () => {
   it('reports a logger call as its code and the caught error’s type, with none of its data', async () => {
     // A real call site: a visitor's search, and an entry that fails to match it.
     const broken = { name: 42, slug: 'broken' } as unknown as SearchResult
-    expect(filterAndSortEntries([broken], `${PRIVATE} @ example.com`)).toEqual([])
+    const failures = new EntryFailures()
+    expect(filterAndSortEntries([broken], `${PRIVATE} @ example.com`, failures)).toEqual([])
+    failures.report()
     logger.error('search_failed', {
       data: { query: PRIVATE },
       extra: { query: PRIVATE },

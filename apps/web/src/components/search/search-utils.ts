@@ -1,4 +1,7 @@
-import { logger } from '@/lib/logging'
+/**
+ * One search entry at a time. These throw on an entry they can't read; the loops in
+ * `use-search-helpers.ts` catch each failure and report a response's failures once (#401).
+ */
 import type { SearchResult } from '../../lib/directory/search-contract'
 
 export interface SearchWebsiteMetadata {
@@ -16,97 +19,59 @@ export interface SearchWebsiteMetadata {
 }
 
 export function canTransformToWebsiteMetadata(entry: SearchResult): boolean {
-  try {
-    if (entry.slug.includes('.DS_Store') || entry.url.includes('.DS_Store')) {
-      return false
-    }
-
-    if (!entry.url || !entry.website) {
-      return false
-    }
-
-    if (!entry.name && !entry.description) {
-      return false
-    }
-
-    return true
-  } catch (error) {
-    logger.error('search_entry_check_failed', {
-      cause: error,
-      data: { error, entry },
-      tags: { type: 'component' }
-    })
+  if (entry.slug.includes('.DS_Store') || entry.url.includes('.DS_Store')) {
     return false
   }
+
+  if (!entry.url || !entry.website) {
+    return false
+  }
+
+  if (!entry.name && !entry.description) {
+    return false
+  }
+
+  return true
 }
 
 export function transformToWebsiteMetadata(entry: SearchResult): SearchWebsiteMetadata {
-  try {
-    const website = entry.website || ''
-    const name = entry.name || 'Untitled'
-    const description = entry.description || ''
-    const categories = [
-      ...(entry.category ? [entry.category] : []),
-      ...(entry.categories || [])
-    ].filter(Boolean)
-    const uniqueCategories = [...new Set(categories)]
+  const website = entry.website || ''
+  const name = entry.name || 'Untitled'
+  const description = entry.description || ''
+  const categories = [
+    ...(entry.category ? [entry.category] : []),
+    ...(entry.categories || [])
+  ].filter(Boolean)
+  const uniqueCategories = [...new Set(categories)]
 
-    return {
-      url: entry.url,
-      slug: entry.slug || '',
-      website,
-      name,
-      description,
-      categories: uniqueCategories,
-      ...(entry.categoryNames ? { categoryNames: entry.categoryNames } : {}),
-      tags: [],
-      category: uniqueCategories[0] || '',
-      publishedAt: ''
-    }
-  } catch (error) {
-    logger.error('search_entry_transform_failed', {
-      cause: error,
-      data: { error, entry },
-      tags: { type: 'component' }
-    })
-
-    return {
-      url: '',
-      slug: '',
-      website: '',
-      name: 'Unknown',
-      description: '',
-      categories: [],
-      tags: [],
-      category: '',
-      publishedAt: ''
-    }
+  return {
+    url: entry.url,
+    slug: entry.slug || '',
+    website,
+    name,
+    description,
+    categories: uniqueCategories,
+    ...(entry.categoryNames ? { categoryNames: entry.categoryNames } : {}),
+    tags: [],
+    category: uniqueCategories[0] || '',
+    publishedAt: ''
   }
 }
 
 export function matchesSearchQuery(entry: SearchResult, query: string): boolean {
-  try {
-    if (!query) {
-      return false
-    }
-
-    const searchTerms = query.toLowerCase().trim().split(/\s+/)
-    const searchableFields = [
-      entry.name?.toLowerCase(),
-      entry.description?.toLowerCase(),
-      entry.category?.toLowerCase(),
-      entry.categories?.join(' ').toLowerCase(),
-      entry.website?.toLowerCase(),
-      entry.url?.toLowerCase()
-    ].filter(Boolean)
-
-    return searchTerms.every(term => searchableFields.some(field => field?.includes(term)))
-  } catch (error) {
-    logger.error('search_query_match_failed', {
-      cause: error,
-      data: { error, entry, query },
-      tags: { type: 'component' }
-    })
+  if (!query) {
     return false
   }
+
+  const searchTerms = query.toLowerCase().trim().split(/\s+/)
+  const searchableFields = [
+    entry.name?.toLowerCase(),
+    entry.description?.toLowerCase(),
+    entry.category?.toLowerCase(),
+    entry.categories?.join(' ').toLowerCase(),
+    entry.website?.toLowerCase(),
+    entry.url?.toLowerCase()
+  ].filter(Boolean)
+
+  return searchTerms.every(term => searchableFields.some(field => field?.includes(term)))
 }

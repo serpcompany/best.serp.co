@@ -1,5 +1,8 @@
+import { reportedByServer } from './server-errors'
+
 /**
- * Reports the error `app/global-error.tsx` caught, in the browser (#48, #355).
+ * Reports the error `app/global-error.tsx` caught, in the browser (#48, #355), unless the server
+ * already reported it (`reportedByServer`, #401).
  *
  * The SDK is imported here, not at the top of that component: every page's server render loads
  * the component, and a static import would load the Sentry server SDK with it. In the browser
@@ -11,9 +14,11 @@
  */
 export function reportGlobalError(
   error: unknown,
+  pathname: string,
   loadSdk: () => Promise<{ captureException: (error: unknown) => unknown }> = () =>
     import('@sentry/nextjs')
 ): Promise<void> {
+  if (reportedByServer(error, pathname)) return Promise.resolve()
   return loadSdk().then(
     ({ captureException }) => {
       captureException(error)
