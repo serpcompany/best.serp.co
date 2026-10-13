@@ -1,4 +1,4 @@
-import { getActiveCategories, getAutocomplete, MAX_SEARCH_LIMIT } from '@/lib/catalog/repository'
+import { getAutocompleteWithCategories, MAX_SEARCH_LIMIT } from '@/lib/catalog/repository'
 import { categoryNamesBySlug } from '@/lib/directory/categories'
 import { getRoute } from '@/lib/routing/routes'
 
@@ -14,11 +14,8 @@ export async function GET(request: Request): Promise<Response> {
   if (!query) return Response.json([])
 
   // Each result names its categories as D1 does, from the cached shell stats, for the search
-  // page's filters (#416).
-  const [listings, categories] = await Promise.all([
-    getAutocomplete(query, limit),
-    getActiveCategories()
-  ])
+  // page's filters (#416). One read sets up D1 access once for both.
+  const { categories, listings } = await getAutocompleteWithCategories(query, limit)
   const names = categoryNamesBySlug(categories)
   return Response.json(
     listings.map(listing => ({

@@ -33,6 +33,10 @@ interface ProjectPageProps {
 export async function generateMetadata({ params }: ProjectPageProps): Promise<Metadata> {
   const { slug } = await params
 
+  // The hub's name from the cached shell stats, as the page reads them (#416). Started with the
+  // listing, as the page does, so a cold data cache waits on D1 once, not twice (#378).
+  const categories = getActiveCategories()
+  categories.catch(() => undefined)
   const project = await getWebsiteBySlug(slug)
 
   if (!project) {
@@ -42,11 +46,7 @@ export async function generateMetadata({ params }: ProjectPageProps): Promise<Me
       : {}
   }
 
-  // The hub's name from the cached shell stats, as the page reads them (#416).
-  return generateWebsiteDetailRouteMetadata(
-    project,
-    categoryNamesBySlug(await getActiveCategories())
-  )
+  return generateWebsiteDetailRouteMetadata(project, categoryNamesBySlug(await categories))
 }
 
 /**

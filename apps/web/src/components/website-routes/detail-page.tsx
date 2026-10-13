@@ -33,11 +33,12 @@ type WebsiteResourcesSectionWebsite = Pick<WebsiteDetailMetadata, 'resourceLinks
 
 /**
  * A listing page's metadata. `categoryNames` is the shell stats' names by slug, so the
- * description names the hub as D1 does (#416).
+ * description names the hub as D1 does (#416). Required, so a caller can't drop the names and
+ * quietly fall back to the slug's own.
  */
 export async function generateWebsiteDetailRouteMetadata(
   project: WebsiteDetailMetadata,
-  categoryNames: ReadonlyMap<string, string> = new Map()
+  categoryNames: ReadonlyMap<string, string>
 ): Promise<Metadata> {
   const categoryFormatted = project.category ? categoryName(project.category, categoryNames) : null
 

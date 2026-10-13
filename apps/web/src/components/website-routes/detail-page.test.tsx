@@ -1,5 +1,5 @@
 import { isValidElement, type ReactNode } from 'react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import type { PublishedBestPage } from '@/db/contracts'
 import type { WebsiteDetailMetadata } from '../../lib/directory/content-query'
 import { listingContentTree } from '../../lib/markdown/listing-content-tree'
@@ -163,6 +163,12 @@ describe('a listing names its hub as D1 does (#416)', () => {
     expect(metadata.description).toContain('Category: Audio & Music.')
     expect(metadata.keywords).toContain('Audio & Music')
     expect(JSON.stringify(metadata)).not.toMatch(/\bAudio\b(?! &)/u)
+  })
+
+  it('requires the names, so tsc catches a caller that drops them (#421 review)', () => {
+    expectTypeOf(generateWebsiteDetailRouteMetadata)
+      .parameter(1)
+      .toEqualTypeOf<ReadonlyMap<string, string>>()
   })
 
   it('in its JSON-LD: the breadcrumb and the application category', () => {
