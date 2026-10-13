@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import type { PublishedBestPage } from '@/db/contracts'
-import { categoryNameFromSlug } from '../../lib/directory/categories'
+import { categoryName } from '../../lib/directory/categories'
 import type {
   TaxonomyName,
   WebsiteDetailMetadata,
@@ -31,10 +31,16 @@ import { WebsiteResourcesSection } from '../website/website-resources-section'
 
 type WebsiteResourcesSectionWebsite = Pick<WebsiteDetailMetadata, 'resourceLinks'>
 
+/**
+ * A listing page's metadata. `categoryNames` is the shell stats' names by slug, so the
+ * description names the hub as D1 does (#416). Required, so a caller can't drop the names and
+ * quietly fall back to the slug's own.
+ */
 export async function generateWebsiteDetailRouteMetadata(
-  project: WebsiteDetailMetadata
+  project: WebsiteDetailMetadata,
+  categoryNames: ReadonlyMap<string, string>
 ): Promise<Metadata> {
-  const categoryFormatted = project.category ? categoryNameFromSlug(project.category) : null
+  const categoryFormatted = project.category ? categoryName(project.category, categoryNames) : null
 
   // Short descriptions are padded with directory context, long ones truncated (#151).
   const seoDescription = composeMetaDescription(project.description, [
@@ -92,7 +98,7 @@ export function listingCategoryNames(
 ): TaxonomyName[] {
   return [...(project.category ? [project.category] : []), ...(project.categories ?? [])]
     .filter((slug, index, slugs) => Boolean(slug) && slugs.indexOf(slug) === index)
-    .map(slug => ({ name: categoryNames.get(slug) ?? categoryNameFromSlug(slug), slug }))
+    .map(slug => ({ name: categoryName(slug, categoryNames), slug }))
 }
 
 export function WebsiteDetailRoutePage({
@@ -163,7 +169,11 @@ export function WebsiteDetailRoutePage({
         <div className="flex flex-col gap-12">
           {/* The listing's own text, links and FAQs read in one column. */}
           <div className="flex max-w-3xl flex-col gap-12">
-            <WebsiteContentSection contentTree={project.contentTree} website={project} />
+            <WebsiteContentSection
+              categories={categories}
+              contentTree={project.contentTree}
+              website={project}
+            />
 
             <WebsiteResourcesSection website={resourcesWebsite} />
 
