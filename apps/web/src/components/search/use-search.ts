@@ -89,13 +89,37 @@ function processSearchResults(
 const reportedSearchFailures = new Set<SearchFailureKind>()
 
 /**
+ * Whether the visitor is leaving the page (#440). Leaving cancels a search still in flight, which
+ * Chromium rejects as a plain `TypeError: Failed to fetch` after `pagehide` has fired. A page the
+ * back/forward cache restores (`pageshow`) is no longer leaving.
+ */
+let leavingPage = false
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', () => {
+    leavingPage = true
+  })
+  window.addEventListener('pageshow', () => {
+    leavingPage = false
+  })
+}
+
+/** A search the page abandoned, by leaving or by aborting it, rather than one that failed. */
+function isAbandoned(error: SearchFailure): boolean {
+  return (
+    error.kind === 'network' &&
+    (leavingPage || (error.cause instanceof DOMException && error.cause.name === 'AbortError'))
+  )
+}
+
+/**
  * Reports a failed search at most once per kind per page session (#401). The box searches on
  * every pause in typing, so an outage would otherwise cost one Sentry event per search. Keyed by
  * kind, so a flaky connection can't hide a later parse failure. An error status isn't reported
- * (`SearchResponseError`).
+ * (`SearchResponseError`), and neither is a search the page abandoned (#440).
  */
 export function reportSearchFailure(error: unknown): void {
-  if (!(error instanceof SearchFailure) || reportedSearchFailures.has(error.kind)) return
+  if (!(error instanceof SearchFailure) || isAbandoned(error)) return
+  if (reportedSearchFailures.has(error.kind)) return
   reportedSearchFailures.add(error.kind)
   logger.error('search_failed', {
     cause: error.cause,
