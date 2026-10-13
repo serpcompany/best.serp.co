@@ -101,6 +101,43 @@ re-runs a release of the `main` head; a release is refused once `main` has moved
 one you won't ship instead of leaving it waiting. Hotfixes follow
 [Release guards](./release-guards.md#hotfixes).
 
+## Production gates not ready
+
+Deploy Production's HTTP gates first wait for the new Worker: three answers in a row from
+`/robots.txt` on the production workers.dev host, each a 200 from the deployed version in under
+2 s, within 3 minutes ([Staging smoke readiness](./ci.md#staging-smoke-readiness)). When that
+wait fails (`Worker version <id> was not ready`), the new Worker already serves best.serp.co and
+any migration is applied, but the release is ungated. The error's advice, re-running the job, is
+staging's: here a re-run builds and deploys again. The owner decides each step below; an agent
+acts only on the owner's go for that release.
+
+1. Check the version and timing by hand from a maintainer machine, with the `<id>` from the
+   error:
+
+   ```bash
+   for i in 1 2 3 4 5; do
+     curl -s -o /dev/null -H 'x-best-serp-co-smoke-test: 1' \
+       -w '%{http_code} %header{x-worker-version} %{time_total} s\n' \
+       https://best-serp-co-production.serpcompany.workers.dev/robots.txt
+     sleep 2
+   done
+   curl -sI https://best.serp.co/ | grep -i -e x-worker-version -e x-site-environment
+   ```
+
+2. Re-run the gates once. When every answer is a 200 from `<id>` in under 2 s, the runner's path
+   was slow: gate the live Worker from the same machine, without deploying again.
+
+   ```bash
+   EXPECTED_WORKER_VERSION=<id> pnpm tsx scripts/d1-preview-http-gates.ts production https://best.serp.co
+   ```
+
+   When the previous version still answers, the deploy didn't take: re-run the failed job
+   (`gh run rerun <run-id> --failed`). The reviewers approve it again, and it deploys the same
+   commit, Worker only, since the migrations are applied.
+3. Roll back the Worker ([Bookmarks and recovery](#bookmarks-and-recovery)) when `<id>` answers
+   slowly or without a 200 from the maintainer machine too, or when the re-run gates fail. A
+   rollback does not undo a migration.
+
 ## Bookmarks and recovery
 
 - No workflow exports D1: this repository is public, so an Actions artifact would expose
