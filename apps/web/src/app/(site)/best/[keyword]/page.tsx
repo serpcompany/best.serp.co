@@ -13,6 +13,7 @@ import {
 import { getRoute } from '@/lib/routing/routes'
 import { type PageSearchParams, redirectMovedTaxonomyPage } from '@/lib/routing/taxonomy-redirect'
 import { composeMetaDescription, generateBaseMetadata } from '@/lib/seo/seo-config'
+import { META_DESCRIPTION_MIN_LENGTH } from '@/lib/seo/seo-helpers'
 import { bestPageEntryCount, isBestPageIndexable } from '@/lib/seo/taxonomy-indexing'
 import { formatListingCount } from '@/lib/site/site-copy'
 
@@ -39,6 +40,34 @@ function firstSentence(text: string): string {
   return /^.+?[.!?](?=\s|$)/su.exec(text.trim())?.[0] ?? text.trim()
 }
 
+/** How many of its top entries a short best page's meta description names first. */
+const DESCRIPTION_ENTRY_NAMES = 3
+
+/** "Includes A, B and C": the page's first `count` entries, in rank order. */
+function includesEntries(items: readonly BestPageItem[], count: number): string {
+  const names = items.slice(0, count).map(item => item.name)
+  const last = names.pop()
+  return `Includes ${names.length ? `${names.join(', ')} and ${last}` : last}`
+}
+
+/**
+ * `base` padded while it is under the minimum length with the page's top entries (#426): three,
+ * or fewer when three would pass the maximum, or more while three stay under the minimum. The
+ * only words added to the entries' own names are "Includes" and "and".
+ */
+function bestPageDescription(base: string, items: readonly BestPageItem[]): string {
+  // Longest first: `count` names, then one fewer, down to one.
+  const padded = (count: number) =>
+    composeMetaDescription(base, [
+      Array.from({ length: count }, (_, index) => includesEntries(items, count - index))
+    ])
+  let count = Math.min(DESCRIPTION_ENTRY_NAMES, items.length)
+  let description = padded(count)
+  while (description.length < META_DESCRIPTION_MIN_LENGTH && count < items.length)
+    description = padded(++count)
+  return description
+}
+
 export async function generateMetadata({ params }: BestPageProps): Promise<Metadata> {
   const { keyword } = await params
   const found = await publicBestPage(keyword)
@@ -48,9 +77,10 @@ export async function generateMetadata({ params }: BestPageProps): Promise<Metad
   // The title and H1 are the page's own (D1); the root layout's template adds " | SERP".
   return generateBaseMetadata({
     title: page.title,
-    // The intro's first sentence plus the count (design 5.1).
-    description: composeMetaDescription(
-      [firstSentence(page.intro), `${formatListingCount(items.length)}.`].filter(Boolean).join(' ')
+    // The intro's first sentence plus the count (design 5.1), padded with its top entries (#426).
+    description: bestPageDescription(
+      [firstSentence(page.intro), `${formatListingCount(items.length)}.`].filter(Boolean).join(' '),
+      items
     ),
     keywords: [page.keyword],
     noindex: !isBestPageIndexable(page),
