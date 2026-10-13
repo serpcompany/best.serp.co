@@ -14,6 +14,19 @@ function isSearchFor(query: string): (url: URL) => boolean {
   return url => url.pathname === '/search/' && url.searchParams.get('q') === query
 }
 
+/**
+ * Submits a search, then waits for `/search/` to show `query` and for that page's own search to
+ * answer, so the test's next navigation can't abandon the request mid-flight (#440).
+ */
+async function submitSearch(page: Page, query: string, submit: () => Promise<void>) {
+  const searched = page.waitForResponse(response => {
+    const url = new URL(response.url())
+    return url.pathname === '/api/search' && url.searchParams.get('q') === query
+  })
+  await Promise.all([page.waitForURL(isSearchFor(query)), submit()])
+  await searched
+}
+
 async function gotoPublicPage(page: Page, path: string) {
   await page.goto(path, { waitUntil: 'domcontentloaded' })
   await expect(page.getByRole('main').first()).toBeVisible()
@@ -125,7 +138,7 @@ test.describe('public parity interactions', () => {
     await expect(field).toHaveValue(search.query)
     const next = 'another search'
     await field.fill(next)
-    await Promise.all([page.waitForURL(isSearchFor(next)), field.press('Enter')])
+    await submitSearch(page, next, () => field.press('Enter'))
     await expect(page.getByRole('search').getByRole('searchbox', { name: 'Search' })).toHaveValue(
       next
     )
@@ -217,7 +230,7 @@ test.describe('public parity interactions', () => {
     await gotoPublicPage(page, '/')
     const field = page.getByPlaceholder('Search the directory...')
     await fillUntilVisible(field, query, page.getByText(results))
-    await Promise.all([page.waitForURL(isSearchFor(query)), field.press('Enter')])
+    await submitSearch(page, query, () => field.press('Enter'))
 
     await gotoPublicPage(page, '/')
     const homeField = page.getByPlaceholder('Search the directory...')
@@ -227,7 +240,7 @@ test.describe('public parity interactions', () => {
       .locator('form')
       .filter({ has: homeField })
       .getByRole('button', { name: 'Search', exact: true })
-    await Promise.all([page.waitForURL(isSearchFor(query)), button.click()])
+    await submitSearch(page, query, () => button.click())
   })
 
   test('favorite toggle and favorites-only filter preserve local state behavior', async ({
