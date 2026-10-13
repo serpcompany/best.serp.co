@@ -208,7 +208,8 @@ test.describe('taxonomy routes on the fixture seed (#346)', () => {
   test('lists linked tags and best pages on the indexes, grouped by hub', async ({ page }) => {
     await page.goto('/products/tags/')
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tags')
-    await expectRobots(page, true)
+    // No page links the tag index: `noindex, follow`, so crawlers still follow its links (#425).
+    await expectRobots(page, false)
     await expectCanonical(page, '/products/tags/')
     const main = page.locator('main')
     // Tags with 3 or more listings, under their hubs.
@@ -321,7 +322,7 @@ test.describe('taxonomy routes on the fixture seed (#346)', () => {
     expect(await sitemap('/sitemap-best.xml')).toEqual([absoluteUrl(bestPath(noteTakingApp.slug))])
     expect(await sitemap('/sitemap-tags.xml')).toEqual([])
     const pages = await sitemap('/sitemap-pages.xml')
-    expect(pages).toContain(absoluteUrl('/products/tags/'))
+    expect(pages).not.toContain(absoluteUrl('/products/tags/'))
     expect(pages).toContain(absoluteUrl('/best/'))
   })
 

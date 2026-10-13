@@ -73,8 +73,9 @@ export const siteRoutes = [
   { indexable: true, path: '/products/[slug]/', sitemapGroup: 'products' },
   { indexable: true, path: '/products/categories/', sitemapGroup: 'pages' },
   { indexable: true, path: '/products/categories/[category]/', sitemapGroup: 'categories' },
-  // Like the best-page index: indexed and in the pages sitemap once it links a tag (`linkedTags`).
-  { indexable: true, path: taxonomyRoutePaths.tagIndex, sitemapGroup: 'pages' },
+  // No page links the tag index, so it is `noindex, follow` and in no sitemap (#425): crawlers
+  // still follow its links to the tag pages, which keep their own rule (`isTagIndexable`).
+  { indexable: false, path: taxonomyRoutePaths.tagIndex, sitemapGroup: null },
   // Indexed at `TAG_INDEX_MIN_LISTINGS` listings, unless a best page ranks it (`isTagIndexable`).
   { indexable: true, path: taxonomyRoutePaths.tagPage, sitemapGroup: 'tags' },
   { disallow: true, indexable: false, path: '/search/', sitemapGroup: null },

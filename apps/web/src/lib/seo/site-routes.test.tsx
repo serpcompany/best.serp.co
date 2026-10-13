@@ -40,7 +40,10 @@ import { isBestPageIndexable, isTagIndexable } from './taxonomy-indexing'
 const origin = 'https://best.serp.co'
 const staticRoutes = siteRoutes.filter(route => !route.path.includes('['))
 
-/** A catalog with something in every taxonomy index, so the pages sitemap lists them all. */
+/**
+ * A catalog with something in every taxonomy index, so the pages sitemap lists every page the
+ * registry gives it (the tag index is noindex, in no sitemap, even then: #425).
+ */
 const tags = [
   { count: 12, lastModifiedAt: '2026-09-01T00:00:00.000Z', slug: 'ai-writing' },
   { count: 4, lastModifiedAt: '2026-09-02T00:00:00.000Z', slug: 'ai-summaries' },

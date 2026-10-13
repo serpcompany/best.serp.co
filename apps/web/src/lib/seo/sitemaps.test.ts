@@ -153,10 +153,11 @@ describe('sitemaps and absolute URLs', () => {
     }
   })
 
-  it('lists the taxonomy indexes in the pages sitemap only while they list something (#341)', async () => {
+  it('lists the best index in the pages sitemap only while it lists something (#341)', async () => {
     const pages = locations(await (await createPagesSitemapResponse(loaders)).text())
-    expect(pages).toContain(`${origin}/products/tags/`)
     expect(pages).toContain(`${origin}/best/`)
+    // The tag index is in no sitemap, even while it lists tags: no page links it (#425).
+    expect(pages).not.toContain(`${origin}/products/tags/`)
     const before = locations(await (await createPagesSitemapResponse(noTaxonomy)).text())
     expect(before).not.toContain(`${origin}/products/tags/`)
     expect(before).not.toContain(`${origin}/best/`)
@@ -204,12 +205,11 @@ describe('sitemaps and absolute URLs', () => {
       [`${origin}/best/ai-chatbot/`]: '2026-09-05T00:00:00.000Z',
       [`${origin}/best/writing-tools/`]: '2026-09-07T00:00:00.000Z'
     })
-    // The catalog pages carry the newest listing, the taxonomy indexes their newest entry (only
-    // what they list: not the unlinked tag or the empty best page); the others none.
+    // The catalog pages carry the newest listing, the best index its newest entry (only what it
+    // lists: not the empty best page); the others none.
     const pages = entries(await (await createPagesSitemapResponse(loaders)).text())
     expect(pages[origin]).toBe('2026-09-30T12:00:00.000Z')
     expect(pages[`${origin}/products/categories/`]).toBe('2026-09-30T12:00:00.000Z')
-    expect(pages[`${origin}/products/tags/`]).toBe('2026-09-04T00:00:00.000Z')
     expect(pages[`${origin}/best/`]).toBe('2026-09-07T00:00:00.000Z')
     expect(pages[`${origin}/about/`]).toBeUndefined()
     // Each index entry carries its newest child.
