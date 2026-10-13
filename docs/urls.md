@@ -99,7 +99,7 @@ publisher's affected routes) build their URLs from it.
 | Path | Page | Robots | Sitemap |
 | --- | --- | --- | --- |
 | `/products/categories/<category>/` | A category (hub) with a public listing; else one 308 through `taxonomy_redirects` (the retired `other`: 308 to `/products/`, #351); else 404 | index | `sitemap-categories.xml` |
-| `/products/tags/` | Tags with 3 or more listings, grouped by hub | index; noindex while it lists none | `sitemap-pages.xml`, while it lists one |
+| `/products/tags/` | Tags with 3 or more listings, grouped by hub | noindex, follow (#425) | none |
 | `/products/tags/<tag>/` | A tag with a public listing, 48 a page (`?page=N`); else one 308; else 404 | index from 10 listings, unless an indexable best page ranks the tag alone | `sitemap-tags.xml` when indexable |
 | `/best/` | Best pages with an entry, grouped by hub | index; noindex while it lists none | `sitemap-pages.xml`, while it lists one |
 | `/best/<keyword>/` | Up to its list size of entries, one page; with none, one 308, else 404 | index from 5 entries | `sitemap-best.xml` when indexable |
@@ -110,6 +110,10 @@ publisher's affected routes) build their URLs from it.
   `apps/web/src/lib/site/taxonomy.ts`, not environment variables. A page that is not indexable
   still renders `noindex, follow`, so its links are crawled. A category page that renders is
   always indexed.
+- **The tag index is never indexed.** No page links `/products/tags/` (the Products menu links
+  Categories and Best, not Tags), so the route registry makes it `noindex, follow` and no sitemap
+  lists it (#425): search engines treat a page that only a sitemap names as unimportant. The tag
+  pages keep their own rule, and a crawler that reaches the index still follows its links.
 - **Names from D1.** Category pages, the hub grid, a listing's header, body, meta description and
   JSON-LD, and the search page's filters name categories from D1: the cached shell stats, which
   `/api/search` sends with each result as `categoryNames` (#416). Only a slug D1 doesn't name, such

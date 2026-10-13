@@ -16,12 +16,11 @@ import { siteCopy } from '@/lib/site/site-copy'
 const tagsPath = getRoute('tag.index')
 
 // The root layout's title template adds ` | SERP`.
-export async function generateMetadata(): Promise<Metadata> {
+export function generateMetadata(): Metadata {
   return generateBaseMetadata({
     title: `${siteCopy.listingName.pluralTitle} by Tag`,
     description: `Browse every ${SITE_NAME} ${siteCopy.listingName.singular} tag to find curated software, AI tools, companies, and resources listed under each one.`,
-    // Empty until the taxonomy is published: noindex then, and out of the pages sitemap.
-    noindex: linkedTags(await getActiveTags()).length === 0,
+    // Always `noindex, follow`, and in no sitemap: the route registry says so (#425).
     path: tagsPath
   })
 }
@@ -29,7 +28,8 @@ export async function generateMetadata(): Promise<Metadata> {
 /**
  * The tag index (#341, design 2.1): the tags with `TAG_LINK_MIN_LISTINGS` or more public listings,
  * grouped under their hubs, each a `ListCard` in the grid like the categories index. With no such
- * tag it shows only its heading, `noindex, follow`, and the pages sitemap leaves it out.
+ * tag it shows only its heading. No page links it, so it is always `noindex, follow` and no
+ * sitemap lists it (#425); crawlers that reach it still follow its links to the tag pages.
  */
 export default async function TagsPage() {
   const [tags, categories] = await Promise.all([getActiveTags(), getActiveCategories()])
