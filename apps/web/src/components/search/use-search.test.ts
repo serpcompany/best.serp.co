@@ -56,39 +56,80 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('a failed search reaches Sentry at most once per page session (#401)', () => {
-  it('reports a burst against a failing API once', async () => {
-    const search = await pageSession()
-    fetch.mockImplementation(() => answer(503))
-    for (const query of ['f', 'fi', 'fix', 'fixt', 'fixture']) await search(query)
-    fetch.mockImplementation(() => Promise.reject(new TypeError('Failed to fetch')))
-    for (const query of ['fixture t', 'fixture to']) await search(query)
-    fetch.mockImplementation(() => answer(200, { not: 'a list' }))
-    await search('fixture too')
+/** No answer: the connection fails before a response, or while its body is read. */
+function noAnswer(): Promise<Response> {
+  return Promise.reject(new TypeError('Failed to fetch'))
+}
 
-    expect(fetch).toHaveBeenCalledTimes(8)
-    expect(logger.error).toHaveBeenCalledExactlyOnceWith(
-      'search_failed',
-      expect.objectContaining({ cause: expect.objectContaining({ status: 503 }) })
-    )
+function cutOffAnswer(): Promise<Response> {
+  const body = new ReadableStream({
+    start(controller) {
+      controller.error(new TypeError('network error'))
+    }
   })
+  return Promise.resolve(new Response(body, { status: 200 }))
+}
 
-  it('never reports a throttle or another 4xx, and still reports the next real failure', async () => {
+function reportedCauses() {
+  return logger.error.mock.calls.map(([code, options]) => [
+    code,
+    (options as { cause: unknown }).cause?.constructor.name
+  ])
+}
+
+describe('a failed search reaches Sentry at most once per kind per page session (#401)', () => {
+  it('never reports an error status: the server reports its own 5xx, and a 4xx is the edge', async () => {
     const search = await pageSession()
-    for (const status of [429, 429, 429, 403, 401, 400]) {
+    for (const status of [500, 502, 503, 429, 403, 401, 400]) {
       fetch.mockImplementationOnce(() => answer(status))
       await search('fixture')
     }
+    expect(fetch).toHaveBeenCalledTimes(7)
     expect(logger.error).not.toHaveBeenCalled()
+  })
 
-    fetch.mockImplementation(() => answer(500))
+  it('reports a burst of network failures and a burst of parse failures once each', async () => {
+    const search = await pageSession()
+    fetch.mockImplementation(noAnswer)
+    for (const query of ['f', 'fi', 'fix']) await search(query)
+    fetch.mockImplementation(cutOffAnswer)
+    await search('fixt')
+    fetch.mockImplementation(() => answer(200, { not: 'a list' }))
+    await search('fixtu')
+    fetch.mockImplementation(() => Promise.resolve(new Response('<html>', { status: 200 })))
+    await search('fixtur')
+    fetch.mockImplementation(() => answer(503))
     await search('fixture')
+
+    expect(fetch).toHaveBeenCalledTimes(7)
+    expect(reportedCauses()).toEqual([
+      ['search_failed', 'TypeError'],
+      ['search_failed', 'ZodError']
+    ])
+  })
+
+  it('lets a later parse failure through after a flaky connection', async () => {
+    const search = await pageSession()
+    fetch.mockImplementationOnce(noAnswer)
+    await search('fixture')
+    fetch.mockImplementationOnce(() => Promise.resolve(new Response('<html>', { status: 200 })))
     await search('fixtures')
-    expect(logger.error).toHaveBeenCalledExactlyOnceWith('search_failed', expect.anything())
+    expect(reportedCauses()).toEqual([
+      ['search_failed', 'TypeError'],
+      ['search_failed', 'SyntaxError']
+    ])
+  })
+
+  it('keeps the error text the search box shows', async () => {
+    const { searchListings } = await import('./use-search')
+    fetch.mockImplementationOnce(noAnswer)
+    await expect(searchListings('fixture')).rejects.toThrow('Failed to fetch')
+    fetch.mockImplementationOnce(() => answer(503))
+    await expect(searchListings('fixture')).rejects.toThrow('Failed to search listings: 503')
   })
 
   it('reports again in the next page session', async () => {
-    fetch.mockImplementation(() => answer(502))
+    fetch.mockImplementation(noAnswer)
     await (await pageSession())('fixture')
     await (await pageSession())('fixture')
     expect(logger.error).toHaveBeenCalledTimes(2)
