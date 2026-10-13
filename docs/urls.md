@@ -110,9 +110,11 @@ publisher's affected routes) build their URLs from it.
   `apps/web/src/lib/site/taxonomy.ts`, not environment variables. A page that is not indexable
   still renders `noindex, follow`, so its links are crawled. A category page that renders is
   always indexed.
-- **Names from D1.** Category pages, the hub grid and a listing's header name categories from D1.
-  Where a page has only the slug (search filters, a listing's meta description and JSON-LD), the
-  name is cased from it (`categoryNameFromSlug`). Only the hubs' icons are checked in
+- **Names from D1.** Category pages, the hub grid, a listing's header, body, meta description and
+  JSON-LD, and the search page's filters name categories from D1: the cached shell stats, which
+  `/api/search` sends with each result as `categoryNames` (#416). Only a slug D1 doesn't name, such
+  as a retired category's, is cased from itself (`categoryName` falls back to
+  `categoryNameFromSlug`). Only the hubs' icons are checked in
   (`apps/web/src/lib/directory/categories.ts`); the v1 category aliases and presentation map are
   gone (#350).
 - **Admins manage them** in `/admin` (#405), on the publisher's operations: a rename keeps the

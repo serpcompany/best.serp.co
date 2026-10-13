@@ -8,6 +8,8 @@ export interface SearchWebsiteMetadata {
   name: string
   description: string
   categories: string[]
+  /** D1's names for its category slugs, from the search API (#416). */
+  categoryNames?: Record<string, string>
   tags: string[]
   category: string
   publishedAt: string
@@ -56,6 +58,7 @@ export function transformToWebsiteMetadata(entry: SearchResult): SearchWebsiteMe
       name,
       description,
       categories: uniqueCategories,
+      ...(entry.categoryNames ? { categoryNames: entry.categoryNames } : {}),
       tags: [],
       category: uniqueCategories[0] || '',
       publishedAt: ''

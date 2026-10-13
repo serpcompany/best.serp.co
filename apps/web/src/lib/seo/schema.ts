@@ -123,7 +123,8 @@ export function generateArticleSchema(website: WebsiteMetadataLike): ArticleSche
 
 /**
  * A listing page's JSON-LD graph. Its `BreadcrumbList` follows the visible trail: Home, the
- * directory, the listing's hub when it has one (#347), then the listing.
+ * directory, the listing's hub when it has one (#347), then the listing. The hub's name is D1's,
+ * in the trail and as the `applicationCategory` (#416).
  */
 export function generateWebsiteDetailSchema(
   website: WebsiteMetadataLike,
@@ -133,9 +134,8 @@ export function generateWebsiteDetailSchema(
   const pageUrl = `${origin}${getRoute('listing.detail', {
     slug: website.slug
   })}`
-  const categoryFormatted = website.category
-    ? categoryNameFromSlug(website.category)
-    : 'Developer Tools'
+  const categoryFormatted =
+    hub?.name ?? (website.category ? categoryNameFromSlug(website.category) : 'Developer Tools')
   const listingLabel = siteCopy.listingName.singular
   const listingLabelTitle = siteCopy.listingName.singularTitle
   const primaryImageUrl = resolveSchemaImageUrl(website)

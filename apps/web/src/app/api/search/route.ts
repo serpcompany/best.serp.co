@@ -1,4 +1,5 @@
-import { getAutocomplete, MAX_SEARCH_LIMIT } from '@/lib/catalog/repository'
+import { getActiveCategories, getAutocomplete, MAX_SEARCH_LIMIT } from '@/lib/catalog/repository'
+import { categoryNamesBySlug } from '@/lib/directory/categories'
 import { getRoute } from '@/lib/routing/routes'
 
 export const dynamic = 'force-dynamic'
@@ -12,11 +13,23 @@ export async function GET(request: Request): Promise<Response> {
     : 20
   if (!query) return Response.json([])
 
-  const listings = await getAutocomplete(query, limit)
+  // Each result names its categories as D1 does, from the cached shell stats, for the search
+  // page's filters (#416).
+  const [listings, categories] = await Promise.all([
+    getAutocomplete(query, limit),
+    getActiveCategories()
+  ])
+  const names = categoryNamesBySlug(categories)
   return Response.json(
     listings.map(listing => ({
       category: listing.category,
       categories: listing.categories,
+      categoryNames: Object.fromEntries(
+        [listing.category, ...(listing.categories ?? [])].flatMap(slug => {
+          const name = names.get(slug)
+          return name ? [[slug, name]] : []
+        })
+      ),
       description: listing.description,
       name: listing.name,
       slug: listing.slug,

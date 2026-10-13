@@ -50,3 +50,29 @@ describe('a listing body (#334)', () => {
     )
   })
 })
+
+describe('a listing body without content (#416)', () => {
+  const bare: WebsiteMetadata = { ...website, category: 'audio', content: undefined }
+
+  beforeEach(() => {
+    vi.stubGlobal('React', React)
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it("names its categories as the page hands them, D1's names", () => {
+    const markup = renderToStaticMarkup(
+      <WebsiteContentSection
+        categories={[{ name: 'Audio & Music', slug: 'audio' }]}
+        website={bare}
+      />
+    )
+    expect(markup).toContain('Audio &amp; Music')
+  })
+
+  it('names them from their slugs only without them', () => {
+    expect(renderToStaticMarkup(<WebsiteContentSection website={bare} />)).toContain('>Audio<')
+  })
+})

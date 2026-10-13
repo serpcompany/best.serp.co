@@ -4,10 +4,15 @@ import type { PublishedBestPage } from '@/db/contracts'
 import type { WebsiteDetailMetadata } from '../../lib/directory/content-query'
 import { listingContentTree } from '../../lib/markdown/listing-content-tree'
 import { DetailPageLayout } from '../layout/detail-page-layout'
+import { JsonLd } from '../seo/json-ld'
 import { BestPageCards } from '../taxonomy/best-page'
 import { WebsiteContentSection } from '../website/website-content-section'
 import { WebsiteRelatedProjects } from '../website/website-related-projects'
-import { listingCategoryNames, WebsiteDetailRoutePage } from './detail-page'
+import {
+  generateWebsiteDetailRouteMetadata,
+  listingCategoryNames,
+  WebsiteDetailRoutePage
+} from './detail-page'
 
 function findElement(node: ReactNode, type: unknown): { props: Record<string, unknown> } | null {
   if (Array.isArray(node)) {
@@ -133,5 +138,51 @@ describe('the listing page in the taxonomy (#347)', () => {
     expect(findElement(WebsiteDetailRoutePage({ categoryNames, project }), BestPageCards)).toBe(
       null
     )
+  })
+})
+
+describe('a listing names its hub as D1 does (#416)', () => {
+  // D1 names the `audio` hub "Audio & Music"; cased from its slug it would read "Audio".
+  const project: WebsiteDetailMetadata = {
+    categories: ['audio', 'retired-hub'],
+    category: 'audio',
+    // Short enough that the meta description is padded with its category.
+    description: 'Music.',
+    name: 'Tunes',
+    nextWebsite: null,
+    previousWebsite: null,
+    publishedAt: '2026-07-04T00:00:00.000Z',
+    relatedWebsites: [],
+    slug: 'fixture-tunes.test',
+    website: 'https://fixture-tunes.test/'
+  }
+  const categoryNames = new Map([['audio', 'Audio & Music']])
+
+  it('in its meta description and keywords', async () => {
+    const metadata = await generateWebsiteDetailRouteMetadata(project, categoryNames)
+    expect(metadata.description).toContain('Category: Audio & Music.')
+    expect(metadata.keywords).toContain('Audio & Music')
+    expect(JSON.stringify(metadata)).not.toMatch(/\bAudio\b(?! &)/u)
+  })
+
+  it('in its JSON-LD: the breadcrumb and the application category', () => {
+    const data = findElement(WebsiteDetailRoutePage({ categoryNames, project }), JsonLd)?.props
+      .data as { '@graph': Array<Record<string, unknown>> }
+    const node = (type: string) => data['@graph'].find(entry => entry['@type'] === type) ?? {}
+    expect(node('SoftwareApplication').applicationCategory).toBe('Audio & Music')
+    expect(
+      (node('BreadcrumbList').itemListElement as Array<{ name: string }>).map(item => item.name)
+    ).toContain('Audio & Music')
+  })
+
+  it('in its body, and names a category D1 no longer has from its slug', () => {
+    const section = findElement(
+      WebsiteDetailRoutePage({ categoryNames, project }),
+      WebsiteContentSection
+    )
+    expect(section?.props.categories).toEqual([
+      { name: 'Audio & Music', slug: 'audio' },
+      { name: 'Retired Hub', slug: 'retired-hub' }
+    ])
   })
 })

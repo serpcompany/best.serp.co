@@ -15,9 +15,24 @@ export function getCategoryIcon(slug: string): LucideIcon {
   return hubIcons.get(slug) ?? Package
 }
 
+/** Category names from D1 by slug (the shell stats' active categories, #416). */
+export function categoryNamesBySlug(
+  categories: ReadonlyArray<{ name: string; slug: string }>
+): Map<string, string> {
+  return new Map(categories.map(category => [category.slug, category.name]))
+}
+
 /**
- * A category's name cased from its slug (`video-downloaders` is "Video Downloaders"), for a
- * page that has only the slug: D1's name (the shell stats) is the one to show where it's at hand.
+ * A category's name: D1's (`names`, `categoryNamesBySlug`), else cased from its slug, the last
+ * resort for a slug D1 doesn't name, such as a retired category's (#416).
+ */
+export function categoryName(slug: string, names: ReadonlyMap<string, string>): string {
+  return names.get(slug) ?? categoryNameFromSlug(slug)
+}
+
+/**
+ * A category's name cased from its slug (`video-downloaders` is "Video Downloaders"): only for a
+ * slug D1 doesn't name. Where D1's names are at hand, use `categoryName` (#416).
  */
 export function categoryNameFromSlug(slug: string): string {
   return slug

@@ -10,6 +10,7 @@ import {
 import { getActiveCategories, getBestPages, getUnpublishedListing } from '@/lib/catalog/repository'
 import { currentClaimCopy, currentClaimFlags } from '@/lib/claims/current'
 import { getWebsiteBySlug, getWebsiteCanonicalRedirect } from '@/lib/content-loader'
+import { categoryNamesBySlug } from '@/lib/directory/categories'
 import { featuredInBestPages } from '@/lib/directory/featured-in'
 import { getFeaturedOnBadgePreviewPathFromKey } from '@/lib/directory/featured-on-badge-url'
 import { GONE_RENDER_HEADER } from '@/lib/routing/gone-listing'
@@ -41,7 +42,11 @@ export async function generateMetadata({ params }: ProjectPageProps): Promise<Me
       : {}
   }
 
-  return generateWebsiteDetailRouteMetadata(project)
+  // The hub's name from the cached shell stats, as the page reads them (#416).
+  return generateWebsiteDetailRouteMetadata(
+    project,
+    categoryNamesBySlug(await getActiveCategories())
+  )
 }
 
 /**
@@ -89,7 +94,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
   const [categories, bestPages] = await shell
   return (
     <WebsiteDetailRoutePage
-      categoryNames={new Map(categories.map(category => [category.slug, category.name]))}
+      categoryNames={categoryNamesBySlug(categories)}
       claim={claim}
       featuredIn={featuredInBestPages(project, bestPages)}
       project={project}

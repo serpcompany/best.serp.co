@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Alert, AlertAction, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
-import { categoryNameFromSlug } from '../../lib/directory/categories'
+import { categoryName } from '../../lib/directory/categories'
 import { getRoute } from '../../lib/routing/routes'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
@@ -36,6 +36,11 @@ export function SearchResults() {
   const availableCategoryCount = useMemo(
     () => new Set(availableCategories).size,
     [availableCategories]
+  )
+  // D1's category names, which the search API sends with each result (#416).
+  const categoryNames = useMemo(
+    () => new Map(results.flatMap(result => Object.entries(result.categoryNames ?? {}))),
+    [results]
   )
 
   useEffect(() => {
@@ -151,6 +156,7 @@ export function SearchResults() {
           selectedCategories={selectedCategories}
           onCategoryChange={setSelectedCategories}
           availableCategories={availableCategories}
+          categoryNames={categoryNames}
           resultCount={results.length}
         />
       }
@@ -165,7 +171,7 @@ export function SearchResults() {
                 size="sm"
                 onClick={() => setSelectedCategories([category])}
               >
-                {categoryNameFromSlug(category)} ({count})
+                {categoryName(category, categoryNames)} ({count})
               </Button>
             ))}
           </div>
