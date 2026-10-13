@@ -1,7 +1,7 @@
 import { Info } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { categoryNameFromSlug } from '../../lib/directory/categories'
-import type { WebsiteMetadata } from '../../lib/directory/content-query'
+import type { TaxonomyName, WebsiteMetadata } from '../../lib/directory/content-query'
 import {
   type ListingContentTree,
   stripDuplicateLinksSection
@@ -13,6 +13,11 @@ import { components as mdxComponents } from '../content/mdx-components'
 import { ListingImage } from '../listing/listing-image'
 
 export interface WebsiteContentSectionProps {
+  /**
+   * The listing's categories named from D1, its hub first (`listingCategoryNames`, #416). Without
+   * them each is named from its slug.
+   */
+  categories?: readonly TaxonomyName[]
   /**
    * The body's tree from the data cache (`WebsiteDetailMetadata.contentTree`, #334). Without it
    * the body's Markdown is parsed here, to the same markup.
@@ -26,13 +31,16 @@ function stripHtmlTags(html: string | null | undefined): string {
   return html.replace(/<[^>]*>/g, '').trim()
 }
 
-export function WebsiteContentSection({ contentTree, website }: WebsiteContentSectionProps) {
-  const categoryLabels = [
-    ...(website.category ? [website.category] : []),
-    ...(website.categories || [])
-  ]
-    .filter((value, index, values) => Boolean(value) && values.indexOf(value) === index)
-    .map(categorySlug => categoryNameFromSlug(categorySlug))
+export function WebsiteContentSection({
+  categories,
+  contentTree,
+  website
+}: WebsiteContentSectionProps) {
+  const categoryLabels =
+    categories?.map(category => category.name) ??
+    [...(website.category ? [website.category] : []), ...(website.categories || [])]
+      .filter((value, index, values) => Boolean(value) && values.indexOf(value) === index)
+      .map(categorySlug => categoryNameFromSlug(categorySlug))
   const featuredImageUrl = website.media?.images?.[0]
 
   if (website.content) {

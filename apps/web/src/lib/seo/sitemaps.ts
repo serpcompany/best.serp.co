@@ -27,12 +27,7 @@ import { getRoute } from '../routing/routes'
 import { siteConfig } from '../site/site-config'
 import { absoluteUrl } from './canonical-url'
 import { siteOrigin } from './seo-config'
-import {
-  isBestPageIndexable,
-  isTagIndexable,
-  linkedTags,
-  listedBestPages
-} from './taxonomy-indexing'
+import { isBestPageIndexable, isTagIndexable, listedBestPages } from './taxonomy-indexing'
 
 type WebsiteSitemapEntry = {
   categories?: string[]
@@ -212,16 +207,15 @@ function getBestPageEntries({ bestPages }: SitemapContent): SitemapEntry[] {
 }
 
 /**
- * The taxonomy indexes list only the tags and best pages that render, so each is in the pages
- * sitemap (with its newest entry's lastmod) only while it lists one; before, it renders noindex.
- * Each index path maps to the lastmods of what it lists; a static page not here is always listed.
+ * The best index lists only the best pages that render, so it is in the pages sitemap (with its
+ * newest entry's lastmod) only while it lists one; before, it renders noindex. Each index path
+ * maps to the lastmods of what it lists; a static page not here is always listed. The tag index
+ * is in no sitemap (#425): the route registry makes it noindex.
  */
 function taxonomyIndexLastmods({
-  bestPages,
-  tags
+  bestPages
 }: SitemapContent): Map<string, Array<string | undefined>> {
   return new Map([
-    [getRoute('tag.index'), linkedTags(tags).map(tag => tag.lastModifiedAt ?? undefined)],
     [getRoute('best.index'), listedBestPages(bestPages).map(page => page.lastModifiedAt)]
   ])
 }

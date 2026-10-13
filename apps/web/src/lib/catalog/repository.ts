@@ -262,8 +262,21 @@ export async function searchListings(query: string, limit = 50): Promise<Website
   return withMediaUrls(await (await getOperations()).searchListings(query, limit))
 }
 
-export async function getAutocomplete(query: string, limit = 8): Promise<WebsiteMetadata[]> {
-  return withMediaUrls(await (await getOperations()).getAutocomplete(query, limit))
+/**
+ * `/api/search`'s results and the shell stats' categories, which name them (#416). Both read
+ * through one operations instance: a route handler isn't a React render, so `cache` keeps
+ * nothing there, and two calls would each set up D1 access and read the catalog epoch.
+ */
+export async function getAutocompleteWithCategories(
+  query: string,
+  limit = 8
+): Promise<{ categories: PublishedCategory[]; listings: WebsiteMetadata[] }> {
+  const operations = await getOperations()
+  const [listings, categories] = await Promise.all([
+    operations.getAutocomplete(query, limit).then(withMediaUrls),
+    operations.getActiveCategories()
+  ])
+  return { categories, listings }
 }
 
 export async function getPublicationVersion(): Promise<number> {
