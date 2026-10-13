@@ -10,6 +10,7 @@ import {
 import { getActiveCategories, getBestPages, getUnpublishedListing } from '@/lib/catalog/repository'
 import { currentClaimCopy, currentClaimFlags } from '@/lib/claims/current'
 import { getWebsiteBySlug, getWebsiteCanonicalRedirect } from '@/lib/content-loader'
+import { categoryNamesBySlug } from '@/lib/directory/categories'
 import { featuredInBestPages } from '@/lib/directory/featured-in'
 import { getFeaturedOnBadgePreviewPathFromKey } from '@/lib/directory/featured-on-badge-url'
 import { GONE_RENDER_HEADER } from '@/lib/routing/gone-listing'
@@ -32,6 +33,10 @@ interface ProjectPageProps {
 export async function generateMetadata({ params }: ProjectPageProps): Promise<Metadata> {
   const { slug } = await params
 
+  // The hub's name from the cached shell stats, as the page reads them (#416). Started with the
+  // listing, as the page does, so a cold data cache waits on D1 once, not twice (#378).
+  const categories = getActiveCategories()
+  categories.catch(() => undefined)
   const project = await getWebsiteBySlug(slug)
 
   if (!project) {
@@ -41,7 +46,7 @@ export async function generateMetadata({ params }: ProjectPageProps): Promise<Me
       : {}
   }
 
-  return generateWebsiteDetailRouteMetadata(project)
+  return generateWebsiteDetailRouteMetadata(project, categoryNamesBySlug(await categories))
 }
 
 /**
@@ -89,7 +94,7 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
   const [categories, bestPages] = await shell
   return (
     <WebsiteDetailRoutePage
-      categoryNames={new Map(categories.map(category => [category.slug, category.name]))}
+      categoryNames={categoryNamesBySlug(categories)}
       claim={claim}
       featuredIn={featuredInBestPages(project, bestPages)}
       project={project}

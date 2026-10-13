@@ -1,4 +1,4 @@
-import { getActiveTags, getBestPages } from '@/lib/catalog/repository'
+import { getBestPages } from '@/lib/catalog/repository'
 import { getWebsites } from '@/lib/content-loader'
 import { createPagesSitemapResponse } from '@/lib/seo/sitemaps'
 
@@ -6,5 +6,5 @@ import { createPagesSitemapResponse } from '@/lib/seo/sitemaps'
 export const dynamic = 'force-dynamic'
 
 export async function GET(): Promise<Response> {
-  return createPagesSitemapResponse({ getBestPages, getTags: getActiveTags, getWebsites })
+  return createPagesSitemapResponse({ getBestPages, getWebsites })
 }

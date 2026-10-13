@@ -10,19 +10,22 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
-import { categoryNameFromSlug, getCategoryIcon } from '../../lib/directory/categories'
+import { categoryName, getCategoryIcon } from '../../lib/directory/categories'
 
 interface SearchFiltersProps {
   selectedCategories: string[]
   onCategoryChange: (categories: string[]) => void
   availableCategories?: string[]
+  /** D1's names by category slug (#416); a slug without one is named from itself. */
+  categoryNames?: ReadonlyMap<string, string>
   resultCount?: number
 }
 
 export function SearchFilters({
   selectedCategories,
   onCategoryChange,
-  availableCategories = []
+  availableCategories = [],
+  categoryNames = new Map()
 }: SearchFiltersProps) {
   const [isOpen, setIsOpen] = useState(false)
 
@@ -94,7 +97,7 @@ export function SearchFilters({
                       className="flex items-center gap-2 text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex-1"
                     >
                       <Icon className="h-4 w-4 text-muted-foreground" />
-                      <span className="flex-1">{categoryNameFromSlug(categorySlug)}</span>
+                      <span className="flex-1">{categoryName(categorySlug, categoryNames)}</span>
                       {availableCategories.includes(categorySlug) && (
                         <span className="text-xs text-muted-foreground">({categoryCount})</span>
                       )}
@@ -111,7 +114,7 @@ export function SearchFilters({
         <div className="flex items-center gap-1 flex-wrap">
           {selectedCategories.map(categorySlug => {
             const Icon = getCategoryIcon(categorySlug)
-            const name = categoryNameFromSlug(categorySlug)
+            const name = categoryName(categorySlug, categoryNames)
 
             return (
               <Badge key={categorySlug} variant="secondary" className="pr-0.5">

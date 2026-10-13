@@ -197,3 +197,15 @@ describe('listing detail JSON-LD breadcrumb (#347)', () => {
     ])
   })
 })
+
+describe('listing detail JSON-LD category (#416)', () => {
+  it("names the application category as D1 names the hub, not from the hub's slug", () => {
+    const audio = { ...listing, category: 'audio' }
+    expect(
+      softwareNode(generateWebsiteDetailSchema(audio, { name: 'Audio & Music', slug: 'audio' }))
+        .applicationCategory
+    ).toBe('Audio & Music')
+    // Without a hub (no names at hand) the slug is the last resort.
+    expect(softwareNode(generateWebsiteDetailSchema(audio)).applicationCategory).toBe('Audio')
+  })
+})
