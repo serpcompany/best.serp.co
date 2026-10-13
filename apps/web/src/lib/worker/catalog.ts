@@ -84,12 +84,13 @@ export function catalogEpochReader(
     return { bookmark: session.getBookmark(), token: catalogEpochToken(epoch) }
   }
   return context =>
-    memo.current(context, async () => {
-      const loaded = await loadSharedEpoch(cache, environment, readPrimary, context)
-      // Bypassed renders in this isolate reuse it instead of reading the epoch again (#77).
-      shareCatalogEpochToken(loaded.read.token)
-      return loaded
-    })
+    memo.current(
+      context,
+      () => loadSharedEpoch(cache, environment, readPrimary, context),
+      // Bypassed renders in this isolate reuse the epoch instead of reading it again (#77): the
+      // one the memo stored, never an older one a slower, earlier load returned (#443).
+      read => shareCatalogEpochToken(read.token)
+    )
 }
 
 /**

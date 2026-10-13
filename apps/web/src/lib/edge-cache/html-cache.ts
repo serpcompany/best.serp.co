@@ -22,6 +22,11 @@ export const EPOCH_FRESH_MS = 30_000
 export const EPOCH_MAX_STALE_MS = 5 * 60_000
 /** How long a request waits for its own epoch load before it falls back (#443). */
 export const EPOCH_LOAD_TIMEOUT_MS = 2_000
+/**
+ * How long a load nobody waits on (a background refresh, or a load its request stopped waiting
+ * for) runs on in its request's `waitUntil`, under that call's 30-second limit (#443).
+ */
+export const EPOCH_REFRESH_TIMEOUT_MS = 25_000
 /** How long a request waits for a Cache API lookup before it treats it as a miss (#443). */
 export const CACHE_MATCH_TIMEOUT_MS = 1_000
 
@@ -341,9 +346,12 @@ export interface LoadedEpoch {
  * disconnects, or `waitUntil`'s 30 seconds run out), so another request awaiting it could wait
  * forever. Each load is therefore the calling request's own (`load` closes over its cache handle
  * and logger), and a request waits for it for at most `timeoutMs`. After a timeout or a failure
- * it falls back on the last value at any age, or on none, which bypasses the cache. A background
- * refresh is claimed for `timeoutMs`, so a busy isolate starts about one per `freshMs`, and one
- * whose request ended is retried once the claim lapses.
+ * it falls back on the last value at any age, or on none, which bypasses the cache. A load its
+ * request stopped waiting for runs on in that request's own `waitUntil`, so a slow answer still
+ * lands. A background refresh is claimed for `timeoutMs`, so a busy isolate starts about one per
+ * `freshMs` (one per claim while refreshes are slow), and one whose request ended is retried once
+ * the claim lapses. Either runs for at most `refreshTimeoutMs`. A load started earlier never
+ * replaces a value a later one stored, and only a load that stores calls its `stored` callback.
  */
 export class EpochMemo {
   private refreshClaimedAt: number | undefined
@@ -353,10 +361,15 @@ export class EpochMemo {
     private readonly now: () => number = Date.now,
     private readonly freshMs = EPOCH_FRESH_MS,
     private readonly maxStaleMs = EPOCH_MAX_STALE_MS,
-    private readonly timeoutMs = EPOCH_LOAD_TIMEOUT_MS
+    private readonly timeoutMs = EPOCH_LOAD_TIMEOUT_MS,
+    private readonly refreshTimeoutMs = EPOCH_REFRESH_TIMEOUT_MS
   ) {}
 
-  async current(context: EdgeCacheContext, load: () => Promise<LoadedEpoch>): Promise<EpochLookup> {
+  async current(
+    context: EdgeCacheContext,
+    load: () => Promise<LoadedEpoch>,
+    stored: (read: EpochRead) => void = () => {}
+  ): Promise<EpochLookup> {
     const value = this.value
     const startedAt = this.now()
     const age = value ? startedAt - value.fetchedAt : Number.POSITIVE_INFINITY
@@ -365,18 +378,27 @@ export class EpochMemo {
       const claimedAt = this.refreshClaimedAt
       if (claimedAt === undefined || startedAt - claimedAt >= this.timeoutMs) {
         this.refreshClaimedAt = startedAt
-        context.waitUntil(
-          settleWithin(this.loadInto(load, startedAt), this.timeoutMs).catch(() => undefined)
-        )
+        this.finishInBackground(context, this.loadInto(load, startedAt, stored))
       }
       return { read: value.read, source: 'stale' }
     }
+    const loading = this.loadInto(load, startedAt, stored)
+    let loaded: LoadedEpoch | typeof TIMED_OUT
     try {
-      const loaded = await settleWithin(this.loadInto(load, startedAt), this.timeoutMs)
-      return loaded === TIMED_OUT ? this.fallback('timeout') : loaded
+      loaded = await settleWithin(loading, this.timeoutMs)
     } catch {
       return this.fallback('error')
     }
+    if (loaded !== TIMED_OUT) return loaded
+    // The request stops waiting, but its own load runs on in its own `waitUntil` (never another
+    // request's), so a slow but healthy D1 still updates the memo and the data center's share.
+    this.finishInBackground(context, loading)
+    return this.fallback('timeout')
+  }
+
+  /** Keeps `loading` running in its own request's `waitUntil`, for at most `refreshTimeoutMs`. */
+  private finishInBackground(context: EdgeCacheContext, loading: Promise<LoadedEpoch>): void {
+    context.waitUntil(settleWithin(loading, this.refreshTimeoutMs).catch(() => undefined))
   }
 
   /** The last value, which another request's load may have set meanwhile, or none. */
@@ -388,11 +410,13 @@ export class EpochMemo {
 
   private async loadInto(
     load: () => Promise<LoadedEpoch>,
-    startedAt: number
+    startedAt: number,
+    stored: (read: EpochRead) => void
   ): Promise<LoadedEpoch> {
     const loaded = await load()
     if (!this.value || this.value.startedAt <= startedAt) {
       this.value = { fetchedAt: this.now(), read: loaded.read, startedAt }
+      stored(loaded.read)
     }
     return loaded
   }

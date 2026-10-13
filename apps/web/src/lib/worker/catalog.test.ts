@@ -191,6 +191,34 @@ describe('catalogEpochReader (#165)', () => {
     }
   })
 
+  // #444 review: a slower, earlier load once shared its token after the memo had kept a newer one,
+  // which moved signed-in and other bypassed renders back to the older epoch.
+  it('never shares an older epoch that a slower, earlier load returns (#443)', async () => {
+    vi.useFakeTimers()
+    try {
+      const env = { D1_RUNTIME_ENV: 'production', DB: binding('newer') }
+      let answerOlder: (value: { database: string }) => void = () => {}
+      epoch.readCatalogEpoch.mockImplementationOnce(
+        () =>
+          new Promise(done => {
+            answerOlder = done
+          })
+      )
+      const older = track(catalogEpochReader(env, cache(), observe)(context))
+      await vi.advanceTimersByTimeAsync(1)
+      const newer = track(catalogEpochReader(env, cache(), observe)(context))
+      await vi.advanceTimersByTimeAsync(0)
+      expect(newer.value?.read?.token).toBe('epoch-of-newer')
+      answerOlder({ database: 'older' })
+      await vi.advanceTimersByTimeAsync(0)
+      // The older load answers its own request, but the isolate's shared token stays newer.
+      expect(older.value?.read?.token).toBe('epoch-of-older')
+      expect(epoch.shareCatalogEpochToken.mock.calls).toEqual([['epoch-of-newer']])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it.each([
     { D1_RUNTIME_ENV: 'local' },
     { D1_RUNTIME_ENV: 'preview', DB: binding('a') },

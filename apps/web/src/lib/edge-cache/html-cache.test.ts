@@ -7,6 +7,7 @@ import {
   type EdgeCacheEvent,
   EPOCH_LOAD_TIMEOUT_MS,
   EPOCH_MAX_STALE_MS,
+  EPOCH_REFRESH_TIMEOUT_MS,
   EpochMemo,
   type EpochRead,
   isCacheableRequest,
@@ -474,6 +475,8 @@ describe('edge HTML cache timeouts (#443)', () => {
     const first = edge.serve(stuck)
     await vi.advanceTimersByTimeAsync(EPOCH_LOAD_TIMEOUT_MS)
     expect((await first).headers.get(EDGE_CACHE_HEADER)).toBe('BYPASS')
+    // Its load runs on in its own request's `waitUntil`, in case it answers late.
+    expect(edge.pending.splice(0)).toHaveLength(1)
     const timedOut = { epochMs: EPOCH_LOAD_TIMEOUT_MS, epochSource: 'timeout' }
     expect(edge.events.splice(0)).toEqual([
       { event: 'edge_cache', state: 'epoch-timeout', ...timedOut },
@@ -516,6 +519,38 @@ describe('edge HTML cache timeouts (#443)', () => {
       state: 'epoch-timeout',
       ...timedOut
     })
+  })
+
+  // #444 review: a load cut off with its request never landed, so a slow D1 kept the isolate on an
+  // old epoch, and every request waited the full timeout.
+  it('lands a load that answers after its request stopped waiting, and the next request uses it', async () => {
+    vi.useFakeTimers()
+    const edge = isolate()
+    // The epoch read takes 3 seconds: the request bypasses at the timeout, and its load runs on.
+    const slow = () => new Promise<LoadedEpoch>(done => setTimeout(() => done(loaded('e1')), 3_000))
+    const first = edge.serve(slow)
+    await vi.advanceTimersByTimeAsync(EPOCH_LOAD_TIMEOUT_MS)
+    expect((await first).headers.get(EDGE_CACHE_HEADER)).toBe('BYPASS')
+    // Workers cancels a request's I/O once it has answered, unless its `waitUntil` holds it.
+    expect(edge.pending).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(1_000)
+    await Promise.all(edge.pending.splice(0))
+    edge.events.splice(0)
+
+    // The next request uses the epoch that landed, without waiting or loading.
+    const load = vi.fn(stuck)
+    expect((await edge.serve(load)).headers.get(EDGE_CACHE_HEADER)).toBe('MISS')
+    expect(load).not.toHaveBeenCalled()
+    expect(edge.events).toEqual([
+      {
+        epochMs: 0,
+        epochSource: 'fresh',
+        event: 'edge_cache',
+        matchMs: 0,
+        state: 'MISS',
+        status: 200
+      }
+    ])
   })
 })
 
@@ -590,25 +625,34 @@ describe('catalog epoch memo', () => {
     let finish: (value: LoadedEpoch) => void = () => {}
     const memo = new EpochMemo(() => clock)
     const context = { waitUntil: () => {} }
+    // What the isolate shares with bypassed renders (`shareCatalogEpochToken`).
+    const shared: string[] = []
+    const share = (epoch: EpochRead) => shared.push(epoch.token)
     const slow = memo.current(
       context,
       () =>
         new Promise<LoadedEpoch>(done => {
           finish = done
-        })
+        }),
+      share
     )
     clock = 1
     // A concurrent request loads for itself and answers while the first load is still out.
     const concurrent = vi.fn(async () => loaded('epoch-2'))
-    expect(await memo.current(context, concurrent)).toEqual({ read: read('epoch-2'), source: 'd1' })
-    // The first load, started earlier, answers its own request but never replaces a newer epoch.
+    expect(await memo.current(context, concurrent, share)).toEqual({
+      read: read('epoch-2'),
+      source: 'd1'
+    })
+    // The first load, started earlier, answers its own request but never replaces a newer epoch,
+    // and never rolls the shared token back to its own.
     finish(loaded('epoch-1'))
     expect((await slow).read).toEqual(read('epoch-1'))
-    expect(await memo.current(context, concurrent)).toEqual({
+    expect(await memo.current(context, concurrent, share)).toEqual({
       read: read('epoch-2'),
       source: 'fresh'
     })
     expect(concurrent).toHaveBeenCalledTimes(1)
+    expect(shared).toEqual(['epoch-2'])
   })
 
   it('answers at the timeout when a load never settles, and the next request loads again', async () => {
@@ -660,9 +704,15 @@ describe('catalog epoch memo', () => {
     clock = 3_000
     expect(await memo.current(context, refresh)).toEqual(stale)
     expect(refresh).toHaveBeenCalledTimes(1)
-    // The background work ends at the timeout instead of holding the request for 30 seconds.
+    // A slow refresh runs on past the request's timeout, and ends under `waitUntil`'s 30 seconds.
+    let ended = false
+    Promise.all(background).then(() => {
+      ended = true
+    })
     await vi.advanceTimersByTimeAsync(2_000)
-    await Promise.all(background)
+    expect(ended).toBe(false)
+    await vi.advanceTimersByTimeAsync(EPOCH_REFRESH_TIMEOUT_MS - 2_000)
+    expect(ended).toBe(true)
 
     // Once the claim lapses, the next stale request refreshes again.
     clock = 3_500
