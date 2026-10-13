@@ -46,7 +46,25 @@ From the edge inward:
    background for up to 5 minutes; isolates in one data center share it through the Cache
    API for 30 seconds. D1 therefore sees about one one-row epoch read per data center per
    30 seconds, and a publication reaches cached pages within about a minute. Nothing is
-   purged: old keys stop matching and expire. The epoch travels with the D1 bookmark of the
+   purged: old keys stop matching and expire.
+   Requests share only the settled epoch, never a load in flight (#443). Workers runs a load's
+   I/O in the request that started it and drops it when that request ends, so a shared load
+   once left every cached page on an isolate waiting for hours. Each load is the calling
+   request's own, through its own cache handle and logger, and nothing before the render waits
+   unbounded:
+   - a request waits at most 2 seconds for its epoch (`EPOCH_LOAD_TIMEOUT_MS`); then, or when
+     the load fails, it uses the isolate's last epoch at any age, or bypasses the cache if there
+     is none. A load it stopped waiting for runs on in its own request's `waitUntil`, so a slow
+     D1 answer still updates the memo and the share;
+   - the load reads the data center's share for at most 1 second before it reads D1, and stores
+     the share in the background;
+   - a page lookup slower than 1 second (`CACHE_MATCH_TIMEOUT_MS`) renders as a miss.
+
+   A stale epoch's background refresh is claimed for 2 seconds, so a busy isolate still starts
+   about one per 30 seconds, and one whose request ended is retried. A refresh, or a load its
+   request stopped waiting for, runs for at most 25 seconds (`EPOCH_REFRESH_TIMEOUT_MS`), under
+   `waitUntil`'s 30. A load started earlier never replaces an epoch a later one stored, and only a
+   load the memo stores shares its token with other renders. The epoch travels with the D1 bookmark of the
    read that returned it, in the memo and in the share (beside the bare token, in an
    `x-d1-bookmark` header; see [Read replication](#read-replication)). The render of a miss gets
    both for its own request (`runWithCatalogRead`, an async context like OpenNext's, never a
@@ -70,6 +88,14 @@ From the edge inward:
    tree's format (`LISTING_CONTENT_FORMAT`), which a change to the parser's output must bump,
    because the data cache survives deployments.
 4. React `cache()` deduplicates reads within a request.
+
+**Logs.** The edge cache logs one `edge_cache` event per request: `HIT`, `MISS` or `BYPASS`, with
+the status. A cacheable request's event carries `epochMs`, `epochSource` (`fresh`, `stale`,
+`shared`, `d1`, `timeout` or `error`) and `matchMs`. A step that fails or times out logs one
+more as it happens: `epoch-timeout` (with `epochAgeMs`, the age of the epoch it fell back on),
+`epoch-error`, `match-timeout` or `store-error`. A client disconnect is not logged: that needs
+the `enable_request_signal` compatibility flag, which would also pass the disconnect to every
+render.
 
 **Environments never share an entry** (#397). The Cache API works on the zone's cache, and
 staging (`staging.best.serp.co`) and production (`best.serp.co`) are custom domains in one zone

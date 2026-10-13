@@ -25,6 +25,7 @@ vi.mock('@/db/client', () => ({
 }))
 
 const { currentCatalogRead } = await import('@/db/catalog-epoch')
+const { EPOCH_LOAD_TIMEOUT_MS } = await import('../edge-cache/html-cache')
 const { catalogEpochReader, catalogRenderer } = await import('./catalog')
 
 /** A `DB` binding whose sessions answer with a bookmark named after it. */
@@ -49,6 +50,21 @@ function cache(): Cache {
 const context = { waitUntil: () => {} }
 const observe = () => {}
 
+/** Whether `promise` has settled yet, and with what, without awaiting it. */
+function track<T>(promise: Promise<T>) {
+  const state: { settled: boolean; value?: T } = { settled: false }
+  promise.then(
+    value => {
+      state.settled = true
+      state.value = value
+    },
+    () => {
+      state.settled = true
+    }
+  )
+  return state
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
 })
@@ -58,8 +74,14 @@ describe('catalogEpochReader (#165)', () => {
     const database = binding('a')
     const first = catalogEpochReader({ D1_RUNTIME_ENV: 'local', DB: database }, cache(), observe)
     const second = catalogEpochReader({ D1_RUNTIME_ENV: 'local', DB: database }, cache(), observe)
-    expect(await first(context)).toEqual({ bookmark: 'bookmark-of-a', token: 'epoch-of-a' })
-    expect(await second(context)).toEqual({ bookmark: 'bookmark-of-a', token: 'epoch-of-a' })
+    expect(await first(context)).toEqual({
+      read: { bookmark: 'bookmark-of-a', token: 'epoch-of-a' },
+      source: 'd1'
+    })
+    expect(await second(context)).toEqual({
+      read: { bookmark: 'bookmark-of-a', token: 'epoch-of-a' },
+      source: 'fresh'
+    })
     expect(epoch.readCatalogEpoch).toHaveBeenCalledTimes(1)
     expect(epoch.shareCatalogEpochToken).toHaveBeenCalledWith('epoch-of-a')
   })
@@ -69,7 +91,7 @@ describe('catalogEpochReader (#165)', () => {
   it('reads the epoch through a session that starts on the primary, and keeps its bookmark', async () => {
     const database = binding('replicated')
     const read = catalogEpochReader({ D1_RUNTIME_ENV: 'staging', DB: database }, cache(), observe)
-    expect(await read(context)).toEqual({
+    expect((await read(context)).read).toEqual({
       bookmark: 'bookmark-of-replicated',
       token: 'epoch-of-replicated'
     })
@@ -92,19 +114,22 @@ describe('catalogEpochReader (#165)', () => {
       cache(),
       observe
     )
-    expect((await before(context))?.token).toBe('epoch-of-old')
-    expect((await after(context))?.token).toBe('epoch-of-new')
+    expect((await before(context)).read?.token).toBe('epoch-of-old')
+    expect((await after(context)).read?.token).toBe('epoch-of-new')
   })
 
-  it("loads through the latest request's cache handle, not the first one's", async () => {
-    const database = binding('handoff')
+  // #443: a load runs in the request that needs it, through that request's own cache handle,
+  // never one a later request handed over.
+  it("loads through its own request's cache handle", async () => {
+    const database = binding('own')
     const first = cache()
-    const latest = cache()
+    const later = cache()
     const read = catalogEpochReader({ D1_RUNTIME_ENV: 'local', DB: database }, first, observe)
-    catalogEpochReader({ D1_RUNTIME_ENV: 'local', DB: database }, latest, observe)
+    catalogEpochReader({ D1_RUNTIME_ENV: 'local', DB: database }, later, observe)
     await read(context)
-    expect(latest.match).toHaveBeenCalled()
-    expect(first.match).not.toHaveBeenCalled()
+    expect(first.match).toHaveBeenCalled()
+    expect(first.put).toHaveBeenCalled()
+    expect(later.match).not.toHaveBeenCalled()
   })
 
   // #397: staging and production are custom domains in one zone, whose cache both Workers share.
@@ -122,11 +147,11 @@ describe('catalogEpochReader (#165)', () => {
     const staging = { D1_RUNTIME_ENV: 'staging', DB: binding('staging-db') }
     const production = { D1_RUNTIME_ENV: 'production', DB: binding('production-db') }
 
-    expect(await catalogEpochReader(staging, zone, observe)(context)).toEqual({
+    expect((await catalogEpochReader(staging, zone, observe)(context)).read).toEqual({
       bookmark: 'bookmark-of-staging-db',
       token: 'epoch-of-staging-db'
     })
-    expect(await catalogEpochReader(production, zone, observe)(context)).toEqual({
+    expect((await catalogEpochReader(production, zone, observe)(context)).read).toEqual({
       bookmark: 'bookmark-of-production-db',
       token: 'epoch-of-production-db'
     })
@@ -136,12 +161,70 @@ describe('catalogEpochReader (#165)', () => {
     })
   })
 
+  // #443: the isolate shared one in-flight epoch load, whose I/O ran in the request that started
+  // it. When that request was canceled, the load never settled, and every later cacheable request
+  // on the isolate waited on it until its own client gave up.
+  it('lets no stuck epoch load hold another request, or itself past the timeout (#443)', async () => {
+    vi.useFakeTimers()
+    try {
+      const env = { D1_RUNTIME_ENV: 'production', DB: binding('stuck') }
+      const stuck = { bookmark: 'bookmark-of-stuck', token: 'epoch-of-stuck' }
+      // The first request's epoch read never settles, as when its request is canceled mid-read.
+      epoch.readCatalogEpoch.mockImplementationOnce(() => new Promise(() => {}))
+      const first = track(catalogEpochReader(env, cache(), observe)(context))
+      const concurrent = track(catalogEpochReader(env, cache(), observe)(context))
+      await vi.advanceTimersByTimeAsync(0)
+      // A concurrent request reads the epoch itself instead of waiting on the stuck load.
+      expect(concurrent.settled).toBe(true)
+      expect(first.settled).toBe(false)
+      expect(concurrent.value).toEqual({ read: stuck, source: 'd1' })
+      await vi.advanceTimersByTimeAsync(EPOCH_LOAD_TIMEOUT_MS)
+      // The stuck request answers at the timeout with the value the concurrent one loaded.
+      expect(first.settled).toBe(true)
+      expect(first.value).toEqual({ ageMs: EPOCH_LOAD_TIMEOUT_MS, read: stuck, source: 'timeout' })
+      const later = track(catalogEpochReader(env, cache(), observe)(context))
+      await vi.advanceTimersByTimeAsync(0)
+      expect(later.value).toEqual({ read: stuck, source: 'fresh' })
+      expect(epoch.readCatalogEpoch).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // #444 review: a slower, earlier load once shared its token after the memo had kept a newer one,
+  // which moved signed-in and other bypassed renders back to the older epoch.
+  it('never shares an older epoch that a slower, earlier load returns (#443)', async () => {
+    vi.useFakeTimers()
+    try {
+      const env = { D1_RUNTIME_ENV: 'production', DB: binding('newer') }
+      let answerOlder: (value: { database: string }) => void = () => {}
+      epoch.readCatalogEpoch.mockImplementationOnce(
+        () =>
+          new Promise(done => {
+            answerOlder = done
+          })
+      )
+      const older = track(catalogEpochReader(env, cache(), observe)(context))
+      await vi.advanceTimersByTimeAsync(1)
+      const newer = track(catalogEpochReader(env, cache(), observe)(context))
+      await vi.advanceTimersByTimeAsync(0)
+      expect(newer.value?.read?.token).toBe('epoch-of-newer')
+      answerOlder({ database: 'older' })
+      await vi.advanceTimersByTimeAsync(0)
+      // The older load answers its own request, but the isolate's shared token stays newer.
+      expect(older.value?.read?.token).toBe('epoch-of-older')
+      expect(epoch.shareCatalogEpochToken.mock.calls).toEqual([['epoch-of-newer']])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it.each([
     { D1_RUNTIME_ENV: 'local' },
     { D1_RUNTIME_ENV: 'preview', DB: binding('a') },
     { DB: binding('a') }
   ])('stays out of the way without a valid binding: %o', async env => {
-    expect(await catalogEpochReader(env, cache(), observe)(context)).toBeNull()
+    expect(await catalogEpochReader(env, cache(), observe)(context)).toEqual({ read: null })
     expect(epoch.readCatalogEpoch).not.toHaveBeenCalled()
   })
 })

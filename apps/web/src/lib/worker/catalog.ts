@@ -10,6 +10,7 @@ import {
 import { createDatabase, createSessionDatabase } from '@/db/client'
 import {
   type EdgeCacheContext,
+  type EpochLookup,
   EpochMemo,
   type EpochRead,
   loadSharedEpoch
@@ -31,24 +32,27 @@ function catalogDatabase(env: CatalogWorkerEnv): D1Database | null {
   return env.DB && runtimeEnvironments.has(env.D1_RUNTIME_ENV ?? '') ? env.DB : null
 }
 
-interface EpochSource {
-  /** The latest request's cache handle and logger, which the next load uses. */
-  latest: { cache: Cache; observe: Observe }
-  memo: EpochMemo
-}
-
 /**
  * One epoch memo per database binding, so every request reads the token through its own
  * binding and never through one an earlier request saw (serp web-stack/nextjs-on-workers.md,
  * "Read bindings inside the request"; #165). The binding object is stable within an isolate, so
- * renders there still share one read of the epoch (#77).
+ * renders there still share one read of the epoch (#77). The memo holds only settled values: each
+ * load runs in the request that needs it, through that request's cache handle and logger (#443).
  */
-const epochSources = new WeakMap<D1Database, EpochSource>()
+const epochMemos = new WeakMap<D1Database, EpochMemo>()
+
+function epochMemoFor(database: D1Database): EpochMemo {
+  const existing = epochMemos.get(database)
+  if (existing) return existing
+  const memo = new EpochMemo()
+  epochMemos.set(database, memo)
+  return memo
+}
 
 /**
  * The catalog epoch for the edge HTML cache's keys, with the D1 bookmark it was read at (#382), or
- * `null` without a valid binding: the cache then stays out of the way, and the Next.js catalog
- * adapter fails closed exactly as it does without this entry.
+ * none (a null `read`) without a valid binding: the cache then stays out of the way, and the
+ * Next.js catalog adapter fails closed exactly as it does without this entry.
  *
  * The epoch is read through a D1 session whose first statement goes to the primary
  * (`first-primary`), so every epoch the edge cache, the data center's share and this isolate's
@@ -63,38 +67,30 @@ export function catalogEpochReader(
   env: CatalogWorkerEnv,
   cache: Cache,
   observe: Observe
-): (context: EdgeCacheContext) => Promise<EpochRead | null> {
+): (context: EdgeCacheContext) => Promise<EpochLookup> {
   const database = catalogDatabase(env)
-  if (!database) return async () => null
+  if (!database) return async () => ({ read: null })
   // Validated with the binding, and fixed for the binding's Worker: the data center's share of
   // the epoch is keyed on it, so staging and production never read each other's (#397).
   const environment = env.D1_RUNTIME_ENV ?? ''
-  let source = epochSources.get(database)
-  if (!source) {
-    const created: EpochSource = {
-      latest: { cache, observe },
-      memo: new EpochMemo(async () => {
-        const { cache: latestCache, observe: latestObserve } = created.latest
-        const read = await loadSharedEpoch(latestCache, environment, async () => {
-          const session = database.withSession('first-primary')
-          const epoch = await readCatalogEpoch({
-            asOf: new Date().toISOString(),
-            client: createSessionDatabase(session),
-            observe: latestObserve
-          })
-          return { bookmark: session.getBookmark(), token: catalogEpochToken(epoch) }
-        })
-        // Bypassed renders in this isolate reuse it instead of reading the epoch again (#77).
-        shareCatalogEpochToken(read.token)
-        return read
-      })
-    }
-    source = created
-    epochSources.set(database, source)
+  const memo = epochMemoFor(database)
+  const readPrimary = async (): Promise<EpochRead> => {
+    const session = database.withSession('first-primary')
+    const epoch = await readCatalogEpoch({
+      asOf: new Date().toISOString(),
+      client: createSessionDatabase(session),
+      observe
+    })
+    return { bookmark: session.getBookmark(), token: catalogEpochToken(epoch) }
   }
-  source.latest = { cache, observe }
-  const { memo } = source
-  return context => memo.current(context)
+  return context =>
+    memo.current(
+      context,
+      () => loadSharedEpoch(cache, environment, readPrimary, context),
+      // Bypassed renders in this isolate reuse the epoch instead of reading it again (#77): the
+      // one the memo stored, never an older one a slower, earlier load returned (#443).
+      read => shareCatalogEpochToken(read.token)
+    )
 }
 
 /**
