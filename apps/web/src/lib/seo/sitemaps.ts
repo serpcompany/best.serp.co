@@ -214,13 +214,13 @@ function getBestPageEntries({ bestPages }: SitemapContent): SitemapEntry[] {
  */
 function taxonomyIndexLastmods({
   bestPages
-}: SitemapContent): Map<string, Array<string | undefined>> {
+}: Pick<SitemapContent, 'bestPages'>): Map<string, Array<string | undefined>> {
   return new Map([
     [getRoute('best.index'), listedBestPages(bestPages).map(page => page.lastModifiedAt)]
   ])
 }
 
-function getPageEntries(content: SitemapContent): SitemapEntry[] {
+function getPageEntries(content: Pick<SitemapContent, 'bestPages' | 'websites'>): SitemapEntry[] {
   const catalogLastmod = newest(content.websites.map(listingLastmod))
   const indexes = taxonomyIndexLastmods(content)
   return sitemapRoutePaths('pages').flatMap(path => {
@@ -264,9 +264,10 @@ export async function createSitemapIndexResponse(
 }
 
 export async function createPagesSitemapResponse(
-  loaders: SitemapContentLoaders
+  loaders: Pick<SitemapContentLoaders, 'getBestPages' | 'getWebsites'>
 ): Promise<Response> {
-  return toXmlResponse(renderSitemap(getPageEntries(await loadContent(loaders))))
+  const [websites, bestPages] = await Promise.all([loaders.getWebsites(), loaders.getBestPages()])
+  return toXmlResponse(renderSitemap(getPageEntries({ bestPages, websites })))
 }
 
 export async function createListingsSitemapResponse(
