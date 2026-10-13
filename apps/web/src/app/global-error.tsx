@@ -20,7 +20,7 @@ type GlobalErrorProperties = {
 const GlobalError = ({ error, reset }: GlobalErrorProperties) => {
   useEffect(() => {
     // Not a static Sentry import: this component is in every page's server render (#355).
-    void reportGlobalError(error)
+    void reportGlobalError(error, window.location.pathname)
   }, [error])
 
   return (

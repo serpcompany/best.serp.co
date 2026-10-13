@@ -38,6 +38,17 @@ export function reportsToServerSentry(path: string): boolean {
   return first !== undefined && SERVER_SENTRY_SURFACES.includes(first)
 }
 
+/**
+ * Whether the server already reported an error that a browser error page caught (#401): Next.js
+ * gives a server error, and only a server error, a `digest`, and `onRequestError` reports it on
+ * the paths that report to Sentry. The error page then reports nothing, so one failure is one
+ * event. A public page's server error still goes to Sentry from the browser only.
+ */
+export function reportedByServer(error: unknown, pathname: string): boolean {
+  const digest = (error as { digest?: unknown } | null)?.digest
+  return typeof digest === 'string' && digest !== '' && reportsToServerSentry(pathname)
+}
+
 interface ServerSentrySwitch {
   /** A reporting request reached the Worker entry; `register()` starts the SDK if it comes later. */
   requested: boolean
