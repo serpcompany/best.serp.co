@@ -49,14 +49,14 @@ export function isTagLinked(tag: Pick<PublishedTag, 'count'>): boolean {
 }
 
 /**
- * The tags the tag index lists. While it lists none (before the taxonomy is published) the index
- * renders `noindex, follow` and the pages sitemap leaves it out.
+ * The tags the tag index lists. The index itself is always `noindex, follow` and in no sitemap
+ * (#425: no page links it), so this decides only what it shows.
  */
 export function linkedTags<T extends Pick<PublishedTag, 'count'>>(tags: readonly T[]): T[] {
   return tags.filter(isTagLinked)
 }
 
-/** The best pages the best index lists: those with an entry. Empty, it is noindex like the tags'. */
+/** The best pages the best index lists: those with an entry. Empty, it is noindex. */
 export function listedBestPages<T extends Pick<PublishedBestPage, 'listSize' | 'poolSize'>>(
   pages: readonly T[]
 ): T[] {

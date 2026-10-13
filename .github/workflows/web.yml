@@ -251,10 +251,10 @@ jobs:
 
   deploy-staging:
     # Every push to staging (and a dispatch on staging): build, a staging D1 Time Travel
-    # bookmark, staging D1 migrations, Worker deploy, HTTP gates, and the Playwright smoke suite
-    # against the deployed staging Worker. Deploy Production releases only a tree one of these
-    # jobs verified. Skips (green) until the `staging` environment holds Cloudflare credentials;
-    # see docs/deploy-credentials.md.
+    # bookmark, staging D1 migrations, Worker deploy, HTTP gates, a readiness wait, and the
+    # Playwright smoke suite against the deployed staging Worker. Deploy Production releases only
+    # a tree one of these jobs verified. Skips (green) until the `staging` environment holds
+    # Cloudflare credentials; see docs/deploy-credentials.md.
     name: Validate, migrate, deploy & smoke-test staging
     needs: [check, e2e, tip]
     if: github.ref == 'refs/heads/staging' && github.event_name != 'pull_request' && needs.tip.outputs.deploy == 'true'
@@ -364,12 +364,34 @@ jobs:
         if: steps.tip.outputs.deploy == 'true'
         run: pnpm --filter web test:install
 
+      # The smoke stalled for minutes on some runners while the Worker answered in milliseconds
+      # (#417, docs/ci.md#staging-smoke-readiness). Right before it, five probes in a row must get
+      # a 200 from the deployed version in under 2 s, within 3 minutes; each probe is logged.
+      - name: Wait for the staging Worker to be ready
+        if: steps.tip.outputs.deploy == 'true'
+        env:
+          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-output.ndjson
+        run: pnpm tsx scripts/worker-readiness.ts "$STAGING_REVIEW_ORIGIN"
+
       - name: Run Playwright smoke against staging
         if: steps.tip.outputs.deploy == 'true'
         env:
           PLAYWRIGHT_BASE_URL: ${{ env.STAGING_REVIEW_ORIGIN }}
           PLAYWRIGHT_EXTERNAL_SERVER: '1'
-        run: pnpm --filter web test:e2e:smoke
+        # The latency probe (#417) times Cloudflare's edge and the Worker from this runner every
+        # 5 s while the suite runs; the suite's exit status is the step's. Stopped, the probe
+        # records its request in flight (at most 30 s) before it exits, so the step waits for it.
+        run: |
+          bash scripts/smoke-latency-probe.sh "$RUNNER_TEMP/smoke-latency-probe" "$PLAYWRIGHT_BASE_URL" &
+          probe=$!
+          trap 'kill "$probe" 2>/dev/null || true; wait "$probe" 2>/dev/null || true' EXIT
+          pnpm --filter web test:e2e:smoke
+
+      # Diagnostics only: never fails the deploy.
+      - name: Report smoke latency
+        if: always() && steps.tip.outputs.deploy == 'true'
+        continue-on-error: true
+        run: bash scripts/smoke-latency-probe.sh --report "$RUNNER_TEMP/smoke-latency-probe"
 
       - name: Retain smoke evidence
         if: always() && steps.tip.outputs.deploy == 'true'
