@@ -167,6 +167,9 @@ publisher's affected routes) build their URLs from it.
   and `ai-copywriting` (the retired category `ai-copywriting` 308s to it), and the listing
   `123movies-downloader`. The next deploy's gates fail on the changed page, and a failed Deploy
   Staging blocks promotion ([Release guards](./release-guards.md#staging-before-production)).
+  `scripts/d1-preview-http-gates.test.ts` fails on a committed manifest that changes a sample, but
+  the admin panel doesn't warn: the gates' one sample listing is an accepted risk (#336). An
+  unpublished sample listing comes back with Republish in `/admin`; do that before the next deploy.
 
 ## Pagination
 
