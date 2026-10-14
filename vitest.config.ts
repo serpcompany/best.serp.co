@@ -32,6 +32,9 @@ export const D1_TESTS = [
   'scripts/taxonomy-manifest.test.ts'
 ]
 
+/** `pnpm test:clock-ahead` (#450): every project runs with the clock this many days ahead. */
+const clockAhead = process.env.VITEST_CLOCK_AHEAD_DAYS
+
 /**
  * One config for every unit test (#178): `pnpm test` runs both projects, and a new test file
  * runs without being listed anywhere. `@/` names `apps/web/src`, as in `apps/web/tsconfig.json`.
@@ -42,6 +45,7 @@ export default defineConfig({
     alias: { '@': resolve(import.meta.dirname, 'apps/web/src') }
   },
   test: {
+    setupFiles: clockAhead ? ['scripts/harness/clock-ahead.setup.ts'] : [],
     projects: [
       {
         extends: true,

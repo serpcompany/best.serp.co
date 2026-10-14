@@ -172,6 +172,18 @@ The one-time json-directory-template import and its harness (`migration:prefligh
 [`.archive/`](../.archive/README.md) (#315). `.archive/` is history: no check, lint, typecheck,
 test, or workflow reads it.
 
+## Clock-ahead run
+
+```bash
+pnpm test:clock-ahead
+```
+
+Runs every Vitest project with `Date` a year ahead (`VITEST_CLOCK_AHEAD_DAYS=365`, through
+`scripts/harness/clock-ahead.setup.ts`; timers stay real), so a test that checks a fixed fixture
+date against the real clock fails now instead of on the day that date passes (#447, #450). The fix
+is to inject the clock, as the code under test already allows, never to move the date. Child
+processes (`tsx` scripts, workerd) keep the real clock. Run it when a change adds dated fixtures.
+
 ## Sibling checkouts
 
 A few repository tests compare a committed copy with its source in another repository's
