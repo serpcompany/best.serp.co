@@ -206,7 +206,11 @@ describe('a public page error in the Worker logs (#355)', () => {
     // The stack keeps its frames and drops the header that repeats the message.
     expect(line.stack).toMatch(/^\s+at /u)
     expect(line.stack).not.toContain('Failed query')
-    expect(String(logged.mock.calls[0]?.[0])).not.toContain('private')
+    // Neither the bound value from the message nor the query string reaches the line.
+    // (Not a bare `private`: a checkout under /private/tmp puts it in stack frames.)
+    const raw = String(logged.mock.calls[0]?.[0])
+    expect(raw).not.toContain('private-slug')
+    expect(raw).not.toContain('q=private')
   })
 
   it('logs an error once when Next.js reports it twice', () => {
