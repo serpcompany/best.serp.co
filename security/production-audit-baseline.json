@@ -1,57 +1,7 @@
 {
-  "generatedAt": "2026-09-26",
-  "reviewBy": "2026-10-31",
+  "generatedAt": "2026-10-14",
+  "reviewBy": "2026-11-28",
   "scope": "production",
-  "reviewGroups": {
-    "framework-edge-runtime": {
-      "batch": "framework-runtime",
-      "modules": ["ws"],
-      "rationale": "These packages are transitive runtime dependencies of the current Next.js, Vercel, and Cloudflare stack. They require upgrades through their direct framework owners plus both Worker builds and Preview verification.",
-      "target": "Issue #93 — framework/runtime upgrade batch"
-    },
-    "product-parsing-and-transport": {
-      "batch": "product-libraries",
-      "modules": ["form-data", "js-yaml", "serialize-javascript"],
-      "rationale": "These parsers and transport helpers are transitive dependencies of current product packages. The safe remediation is to upgrade their owning direct dependencies and validate sitemap, feed, submission, and serialization behavior.",
-      "target": "Issue #92 follow-up — product-libraries upgrade batch"
-    }
-  },
-  "advisories": [
-    {
-      "id": "GHSA-2883-xcg3-v3hh",
-      "module": "js-yaml",
-      "severity": "high",
-      "batch": "product-libraries"
-    },
-    {
-      "id": "GHSA-52cp-r559-cp3m",
-      "module": "js-yaml",
-      "severity": "high",
-      "batch": "product-libraries"
-    },
-    {
-      "id": "GHSA-5c6j-r48x-rmvq",
-      "module": "serialize-javascript",
-      "severity": "high",
-      "batch": "product-libraries"
-    },
-    {
-      "id": "GHSA-5p4m-2wfm-xmqj",
-      "module": "js-yaml",
-      "severity": "high",
-      "batch": "product-libraries"
-    },
-    {
-      "id": "GHSA-96hv-2xvq-fx4p",
-      "module": "ws",
-      "severity": "high",
-      "batch": "framework-runtime"
-    },
-    {
-      "id": "GHSA-hmw2-7cc7-3qxx",
-      "module": "form-data",
-      "severity": "high",
-      "batch": "product-libraries"
-    }
-  ]
+  "reviewGroups": {},
+  "advisories": []
 }

@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import yaml from 'js-yaml'
 import { describe, expect, it } from 'vitest'
+import { validateAuditBaseline } from './production-dependency-audit.ts'
 
 interface WorkflowJob {
   permissions?: Record<string, string>
@@ -90,8 +91,8 @@ describe('security automation', () => {
 
     expect(baseline.scope).toBe('production')
     expect(baseline.reviewBy).toMatch(/^\d{4}-\d{2}-\d{2}$/u)
-    expect(baseline.advisories.length).toBeGreaterThan(0)
-    expect(Object.keys(baseline.reviewGroups ?? {})).not.toHaveLength(0)
+    // An empty baseline (no accepted advisories) is valid; the file and its deadline stay.
+    expect(() => validateAuditBaseline(baseline)).not.toThrow()
     for (const advisory of baseline.advisories) {
       expect(advisory.batch).toBeTruthy()
       expect(

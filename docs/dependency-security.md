@@ -4,7 +4,7 @@ Status: active
 
 Responsible area: repository and release engineering
 
-Last verified: 2026-09-26
+Last verified: 2026-10-14
 
 Validation: `pnpm security:audit:production`
 
@@ -38,7 +38,9 @@ compares advisory-plus-package identities with the reviewed baseline in
 Do not refresh the baseline mechanically. `reviewGroups` record why each coupled
 package family remains and identify its issue/batch target. Every advisory's batch
 and module must match exactly one group. A baseline change must remove fixed entries
-or explicitly re-review the remaining family with a near-term date.
+or explicitly re-review the remaining family with a near-term date. An empty baseline
+(no accepted advisories, no review groups) is valid and still carries a review deadline;
+keep the file rather than deleting it.
 
 ## Upgrade batches
 
