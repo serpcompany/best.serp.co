@@ -551,6 +551,40 @@ describe('publisher plan in SQLite transaction (D1 batch emulator)', () => {
       expect(changed.prepare('SELECT version FROM publication_state').get()).toEqual({ version: 4 })
     })
 
+    // #336: an approval deletes the listing's logo row and queues the new one for the cron, so an
+    // empty update (a renamed listing's, docs/media.md) would pass its `expected: []` and drop it.
+    it('refuses an empty update while a logo or image is queued for the listing (#336)', () => {
+      const empty = mediaUpdate({ expected: [], media: {} })
+      const queued = 'a logo or image is queued for the listing, so it is not empty'
+      for (const slot of [`'pending',0,'${now}',NULL`, `'failed',5,NULL,'fetch failed'`]) {
+        const db = database()
+        db.exec(`INSERT INTO media_ingestions (listing_id,kind,sort_order,source_url,status,attempts,next_attempt_at,last_error)
+          VALUES ('lst_sqlite_test','logo',0,'https://queued.example/logo.png',${slot})`)
+        expect(() => executeInTestTransaction(db, plan({ operations: [empty] })), slot).toThrow(
+          `bad JSON path: 'listing-media-update old-slug: ${queued}'`
+        )
+        expect(db.prepare('SELECT COUNT(*) AS count FROM media_ingestions').get()).toEqual({
+          count: 1
+        })
+        expect(db.prepare('SELECT version FROM publication_state').get()).toEqual({ version: 4 })
+      }
+      // With nothing queued, the empty update applies.
+      const db = database()
+      executeInTestTransaction(db, plan({ operations: [empty] }))
+      expect(db.prepare('SELECT version FROM publication_state').get()).toEqual({ version: 5 })
+      // An update that names its media still replaces a queued slot: the manifest wins.
+      const named = database()
+      named.exec(`INSERT INTO media_ingestions (listing_id,kind,sort_order,source_url,next_attempt_at)
+        VALUES ('lst_sqlite_test','logo',0,'https://queued.example/logo.png','${now}')`)
+      executeInTestTransaction(
+        named,
+        plan({ operations: [mediaUpdate({ expected: [], media: { logo: hosted('logo', 'a') } })] })
+      )
+      expect(named.prepare('SELECT COUNT(*) AS count FROM media_ingestions').get()).toEqual({
+        count: 0
+      })
+    })
+
     it('applies a row-level manifest at whatever version each environment is (#97 review B3)', () => {
       const rows = (overrides: Record<string, unknown> = {}) =>
         manifestSchema.parse({

@@ -154,10 +154,12 @@ function archivedModules(): string[] {
 }
 
 /**
- * A path into `.archive/`, quoted or as a shell argument: at least one path character must
- * follow, so code that excludes the archive by its `.archive/` prefix doesn't match.
+ * A path into `.archive/`, quoted, as a shell argument, or under a root variable
+ * (`${root}/.archive/`, `${{ github.workspace }}/.archive/`, `resolve(root, '.archive')`, #336):
+ * a path character must follow, or a quote that ends an argument, so code that excludes the
+ * archive by its `.archive/` prefix doesn't match.
  */
-const ARCHIVE_PATH = /(?:^|[\s'"`=(:,])(?:\.{1,2}\/)*\.archive(?:\/[\w.-]|['"`]\s*,)/u
+const ARCHIVE_PATH = /(?:^|[\s'"`=(:,/}])(?:\.{1,2}\/)*\.archive(?:\/[\w.-]|['"`]\s*[,)])/u
 
 /**
  * The lines of `source` that read a path into `.archive/` or name a module archived there
@@ -941,6 +943,10 @@ describe('single-site D1-only repository architecture', () => {
       'a relative import': `import { run } from '../.archive/scripts/cloudflare-release-bootstrap'`,
       'a template literal': 'readFileSync(`./.archive/d1/artifacts/parity.yaml`)',
       'a joined segment': `resolve(root, '.archive', 'd1')`,
+      // #336: paths built from a root variable.
+      'a template literal under a root': `readFileSync(\`\${root}/.archive/d1/x.yaml\`)`,
+      'a workflow path under the workspace': `path: \${{ github.workspace }}/.archive/d1`,
+      'the archive itself, resolved': `resolve(root, '.archive')`,
       'a shell argument': 'run: pnpm tsx .archive/scripts/listing-faq-move.ts',
       'an archived module': `import { moveFaqs } from './listing-faq-move'`,
       'an archived module with its extension': `"faqs": "tsx scripts/listing-faq-move.ts"`,

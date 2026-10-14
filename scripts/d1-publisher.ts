@@ -365,7 +365,9 @@ const operation = z.discriminatedUnion('action', [
    * logo and image rows (kind, source url, and hosted key, ordered by kind then sort order) when
    * the manifest was generated: the batch refuses a listing whose media changed since (a
    * row-level compare-and-swap, so the operation fits any environment whose rows match). Keys
-   * belong to the slug. The listing's queued media slots are dropped: the manifest wins.
+   * belong to the slug. The listing's queued media slots are dropped: the manifest wins. An empty
+   * update (`expected: []`, no logo or image) is refused while a logo or image is queued for the
+   * listing (#336): it says the listing has none, and would drop one an approval queued.
    */
   z
     .object({
@@ -1829,6 +1831,8 @@ export function buildPublicationPlan(
     }
     if (op.action === 'listing-media-update') {
       const expected = expectedMediaJson(op.expected)
+      const empty =
+        op.expected.length === 0 && !op.media.logo && (op.media.images ?? []).length === 0
       statements.push(
         statement(
           `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=?) AND ${CURRENT_MEDIA_JSON}=? THEN 1 ELSE ${GUARD_FAILURE} END`,
@@ -1837,6 +1841,18 @@ export function buildPublicationPlan(
           op.id,
           expected
         ),
+        // An empty update says the listing has no logo or image (docs/media.md, a renamed one),
+        // but an approval's new logo waits in the queue until the cron hosts it (#336). Refuse it
+        // rather than drop that slot below; a pending or a failed slot counts.
+        ...(empty
+          ? [
+              statement(
+                `SELECT CASE WHEN EXISTS (SELECT 1 FROM media_ingestions WHERE listing_id=? AND kind IN ('logo','image')) THEN ${REASONED_GUARD_FAILURE} ELSE 1 END`,
+                op.id,
+                `listing-media-update ${op.slug}: a logo or image is queued for the listing, so it is not empty`
+              )
+            ]
+          : []),
         statement(
           "DELETE FROM listing_media WHERE listing_id=? AND kind IN ('logo','image')",
           op.id
