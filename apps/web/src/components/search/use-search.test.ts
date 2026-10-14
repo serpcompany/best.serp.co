@@ -3,16 +3,16 @@ import type { SearchResult } from '@/lib/directory/search-contract'
 
 const logger = vi.hoisted(() => ({ error: vi.fn() }))
 /** Entries whose slug starts with one of these fail at that step, as a bad shape would. */
-const broken = vi.hoisted(() => ({ match: 'bad-match-', transform: 'bad-transform-' }))
+const broken = vi.hoisted(() => ({ check: 'bad-check-', transform: 'bad-transform-' }))
 
 vi.mock('@/lib/logging', () => ({ logger }))
 vi.mock('./search-utils', async importOriginal => {
   const actual = await importOriginal<typeof import('./search-utils')>()
   return {
     ...actual,
-    matchesSearchQuery: (entry: SearchResult, query: string) => {
-      if (entry.slug.startsWith(broken.match)) throw new TypeError('cannot read the entry')
-      return actual.matchesSearchQuery(entry, query)
+    canTransformToWebsiteMetadata: (entry: SearchResult) => {
+      if (entry.slug.startsWith(broken.check)) throw new TypeError('cannot read the entry')
+      return actual.canTransformToWebsiteMetadata(entry)
     },
     transformToWebsiteMetadata: (entry: SearchResult) => {
       if (entry.slug.startsWith(broken.transform)) throw new TypeError('cannot read the entry')
@@ -180,14 +180,14 @@ describe('a response’s failed entries are one report (#401)', () => {
   it('collapses every failed entry of a response, at any step, into one event', async () => {
     const search = await pageSession()
     const entries = [
-      ...Array.from({ length: 50 }, (_, index) => entry(`${broken.match}${index}`)),
+      ...Array.from({ length: 50 }, (_, index) => entry(`${broken.check}${index}`)),
       ...Array.from({ length: 50 }, (_, index) => entry(`${broken.transform}${index}`))
     ]
     fetch.mockImplementation(() => answer(200, entries))
     await search('fixture')
 
     expect(logger.error).toHaveBeenCalledExactlyOnceWith(
-      'search_query_match_failed',
+      'search_entry_check_failed',
       expect.objectContaining({ cause: expect.any(TypeError) })
     )
     // Every failure stays in the console line's data, which Sentry never gets.
@@ -202,6 +202,34 @@ describe('a response’s failed entries are one report (#401)', () => {
     const search = await pageSession()
     fetch.mockImplementation(() => answer(200, [entry('fixture-a'), entry('fixture-b')]))
     await expect(search('fixture')).resolves.toHaveLength(2)
+    expect(logger.error).not.toHaveBeenCalled()
+  })
+})
+
+describe('the page shows every listing the API matched (#432)', () => {
+  it('keeps a listing matched only by its category’s name, and one matched only by a tag', async () => {
+    const { searchListings } = await import('./use-search')
+    // Its own name, description and slug say nothing of music: D1 names its category.
+    const audio = {
+      ...entry('fixture-hum'),
+      category: 'audio',
+      categoryNames: { audio: 'Audio & Music' }
+    }
+    // Matched through a tag, which the API doesn't send.
+    const tagged = entry('fixture-sketchpad')
+    fetch.mockImplementationOnce(() => answer(200, [audio]))
+    expect((await searchListings('music')).map(result => result.slug)).toEqual(['fixture-hum'])
+    fetch.mockImplementationOnce(() => answer(200, [tagged]))
+    expect((await searchListings('whiteboards')).map(result => result.slug)).toEqual([
+      'fixture-sketchpad'
+    ])
+    expect(logger.error).not.toHaveBeenCalled()
+  })
+
+  it('shows no results for a query the API matched nothing for', async () => {
+    const { searchListings } = await import('./use-search')
+    fetch.mockImplementationOnce(() => answer(200, []))
+    await expect(searchListings('fixture-nothing-matches')).resolves.toEqual([])
     expect(logger.error).not.toHaveBeenCalled()
   })
 })

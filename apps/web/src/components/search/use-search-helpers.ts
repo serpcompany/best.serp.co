@@ -2,11 +2,7 @@ import { logger } from '@/lib/logging'
 import type { ErrorCode } from '@/lib/telemetry/sentry'
 import type { SearchResult } from '../../lib/directory/search-contract'
 import type { SearchWebsiteMetadata } from './search-utils'
-import {
-  canTransformToWebsiteMetadata,
-  matchesSearchQuery,
-  transformToWebsiteMetadata
-} from './search-utils'
+import { canTransformToWebsiteMetadata, transformToWebsiteMetadata } from './search-utils'
 
 interface EntryFailure {
   code: ErrorCode
@@ -38,37 +34,29 @@ export class EntryFailures {
   }
 }
 
-export function filterAndSortEntries(
-  entries: SearchResult[],
-  query: string,
-  failures: EntryFailures
-): SearchResult[] {
+/**
+ * The API's matches, best first. Every entry stays: the API matched the query on each listing's
+ * name, description and slug and on its categories' and tags' names, and matching it again here on
+ * the listing's own text hid the listings found through a category or tag name (#432).
+ */
+export function sortEntries(entries: SearchResult[], query: string): SearchResult[] {
   const queryLower = query.toLowerCase()
 
-  return entries
-    .filter(entry => {
-      try {
-        return matchesSearchQuery(entry, query)
-      } catch (matchError) {
-        failures.record('search_query_match_failed', matchError, entry)
-        return false
-      }
-    })
-    .sort((left, right) => {
-      const leftTitle = left.name.toLowerCase()
-      const rightTitle = right.name.toLowerCase()
+  return [...entries].sort((left, right) => {
+    const leftTitle = left.name.toLowerCase()
+    const rightTitle = right.name.toLowerCase()
 
-      if (leftTitle === queryLower && rightTitle !== queryLower) return -1
-      if (rightTitle === queryLower && leftTitle !== queryLower) return 1
+    if (leftTitle === queryLower && rightTitle !== queryLower) return -1
+    if (rightTitle === queryLower && leftTitle !== queryLower) return 1
 
-      if (leftTitle.startsWith(queryLower) && !rightTitle.startsWith(queryLower)) return -1
-      if (rightTitle.startsWith(queryLower) && !leftTitle.startsWith(queryLower)) return 1
+    if (leftTitle.startsWith(queryLower) && !rightTitle.startsWith(queryLower)) return -1
+    if (rightTitle.startsWith(queryLower) && !leftTitle.startsWith(queryLower)) return 1
 
-      if (leftTitle.includes(queryLower) && !rightTitle.includes(queryLower)) return -1
-      if (rightTitle.includes(queryLower) && !leftTitle.includes(queryLower)) return 1
+    if (leftTitle.includes(queryLower) && !rightTitle.includes(queryLower)) return -1
+    if (rightTitle.includes(queryLower) && !leftTitle.includes(queryLower)) return 1
 
-      return leftTitle.localeCompare(rightTitle)
-    })
+    return leftTitle.localeCompare(rightTitle)
+  })
 }
 
 export function validateEntries(entries: SearchResult[], failures: EntryFailures): SearchResult[] {
