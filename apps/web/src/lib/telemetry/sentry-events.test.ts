@@ -8,7 +8,7 @@ import {
 } from '@sentry/core'
 import * as Sentry from '@sentry/nextjs'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { EntryFailures, filterAndSortEntries } from '@/components/search/use-search-helpers'
+import { EntryFailures, validateEntries } from '@/components/search/use-search-helpers'
 import type { SearchResult } from '@/lib/directory/search-contract'
 import { logger } from '@/lib/logging'
 import { browserSentryOptions, ERROR_CODES, REDACTED_MESSAGE, sentryOptions } from './sentry'
@@ -111,10 +111,10 @@ async function waitForEvents(count: number) {
 
 describe('what reaches Sentry (#211)', () => {
   it('reports a logger call as its code and the caught error’s type, with none of its data', async () => {
-    // A real call site: a visitor's search, and an entry that fails to match it.
-    const broken = { name: 42, slug: 'broken' } as unknown as SearchResult
+    // A real call site: a search result that fails its check, holding what a visitor typed.
+    const broken = { name: `${PRIVATE} @ example.com`, slug: 'broken' } as unknown as SearchResult
     const failures = new EntryFailures()
-    expect(filterAndSortEntries([broken], `${PRIVATE} @ example.com`, failures)).toEqual([])
+    expect(validateEntries([broken], failures)).toEqual([])
     failures.report()
     logger.error('search_failed', {
       data: { query: PRIVATE },
@@ -133,11 +133,11 @@ describe('what reaches Sentry (#211)', () => {
     const byCode = Object.fromEntries(
       events.map(event => [event.exception?.values.at(-1)?.value, event])
     )
-    expect(Object.keys(byCode).sort()).toEqual(['search_failed', 'search_query_match_failed'])
+    expect(Object.keys(byCode).sort()).toEqual(['search_entry_check_failed', 'search_failed'])
     // The caught error goes as the code's cause: its type and frames, its message redacted.
-    expect(byCode.search_query_match_failed?.exception?.values).toEqual([
+    expect(byCode.search_entry_check_failed?.exception?.values).toEqual([
       expect.objectContaining({ type: 'TypeError', value: REDACTED_MESSAGE }),
-      expect.objectContaining({ type: 'Error', value: 'search_query_match_failed' })
+      expect.objectContaining({ type: 'Error', value: 'search_entry_check_failed' })
     ])
     expect(events.flatMap(event => event.breadcrumbs ?? [])).not.toContainEqual(
       expect.objectContaining({ category: 'console' })

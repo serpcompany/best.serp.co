@@ -1,5 +1,6 @@
 import { expect } from '@playwright/test'
-import { seedFacts, seedListings } from './seed-facts'
+import { seedFacts, seedListings, seedTags } from './seed-facts'
+import { listingPath } from './site-fixture'
 import { test } from './test'
 
 /**
@@ -57,5 +58,22 @@ test.describe('search API', () => {
       await request.get(`/api/search?q=${encodeURIComponent(host)}&limit=5`)
     ).json()) as Array<{ slug: string }>
     expect(domain[0]?.slug).toBe(host)
+  })
+})
+
+test.describe('search page', () => {
+  test('shows the listings the API matched by a tag name, and none for a query nothing matches', async ({
+    page
+  }) => {
+    // Neither listing's own name, description or slug holds the tag's name (#432).
+    const tag = seedTags.whiteboards
+    await page.goto(`/search/?q=${encodeURIComponent(tag.name)}`)
+    for (const listing of [seedListings.claimable, seedListings.noLogo]) {
+      await expect(
+        page.locator(`main a[href="${listingPath(listing.slug)}"]`).first()
+      ).toBeVisible()
+    }
+    await page.goto('/search/?q=fixture-nothing-matches')
+    await expect(page.getByRole('heading', { name: 'Nothing Found' })).toBeVisible()
   })
 })
