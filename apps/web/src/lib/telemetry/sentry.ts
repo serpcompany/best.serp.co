@@ -53,8 +53,7 @@ export const ERROR_CODES = [
   'search_entry_check_failed',
   'search_entry_transform_failed',
   'search_failed',
-  'search_lenient_processing_failed',
-  'search_query_match_failed'
+  'search_lenient_processing_failed'
 ] as const
 
 export type ErrorCode = (typeof ERROR_CODES)[number]

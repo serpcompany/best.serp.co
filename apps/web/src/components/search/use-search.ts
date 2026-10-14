@@ -10,7 +10,7 @@ import {
 import type { SearchWebsiteMetadata } from './search-utils'
 import {
   EntryFailures,
-  filterAndSortEntries,
+  sortEntries,
   transformAndSanitizeEntries,
   tryLenientProcessing,
   validateEntries
@@ -75,10 +75,10 @@ function processSearchResults(
 ): SearchWebsiteMetadata[] {
   const failures = new EntryFailures()
   try {
-    const filtered = filterAndSortEntries(searchResults, query, failures)
-    const valid = validateEntries(filtered, failures)
+    const sorted = sortEntries(searchResults, query)
+    const valid = validateEntries(sorted, failures)
     return valid.length === 0
-      ? tryLenientProcessing(filtered, failures)
+      ? tryLenientProcessing(sorted, failures)
       : transformAndSanitizeEntries(valid, failures)
   } finally {
     failures.report()

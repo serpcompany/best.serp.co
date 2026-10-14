@@ -57,21 +57,3 @@ export function transformToWebsiteMetadata(entry: SearchResult): SearchWebsiteMe
     publishedAt: ''
   }
 }
-
-export function matchesSearchQuery(entry: SearchResult, query: string): boolean {
-  if (!query) {
-    return false
-  }
-
-  const searchTerms = query.toLowerCase().trim().split(/\s+/)
-  const searchableFields = [
-    entry.name?.toLowerCase(),
-    entry.description?.toLowerCase(),
-    entry.category?.toLowerCase(),
-    entry.categories?.join(' ').toLowerCase(),
-    entry.website?.toLowerCase(),
-    entry.url?.toLowerCase()
-  ].filter(Boolean)
-
-  return searchTerms.every(term => searchableFields.some(field => field?.includes(term)))
-}
