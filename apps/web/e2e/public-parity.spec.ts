@@ -16,15 +16,20 @@ function isSearchFor(query: string): (url: URL) => boolean {
 
 /**
  * Submits a search, then waits for `/search/` to show `query` and for that page's own search to
- * answer, so the test's next navigation can't abandon the request mid-flight (#440).
+ * answer in full, body included, so the test's next navigation can't abandon the request
+ * mid-flight (#440). One `Promise.all` holds every wait, so a failed submit leaves none dangling.
  */
 async function submitSearch(page: Page, query: string, submit: () => Promise<void>) {
-  const searched = page.waitForResponse(response => {
-    const url = new URL(response.url())
-    return url.pathname === '/api/search' && url.searchParams.get('q') === query
-  })
-  await Promise.all([page.waitForURL(isSearchFor(query)), submit()])
-  await searched
+  const [searched] = await Promise.all([
+    page.waitForResponse(response => {
+      const url = new URL(response.url())
+      return url.pathname === '/api/search' && url.searchParams.get('q') === query
+    }),
+    page.waitForURL(isSearchFor(query)),
+    submit()
+  ])
+  // The response resolves on its headers; the page still reads the body (#442).
+  await searched.finished()
 }
 
 async function gotoPublicPage(page: Page, path: string) {
