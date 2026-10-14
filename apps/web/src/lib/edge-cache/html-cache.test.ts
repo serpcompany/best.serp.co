@@ -5,6 +5,7 @@ import {
   EDGE_CACHE_HEADER,
   type EdgeCacheContext,
   type EdgeCacheEvent,
+  EPOCH_FRESH_MS,
   EPOCH_LOAD_TIMEOUT_MS,
   EPOCH_MAX_STALE_MS,
   EPOCH_REFRESH_TIMEOUT_MS,
@@ -689,7 +690,7 @@ describe('catalog epoch memo', () => {
     expect(await new EpochMemo().current(context, failing)).toEqual({ read: null, source: 'error' })
   })
 
-  it('runs one background refresh at a time, bounded, and retries one whose request ended', async () => {
+  it('runs one background refresh at a time, bounded, and releases its claim when it ends', async () => {
     vi.useFakeTimers()
     let clock = 0
     const memo = new EpochMemo(() => clock, 1_000, 10_000, 2_000)
@@ -714,13 +715,111 @@ describe('catalog epoch memo', () => {
     await vi.advanceTimersByTimeAsync(EPOCH_REFRESH_TIMEOUT_MS - 2_000)
     expect(ended).toBe(true)
 
-    // Once the claim lapses, the next stale request refreshes again.
-    clock = 3_500
+    // At its bound (the clock read 3_000) the refresh keeps its claim 2 seconds longer.
+    const failing = vi.fn(async (): Promise<LoadedEpoch> => {
+      throw new Error('D1 unavailable')
+    })
+    clock = 4_999
+    expect(await memo.current(context, failing)).toEqual(stale)
+    expect(failing).not.toHaveBeenCalled()
+    clock = 5_000
+    expect(await memo.current(context, failing)).toEqual(stale)
+    await Promise.all(background)
+    // So does a refresh that fails.
     const retry = vi.fn(async () => loaded('epoch-2'))
+    clock = 6_999
+    expect(await memo.current(context, retry)).toEqual(stale)
+    expect(retry).not.toHaveBeenCalled()
+    clock = 7_000
     expect(await memo.current(context, retry)).toEqual(stale)
     await Promise.all(background)
     expect(await memo.current(context, retry)).toEqual({ read: read('epoch-2'), source: 'fresh' })
-    expect(retry).toHaveBeenCalledTimes(1)
+    // An answer frees its claim at once: the next stale request refreshes.
+    clock = 8_000
+    expect(await memo.current(context, retry)).toEqual({ read: read('epoch-2'), source: 'stale' })
+    expect(failing).toHaveBeenCalledTimes(1)
+    expect(retry).toHaveBeenCalledTimes(2)
+  })
+
+  // #446 review: a failed refresh that freed its claim at once let a D1 that fails fast be read
+  // once per stale request (100 a second here).
+  it('retries a background refresh that fails fast at most once per 2 seconds', async () => {
+    vi.useFakeTimers()
+    const memo = new EpochMemo()
+    const context = { waitUntil: () => {} }
+    await memo.current(context, async () => loaded('epoch-1'))
+    await vi.advanceTimersByTimeAsync(EPOCH_FRESH_MS)
+
+    const fastFailingD1 = vi.fn(async (): Promise<LoadedEpoch> => {
+      await new Promise(done => setTimeout(done, 5))
+      throw new Error('D1 overloaded')
+    })
+    // A request every 10 ms for 10 seconds: each is served the stale epoch.
+    for (let elapsed = 0; elapsed < 10_000; elapsed += 10) {
+      expect(await memo.current(context, fastFailingD1)).toEqual({
+        read: read('epoch-1'),
+        source: 'stale'
+      })
+      await vi.advanceTimersByTimeAsync(10)
+    }
+    // At 0, 2_010, 4_020, 6_030 and 8_040 ms: each failure holds the claim 2 seconds.
+    expect(fastFailingD1).toHaveBeenCalledTimes(10_000 / EPOCH_LOAD_TIMEOUT_MS)
+  })
+
+  // #445: a claim that lapsed after 2 seconds let a slow D1 start a refresh every 2 seconds.
+  it('keeps one background refresh in flight while D1 is slow', async () => {
+    vi.useFakeTimers()
+    const memo = new EpochMemo()
+    const context = { waitUntil: () => {} }
+    await memo.current(context, async () => loaded('epoch-1'))
+    await vi.advanceTimersByTimeAsync(EPOCH_FRESH_MS)
+
+    let inFlight = 0
+    let mostInFlight = 0
+    const slowD1 = vi.fn(async () => {
+      inFlight += 1
+      mostInFlight = Math.max(mostInFlight, inFlight)
+      await new Promise(done => setTimeout(done, 10_000))
+      inFlight -= 1
+      return loaded('epoch-2')
+    })
+    // A request every 500 ms while the 10-second read is out: each is served the stale epoch.
+    for (let elapsed = 0; elapsed < 10_000; elapsed += 500) {
+      expect(await memo.current(context, slowD1)).toEqual({
+        read: read('epoch-1'),
+        source: 'stale'
+      })
+      await vi.advanceTimersByTimeAsync(500)
+    }
+    expect(mostInFlight).toBe(1)
+    expect(slowD1).toHaveBeenCalledTimes(1)
+    expect(await memo.current(context, slowD1)).toEqual({ read: read('epoch-2'), source: 'fresh' })
+  })
+
+  it('lets a claim lapse at its bound even if the refresh never ends, and keeps a newer claim', async () => {
+    vi.useFakeTimers()
+    let clock = 0
+    const memo = new EpochMemo(() => clock, 1_000, 60_000)
+    const context = { waitUntil: () => {} }
+    await memo.current(context, async () => loaded('epoch-1'))
+
+    const refresh = vi.fn(stuck)
+    clock = 1_000
+    await memo.current(context, refresh)
+    // Still out just before its bound: the claim holds.
+    await vi.advanceTimersByTimeAsync(EPOCH_REFRESH_TIMEOUT_MS - 1)
+    clock = 1_000 + EPOCH_REFRESH_TIMEOUT_MS - 1
+    await memo.current(context, refresh)
+    expect(refresh).toHaveBeenCalledTimes(1)
+    // At the bound the claim lapses on the clock alone, as for a refresh whose request was cut
+    // off and never releases it, and the next stale request refreshes.
+    clock = 1_000 + EPOCH_REFRESH_TIMEOUT_MS
+    await memo.current(context, refresh)
+    expect(refresh).toHaveBeenCalledTimes(2)
+    // The first refresh's bound ends after that, and releases only its own claim.
+    await vi.advanceTimersByTimeAsync(1)
+    await memo.current(context, refresh)
+    expect(refresh).toHaveBeenCalledTimes(2)
   })
 })
 
