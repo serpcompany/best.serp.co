@@ -181,7 +181,7 @@ describe('a public page error in the Worker logs (#355)', () => {
     )
     logRequestError(
       error,
-      { method: 'GET', path: '/search/?q=private' },
+      { method: 'GET', path: '/search/?q=hidden-term' },
       {
         renderSource: 'react-server-components',
         revalidateReason: undefined,
@@ -210,7 +210,8 @@ describe('a public page error in the Worker logs (#355)', () => {
     // (Not a bare `private`: a checkout under /private/tmp puts it in stack frames.)
     const raw = String(logged.mock.calls[0]?.[0])
     expect(raw).not.toContain('private-slug')
-    expect(raw).not.toContain('q=private')
+    expect(raw).not.toContain('hidden-term')
+    expect(raw).not.toContain('Failed query')
   })
 
   it('logs an error once when Next.js reports it twice', () => {
