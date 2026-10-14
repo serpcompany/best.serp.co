@@ -106,7 +106,8 @@ describe('requireAdmin decisions', () => {
       getAdminStatus: async () => {
         throw new Error('D1 unavailable')
       },
-      getSession: async () => snapshot()
+      getSession: async () => snapshot(),
+      now: () => now
     })
     expect(result).toMatchObject({ status: 503 })
     error.mockRestore()
