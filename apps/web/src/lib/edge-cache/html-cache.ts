@@ -348,10 +348,12 @@ export interface LoadedEpoch {
  * and logger), and a request waits for it for at most `timeoutMs`. After a timeout or a failure
  * it falls back on the last value at any age, or on none, which bypasses the cache. A load its
  * request stopped waiting for runs on in that request's own `waitUntil`, so a slow answer still
- * lands. A background refresh is claimed for `timeoutMs`, so a busy isolate starts about one per
- * `freshMs` (one per claim while refreshes are slow), and one whose request ended is retried once
- * the claim lapses. Either runs for at most `refreshTimeoutMs`. A load started earlier never
- * replaces a value a later one stored, and only a load that stores calls its `stored` callback.
+ * lands. It, like a background refresh, runs for at most `refreshTimeoutMs`. A background refresh
+ * holds its claim until it settles or that bound ends (#445), so an isolate runs one at a time
+ * however slow D1 is, and a busy isolate starts about one per `freshMs`. A refresh whose request
+ * ended never releases its claim, which lapses `refreshTimeoutMs` after it was taken, and the next
+ * stale request refreshes again. A load started earlier never replaces a value a later one
+ * stored, and only a load that stores calls its `stored` callback.
  */
 export class EpochMemo {
   private refreshClaimedAt: number | undefined
@@ -376,9 +378,12 @@ export class EpochMemo {
     if (value && age < this.freshMs) return { read: value.read, source: 'fresh' }
     if (value && age < this.maxStaleMs) {
       const claimedAt = this.refreshClaimedAt
-      if (claimedAt === undefined || startedAt - claimedAt >= this.timeoutMs) {
+      if (claimedAt === undefined || startedAt - claimedAt >= this.refreshTimeoutMs) {
         this.refreshClaimedAt = startedAt
-        this.finishInBackground(context, this.loadInto(load, startedAt, stored))
+        this.finishInBackground(context, this.loadInto(load, startedAt, stored), () => {
+          // Releases only its own claim, never one taken after this one lapsed.
+          if (this.refreshClaimedAt === startedAt) this.refreshClaimedAt = undefined
+        })
       }
       return { read: value.read, source: 'stale' }
     }
@@ -396,9 +401,20 @@ export class EpochMemo {
     return this.fallback('timeout')
   }
 
-  /** Keeps `loading` running in its own request's `waitUntil`, for at most `refreshTimeoutMs`. */
-  private finishInBackground(context: EdgeCacheContext, loading: Promise<LoadedEpoch>): void {
-    context.waitUntil(settleWithin(loading, this.refreshTimeoutMs).catch(() => undefined))
+  /**
+   * Keeps `loading` running in its own request's `waitUntil`, for at most `refreshTimeoutMs`,
+   * then calls `ended`, whether it answered, failed or ran out of time.
+   */
+  private finishInBackground(
+    context: EdgeCacheContext,
+    loading: Promise<LoadedEpoch>,
+    ended: () => void = () => {}
+  ): void {
+    context.waitUntil(
+      settleWithin(loading, this.refreshTimeoutMs)
+        .catch(() => undefined)
+        .finally(ended)
+    )
   }
 
   /** The last value, which another request's load may have set meanwhile, or none. */

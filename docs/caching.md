@@ -60,10 +60,13 @@ From the edge inward:
      the share in the background;
    - a page lookup slower than 1 second (`CACHE_MATCH_TIMEOUT_MS`) renders as a miss.
 
-   A stale epoch's background refresh is claimed for 2 seconds, so a busy isolate still starts
-   about one per 30 seconds, and one whose request ended is retried. A refresh, or a load its
-   request stopped waiting for, runs for at most 25 seconds (`EPOCH_REFRESH_TIMEOUT_MS`), under
-   `waitUntil`'s 30. A load started earlier never replaces an epoch a later one stored, and only a
+   A refresh, or a load its request stopped waiting for, runs for at most 25 seconds
+   (`EPOCH_REFRESH_TIMEOUT_MS`), under `waitUntil`'s 30. A stale epoch's background refresh holds
+   its claim until it answers, fails or reaches that bound (#445), so an isolate runs one at a
+   time however slow D1 is, and a busy isolate starts about one per 30 seconds plus the read's
+   time. A refresh whose request ended never releases its claim; it lapses after 25 seconds, and
+   the next stale request refreshes again.
+   A load started earlier never replaces an epoch a later one stored, and only a
    load the memo stores shares its token with other renders. The epoch travels with the D1 bookmark of the
    read that returned it, in the memo and in the share (beside the bare token, in an
    `x-d1-bookmark` header; see [Read replication](#read-replication)). The render of a miss gets
