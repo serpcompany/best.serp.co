@@ -159,20 +159,28 @@ describe('a search the page abandons is not a failure (#440)', () => {
     expect(logger.error).not.toHaveBeenCalled()
   })
 
-  it('still reports a network failure on a page the visitor stays on, or comes back to', async () => {
+  it('still reports a network failure on a page the visitor stays on', async () => {
     const search = await pageSession()
     fetch.mockImplementation(noAnswer)
     await search('fixture')
     expect(reportedCauses()).toEqual([['search_failed', 'TypeError']])
+  })
 
-    const restored = await pageSession()
+  it('reports a network failure once on a page the visitor comes back to, after the searches it abandoned (#442)', async () => {
+    // One page session throughout, as a back/forward-cache restore keeps the module.
+    const search = await pageSession()
+    fetch.mockImplementationOnce(() => Promise.reject(new DOMException('aborted', 'AbortError')))
+    await search('fixture')
+    fetch.mockImplementation(noAnswer)
     page.dispatchEvent(new Event('pagehide'))
+    await search('fixture')
+    expect(logger.error).not.toHaveBeenCalled()
+
+    // Restored: the abandoned searches didn't use up the session's one network report.
     page.dispatchEvent(new Event('pageshow'))
-    await restored('fixture')
-    expect(reportedCauses()).toEqual([
-      ['search_failed', 'TypeError'],
-      ['search_failed', 'TypeError']
-    ])
+    await search('fixture')
+    await search('fixtures')
+    expect(reportedCauses()).toEqual([['search_failed', 'TypeError']])
   })
 })
 

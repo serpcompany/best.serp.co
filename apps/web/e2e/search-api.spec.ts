@@ -76,4 +76,37 @@ test.describe('search page', () => {
     await page.goto('/search/?q=fixture-nothing-matches')
     await expect(page.getByRole('heading', { name: 'Nothing Found' })).toBeVisible()
   })
+
+  test('logs nothing for a search the visitor leaves mid-flight (#440, #442)', async ({ page }) => {
+    // Hold the page's search until the visitor has left, so leaving cancels it. Chromium fires
+    // `pagehide` before it rejects the cancelled fetch, which is what keeps the page from
+    // reporting it; the console-error fixture fails this test on a `search_failed`.
+    let leave = () => {}
+    const left = new Promise<void>(resolve => {
+      leave = resolve
+    })
+    await page.route(
+      url => url.pathname === '/api/search',
+      async route => {
+        await left
+        // The page that sent it is gone, so the route may already be closed.
+        await route.continue().catch(() => undefined)
+      }
+    )
+    const query = seedFacts.search.query
+    const searching = page.waitForRequest(request => {
+      const url = new URL(request.url())
+      return url.pathname === '/api/search' && url.searchParams.get('q') === query
+    })
+    const cancelled = page.waitForEvent('requestfailed', request => {
+      return new URL(request.url()).pathname === '/api/search'
+    })
+    await page.goto(`/search/?q=${encodeURIComponent(query)}`)
+    await searching
+
+    await page.goto('/')
+    leave()
+    // The browser cancelled the search rather than the test answering it.
+    expect((await cancelled).failure()?.errorText).toBe('net::ERR_ABORTED')
+  })
 })
