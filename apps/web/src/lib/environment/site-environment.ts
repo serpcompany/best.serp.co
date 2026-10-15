@@ -62,6 +62,15 @@ export const WORKER_VERSION_HEADER = 'x-worker-version'
  */
 export const SITE_ENVIRONMENT_HEADER = 'x-site-environment'
 
+/**
+ * A Cloudflare Web Analytics site token (#170): 32 hex characters, public, not a secret. The one
+ * copy of the pattern (#272): the root layout renders the beacon only for a
+ * `CF_WEB_ANALYTICS_TOKEN` that matches it (`analyticsForRequest`), the Worker config test
+ * requires production's to match it, and the production HTTP gates then require the beacon on
+ * best.serp.co.
+ */
+export const WEB_ANALYTICS_TOKEN_PATTERN = /^[0-9a-f]{32}$/u
+
 export const NON_PRODUCTION_X_ROBOTS_TAG = 'noindex, nofollow'
 export const NON_PRODUCTION_ROBOTS_TXT = 'User-agent: *\nDisallow: /\n'
 

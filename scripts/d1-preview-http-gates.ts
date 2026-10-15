@@ -14,7 +14,8 @@
  * - `production <origin>`: the production Worker. The origin may be `https://best.serp.co` or
  *   the production workers.dev origin. Routes, versions, and the workers.dev policy are gated
  *   through the workers.dev origin with the smoke-test header. best.serp.co's public policy
- *   (indexable, robots.txt lists the sitemap index, Google Tag Manager loads) is then checked
+ *   (indexable, robots.txt lists the sitemap index, Google Tag Manager loads, and so does the
+ *   Cloudflare Web Analytics beacon while production has a site token) is then checked
  *   on best.serp.co itself, without the header: strictly whenever the Worker answers, and
  *   skipped with a `::warning::` only for `serp.co` zone protection (a `cf-mitigated`
  *   challenge, or a 403 or 429 without Worker headers) and for GitHub Pages before the cutover
@@ -48,6 +49,7 @@ import {
 import {
   SITE_ENVIRONMENT_HEADER,
   SMOKE_TEST_HEADER,
+  WEB_ANALYTICS_TOKEN_PATTERN,
   WORKER_VERSION_HEADER
 } from '../apps/web/src/lib/environment/site-environment'
 import {
@@ -73,12 +75,19 @@ const defaultReadyLatencyMs = 2_000
 const maxBodyProbeBytes = 4_096
 // Enough for robots.txt and for the <head> of the home page (its robots meta sits near 6 KB).
 const maxTextProbeBytes = 131_072
-// The whole home page (about 570 KB): Google Tag Manager's <noscript> follows <body>, and its
-// script is in the payload near the end.
+// The whole home page (about 490 KB) through </body>: Google Tag Manager's <noscript> follows
+// <body>, and the Cloudflare Web Analytics beacon ends the page's markup, before Next.js's payload.
 const maxDocumentProbeBytes = 4 * 1_048_576
 const googleTagManagerMarker = 'googletagmanager.com'
 /** The Cloudflare Web Analytics beacon's host (#170), which non-production must not load. */
 const webAnalyticsMarker = 'cloudflareinsights.com'
+/**
+ * The beacon's `<script>` element (`root-shell.tsx`), which best.serp.co must render while
+ * production has a site token (#272). Next.js's payload also names the URL, as escaped JSON in an
+ * inline script, which does not count.
+ */
+const webAnalyticsBeaconScript =
+  /<script\b[^>]*\ssrc=(["']?)https:\/\/static\.cloudflareinsights\.com\/beacon\.min\.js\1[\s/>]/iu
 const workerVersionPattern = /^[A-Za-z0-9-]{1,64}$/u
 /** The production Worker's platform host: where CI reaches it, with the smoke-test header. */
 const productionPlatformOrigin = new URL(project.remote.production.reviewOrigin)
@@ -117,7 +126,10 @@ export interface HttpGateOptions {
   versionPollIntervalMs?: number
   /** Once the Worker is ready, the budget for retrying an answer from another version (≤ 60 s). */
   versionWaitMs?: number
-  /** Wrangler config whose `CANONICAL_HOST_REDIRECT` per environment decides the host-redirect gate. */
+  /**
+   * Wrangler config whose `CANONICAL_HOST_REDIRECT` per environment decides the host-redirect
+   * gate, and whose production `CF_WEB_ANALYTICS_TOKEN` decides the beacon check on best.serp.co.
+   */
   wranglerConfigPath?: string
 }
 
@@ -752,22 +764,29 @@ async function readBoundedText(
 }
 
 /**
- * The document up to its Google Tag Manager reference (the `<noscript>` frame right after
- * `<body>`), or all of it (bounded) when there is none, so the `<head>` is always included.
+ * The document through `</body>` (bounded), so both the `<head>` and the Cloudflare Web
+ * Analytics beacon at the end of `<body>` are read (#272): `loadsWebAnalytics` is any mention of
+ * its host, `rendersWebAnalyticsBeacon` its `<script>` element.
  */
 async function readDocument(
   response: Response,
   label: string
-): Promise<{ head: string; loadsGoogleTagManager: boolean; loadsWebAnalytics: boolean }> {
-  const document = await readBoundedText(response, label, {
+): Promise<{
+  html: string
+  loadsGoogleTagManager: boolean
+  loadsWebAnalytics: boolean
+  rendersWebAnalyticsBeacon: boolean
+}> {
+  const html = await readBoundedText(response, label, {
     maxBytes: maxDocumentProbeBytes,
-    stopAt: /googletagmanager\.com/iu
+    stopAt: /<\/body>/iu
   })
+  const lowercase = html.toLowerCase()
   return {
-    head: document,
-    loadsGoogleTagManager: document.toLowerCase().includes(googleTagManagerMarker),
-    // Read in full whenever Google Tag Manager is absent, so the beacon before `</body>` is seen.
-    loadsWebAnalytics: document.toLowerCase().includes(webAnalyticsMarker)
+    html,
+    loadsGoogleTagManager: lowercase.includes(googleTagManagerMarker),
+    loadsWebAnalytics: lowercase.includes(webAnalyticsMarker),
+    rendersWebAnalyticsBeacon: webAnalyticsBeaconScript.test(html)
   }
 }
 
@@ -812,7 +831,7 @@ async function expectNonProductionPolicy(target: GateTarget, listingPath: string
           throw new Error(`${mode} route / loads Google Tag Manager.`)
         if (document.loadsWebAnalytics)
           throw new Error(`${mode} route / loads the Cloudflare Web Analytics beacon.`)
-        if (metaRobotsBlocksIndexing(document.head))
+        if (metaRobotsBlocksIndexing(document.html))
           throw new Error(`${mode} route / sent noindex in its robots meta, on every host.`)
       }
       if (path === '/robots.txt') {
@@ -831,20 +850,45 @@ async function expectNonProductionPolicy(target: GateTarget, listingPath: string
   })
 }
 
+/** An environment's vars in the checked-in Wrangler config. */
+function configuredVars(
+  configPath: string,
+  environment: RemoteEnvironment
+): Record<string, string | undefined> {
+  const config = JSON.parse(readFileSync(resolve(configPath), 'utf8')) as {
+    env?: Partial<Record<RemoteEnvironment, { vars?: Record<string, string | undefined> }>>
+  }
+  return config.env?.[environment]?.vars ?? {}
+}
+
 /** Whether the checked-in config turns an environment's canonical-host redirect on. */
 export function canonicalHostRedirectConfigured(
   configPath: string = project.wranglerConfigPath,
   environment: RemoteEnvironment = 'production'
 ): boolean {
-  const config = JSON.parse(readFileSync(resolve(configPath), 'utf8')) as {
-    env?: Partial<Record<RemoteEnvironment, { vars?: Record<string, string | undefined> }>>
-  }
-  const value = config.env?.[environment]?.vars?.CANONICAL_HOST_REDIRECT
+  const value = configuredVars(configPath, environment).CANONICAL_HOST_REDIRECT
   if (value !== 'on' && value !== 'off')
     throw new Error(
       `${configPath} env.${environment}.vars.CANONICAL_HOST_REDIRECT must be on or off.`
     )
   return value === 'on'
+}
+
+/**
+ * Whether the checked-in config gives production a Cloudflare Web Analytics site token (#170,
+ * #271), so best.serp.co must render the beacon (#272). Unset or empty, it need not. A value that
+ * is no site token fails: the root layout would render no beacon for it, silently.
+ */
+export function webAnalyticsTokenConfigured(
+  configPath: string = project.wranglerConfigPath
+): boolean {
+  const value = configuredVars(configPath, 'production').CF_WEB_ANALYTICS_TOKEN?.trim()
+  if (!value) return false
+  if (!WEB_ANALYTICS_TOKEN_PATTERN.test(value))
+    throw new Error(
+      `${configPath} env.production.vars.CF_WEB_ANALYTICS_TOKEN must be a Web Analytics site token (32 hex characters).`
+    )
+  return true
 }
 
 /**
@@ -912,8 +956,9 @@ async function expectHostRedirectPolicy(target: GateTarget, redirectTo: URL | nu
  * smoke-test header, as visitors and crawlers see it: answered by the production Worker
  * (`x-site-environment: production`); no noindex on `/`, robots.txt or the sitemap index;
  * robots.txt lets Google and `*` crawl and lists the sitemap index; Google Tag Manager loads;
- * and no answer asks for a password (`WWW-Authenticate`: only staging has one, #359). A noindex
- * reaching best.serp.co would deindex the site.
+ * with `webAnalyticsBeacon` (production has a site token), so does the Cloudflare Web Analytics
+ * beacon (#272); and no answer asks for a password (`WWW-Authenticate`: only staging has one,
+ * #359). A noindex reaching best.serp.co would deindex the site.
  *
  * Every answer from the Worker is enforced. With `skipNonWorker` (production gates), zone
  * protection and GitHub Pages (`notAnsweredByWorker`) are skipped with a `::warning::`, so
@@ -924,7 +969,7 @@ async function expectHostRedirectPolicy(target: GateTarget, redirectTo: URL | nu
 async function expectPublicPolicy(
   target: GateTarget,
   contentPath: string,
-  options: { redirectOn: boolean; skipNonWorker: boolean }
+  options: { redirectOn: boolean; skipNonWorker: boolean; webAnalyticsBeacon: boolean }
 ): Promise<void> {
   const site: GateTarget = { ...target, baseUrl: canonicalOrigin, label: 'best.serp.co route' }
   const check = async (path: string, inspect: (response: Response) => Promise<void>) => {
@@ -964,12 +1009,16 @@ async function expectPublicPolicy(
     }
     const header = xRobotsTagBlocksIndexing(response.headers.get('x-robots-tag'))
     const document = await readDocument(response, 'best.serp.co route /')
-    if (header || metaRobotsBlocksIndexing(document.head))
+    if (header || metaRobotsBlocksIndexing(document.html))
       throw new Error(
         `best.serp.co route / sent noindex in its ${header ? 'X-Robots-Tag header' : 'robots meta'}.`
       )
     if (!document.loadsGoogleTagManager)
       throw new Error('best.serp.co route / does not load Google Tag Manager.')
+    if (options.webAnalyticsBeacon && !document.rendersWebAnalyticsBeacon)
+      throw new Error(
+        'best.serp.co route / has no Cloudflare Web Analytics beacon (a <script> from static.cloudflareinsights.com/beacon.min.js), though env.production.vars.CF_WEB_ANALYTICS_TOKEN holds a site token.'
+      )
   })
   const sitemapIndex = routeUrl(canonicalOrigin, '/sitemap-index.xml')
   await check('/sitemap-index.xml', async response => {
@@ -1026,6 +1075,9 @@ export async function runHttpGates(
   if (options.expectedVersion !== undefined && !workerVersionPattern.test(options.expectedVersion))
     throw new Error('The expected Worker version is not a Worker version id.')
   const redirectTo = canonicalHostRedirectTarget(mode, baseUrl, options.wranglerConfigPath)
+  // Only the production and public modes check best.serp.co, which renders the beacon.
+  const webAnalyticsBeacon =
+    mode !== 'staging' && webAnalyticsTokenConfigured(options.wranglerConfigPath)
   const target: GateTarget = { baseUrl, mode, timeoutMs }
   if (options.expectedVersion) {
     const clock = options.clock ?? realClock
@@ -1051,7 +1103,8 @@ export async function runHttpGates(
   if (mode === 'public') {
     await expectPublicPolicy(target, listingRoute(listingSlug), {
       redirectOn: false,
-      skipNonWorker: false
+      skipNonWorker: false,
+      webAnalyticsBeacon
     })
     return
   }
@@ -1081,7 +1134,8 @@ export async function runHttpGates(
   if (mode === 'production')
     await expectPublicPolicy(target, listingRoute(listingSlug), {
       redirectOn: redirectTo !== null,
-      skipNonWorker: true
+      skipNonWorker: true,
+      webAnalyticsBeacon
     })
 }
 

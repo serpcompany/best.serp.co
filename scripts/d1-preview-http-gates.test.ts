@@ -34,7 +34,8 @@ import {
   SAMPLE_FAILURE_HINT,
   taxonomyChanges,
   taxonomyChangesOf,
-  waitForWorkerReadiness
+  waitForWorkerReadiness,
+  webAnalyticsTokenConfigured
 } from './d1-preview-http-gates.ts'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -992,6 +993,114 @@ describe('environment-specific crawl policy gates', () => {
     await expect(gates('production', origin)).rejects.toThrow(
       'production route / loads the Cloudflare Web Analytics beacon'
     )
+  })
+
+  // #272: while production has a site token, best.serp.co must render the beacon. It sits at the
+  // end of <body>, long after Google Tag Manager in <head>, where the document read used to stop.
+  describe('the Cloudflare Web Analytics beacon on best.serp.co (#272)', () => {
+    const token = '0123456789abcdef0123456789abcdef'
+    const gtmScript =
+      "<script>(function(w,d,s,l,i){j.src='https://www.googletagmanager.com/gtm.js?id='+i})</script>"
+    const beacon = `<script data-cf-beacon="{&quot;token&quot;:&quot;${token}&quot;}" defer="" src="https://static.cloudflareinsights.com/beacon.min.js"></script>`
+    // Next.js's payload names the beacon too, as escaped JSON inside a script: not the beacon.
+    const payload = `<script>self.__next_f.push([1,"[\\"$\\",\\"script\\",null,{\\"defer\\":true,\\"src\\":\\"https://static.cloudflareinsights.com/beacon.min.js\\"}]"])</script>`
+    const missing = 'best.serp.co route / has no Cloudflare Web Analytics beacon'
+
+    function tokenConfig(productionToken?: string): string {
+      const path = join(
+        fixtureDirectory,
+        `wrangler-web-analytics-${productionToken ?? 'unset'}.jsonc`
+      )
+      writeFileSync(
+        path,
+        JSON.stringify({
+          env: {
+            production: {
+              vars: { CANONICAL_HOST_REDIRECT: 'off', CF_WEB_ANALYTICS_TOKEN: productionToken }
+            },
+            staging: { vars: { CANONICAL_HOST_REDIRECT: 'off' } }
+          }
+        })
+      )
+      return path
+    }
+
+    /** best.serp.co's home page, streamed one chunk per part as the Worker streams it. */
+    function stubHome(...parts: string[]): void {
+      stubCrawlPolicy((url, response) => {
+        if (url.origin !== origin || url.pathname !== '/') return response
+        const encoder = new TextEncoder()
+        const body = new ReadableStream<Uint8Array>({
+          start(controller) {
+            for (const part of parts) controller.enqueue(encoder.encode(part))
+            controller.close()
+          }
+        })
+        return new Response(body, { headers: response.headers })
+      })
+    }
+
+    const head = `<html><head><title>SERP</title>${gtmScript}</head><body>${googleTagManager}`
+
+    it.each(['production', 'public'])(
+      'reads on past Google Tag Manager to the beacon in %s gates',
+      async mode => {
+        stubHome(head, '<main>ok</main>', payload, beacon, '</body></html>')
+        await expect(
+          gates(mode, origin, undefined, { wranglerConfigPath: tokenConfig(token) })
+        ).resolves.toBeUndefined()
+      }
+    )
+
+    it.each([
+      ['production', 'no beacon', [head, '<main>ok</main>', '</body></html>']],
+      ['public', 'no beacon', [head, '<main>ok</main>', '</body></html>']],
+      [
+        'production',
+        'only the payload naming it',
+        [head, '<main>ok</main>', payload, '</body></html>']
+      ]
+    ])('rejects best.serp.co in %s gates with %s', async (mode, _label, parts) => {
+      stubHome(...parts)
+      await expect(
+        gates(mode, origin, undefined, { wranglerConfigPath: tokenConfig(token) })
+      ).rejects.toThrow(missing)
+    })
+
+    it.each([undefined, '', '  '])(
+      'needs no beacon while production has no site token (%o)',
+      async productionToken => {
+        stubHome(head, '<main>ok</main>', '</body></html>')
+        for (const mode of ['production', 'public'])
+          await expect(
+            gates(mode, origin, undefined, { wranglerConfigPath: tokenConfig(productionToken) })
+          ).resolves.toBeUndefined()
+      }
+    )
+
+    it('leaves best.serp.co to the production gates: staging never requests it', async () => {
+      const urls = stubCrawlPolicy((_url, response) => response)
+      await expect(
+        gates('staging', stagingOrigin, undefined, { wranglerConfigPath: tokenConfig(token) })
+      ).resolves.toBeUndefined()
+      expect(urls.some(url => url.origin === origin)).toBe(false)
+    })
+
+    it('reads the site token from the checked-in config, and refuses a value that is none', async () => {
+      expect(webAnalyticsTokenConfigured()).toBe(true)
+      expect(webAnalyticsTokenConfigured(tokenConfig(token))).toBe(true)
+      expect(webAnalyticsTokenConfigured(tokenConfig())).toBe(false)
+      const notAToken = tokenConfig('GTM-TEST')
+      expect(() => webAnalyticsTokenConfigured(notAToken)).toThrowError(
+        `${notAToken} env.production.vars.CF_WEB_ANALYTICS_TOKEN must be a Web Analytics site token`
+      )
+      // Before any request: the config is read first.
+      const urls = stubCrawlPolicy((_url, response) => response)
+      await expect(
+        gates('production', origin, undefined, { wranglerConfigPath: notAToken })
+      ).rejects.toThrow('must be a Web Analytics site token')
+      expect(urls).toEqual([])
+    })
   })
 
   it.each([
