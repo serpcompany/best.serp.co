@@ -259,6 +259,8 @@ export function buildMarkOrderPaidPlans(input: {
 /**
  * Records what a paid order did, once (`applied_at`). Sent in the same batch as the plans that
  * applied it (the submission's payment, the upgrade, the relist), so both happen or neither.
+ * Never a disputed payment (#473): a dispute recorded after the fulfilment read the order
+ * refuses the whole batch, so the listing never goes live on it.
  */
 export function buildMarkOrderAppliedPlans(input: {
   /** The guardrail check that held the submission (`held` only). */
@@ -270,7 +272,7 @@ export function buildMarkOrderAppliedPlans(input: {
   return [
     {
       sql: `UPDATE orders SET outcome=?,check_problem=?,applied_at=?,updated_at=?
-        WHERE id=? AND status='paid' AND applied_at IS NULL`,
+        WHERE id=? AND status='paid' AND applied_at IS NULL AND dispute_status IS NULL`,
       params: [input.outcome, input.checkProblem ?? null, input.now, input.now, input.orderId]
     },
     assertPreviousStatementChangedOne('order_applied')

@@ -41,7 +41,9 @@ export type ListingLinkRel = (typeof listingLinkRels)[number]
  * Submission lifecycle (docs/submission-flow.md). `draft` is saved with no plan chosen yet
  * (or paid chosen and checkout not completed); `pending_badge` means free was chosen and the
  * badge is not verified yet. `verified` and `paid_pending_review` are the review queue;
- * `paid_pending_review` is the only queue state whose listing is already live.
+ * `paid_pending_review` is the only queue state whose listing is already live, unless a dispute
+ * or a refund made at the provider took it down (#473): its reviewer then republishes and
+ * approves it, or rejects it (docs/billing.md).
  */
 export const submissionStatuses = [
   'draft',
@@ -1852,6 +1854,10 @@ export const orders = sqliteTable(
     uniqueIndex('orders_provider_checkout_idx')
       .on(table.provider, table.providerCheckoutId)
       .where(sql`${table.providerCheckoutId} IS NOT NULL`),
+    // A refund's or a dispute's payment finds its order (#473).
+    index('orders_provider_payment_idx')
+      .on(table.provider, table.providerPaymentId)
+      .where(sql`${table.providerPaymentId} IS NOT NULL`),
     index('orders_status_created_idx').on(table.status, table.createdAt),
     index('orders_submission_idx').on(table.submissionId),
     index('orders_listing_idx').on(table.listingId),
@@ -1877,7 +1883,9 @@ export const billingEvents = sqliteTable(
   },
   table => [
     primaryKey({ columns: [table.provider, table.eventId] }),
-    index('billing_events_order_idx').on(table.orderId)
+    index('billing_events_order_idx').on(table.orderId),
+    // The sweep's recent payment alerts (#473, #481).
+    index('billing_events_processed_idx').on(table.processedAt)
   ]
 )
 

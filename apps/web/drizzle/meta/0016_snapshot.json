@@ -683,6 +683,13 @@
             "order_id"
           ],
           "isUnique": false
+        },
+        "billing_events_processed_idx": {
+          "name": "billing_events_processed_idx",
+          "columns": [
+            "processed_at"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -4280,6 +4287,15 @@
           ],
           "isUnique": true,
           "where": "\"orders\".\"provider_checkout_id\" IS NOT NULL"
+        },
+        "orders_provider_payment_idx": {
+          "name": "orders_provider_payment_idx",
+          "columns": [
+            "provider",
+            "provider_payment_id"
+          ],
+          "isUnique": false,
+          "where": "\"orders\".\"provider_payment_id\" IS NOT NULL"
         },
         "orders_status_created_idx": {
           "name": "orders_status_created_idx",

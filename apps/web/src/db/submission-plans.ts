@@ -604,8 +604,9 @@ export function buildRequestSubmissionChangesPlans(input: {
 /**
  * `changes_requested` → back to the review queue it left: `paid_pending_review` when it has a
  * listing, otherwise `verified`. A submission whose listing is no longer live cannot resubmit
- * (`paid_pending_review` is always live); unpublishing is refused while it is queued anyway.
- * Only the submission's owner may resubmit.
+ * (`paid_pending_review` is live): an admin's unpublish is refused while it is queued, and only
+ * a dispute or a refund made at the provider takes it down (#473), until an admin republishes
+ * or rejects it. Only the submission's owner may resubmit.
  */
 export function buildResubmitSubmissionPlans(input: {
   now: string
@@ -806,6 +807,11 @@ function refundBadgeCheck(passed: boolean, recorded: boolean): string {
  *   couldn't tell (owner decision, 2026-10-06), is taken down in the same batch.
  * - `already_unpublished`: an approved paid listing that is already down (unpublished by an
  *   admin, or deleted) is refunded without touching the catalog.
+ * - `at_provider`: a refund of the whole payment made at the provider, outside the site (#473),
+ *   of an approved paid listing that is down (the same batch takes it down first) or of one
+ *   held for review (`verified`, no listing yet). A `paid_pending_review` submission can't
+ *   record it (the `listing_submissions_live_review_paid` CHECK), nor one that returns there:
+ *   its refunded order is the record, which the admin's plan reading checks too.
  */
 export function buildRefundSubmissionPlans(
   input: {
@@ -822,6 +828,7 @@ export function buildRefundSubmissionPlans(
   } & (
     | { mode: 'after_rejection' }
     | { mode: 'already_unpublished' }
+    | { mode: 'at_provider' }
     | { badgeCheckId: number; mode: 'keep_free' }
     | { badgeCheckId: number; mode: 'unpublish'; publication: CatalogPublication }
   )
@@ -856,6 +863,19 @@ export function buildRefundSubmissionPlans(
         'unpublished_listing_refunded'
       ),
       event(input.submissionId, 'refunded', input.actor, 'already_unpublished')
+    ]
+  }
+  if (input.mode === 'at_provider') {
+    return [
+      ...refund(
+        {
+          sql: `s.status IN ('verified','approved') AND NOT ${live}`,
+          params: []
+        },
+        'paid',
+        'provider_refund_recorded'
+      ),
+      event(input.submissionId, 'refunded', input.actor, 'at_provider')
     ]
   }
   if (input.mode === 'keep_free') {

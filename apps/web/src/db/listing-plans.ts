@@ -177,7 +177,9 @@ function submissionEvent(
  * Live → unpublished, with a reason code (for example `admin` or `badge_missing`). Refused while
  * the listing's own submission is still in review: the reviewer rejects it instead, so
  * `paid_pending_review` stays live. Only a payment dispute or a refund made at the provider
- * (`whileInReview`, #473) takes such a listing down; its reviewer can then still reject it.
+ * (`whileInReview`, #473) takes such a listing down, leaving a `paid_pending_review` (or
+ * `changes_requested`) submission whose listing isn't live: Approve is refused, and so is the
+ * owner's resubmission, until an admin republishes it (then Approve) or rejects it.
  */
 export function buildUnpublishListingPlans(input: {
   listingId: string

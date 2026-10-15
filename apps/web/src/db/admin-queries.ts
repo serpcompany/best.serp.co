@@ -44,12 +44,20 @@ const revisionStatusesByView: Record<ReviewQueueView, string> = {
   waiting: `'pending_review'`
 }
 
-/** Whether a listing is on the paid plan: a paid claim, or a paid, unrefunded submission. */
+/**
+ * Whether a listing is on the paid plan: a paid claim, or a paid, unrefunded submission whose
+ * payment stands. The order that paid it (applied to it: a submission is paid once) must not be
+ * refunded, which a refund made at the provider records there for a submission in review, nor
+ * disputed (open, or lost; a won dispute leaves it paid, #473).
+ */
 const listingPaidSql = (listingIdSql: string) => `CASE WHEN EXISTS (SELECT 1 FROM listing_owners po
     WHERE po.listing_id=${listingIdSql} AND po.revoked_at IS NULL AND po.verified_via='paid_claim')
   OR EXISTS (SELECT 1 FROM listing_submissions ps WHERE ps.listing_id=${listingIdSql}
     AND ps.plan='paid' AND ps.paid_at IS NOT NULL AND ps.refunded_at IS NULL
-    AND ps.status IN ('paid_pending_review','approved'))
+    AND ps.status IN ('paid_pending_review','approved')
+    AND NOT EXISTS (SELECT 1 FROM orders pd WHERE pd.submission_id=ps.id
+      AND pd.outcome IN ('published','held','upgraded','relisted')
+      AND (pd.status='refunded' OR pd.dispute_status IN ('open','lost'))))
   THEN 'paid' ELSE 'free' END`
 
 const latestConclusiveBadge = (listingIdSql: string) => `(SELECT outcome FROM badge_checks

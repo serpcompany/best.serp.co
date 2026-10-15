@@ -130,22 +130,29 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
   `charge.dispute.created`, `charge.dispute.closed` and `refund.failed`, with the same signature
   check and once-per-event handling, and finds the order by the charge's PaymentIntent (an
   unknown one is recorded as `unknown_order` and answered 200). Everything is recorded before the
-  answer; only the admin's email goes after it, and the sweep sends it again if it didn't go. A
-  dispute that opens (`dispute_status` `open`), or a refund of the whole payment made in Stripe's
-  dashboard (`refunded`, as an admin's refund by `provider`, and the submission recorded
-  refunded so the listing reads as free), takes down the listing the payment made or kept live
-  (a paid submission's, an upgrade's, a relist's), in the same batch, even while its submission
-  is in review (owner decision on #156), and emails the admin (`admin-payment-alert`). A claim's
-  payment bought ownership, not the listing's place, so a claim's listing stays up; a payment
-  held for review has none live. A closed dispute records `won` or `lost` only: nothing
-  republishes the listing, and an admin decides in /admin. A partial refund changes nothing
-  and emails the admin. `refund.failed` flags a refund the site made `refund_failed` and emails
-  the admin. The site's own refund is claimed `refunding` before Stripe is asked, so its
-  `charge.refunded` finds the order `refunding` or `refunded` and changes nothing. A disputed
-  payment is never applied by fulfilment, and admin Orders shows "Disputed", "Dispute won",
-  "Dispute lost" or "Refunded outside the site", with no "Refund…" while a dispute is open or
-  lost (Stripe refuses those refunds; the refund routes answer 409). The four events stay dormant
-  until the owner ticks them on both webhooks ([Configuration](#configuration-owner)).
+  answer; only the admin's email goes after it, and the sweep re-sends it. A dispute that opens
+  (`dispute_status` `open`), or a full refund made in Stripe's dashboard (`refunded`, an admin's
+  refund by `provider`), takes down the listing the payment made or kept live (a paid
+  submission's, an upgrade's, a relist's) in the same batch, even in review (owner decision on
+  #156), and emails the admin (`admin-payment-alert`). A claim's listing stays up (the payment
+  bought ownership); a held payment has none live. Neither returns as paid: /admin reads a
+  listing as free when its paying order is refunded, or disputed and not won, and the refund
+  also records an approved or held submission refunded (`at_provider`; `paid_pending_review`
+  can't hold `refunded_at`, a CHECK). A closed dispute records `won` or `lost` only, and an
+  admin decides; a lost one never reported open is opened first (takedown, email). A partial
+  refund changes nothing and emails the admin. `refund.failed` flags the site's refund
+  `refund_failed` and emails the admin. The site's own refund's `charge.refunded` finds the
+  order `refunded`, or `refunding` while that refund may still run (claimed under ten minutes
+  ago, never failed), and changes nothing; after it failed, the dashboard refund finishes it
+  (its listing change, `refunded`, the admin's email; a rejection's own refund then records
+  the submission and emails the owner). Fulfilment never applies a disputed payment (the apply
+  refuses one disputed meanwhile). Admin Orders shows "Disputed", "Dispute won", "Dispute lost"
+  or "Refunded outside the site", with no "Refund…" while a dispute is open or lost (Stripe
+  refuses; the routes answer 409). The four events stay dormant until the owner ticks them on
+  both webhooks ([Configuration](#configuration-owner)).
+- **A listing taken down in review** (`paid_pending_review`, `changes_requested`) can't be
+  approved or resubmitted until it is live: the reviewer republishes it, then approves it, or
+  rejects it.
 - **Paid submission.** The guardrails run: a public address under the safe-fetch rules, the site
   answers with an HTML page, no listing has the website, and no prohibited block covers it. Pass:
   the listing is created and published (catalog version bump) and the submission is
