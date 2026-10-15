@@ -102,11 +102,13 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
   The claim dialog's "Continue to payment" opens `GET /claims/<id>/checkout/` for a confirmed
   paid claim (in time, the listing unowned); the return `/claims/<id>/checkout/success/` and a
   cancel both go back to `/products/<slug>/#claim`. The checkout closes when the confirmation
-  does (none opens in its last half hour). The payment completes the claim through
-  `completePaidClaim` (the claimer becomes the owner, `paid_claim`) in one D1 batch with the
-  order's applied record, so a payment completed the claim exactly when it is applied. Any other
-  payment for it (a second tab, a claim completed by the badge, one an admin refunded meanwhile,
-  someone else owning the listing, an expired confirmation) is refunded.
+  does, so none opens in its last 31 minutes (`SHORTEST_CHECKOUT_MS`, `checkout-window.ts`): the
+  dialog then asks for a new code, as for an expired confirmation (#128), and the route answers
+  409 as the backstop. The payment completes the claim through `completePaidClaim` (the claimer
+  becomes the owner, `paid_claim`) in one D1 batch with the order's applied record, so a payment
+  completed the claim exactly when it is applied. Any other payment for it (a second tab, a claim
+  completed by the badge, one an admin refunded meanwhile, someone else owning the listing, an
+  expired confirmation) is refunded.
 - **Unapplied payments.** A payment the target can no longer accept (withdrawn or expired, already
   paid by another checkout, rejected, unlisted by an admin) is refunded in full and recorded
   (`unapplied`); a withdrawn submission records it with `buildRecordUnappliedPaymentPlans`.

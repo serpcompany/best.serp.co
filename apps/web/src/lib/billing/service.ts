@@ -32,6 +32,7 @@ import type { EmailRequest } from '../email/service'
 import type { TemplateInput } from '../email/templates'
 import { CodedError } from '../telemetry/coded-error'
 import { errorFields } from '../telemetry/error-fields'
+import { tooLateForCheckout } from './checkout-window'
 import type { GuardrailResult } from './guardrails'
 import {
   type BillingEvent,
@@ -61,8 +62,6 @@ export const BILLING_ACTOR = 'billing'
 const BILLING_WORKFLOW = 'app/billing'
 /** A checkout stays open this long; an unpaid order is then failed and a new one opened. */
 export const CHECKOUT_LIFETIME_MS = 60 * 60 * 1000
-/** The shortest checkout the provider opens (Stripe: 30 minutes), with a minute's margin. */
-const SHORTEST_CHECKOUT_MS = 31 * 60 * 1000
 /** An open checkout is reused unless it closes sooner than this. */
 const CHECKOUT_REUSE_MARGIN_MS = 5 * 60 * 1000
 /** The sweep looks again at orders this long after their checkout closed or they were paid. */
@@ -385,8 +384,9 @@ export async function startClaimCheckout(
   const claim = await deps.paidClaims.forCheckout(input)
   if (!claim) return { ok: true, redirect: dialog }
   // The checkout closes with the confirmation, so nobody pays for a claim that can't complete;
-  // with less left than a checkout's shortest life, the address is confirmed again first.
-  if (claim.confirmedUntil.getTime() - deps.now().getTime() < SHORTEST_CHECKOUT_MS) {
+  // with less left than a checkout's shortest life, the address is confirmed again first (the
+  // claim dialog asks for a new code then, #128; this answer is the backstop).
+  if (tooLateForCheckout(claim.confirmedUntil.getTime(), deps.now().getTime())) {
     return failure(409, 'not_payable', 'This claim can’t be paid for.')
   }
   return openCheckout(deps, input, {

@@ -16,6 +16,7 @@ import { buildRejectSubmissionPlans } from '@/db/submission-plans'
 import { insertPublishedListing, SqliteD1 } from '@/db/test-support'
 import { checkBadgeAtRefund } from '../badge-program/refund'
 import { features, type SiteFeatures } from '../features'
+import { SHORTEST_CHECKOUT_MS } from './checkout-window'
 import type { GuardrailResult } from './guardrails'
 import { createPaidClaims } from './paid-claims'
 import {
@@ -966,6 +967,24 @@ describe('paid claims (#67)', () => {
     await expect(
       startClaimCheckout(f.deps, { ...claim, email: 'maya@example.com', origin: ORIGIN })
     ).resolves.toMatchObject({ ok: false, status: 409 })
+    expect(f.rows('SELECT id FROM orders')).toEqual([])
+  })
+
+  it('opens a checkout just over the shortest checkout before the confirmation ends, and none just under (#128)', async () => {
+    const f = claimFixture()
+    // Confirmed at 11:05 the day before NOW's: the confirmation ends at 11:05 on NOW's day.
+    f.db.exec(`UPDATE listing_claims SET email_verified_at='2026-10-05T11:05:00.000Z'`)
+    const confirmedUntil = Date.parse('2026-10-06T11:05:00.000Z')
+    f.clock.now = new Date(confirmedUntil - SHORTEST_CHECKOUT_MS - 1000)
+    await openClaimCheckout(f)
+    expect(f.row('SELECT checkout_expires_at FROM orders')).toEqual({
+      checkout_expires_at: '2026-10-06T11:05:00.000Z'
+    })
+    f.db.exec(`DELETE FROM orders`)
+    f.clock.now = new Date(confirmedUntil - SHORTEST_CHECKOUT_MS + 1000)
+    await expect(
+      startClaimCheckout(f.deps, { ...claim, email: 'maya@example.com', origin: ORIGIN })
+    ).resolves.toMatchObject({ error: 'not_payable', ok: false, status: 409 })
     expect(f.rows('SELECT id FROM orders')).toEqual([])
   })
 

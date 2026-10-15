@@ -42,6 +42,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Separator } from '@/components/ui/separator'
 import { buildFeaturedOnBadgeEmbedHtml } from '@/components/website/featured-on-badge-embed-panel'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { tooLateForCheckout } from '@/lib/billing/checkout-window'
 
 /**
  * Claiming a listing (serpcompany/best.serp.co#67, #70 screens 8 and 9a): the "Claim this
@@ -141,6 +142,17 @@ function formatCountdown(seconds: number): string {
 
 function usd(cents: number, withCents: boolean): string {
   return `$${withCents ? (cents / 100).toFixed(2) : Math.round(cents / 100)}`
+}
+
+/**
+ * A confirmation lasts 24 hours. A paid claim's checkout closes with it and can't be shorter than
+ * the provider's shortest checkout, so with less than that left a paid claim confirms the address
+ * again before paying (#128), as any claim does once the confirmation has run out.
+ */
+function confirmationRunOut(claim: ClaimView, now: number): boolean {
+  if (!claim.confirmedUntil) return false
+  const until = Date.parse(claim.confirmedUntil)
+  return claim.method === 'paid' ? tooLateForCheckout(until, now) : until <= now
 }
 
 function useNow(active: boolean): number {
@@ -248,12 +260,8 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
         resumed.lockedUntil && Date.parse(resumed.lockedUntil) > Date.now() ? 'attempts' : null
       )
       setStep('code')
-    } else if (
-      resumed?.status === 'email_verified' &&
-      resumed.confirmedUntil &&
-      Date.parse(resumed.confirmedUntil) <= Date.now()
-    ) {
-      // A confirmation lasts 24 hours: past that, the address is confirmed again with a new code.
+    } else if (resumed?.status === 'email_verified' && confirmationRunOut(resumed, Date.now())) {
+      // Past the confirmation (for a paid claim, too near its end), a new code confirms again.
       setEmail(resumed.email)
       setCodeError('expired')
       setStep('code')
@@ -374,6 +382,14 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
     )
   }
 
+  /** Back to the code step, which offers a new code for the confirmed address. */
+  function confirmAgain(confirmed: ClaimView) {
+    setEmail(confirmed.email)
+    setCode('')
+    setCodeError('expired')
+    setStep('code')
+  }
+
   async function verifyBadge() {
     if (inFlight.current || !claim) return
     inFlight.current = true
@@ -399,10 +415,7 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
     if (elsewhere(response.status, error)) return
     if (error.code === 'confirmation_expired') {
       // 24 hours after the address was confirmed: confirm it again with a new code.
-      setEmail(claim.email)
-      setCode('')
-      setCodeError('expired')
-      setStep('code')
+      confirmAgain(claim)
     } else if (error.code === 'cooldown') {
       setBadgeWaitUntil(Date.now() + (error.retryAfterSeconds ?? BADGE_COOLDOWN_SECONDS) * 1000)
     } else if (error.code === 'checks_used') {
@@ -696,6 +709,13 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
           href={claim ? `/claims/${claim.id}/checkout/` : '#claim'}
           aria-disabled={!claim}
           className={buttonVariants()}
+          onClick={event => {
+            // Left open until too little of the confirmation is left for a checkout (#128).
+            if (claim && confirmationRunOut(claim, Date.now())) {
+              event.preventDefault()
+              confirmAgain(claim)
+            }
+          }}
         >
           {`Continue to payment: ${usd(priceCents, false)}`}
           <ArrowRight />
