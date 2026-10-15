@@ -170,7 +170,7 @@ describe('pnpm release:promote (#171)', () => {
   })
 
   it('runs only at a terminal', () => {
-    expect(() => assertInteractive(undefined)).toThrow(/Agents never run it/u)
+    expect(() => assertInteractive(undefined)).toThrow(/only on the owner's "you do it"/u)
     expect(() => assertInteractive(false)).toThrow(/needs a terminal/u)
     expect(() => assertInteractive(true)).not.toThrow()
   })

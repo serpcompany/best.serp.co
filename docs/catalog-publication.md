@@ -16,7 +16,9 @@ procedure is in [Media publishing](./media-publishing.md#uploading-and-publishin
   **Upload Listing Media** from `main` copies staging's verified objects bucket to bucket
   through the R2 API. A plan is uploaded before the manifest that names its keys is published.
 - **Who runs them.** Each dispatch needs its typed confirmation (`project.confirmation` in
-  `scripts/project.ts`). Only the owner dispatches them; agents prepare and review the files
+  `scripts/project.ts`). Only the owner dispatches them, apart from a release's approved
+  production publications, which an agent may run on the owner's "you do it" for that release
+  ([Owner rules](./owner-rules.md#production-releases)). Agents prepare and review the files
   (AGENTS.md).
 
 No staging-verification check gates these workflows the way it gates Deploy Production: they

@@ -5,7 +5,9 @@ then production as reviewed files, uploaded and published by protected workflows
 storage: [Listing media](./media.md). Why staging comes first:
 [Catalog publication](./catalog-publication.md).
 
-Agents prepare and review these files; they never run the uploads or publications.
+Agents prepare and review these files. They never run the uploads or publications, apart from
+step 3 below on the owner's "you do it" for that release
+([Owner rules](./owner-rules.md#production-releases)).
 
 ## Uploading and publishing
 
@@ -14,7 +16,8 @@ metadata, and source: a public https URL or a `repo:` file under `apps/web/publi
 row-level manifests under `d1/publications/` that name the keys.
 `pnpm media:upload:dry-run -- d1/media/<plan>.json` fetches and verifies every object locally and
 writes nothing. The owner then runs, in order, each with its typed confirmation
-(`project.confirmation` in `scripts/project.ts`):
+(`project.confirmation` in `scripts/project.ts`); step 3 an agent may run instead on that release's
+"you do it":
 
 1. **Upload Listing Media (staging)** from `staging`. Every object is fetched again and uploaded
    only if its bytes still match the plan.

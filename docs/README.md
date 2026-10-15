@@ -41,6 +41,7 @@ Each doc covers one topic. Open the one whose "read it when" matches the task.
 | [Harness](./harness.md) | Validation loops, runtime evidence, worktrees | You validate a change, capture runtime evidence, or start a worktree |
 | [CI](./ci.md) | `web.yml` checks and staging deploy, rulesets, runners | A check fails in CI, or you change a workflow |
 | [Dependency security](./dependency-security.md) | Production dependency audit | You add or upgrade a dependency, or the audit fails |
+| [Owner rules](./owner-rules.md) | The owner's standing rules: asking the owner, UI extras and acceptance, merging to staging, the per-release production go, Node 24 and scratch files | You ask the owner something, add UI, merge a pull request, release to production, or set up a worktree |
 | [Issue tracker](./agents/issue-tracker.md) | Agent issue workflow configuration | You file, label or close an issue |
 | [Triage labels](./agents/triage-labels.md) | Label conventions | You triage an issue |
 | [Domain docs](./agents/domain.md) | Shared vocabulary configuration | You name a domain concept |

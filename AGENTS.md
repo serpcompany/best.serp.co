@@ -34,8 +34,7 @@ Cloudflare backed by one D1 database per environment. D1 is the only catalog sto
   production D1 bootstrap (#315).
 - `scripts/harness/`: deterministic agent feedback and runtime tooling.
 - `docs/`: operating procedures.
-
-Closer `AGENTS.md` files add local rules without replacing this contract.
+- Closer `AGENTS.md` files add local rules without replacing this contract.
 
 ## Primary commands
 
@@ -44,9 +43,8 @@ Closer `AGENTS.md` files add local rules without replacing this contract.
   `pnpm db:verify:local` checks them ([Development](./docs/development.md#local-data)).
 - `pnpm db:generate`: generate a reviewed migration from the Drizzle schema.
 - `pnpm db:migrations:list:{local,staging,production}`: read-only migration status.
-  `pnpm db:migrate:{staging,production}` runs only inside the protected deploy workflows,
-  and production only after Deploy Staging verified the same source tree
-  (see [Release guards](./docs/release-guards.md)).
+  `pnpm db:migrate:{staging,production}` runs only inside the protected deploy workflows, and
+  production only after [Deploy Staging verified](./docs/release-guards.md) the same source tree.
 - `pnpm check`: the read-only finish gate CI runs; `pnpm harness:fast` is the quicker loop.
 - `pnpm cf-typegen`: regenerate `apps/web/cloudflare-env.d.ts` after a Wrangler change.
 - `pnpm test` (all Vitest projects), `pnpm test:e2e` (Playwright on a local Worker); while
@@ -59,17 +57,19 @@ Closer `AGENTS.md` files add local rules without replacing this contract.
 
 Stage: ship
 
-GitHub Issues on `serpcompany/best.serp.co` are the source of truth for planning. To resume
-work, start from the open issue labelled `handoff` (`gh issue list --label handoff`).
-`staging` is the base branch: branch from `origin/staging` as `issue-<n>-<slug>` and open
-pull requests into `staging` (`gh pr create --base staging`); each merge deploys staging.
-`main` is production and changes only by a fast-forward promotion (`pnpm release:promote`,
-owner only) or a `hotfix-*` pull request ([Release guards](./docs/release-guards.md#promotion)).
-Rulesets require a PR and `web.yml`'s `check` and `e2e`, and block force pushes and deletion.
-Agents never merge or push to `main`; the owner approves every merge. Agents never dispatch a
-production workflow or a staging data workflow (catalog publication, media upload), type their
-confirmations, approve a deployment, or run the emergency `pnpm deploy:*`; only the owner does.
-Issues and labels never grant production, database, or deployment authority.
+GitHub Issues on `serpcompany/best.serp.co` are the source of truth for planning. To resume work,
+start from the open issue labelled `handoff` (`gh issue list --label handoff`). `staging` is the
+base branch: branch from `origin/staging` as `issue-<n>-<slug>` and open pull requests into it; each
+merge deploys staging. `main` is production and changes only by a fast-forward
+[promotion](./docs/release-guards.md#promotion) (`pnpm release:promote`) or a `hotfix-*` pull
+request. Agents squash-merge agent PRs into `staging` once green and reviewed clean (no blocking
+findings). Agents never merge into or push to `main`, dispatch a production workflow or a staging
+data workflow (catalog publication, media upload), type their confirmations, approve a deployment,
+or run the emergency `pnpm deploy:*`, apart from three steps the owner's "you do it" for one release
+allows: run `release:promote` under `expect`, approve its production gate, and run its approved
+production uploads and publications. Issues and labels never grant production, database, or
+deployment authority. [Owner rules](./docs/owner-rules.md) records those steps, asking the owner,
+hands-off defaults, UI extras and acceptance, Node 24 and scratch files, and the staging queue.
 
 ## Non-negotiable architecture
 
