@@ -155,11 +155,13 @@ function archivedModules(): string[] {
 
 /**
  * A path into `.archive/`, quoted, as a shell argument, or under a root variable
- * (`${root}/.archive/`, `${{ github.workspace }}/.archive/`, `resolve(root, '.archive')`, #336):
- * a path character must follow, or a quote that ends an argument, so code that excludes the
- * archive by its `.archive/` prefix doesn't match.
+ * (`${root}/.archive/`, `${{ github.workspace }}/.archive/`, #336): a path character must follow,
+ * or a quote and a comma (a joined segment). The archive itself is matched only as a later
+ * argument (`resolve(root, '.archive')`), so code that excludes the archive by its prefix, with
+ * or without the slash (`startsWith('.archive')`, #458), doesn't match.
  */
-const ARCHIVE_PATH = /(?:^|[\s'"`=(:,/}])(?:\.{1,2}\/)*\.archive(?:\/[\w.-]|['"`]\s*[,)])/u
+const ARCHIVE_PATH =
+  /(?:^|[\s'"`=(:,/}])(?:\.{1,2}\/)*\.archive(?:\/[\w.-]|['"`]\s*,)|,\s*['"`]\.archive['"`]\s*\)/u
 
 /**
  * The lines of `source` that read a path into `.archive/` or name a module archived there
@@ -978,6 +980,8 @@ describe('single-site D1-only repository architecture', () => {
     for (const prose of [
       // Excluding the archive names only its prefix, never a path into it.
       `return !file.startsWith('.archive/')`,
+      `return !file.startsWith('.archive')`,
+      `files.filter(file => !file.includes('.archive'))`,
       `'The v1 catalog import is retired (#315; history in .archive/).'`,
       ' * Approved copy (`.archive/mockups/submissions/COPY.md`).',
       '// Archived with the v1 import in .archive/scripts/listing-faq-move.ts',

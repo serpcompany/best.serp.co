@@ -536,6 +536,8 @@ describe('publisher plan in SQLite transaction (D1 batch emulator)', () => {
 
     it('drops every image of a listing that has none left, and rolls back when media changed', () => {
       const db = mediaDatabase()
+      // With nothing queued: a queued logo it doesn't replace refuses it (#458, below).
+      db.exec('DELETE FROM media_ingestions')
       executeInTestTransaction(db, plan({ operations: [mediaUpdate({ media: {} })] }))
       expect(
         db.prepare("SELECT kind FROM listing_media WHERE listing_id='lst_sqlite_test'").all()
@@ -551,37 +553,169 @@ describe('publisher plan in SQLite transaction (D1 batch emulator)', () => {
       expect(changed.prepare('SELECT version FROM publication_state').get()).toEqual({ version: 4 })
     })
 
-    // #336: an approval deletes the listing's logo row and queues the new one for the cron, so an
-    // empty update (a renamed listing's, docs/media.md) would pass its `expected: []` and drop it.
-    it('refuses an empty update while a logo or image is queued for the listing (#336)', () => {
-      const empty = mediaUpdate({ expected: [], media: {} })
-      const queued = 'a logo or image is queued for the listing, so it is not empty'
-      for (const slot of [`'pending',0,'${now}',NULL`, `'failed',5,NULL,'fetch failed'`]) {
+    // #336, #458: an approval deletes the listing's logo row and queues its new logo for the cron
+    // (`adoptStagedLogoPlans`), and `expected` lists rows, never the queue. An update generated
+    // in that window would drop the logo, so the publisher refuses any update that drops a
+    // pending or failed slot without writing that slot's kind and sort order.
+    describe('a pending or failed upload the update does not replace (#336, #458)', () => {
+      const reviewedKey = `best.serp.co/revisions/rev_sqlite/logo/${'d'.repeat(16)}.png`
+      const refusal = (slug: string, slots: string) =>
+        `bad JSON path: 'listing-media-update ${slug} (lst_sqlite_test) would drop a pending or failed upload it does not replace: ${slots}. Let the media cron host a pending one, or host a failed one with a media upload plan, then ship an update that names it (docs/media.md)'`
+      /** Queues a slot as an approval (a logo, with its reviewed key) or an admin edit would. */
+      const queue = (
+        db: DatabaseSync,
+        status: 'failed' | 'pending',
+        kind: 'image' | 'logo' = 'logo',
+        order = 0
+      ) =>
+        db
+          .prepare(
+            `INSERT INTO media_ingestions (listing_id,kind,sort_order,source_url,copy_from_key,status,attempts,next_attempt_at,last_error)
+              VALUES ('lst_sqlite_test',?,?,?,?,?,?,?,?)`
+          )
+          .run(
+            kind,
+            order,
+            `https://queued.example/${kind}.png`,
+            kind === 'logo' ? reviewedKey : null,
+            status,
+            status === 'failed' ? 5 : 0,
+            status === 'pending' ? now : null,
+            status === 'failed' ? 'fetch failed' : null
+          )
+      const insertHosted = (
+        db: DatabaseSync,
+        kind: 'image' | 'logo',
+        image: ReturnType<typeof hosted>
+      ) =>
+        db
+          .prepare(
+            `INSERT INTO listing_media (listing_id,kind,url,sort_order,media_key,sha256,content_type,bytes,width,height)
+              VALUES ('lst_sqlite_test',?,?,0,?,?,?,?,?,?)`
+          )
+          .run(
+            kind,
+            image.source,
+            image.key,
+            image.sha256,
+            image.contentType,
+            image.bytes,
+            image.width,
+            image.height
+          )
+      /** A renamed listing with an image, as the rename left it: its row keeps the old slug. */
+      const oldImage = hosted('image', 'b')
+      const renamed = () => {
         const db = database()
-        db.exec(`INSERT INTO media_ingestions (listing_id,kind,sort_order,source_url,status,attempts,next_attempt_at,last_error)
-          VALUES ('lst_sqlite_test','logo',0,'https://queued.example/logo.png',${slot})`)
-        expect(() => executeInTestTransaction(db, plan({ operations: [empty] })), slot).toThrow(
-          `bad JSON path: 'listing-media-update old-slug: ${queued}'`
-        )
-        expect(db.prepare('SELECT COUNT(*) AS count FROM media_ingestions').get()).toEqual({
-          count: 1
-        })
-        expect(db.prepare('SELECT version FROM publication_state').get()).toEqual({ version: 4 })
+        db.exec("UPDATE listings SET slug='new-slug' WHERE id='lst_sqlite_test'")
+        insertHosted(db, 'image', oldImage)
+        return db
       }
-      // With nothing queued, the empty update applies.
-      const db = database()
-      executeInTestTransaction(db, plan({ operations: [empty] }))
-      expect(db.prepare('SELECT version FROM publication_state').get()).toEqual({ version: 5 })
-      // An update that names its media still replaces a queued slot: the manifest wins.
-      const named = database()
-      named.exec(`INSERT INTO media_ingestions (listing_id,kind,sort_order,source_url,next_attempt_at)
-        VALUES ('lst_sqlite_test','logo',0,'https://queued.example/logo.png','${now}')`)
-      executeInTestTransaction(
-        named,
-        plan({ operations: [mediaUpdate({ expected: [], media: { logo: hosted('logo', 'a') } })] })
-      )
-      expect(named.prepare('SELECT COUNT(*) AS count FROM media_ingestions').get()).toEqual({
-        count: 0
+      const imageRow = { kind: 'image', url: oldImage.source, key: oldImage.key }
+      const rehost = { images: [hosted('image', 'b', 'new-slug')] }
+      const queueAndVersion = (db: DatabaseSync) => ({
+        queue: db.prepare('SELECT kind,status FROM media_ingestions ORDER BY kind').all(),
+        rows: db.prepare('SELECT kind,media_key FROM listing_media ORDER BY kind').all(),
+        version: db.prepare('SELECT version FROM publication_state').get()
+      })
+
+      it('refuses a renamed listing’s follow-up that names its images while its new logo waits', () => {
+        for (const status of ['pending', 'failed'] as const) {
+          const db = renamed()
+          queue(db, status)
+          const before = queueAndVersion(db)
+          const followUp = mediaUpdate({ slug: 'new-slug', expected: [imageRow], media: rehost })
+          expect(
+            () => executeInTestTransaction(db, plan({ operations: [followUp] })),
+            status
+          ).toThrow(refusal('new-slug', `logo ${reviewedKey} (${status})`))
+          // The batch rolled back: the queued logo, the old image row, and the version stay.
+          expect(queueAndVersion(db)).toEqual(before)
+          expect(before.queue).toEqual([{ kind: 'logo', status }])
+        }
+        // Once the cron hosts the logo (under the listing's slug, deleting its slot), an update
+        // generated from the rows names it and applies (docs/media.md).
+        const db = renamed()
+        const logo = hosted('logo', 'c', 'new-slug')
+        insertHosted(db, 'logo', logo)
+        const followUp = mediaUpdate({
+          slug: 'new-slug',
+          expected: [imageRow, { kind: 'logo', url: logo.source, key: logo.key }],
+          media: { ...rehost, logo }
+        })
+        executeInTestTransaction(db, plan({ operations: [followUp] }))
+        expect(queueAndVersion(db)).toEqual({
+          queue: [],
+          rows: [
+            { kind: 'image', media_key: rehost.images[0]?.key },
+            { kind: 'logo', media_key: logo.key }
+          ],
+          version: { version: 5 }
+        })
+      })
+
+      it('refuses every update that drops a slot, and applies one that replaces it', () => {
+        const refused = [
+          // A renamed listing with no media ships an empty update (#336).
+          ['an empty update', database, 'pending', 'logo', 0, { expected: [], media: {} }],
+          // The cleanup shape: every row goes, and the logo an admin queued with them.
+          ['an update that removes the logo', mediaDatabase, 'failed', 'logo', 0, { media: {} }],
+          [
+            'an update with fewer images than the queue',
+            database,
+            'pending',
+            'image',
+            1,
+            { expected: [], media: { images: [hosted('image', 'b')] } }
+          ]
+        ] as const
+        for (const [name, start, status, kind, order, overrides] of refused) {
+          const db = start()
+          db.exec('DELETE FROM media_ingestions')
+          queue(db, status, kind, order)
+          const before = queueAndVersion(db)
+          const slot = kind === 'logo' ? reviewedKey : 'https://queued.example/image.png'
+          expect(
+            () => executeInTestTransaction(db, plan({ operations: [mediaUpdate(overrides)] })),
+            name
+          ).toThrow(refusal('old-slug', `${kind} ${slot} (${status})`))
+          expect(queueAndVersion(db), name).toEqual(before)
+        }
+        // Several dropped slots are all named, in kind and sort order.
+        const both = database()
+        queue(both, 'failed', 'image')
+        queue(both, 'pending')
+        expect(() =>
+          executeInTestTransaction(
+            both,
+            plan({ operations: [mediaUpdate({ expected: [], media: {} })] })
+          )
+        ).toThrow(
+          refusal(
+            'old-slug',
+            `image https://queued.example/image.png (failed), logo ${reviewedKey} (pending)`
+          )
+        )
+        // With nothing queued, the empty update applies.
+        const db = database()
+        executeInTestTransaction(
+          db,
+          plan({ operations: [mediaUpdate({ expected: [], media: {} })] })
+        )
+        expect(db.prepare('SELECT version FROM publication_state').get()).toEqual({ version: 5 })
+        // An update that writes the slot's kind and sort order replaces it: the manifest wins.
+        for (const [kind, media] of [
+          ['logo', { logo: hosted('logo', 'a') }],
+          ['image', { images: [hosted('image', 'b')] }]
+        ] as const) {
+          const named = database()
+          queue(named, 'pending', kind)
+          executeInTestTransaction(
+            named,
+            plan({ operations: [mediaUpdate({ expected: [], media })] })
+          )
+          expect(queueAndVersion(named).queue, kind).toEqual([])
+        }
       })
     })
 
