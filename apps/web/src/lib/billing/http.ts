@@ -43,9 +43,9 @@ type CheckoutHandler = (input: {
 }) => Promise<Response>
 
 /**
- * Runs a checkout route: 404 while orders are off, the sign-in page (and back) when signed
- * out, 503 when billing is misconfigured, and the handler otherwise. Account routes pass the
- * user `requireAccountUser()` already resolved.
+ * Runs a checkout route: 404 while orders are off, 503 when billing or its public origin
+ * (`publicOrigin`) is misconfigured, the sign-in page (and back) when signed out, and the
+ * handler otherwise. Account routes pass the user `requireAccountUser()` already resolved.
  */
 export async function withCheckout(
   request: Request,
@@ -54,9 +54,13 @@ export async function withCheckout(
   signedIn?: SessionUser
 ): Promise<Response> {
   if (isRouterRequest(request)) return noStore(204)
-  let deps: BillingDependencies | null
+  let deps: BillingDependencies
+  let origin: string
   try {
-    deps = await billing()
+    const configured = await billing()
+    if (!configured) return noStore(404, 'Not found')
+    deps = configured
+    origin = await publicOrigin(request)
   } catch (error) {
     console.error(
       JSON.stringify({
@@ -66,10 +70,9 @@ export async function withCheckout(
     )
     return noStore(503, 'Checkout is unavailable right now. Try again.')
   }
-  if (!deps) return noStore(404, 'Not found')
   const user = signedIn ?? (await getRequestUser(request))
   if (!user) return redirectTo(`/login/?callbackUrl=${encodeURIComponent(returnPath)}`)
-  return handler({ deps, origin: await publicOrigin(request), user })
+  return handler({ deps, origin, user })
 }
 
 /** Sends the buyer to the provider, or to where things stand, or answers the failure. */

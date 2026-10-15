@@ -76,6 +76,10 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
   before any checkout. A draft with no plan chooses paid first. The account shows "Upgrade"
   and "Relist" only when the checkout would accept them (never after a refund). A submission or listing that can't be paid for goes to
   its account page. Next.js router requests never open one, and the links are plain anchors.
+  The session's return and cancel URLs start with `BETTER_AUTH_URL`, the environment's https
+  origin, never the request's host: inside OpenNext a client's `X-Forwarded-Host` becomes
+  `Host` (#467). Without a valid one, a deployed Worker's checkout answers 503; only a local
+  Worker without it uses the request's host.
 - **Return.** Stripe returns to the return page (or, for an upgrade or relist, the account
   listing's success route): it asks Stripe about the order's own session and applies a paid one
   if the webhook hasn't. Cancelling returns to the cancelled page (or the account listing).
@@ -190,6 +194,7 @@ the flag off; nothing uses it while the flag is on.
 ## Tests
 
 `apps/web/src/lib/billing/{service,providers/stripe}.test.ts` (node:sqlite and a fake provider),
+`apps/web/src/lib/billing/http.test.ts` (the checkout routes' return URLs under a spoofed host),
 `scripts/d1-drizzle-local.test.ts` (the migration), and `apps/web/e2e/billing.spec.ts`
 (Playwright on the admin panel suite's Worker and D1, `PLAYWRIGHT_PORT` + 3, started with the
 mocked provider's test values (`BILLING_PREVIEW_VARS` in `apps/web/e2e/orders-worker.ts`;
