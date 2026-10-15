@@ -38,10 +38,12 @@ no beacon.
 Sentry reports errors from the browser (`instrumentation-client.ts`) on every page, and from
 the Worker (`apps/web/src/instrumentation.ts`, server rendering and route handlers) on the
 signed-in and operational surfaces only: `/admin`, `/account`, `/submit`, `/login`, `/claims`
-and `/api` (#355). The Worker entry adds the errors Next.js never sees, from those same surfaces
-and from the cron jobs ([below](#worker-entry-and-cron-errors)). The settings and the scrubber are in `apps/web/src/lib/telemetry/sentry.ts`:
-errors only, with no PII, free-text error messages, query strings, cookies, headers, console
-output, logger data, sessions, tracing, or replay. Both deploy builds bake in
+and `/api` (#355), apart from `/api/search`, which logs like a public page
+([below](#public-pages-worker-logs-not-sentry), #401). The Worker entry adds the errors
+Next.js never sees, from those same surfaces and from the cron jobs
+([below](#worker-entry-and-cron-errors)). The settings and the scrubber are in
+`apps/web/src/lib/telemetry/sentry.ts`: errors only, with no PII, free-text error messages, query
+strings, cookies, headers, console output, logger data, sessions, tracing, or replay. Both deploy builds bake in
 `NEXT_PUBLIC_SENTRY_DSN` (repo variable `SENTRY_DSN`) and the commit as the release; with no DSN,
 Sentry stays off (E2E sets none).
 `SENTRY_AUTH_TOKEN` (repo secret, project releases scope) and the `SENTRY_PROJECT` variable
@@ -105,9 +107,10 @@ Errors are Sentry's most expensive category, so a failure that repeats is report
   answer, or one cut off) and `parse` (an answer that doesn't parse or fit the contract). Keyed by
   kind, a flaky connection can't hide a later parse failure, the sign of a tab older than a
   deploy. An error status is never reported from the browser: `/api/search` answers only 200 or a
-  server error, which `onRequestError` already reports (`/api` reports to Sentry), and a 4xx comes
-  from in front of it (a 429 throttle, a challenge, staging's password). During an outage of the
-  route itself, the server still sends one event per failed search; #401 tracks that.
+  server error, which the Worker logs and doesn't send to Sentry
+  ([below](#public-pages-worker-logs-not-sentry)), and a 4xx comes from in front of it (a 429
+  throttle, a challenge, staging's password). So an outage of the route itself sends Sentry
+  nothing; each failed search is a `request_error` line in Workers Logs.
 - **Search entries** (`use-search-helpers.ts`): the entries one response fails on are one report,
   the first failure's code, with every failed entry in the console line's `data`.
 - **Error pages** (`error-content.tsx`, `global-error.tsx`): an error with a Next.js `digest` came
@@ -121,6 +124,14 @@ Every other path never loads the Worker's Sentry SDK: the home page, the catalog
 sitemaps and RSS, the other public pages, and unknown paths. This is the owner's decision in
 #355: the SDK cost about 110 ms of CPU in each fresh isolate (#334), and search crawlers mostly
 see uncached public pages in fresh isolates.
+
+**The search API logs the same way** (#401, the owner's option 1). `/api/search` is under `/api`,
+but every public page's search box calls it on each pause in typing, so during an outage of the
+route (D1's `Network connection lost`) Sentry got one event per search, and each fresh isolate
+started the SDK to serve it. `LOG_ONLY_ROUTES` in `lib/telemetry/server-errors.ts` takes the
+route, and every path under it, out of the surfaces: its errors are `request_error` lines only,
+and a search never starts the SDK. The browser doesn't report its error statuses either, so the
+line is the error's only record. Every other `/api` route still reports to Sentry.
 
 ### Every request error is in the Worker logs
 
@@ -176,9 +187,11 @@ is made per request, at run time, by which modules the isolate evaluates.
   request never starts it.
 - **`onRequestError` routes by path.** Every error is logged as `request_error` first; a
   reporting path also goes to `Sentry.captureRequestError`, and one whose SDK fails to load or
-  start is only logged. Only the first segment of the pathname counts, even in an absolute URL.
-  `server-errors.test.ts` walks the top-level routes in `apps/web/src/app` and fails on one that
-  is neither a surface (`SERVER_SENTRY_SURFACES`) nor in its list of public segments.
+  start is only logged. Only the first segment of the pathname counts, even in an absolute URL,
+  apart from `LOG_ONLY_ROUTES`, which match by whole segments (`/api/search/…`, not
+  `/api/searchx`). `server-errors.test.ts` walks the top-level routes in `apps/web/src/app` and
+  fails on one that is neither a surface (`SERVER_SENTRY_SURFACES`) nor in its list of public
+  segments, and holds every route folder in `src/app/api` but `search` to reporting.
 - **`global-error.tsx` imports `captureException` when it shows**
   (`lib/telemetry/report-global-error.ts`). Every page's server render loads that component,
   and its static import used to load a second, server-rendering copy of the SDK. In the
