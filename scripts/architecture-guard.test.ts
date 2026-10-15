@@ -156,12 +156,13 @@ function archivedModules(): string[] {
 /**
  * A path into `.archive/`, quoted, as a shell argument, or under a root variable
  * (`${root}/.archive/`, `${{ github.workspace }}/.archive/`, #336): a path character must follow,
- * or a quote and a comma (a joined segment). The archive itself is matched only as a later
- * argument (`resolve(root, '.archive')`), so code that excludes the archive by its prefix, with
- * or without the slash (`startsWith('.archive')`, #458), doesn't match.
+ * so code that excludes the archive by its `.archive/` prefix doesn't match. The archive itself
+ * matches as a quoted argument (`readdirSync('.archive')`, `resolve(root, '.archive')`), except
+ * to a string's prefix or containment method, which compares a path rather than reading one
+ * (`startsWith('.archive')`, #458).
  */
 const ARCHIVE_PATH =
-  /(?:^|[\s'"`=(:,/}])(?:\.{1,2}\/)*\.archive(?:\/[\w.-]|['"`]\s*,)|,\s*['"`]\.archive['"`]\s*\)/u
+  /(?:^|[\s'"`=(:,/}])(?:\.{1,2}\/)*\.archive\/[\w.-]|(?<!\b(?:startsWith|endsWith|includes|indexOf|lastIndexOf)\(\s*)(?:^|[\s'"`=(:,/}])(?:\.{1,2}\/)*\.archive['"`]\s*[,)]/u
 
 /**
  * The lines of `source` that read a path into `.archive/` or name a module archived there
@@ -949,6 +950,11 @@ describe('single-site D1-only repository architecture', () => {
       'a template literal under a root': `readFileSync(\`\${root}/.archive/d1/x.yaml\`)`,
       'a workflow path under the workspace': `path: \${{ github.workspace }}/.archive/d1`,
       'the archive itself, resolved': `resolve(root, '.archive')`,
+      // #458 review: the archive as a first or only argument.
+      'the archive itself, listed': `readdirSync('.archive')`,
+      'the archive itself, checked': `existsSync(".archive")`,
+      'the archive itself, resolved alone': `resolve('.archive')`,
+      'the archive itself, removed': `rmSync('.archive', { recursive: true })`,
       'a shell argument': 'run: pnpm tsx .archive/scripts/listing-faq-move.ts',
       'an archived module': `import { moveFaqs } from './listing-faq-move'`,
       'an archived module with its extension': `"faqs": "tsx scripts/listing-faq-move.ts"`,
@@ -982,6 +988,8 @@ describe('single-site D1-only repository architecture', () => {
       `return !file.startsWith('.archive/')`,
       `return !file.startsWith('.archive')`,
       `files.filter(file => !file.includes('.archive'))`,
+      `return file.endsWith(".archive") || file.indexOf('.archive') === 0`,
+      `const at = file.lastIndexOf( '.archive', end)`,
       `'The v1 catalog import is retired (#315; history in .archive/).'`,
       ' * Approved copy (`.archive/mockups/submissions/COPY.md`).',
       '// Archived with the v1 import in .archive/scripts/listing-faq-move.ts',
