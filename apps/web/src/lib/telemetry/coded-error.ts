@@ -10,6 +10,7 @@ export const FAILURE_CODES = [
   'auth_guard_failed',
   'billing_mock_port_invalid',
   'billing_mock_port_not_local',
+  'billing_origin_invalid',
   'billing_secret_key_wrong_mode',
   'billing_secrets_missing',
   'billing_tax_unsupported',

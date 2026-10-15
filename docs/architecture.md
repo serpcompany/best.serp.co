@@ -175,15 +175,17 @@ host alone. A test (`apps/web/src/lib/environment/site-environment.test.ts`) pin
   ([CI](./ci.md#staging-smoke-readiness)). Production is gated on its platform host with the
   smoke-test header (non-production policy, `x-site-environment: production`, and the 308 once
   the switch is `on`), then on best.serp.co itself without it: no noindex, robots.txt lists the
-  sitemap index, Google Tag Manager loads. Every answer from the Worker is enforced. Only
-  these are skipped, with a `best.serp.co check skipped` warning: a `cf-mitigated` challenge,
-  a 403 or 429 without Worker headers (zone protection), and GitHub Pages before the cutover
-  (which fails while the switch is `on`). A 503 without Worker headers (for example, a Worker
-  over its limits), no answer, or any other answer fails. The workers.dev pass also rejects a
-  robots-meta noindex on `/` and a listing page, which is the same on every host. In
-  `apps/web/src/lib/environment/`, `public-policy.test.tsx` runs the policy through the Worker
-  pipeline and the root layout's analytics decision, and `noindex-sources.test.ts` checks the
-  real `next.config.ts` headers and the layout's and pages' robots metadata.
+  sitemap index, Google Tag Manager loads, and so does the Cloudflare Web Analytics beacon while
+  `env.production.vars.CF_WEB_ANALYTICS_TOKEN` holds a site token (#272). Every answer from the
+  Worker is enforced. Only these are skipped, with a `best.serp.co check skipped` warning: a
+  `cf-mitigated` challenge, a 403 or 429 without Worker headers (zone protection), and GitHub
+  Pages before the cutover (which fails while the switch is `on`). A 503 without Worker
+  headers (for example, a Worker over its limits), no answer, or any other answer fails. The
+  workers.dev pass also rejects a robots-meta noindex on `/` and a listing page, which is the
+  same on every host. In `apps/web/src/lib/environment/`, `public-policy.test.tsx` runs the
+  policy through the Worker pipeline and the root layout's analytics decision, and
+  `noindex-sources.test.ts` checks the real `next.config.ts` headers and the layout's and pages'
+  robots metadata.
 - **Manual check of best.serp.co** (after any gate run that logged `best.serp.co check skipped`;
   [deploy runbook](./deploy-runbook.md#after-a-deploy)). `pnpm tsx scripts/d1-preview-http-gates.ts
   public https://best.serp.co` runs the same best.serp.co checks without skipping anything. Then

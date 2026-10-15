@@ -1,8 +1,10 @@
 import 'server-only'
 
 import { getCloudflareContext } from '@opennextjs/cloudflare'
+import { httpsOrigin } from '../auth/settings'
 import { enqueueEmail } from '../email/server'
-import { ordersEnabledFor } from './flags'
+import { CodedError } from '../telemetry/coded-error'
+import { isLocalWorker, ordersEnabledFor } from './flags'
 import type { BillingDependencies } from './service'
 import { type BillingEnv, createBillingDependencies } from './worker-billing'
 
@@ -47,12 +49,26 @@ export async function requestWaitUntil(): Promise<(task: Promise<unknown>) => vo
 }
 
 /**
- * The Worker's public origin for the provider's return URLs: `BETTER_AUTH_URL` (staging and
- * production set it to this Worker's https origin), else, on a local Worker, the request's own
- * host, so the buyer comes back to the origin their session cookie belongs to.
+ * The Worker's public origin for the provider's return URLs: the environment's configured
+ * origin, `BETTER_AUTH_URL` (staging and production set it to this Worker's https origin).
+ * Only a local Worker (`isLocalWorker`) without it uses the request's own host, so the buyer
+ * comes back to the origin their session cookie belongs to. A deployed Worker never reads the
+ * host (#467): inside OpenNext a client's `X-Forwarded-Host` becomes `Host`, which would let
+ * the client choose where the provider sends the buyer. Without an https origin there it
+ * throws, and the checkout route answers 503.
  */
 export async function publicOrigin(request: Request): Promise<string> {
   const env = (await workerEnv()) as BillingEnv & { BETTER_AUTH_URL?: string }
+  if (!isLocalWorker(env)) {
+    const origin = httpsOrigin(env.BETTER_AUTH_URL ?? '')
+    if (!origin) {
+      throw new CodedError(
+        'billing_origin_invalid',
+        'BETTER_AUTH_URL must be the https origin of this Worker for checkout return URLs.'
+      )
+    }
+    return origin
+  }
   if (env.BETTER_AUTH_URL) return new URL(env.BETTER_AUTH_URL).origin
   const url = new URL(request.url)
   const host = request.headers.get('host')
