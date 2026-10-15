@@ -193,6 +193,15 @@ describe('starting the Worker Sentry SDK (#355)', () => {
     expect(start).not.toHaveBeenCalled()
   })
 
+  it('never starts it for a search that is a fresh isolate’s first request (#464)', async () => {
+    // The Worker entry runs before OpenNext's first request calls register() (`worker.ts`).
+    await startServerSentryFor(request('/api/search?q=video'))
+    const start = vi.fn(async () => {})
+    await registerServerSentryStarter(start)
+    await startServerSentryFor(request('/api/search/?q=video'))
+    expect(start).not.toHaveBeenCalled()
+  })
+
   it('starts it in register() when the reporting request came first', async () => {
     await startServerSentryFor(request('/account/'))
     const start = vi.fn(async () => {})
