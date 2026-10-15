@@ -5,13 +5,20 @@
  * environment's configured origin (`BETTER_AUTH_URL`) whatever host the client puts in the URL,
  * `Host` or `X-Forwarded-Host` (OpenNext turns the last into `Host`); without a valid origin the
  * route answers 503 and opens nothing. Only a local Worker without one uses the request's host.
+ *
+ * And no provider secret in a URL (#469): with the provider's secrets in the Worker's env, as
+ * on staging and production, no URL a checkout route sends the buyer to or has the provider send
+ * them back to carries one, and the buyer's returns redirect to bare pages.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GET as listingCheckout } from '@/app/(dashboard)/account/listings/[slug]/checkout/route'
+import { GET as listingReturn } from '@/app/(dashboard)/account/listings/[slug]/checkout/success/route'
 import { GET as claimCheckout } from '@/app/(site)/claims/[id]/checkout/route'
+import { GET as claimReturn } from '@/app/(site)/claims/[id]/checkout/success/route'
 import { GET as submissionCheckout } from '@/app/(site)/submit/[id]/checkout/start/route'
 import type { CheckoutRequest } from './provider'
+import { providerSecretsIn, TEST_PROVIDER_SECRETS } from './providers/test-support'
 import type { BillingDependencies } from './service'
 
 const { current, getCloudflareContext, USER } = vi.hoisted(() => ({
@@ -114,6 +121,7 @@ function stubBilling(): CheckoutRequest[] {
         kind: 'listing'
       }),
       openOrder: async () => null,
+      order: async () => null,
       websiteConflicts: async () => ({ blocked: false, listed: false })
     },
     paidClaims: {
@@ -242,5 +250,58 @@ describe('checkout return URLs on a local Worker', () => {
 
     expect(response.status).toBe(503)
     expect(checkouts).toEqual([])
+  })
+})
+
+describe('no provider secret in a checkout URL (#469)', () => {
+  const SECRETS = Object.values(TEST_PROVIDER_SECRETS)
+
+  it.each(ROUTES)(
+    'the $name checkout sends the buyer out and back with no provider secret in either URL',
+    async route => {
+      worker({ ...PRODUCTION, ...TEST_PROVIDER_SECRETS })
+      const checkouts = stubBilling()
+
+      const response = await route.call(new Request(`${PRODUCTION.BETTER_AUTH_URL}${route.path}`))
+
+      expect(response.status).toBe(303)
+      const [checkout] = checkouts
+      if (!checkout) throw new Error('no checkout opened')
+      const urls = [response.headers.get('location') ?? '', checkout.successUrl, checkout.cancelUrl]
+      for (const url of urls) expect(providerSecretsIn(url, SECRETS), url).toEqual([])
+      // The provider sends the buyer back with our own order id and nothing else. A Checkout
+      // Session id (`{CHECKOUT_SESSION_ID}`) would be a public identifier, not a secret, but the
+      // order id already finds the checkout; adding one means first redirecting the return page
+      // to its bare URL (serp's payments standard).
+      expect([...new URL(checkout.successUrl).searchParams]).toEqual([['order', ORDER]])
+      expect(new URL(checkout.cancelUrl).search).toBe('')
+    }
+  )
+
+  const RETURN_ORDER = '33333333-3333-4333-8333-333333333333'
+  it.each([
+    {
+      call: (request: Request) => claimReturn(request, { params: Promise.resolve({ id: CLAIM }) }),
+      location: `/products/${SLUG}/#claim`,
+      name: 'claim',
+      path: `/claims/${CLAIM}/checkout/success/?order=${RETURN_ORDER}`
+    },
+    {
+      call: (request: Request) =>
+        listingReturn(request, { params: Promise.resolve({ slug: SLUG }) }),
+      location: `/account/listings/${SLUG}/`,
+      name: 'listing upgrade',
+      path: `/account/listings/${SLUG}/checkout/success/?order=${RETURN_ORDER}`
+    }
+  ])('the $name return redirects to its bare page', async route => {
+    worker({ ...PRODUCTION, ...TEST_PROVIDER_SECRETS })
+    stubBilling()
+
+    const response = await route.call(new Request(`${PRODUCTION.BETTER_AUTH_URL}${route.path}`))
+
+    expect(response.status).toBe(303)
+    const location = response.headers.get('location') ?? ''
+    expect(location).toBe(route.location)
+    expect(providerSecretsIn(location, SECRETS)).toEqual([])
   })
 })

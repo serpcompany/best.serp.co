@@ -2,8 +2,9 @@
  * The Stripe provider (#68) on a recorded `fetch`: Checkout Sessions are created form-encoded
  * with the order's reference, catalog price (#250), card-only payment, expiry, and idempotency
  * key, and refused when that price isn't the site's; refunds
- * carry their own key; and webhooks verify the raw body's signature within the timestamp
- * tolerance before anything is read.
+ * carry their own key; webhooks verify the raw body's signature within the timestamp
+ * tolerance before anything is read; and no URL the provider builds or hands back carries its
+ * key, its webhook secret, a client secret, or a signature (#469).
  */
 import { describe, expect, it } from 'vitest'
 import { BillingProviderError, BillingWebhookError } from '../provider'
@@ -13,6 +14,7 @@ import {
   stripeSignature,
   verifyStripeSignature
 } from './stripe'
+import { providerSecretsIn } from './test-support'
 
 const NOW = new Date('2026-10-06T12:00:00.000Z')
 const SECRET = 'whsec_unit'
@@ -343,5 +345,121 @@ describe('Stripe provider', () => {
       'https://api.stripe.com/v1/checkout/sessions/cs_test_2/expire',
       'https://api.stripe.com/v1/checkout/sessions/cs_test_3/expire'
     ])
+  })
+})
+
+describe('provider secrets in URLs (#469)', () => {
+  const KEY = 'sk_test_469key'
+  const WEBHOOK_SECRET = 'whsec_469secret'
+  // A configured value with no recognisable shape: found because a test named it.
+  const OPAQUE = 'opaque-469-value'
+  const KNOWN = [KEY, WEBHOOK_SECRET, OPAQUE]
+  const RETURN_URL =
+    'https://best.serp.co/submit/11111111-1111-4111-8111-111111111111/checkout/return/?order=22222222-2222-4222-8222-222222222222'
+
+  it('finds each kind of provider secret anywhere in a URL, as written or encoded', async () => {
+    const at = Math.floor(NOW.getTime() / 1000)
+    const signature = `t=${at},v1=${await stripeSignature(WEBHOOK_SECRET, at, '{}')}`
+    const leaks: Record<string, string> = {
+      'a configured secret, encoded': `${RETURN_URL}&x=${encodeURIComponent(OPAQUE)}`,
+      'a live secret key in the path': 'https://best.serp.co/r/sk_live_abc123/',
+      'a restricted key in the query': `${RETURN_URL}&k=rk_test_abc123`,
+      'a webhook secret in the fragment': 'https://best.serp.co/products/example.com/#whsec_abc123',
+      'an ephemeral key': `${RETURN_URL}&e=ek_test_abc123`,
+      'a client secret': `${RETURN_URL}&c=cs_test_a1b2_secret_c3d4`,
+      'a client_secret parameter': `${RETURN_URL}&client_secret=anything`,
+      'a session token parameter': 'https://best.serp.co/thanks/?customer_session_token=abc',
+      'a signature, encoded': `${RETURN_URL}&s=${encodeURIComponent(signature)}`,
+      'a signature, encoded twice': `${RETURN_URL}&s=${encodeURIComponent(encodeURIComponent(signature))}`,
+      'a signature parameter': `${RETURN_URL}&signature=abc`,
+      'an api key parameter': `${RETURN_URL}&apiKey=abc`,
+      'the configured key': `https://best.serp.co/?k=${KEY}`
+    }
+    for (const [name, url] of Object.entries(leaks)) {
+      expect(providerSecretsIn(url, KNOWN), name).not.toEqual([])
+    }
+    const clean = [
+      RETURN_URL,
+      'https://best.serp.co/account/listings/example.com/',
+      'https://best.serp.co/products/example.com/#claim',
+      `/login/?callbackUrl=${encodeURIComponent(new URL(RETURN_URL).pathname + new URL(RETURN_URL).search)}`,
+      // Public identifiers: a Checkout Session id (Stripe documents it for return URLs), a
+      // payment id in the admin's dashboard link, and a publishable key.
+      'https://checkout.stripe.com/c/pay/cs_test_a1B2c3',
+      'https://best.serp.co/thanks/?session_id=cs_live_a1B2c3',
+      'https://dashboard.stripe.com/test/payments/pi_3Abc',
+      'https://best.serp.co/?pk=pk_live_abc123'
+    ]
+    for (const url of clean) expect(providerSecretsIn(url, KNOWN), url).toEqual([])
+  })
+
+  it('builds no URL that carries its key, its webhook secret, a client secret or a signature', async () => {
+    const at = Math.floor(NOW.getTime() / 1000)
+    const signature = await stripeSignature(WEBHOOK_SECRET, at, '{}')
+    // Stripe answers with a client secret on a session; it must never reach a URL either.
+    const clientSecret = 'cs_test_469_secret_abc123'
+    const { calls, fetcher } = recorder([
+      {
+        body: {
+          amount_subtotal: 4900,
+          client_secret: clientSecret,
+          currency: 'usd',
+          expires_at: 1791295200,
+          id: 'cs_test_469',
+          url: 'https://checkout.stripe.com/c/pay/cs_test_469'
+        }
+      },
+      { body: { client_secret: clientSecret, id: 'cs_test_469', livemode: false, status: 'open' } },
+      { body: { id: 'cs_test_469', status: 'expired' } },
+      { body: { id: 're_469', status: 'succeeded' } }
+    ])
+    const stripe = createStripeProvider({
+      fetcher,
+      live: false,
+      prices: PRICES,
+      secretKey: KEY,
+      webhookSecret: WEBHOOK_SECRET
+    })
+    const request = {
+      amountCents: 4900,
+      cancelUrl: 'https://best.serp.co/submit/s/checkout/cancelled/',
+      currency: 'usd',
+      customerEmail: 'maya@example.com',
+      description: 'Paid listing: Tablesmith',
+      expiresAt: new Date('2026-10-06T13:00:00.000Z'),
+      idempotencyKey: 'checkout:order-1',
+      kind: 'paid_listing' as const,
+      orderId: 'order-1',
+      successUrl: 'https://best.serp.co/submit/s/checkout/return/?order=order-1'
+    }
+    const session = await stripe.createCheckout(request)
+    await stripe.getCheckout('cs_test_469')
+    await stripe.expireCheckout('cs_test_469')
+    await stripe.refund({
+      amountCents: 4900,
+      idempotencyKey: 'refund:order-1',
+      orderId: 'order-1',
+      paymentId: 'pi_469'
+    })
+    const form = new URLSearchParams(calls[0]?.body ?? '')
+    // The return URLs go to the provider exactly as the site built them, with nothing added.
+    expect(form.get('success_url')).toBe(request.successUrl)
+    expect(form.get('cancel_url')).toBe(request.cancelUrl)
+    // The buyer goes to the provider's own checkout page, as the provider gave it.
+    expect(session.url).toBe('https://checkout.stripe.com/c/pay/cs_test_469')
+    const urls = [
+      ...calls.map(call => call.url),
+      form.get('success_url') ?? '',
+      form.get('cancel_url') ?? '',
+      session.url,
+      stripe.dashboardUrl('pi_469') ?? '',
+      stripe.dashboardUrl('cs_test_469') ?? ''
+    ]
+    expect(calls).toHaveLength(4)
+    for (const url of urls) {
+      expect(providerSecretsIn(url, [...KNOWN, clientSecret, signature]), url).toEqual([])
+    }
+    // The key travels only in the authorization header.
+    for (const call of calls) expect(call.headers.authorization).toBe(`Bearer ${KEY}`)
   })
 })
