@@ -4,7 +4,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { headers } from 'next/headers'
 import { resolveGoogleTagManagerId } from '@/lib/analytics/google-tag-manager'
 import { siteConfig } from '@/lib/site/site-config'
-import { isPublicProduction } from './site-environment'
+import { isPublicProduction, WEB_ANALYTICS_TOKEN_PATTERN } from './site-environment'
 
 /**
  * The Worker env when the current request is served as the public production site: the
@@ -36,9 +36,6 @@ async function publicProductionEnv(): Promise<Partial<CloudflareEnv> | null> {
   }
 }
 
-/** A Cloudflare Web Analytics site token: 32 hex characters, public, not a secret. */
-const WEB_ANALYTICS_TOKEN = /^[0-9a-f]{32}$/u
-
 export type RequestAnalytics = {
   /** The Cloudflare Web Analytics beacon's site token (#170). */
   cloudflareWebAnalyticsToken?: string
@@ -56,7 +53,9 @@ export async function analyticsForRequest(): Promise<RequestAnalytics> {
   if (!env) return {}
   const token = env.CF_WEB_ANALYTICS_TOKEN?.trim()
   return {
-    ...(token && WEB_ANALYTICS_TOKEN.test(token) ? { cloudflareWebAnalyticsToken: token } : {}),
+    ...(token && WEB_ANALYTICS_TOKEN_PATTERN.test(token)
+      ? { cloudflareWebAnalyticsToken: token }
+      : {}),
     gtmId: resolveGoogleTagManagerId(siteConfig)
   }
 }
