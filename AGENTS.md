@@ -63,13 +63,13 @@ base branch: branch from `origin/staging` as `issue-<n>-<slug>` and open pull re
 merge deploys staging. `main` is production and changes only by a fast-forward
 [promotion](./docs/release-guards.md#promotion) (`pnpm release:promote`) or a `hotfix-*` pull
 request. Agents squash-merge agent PRs into `staging` once green and reviewed clean (no blocking
-findings). Agents never push to `main`, dispatch a production workflow or a staging data workflow
-(catalog publication, media upload), type their confirmations, approve a deployment, or run the
-emergency `pnpm deploy:*`, apart from three steps the owner's "you do it" for one release allows:
-run `release:promote` under `expect`, approve its production gate, and run its approved uploads
-and publications. Issues and labels never grant production, database, or deployment authority.
-[Owner rules](./docs/owner-rules.md) records those release steps, how to ask the owner, hands-off
-defaults, UI extras and acceptance, Node 24 and scratch files, and the staging deploy queue.
+findings). Agents never merge into or push to `main`, dispatch a production workflow or a staging
+data workflow (catalog publication, media upload), type their confirmations, approve a deployment,
+or run the emergency `pnpm deploy:*`, apart from three steps the owner's "you do it" for one release
+allows: run `release:promote` under `expect`, approve its production gate, and run its approved
+production uploads and publications. Issues and labels never grant production, database, or
+deployment authority. [Owner rules](./docs/owner-rules.md) records those steps, asking the owner,
+hands-off defaults, UI extras and acceptance, Node 24 and scratch files, and the staging queue.
 
 ## Non-negotiable architecture
 

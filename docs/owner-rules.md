@@ -64,6 +64,7 @@ spawn corepack pnpm release:promote
 expect {
   -re "Type (\[0-9a-f\]{12}) to fast-forward" { if {$expect_out(1,string) ne $sha} { puts "\nSHA MISMATCH"; exit 2 }; send "$sha\r"; exp_continue }
   -re "main is now (\[0-9a-f\]{40})" { exp_continue }
+  timeout { puts "\nTIMEOUT"; exit 3 }
   eof
 }
 lassign [wait] pid spawnid os_error value
@@ -72,7 +73,8 @@ exit $value
 
 From a detached worktree at `origin/staging`, after `pnpm install`, run
 `expect promote.exp <first 12 characters of the staging tip>`. The script answers only when the
-prompt shows that SHA; otherwise it exits 2 without answering. It exits with the command's code.
+prompt shows that SHA; otherwise it exits 2 without answering. If the prompt or the command takes over 300 seconds, it
+exits 3. Otherwise it exits with the command's code.
 
 ## Local loop
 

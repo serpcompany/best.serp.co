@@ -54,9 +54,10 @@ The repository follows the serp git-workflow standard for repositories with Stag
   reviewers.
 - **Releases are the owner's.** Each needs the owner's go for that release, and a go never
   carries over. Only on that release's "you do it" may an agent run `pnpm release:promote`,
-  approve that release's Deploy Production gate, and run its approved publications
-  ([Owner rules](./owner-rules.md#production-releases)). Otherwise agents never dispatch a
-  production workflow, never type a production confirmation, and never approve a deployment.
+  approve that release's Deploy Production gate, and run its approved media uploads and catalog
+  publications ([Owner rules](./owner-rules.md#production-releases)). Otherwise agents never
+  dispatch a production workflow, never type a production confirmation, and never approve a
+  deployment.
 - **CI catches mis-targeted pull requests.** Rulesets cannot restrict a head branch, so
   `web.yml`'s `check` fails a pull request into `main` unless its head is a `hotfix-*` branch
   of this repository. It is an accident guard, not the control: a pull request runs its own
