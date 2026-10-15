@@ -25,18 +25,21 @@ and the webhook answer 404, `/admin/orders/` is a 404, and the sweep does nothin
   `/api/webhooks/<provider>`; serpcompany/serp#1494 proposes it accept this shape. The webhook
   stays at `/api/billing/webhook/`: moving it means registering both Stripe endpoints again and
   changing staging's password bypass.
-- **One-click pay links** (owner decision on #156, 2026-10-15). The checkout routes are GET page
-  routes, so an emailed link (the draft reminder's "Complete checkout") or a page's "$49" link
-  reaches checkout in one click. That is a deliberate exception to serp's rule that writes are
+- **One-click pay links** (owner decision on #156, 2026-10-15). The checkout routes are GET route
+  handlers at page URLs, so an emailed link (the draft reminder's "Complete checkout") or a page's
+  "$49" link reaches checkout in one click. That is a deliberate exception to serp's rule that writes are
   `/api/` route handlers with an `Origin` check
   ([Next.js on Workers](https://github.com/serpcompany/serp/blob/main/docs/engineering/standards/web-stack/nextjs-on-workers.md#rendering-and-requests)).
-  A mail scanner opening the link only creates an unused checkout session; nobody is charged.
+  A signed-out request, such as a mail scanner's, goes to sign-in and opens nothing. Without an
+  `Origin` check, a link on another site can make a signed-in owner's browser open a checkout for
+  their own listing: that creates a pending order and an unused Stripe session, and nobody is
+  charged.
 
 ## Module
 
 | Piece | Where | Does |
 |---|---|---|
-| Provider interface | `apps/web/src/lib/billing/provider.ts` | `createCheckout`, `getCheckout`, `expireCheckout`, `verifyWebhook`, `refund`, `dashboardUrl` |
+| Provider interface | `apps/web/src/lib/billing/provider.ts` | Checkout, webhook verification and refunds, plus the reads the sweep and admin Orders use |
 | Provider | `apps/web/src/lib/billing/providers/{index,stripe}.ts` | The only Stripe code (secrets, key modes, API): `fetch` and Web Crypto, no Node SDK |
 | Service | `apps/web/src/lib/billing/service.ts` | Checkout, webhook, fulfilment, refunds, the sweep |
 | Guardrails | `apps/web/src/lib/billing/guardrails.ts` | Checks before a paid submission goes live |
