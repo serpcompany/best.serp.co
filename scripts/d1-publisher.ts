@@ -366,8 +366,8 @@ const operation = z.discriminatedUnion('action', [
    * the manifest was generated: the batch refuses a listing whose media changed since (a
    * row-level compare-and-swap, so the operation fits any environment whose rows match). Keys
    * belong to the slug. The listing's queued media slots are dropped: the manifest wins where it
-   * writes the slot's kind and sort order with a source `expected` doesn't list for that kind. It
-   * is refused while the listing has a pending or failed logo or image slot it would drop without
+   * writes the slot's kind and sort order with new media, neither the same source nor the same
+   * bytes (the key's digest) as an `expected` row of that kind. It is refused while the listing has a pending or failed logo or image slot it would drop without
    * replacing (#336, #458), such as an approval's new logo behind a renamed listing's update,
    * empty (`expected: []`, `media: {}`), naming images, or re-hosting the old logo.
    */
@@ -1838,14 +1838,23 @@ export function buildPublicationPlan(
         ...(op.media.logo ? [['logo', op.media.logo, 0] as const] : []),
         ...(op.media.images ?? []).map((image, order) => ['image', image, order] as const)
       ]
-      // The slots it replaces: those it writes with a source the listing's rows don't already
-      // list for that kind. A re-host of an old row (a renamed listing's follow-up) would revert
-      // a newer upload queued at its position, not replace it (#458 review). Any other queued
-      // slot is one the `DELETE` below would drop.
-      const rehost = (kind: string, source: string) =>
-        op.expected.some(row => row.kind === kind && row.url === source)
+      // The slots it replaces: those it writes with new media, neither the same source nor the
+      // same bytes as a row the listing already has of that kind. A re-host of an old row (a
+      // renamed listing's follow-up, whose source may be the old slug's CDN copy, as in #337's
+      // moves between slugs) would revert a newer upload queued at its position, not replace it
+      // (#458 review). Same bytes: the row's key carries the digest prefix that `hostedImage`
+      // holds the written key to; an imported row with no key matches on its source only. Any
+      // other queued slot is one the `DELETE` below would drop.
+      const rehost = (kind: string, image: HostedImageEntry) =>
+        op.expected.some(
+          row =>
+            row.kind === kind &&
+            (row.url === image.source ||
+              (row.key !== null &&
+                parseMediaKey(row.key)?.hash === image.sha256.slice(0, MEDIA_HASH_LENGTH)))
+        )
       const replaced = written
-        .filter(([kind, image]) => !rehost(kind, image.source))
+        .filter(([kind, image]) => !rehost(kind, image))
         .map(([kind, , order]) => `${kind} ${order}`)
       const dropped = `media_ingestions WHERE listing_id=? AND kind IN ('logo','image') AND kind || ' ' || sort_order NOT IN (SELECT value FROM json_each(?))`
       const droppedParams = [op.id, JSON.stringify(replaced)]

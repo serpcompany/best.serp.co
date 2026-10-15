@@ -50,8 +50,9 @@ under a live listing's path.
   image gets an empty update (`expected: []`, `media: {}`), which the publisher refuses if it has
   media after all. Every media update drops the listing's queued slots, so the publisher refuses
   one, empty or not, that would drop a pending or failed logo or image slot it doesn't replace
-  (it writes no row at the slot's kind and sort order, or writes there only a re-host of a
-  source its `expected` rows list for that kind), and the refusal names the slot: an approval's
+  (it writes no row at the slot's kind and sort order, or writes there only a re-host: the same
+  source or the same bytes as one of its `expected` rows of that kind, such as the old slug's
+  CDN copy), and the refusal names the slot: an approval's
   new logo or image, or an admin's new logo whose first fetch failed, waits in the queue until
   the `*/15` cron hosts it, and a renamed listing's update names only the rows it had. Once a
   pending one is hosted, ship an update that names it instead. A failed one stopped retrying and

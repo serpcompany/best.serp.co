@@ -723,6 +723,37 @@ describe('publisher plan in SQLite transaction (D1 batch emulator)', () => {
         }
       })
 
+      // A re-host whose source is the old slug's CDN copy (the source #337 used to move hosted
+      // media between slugs, d1/media/2026-10-10-duplicate-listings.json) is the same bytes, so
+      // it replaces nothing.
+      const submissionImage = `best.serp.co/submissions/sub_sqlite/image/${'e'.repeat(16)}.png`
+      const fromCdn = (kind: 'image' | 'logo', old: ReturnType<typeof hosted>) => ({
+        ...hosted(kind, old.sha256.charAt(0), 'new-slug'),
+        source: `https://cdn.serp.co/${old.key}`
+      })
+      it.each([
+        ['an admin’s new logo (pending)', 'logo', 'pending', null, adminLogo],
+        ['an admin’s new logo (failed)', 'logo', 'failed', null, adminLogo],
+        ['a paid submission’s image', 'image', 'pending', submissionImage, submissionImage]
+      ] as const)(
+        'refuses a renamed listing’s follow-up from the old CDN copy while %s waits',
+        (_, kind, status, copyFrom, slot) => {
+          const db = renamed()
+          insertHosted(db, 'logo', oldLogo)
+          queue(db, status, kind, 0, copyFrom)
+          const before = queueAndVersion(db)
+          const followUp = mediaUpdate({
+            slug: 'new-slug',
+            expected: [imageRow, logoRow],
+            media: { images: [fromCdn('image', oldImage)], logo: fromCdn('logo', oldLogo) }
+          })
+          expect(() => executeInTestTransaction(db, plan({ operations: [followUp] }))).toThrow(
+            refusal('new-slug', `${kind} ${slot} (${status})`)
+          )
+          expect(queueAndVersion(db)).toEqual(before)
+        }
+      )
+
       it('refuses every update that drops a slot, and applies one that replaces it', () => {
         const refused = [
           // A renamed listing with no media ships an empty update (#336).
