@@ -7,7 +7,9 @@ export const dynamic = 'force-dynamic'
  * `GET /claims/<id>/checkout/` (#67, #68; screen 8's "Continue to payment"): opens (or reuses)
  * the payment provider's checkout for the user's confirmed paid claim and sends them there. 404
  * unless orders and claims are both on; a claim that can't be paid for (any more) goes back to
- * the listing's claim dialog, which shows where it stands.
+ * the listing's claim dialog, which shows where it stands, and one with too little of its
+ * confirmation left goes back to the dialog's request for a new code (#128, #476), however the
+ * link was opened (a click, a middle click, a new tab).
  */
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params

@@ -42,6 +42,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Separator } from '@/components/ui/separator'
 import { buildFeaturedOnBadgeEmbedHtml } from '@/components/website/featured-on-badge-embed-panel'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { CONFIRM_AGAIN_HASH, tooLateForCheckout } from '@/lib/billing/checkout-window'
 
 /**
  * Claiming a listing (serpcompany/best.serp.co#67, #70 screens 8 and 9a): the "Claim this
@@ -143,6 +144,17 @@ function usd(cents: number, withCents: boolean): string {
   return `$${withCents ? (cents / 100).toFixed(2) : Math.round(cents / 100)}`
 }
 
+/**
+ * A confirmation lasts 24 hours. A paid claim's checkout closes with it and can't be shorter than
+ * the provider's shortest checkout, so with less than that left a paid claim confirms the address
+ * again before paying (#128), as any claim does once the confirmation has run out.
+ */
+function confirmationRunOut(claim: ClaimView, now: number): boolean {
+  if (!claim.confirmedUntil) return false
+  const until = Date.parse(claim.confirmedUntil)
+  return claim.method === 'paid' ? tooLateForCheckout(until, now) : until <= now
+}
+
 function useNow(active: boolean): number {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -188,6 +200,11 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
   const [badgeWaitUntil, setBadgeWaitUntil] = useState(0)
   const [busy, setBusy] = useState(false)
   const inFlight = useRef(false)
+  /**
+   * The checkout route refused the paid claim's confirmation on the server's clock (#476): the
+   * dialog asks for a new code, whatever the browser's clock says, until one confirms.
+   */
+  const refusedByServer = useRef(false)
   const name = listing.name
   const domain = target?.domain ?? ''
   const embed = buildFeaturedOnBadgeEmbedHtml({
@@ -250,10 +267,10 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
       setStep('code')
     } else if (
       resumed?.status === 'email_verified' &&
-      resumed.confirmedUntil &&
-      Date.parse(resumed.confirmedUntil) <= Date.now()
+      ((refusedByServer.current && resumed.method === 'paid') ||
+        confirmationRunOut(resumed, Date.now()))
     ) {
-      // A confirmation lasts 24 hours: past that, the address is confirmed again with a new code.
+      // Past the confirmation (for a paid claim, too near its end), a new code confirms again.
       setEmail(resumed.email)
       setCodeError('expired')
       setStep('code')
@@ -290,8 +307,14 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
     void load()
   }, [load])
 
-  // After signing in, the login page brings the visitor back to `#claim`.
+  // After signing in, the login page brings the visitor back to `#claim`. The checkout route
+  // sends a paid claim it refused for its confirmation back to `CONFIRM_AGAIN_HASH`: read once
+  // (it becomes `#claim`), so a reload after the new code opens the dialog as the claim stands.
   useEffect(() => {
+    if (window.location.hash === CONFIRM_AGAIN_HASH) {
+      refusedByServer.current = true
+      window.history.replaceState(null, '', '#claim')
+    }
     if (window.location.hash === '#claim') openDialog()
   }, [openDialog])
 
@@ -358,6 +381,8 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
     inFlight.current = false
     setBusy(false)
     if (response.ok) {
+      // A new confirmation: the route's refusal was of the one before.
+      refusedByServer.current = false
       setClaim(response.data.claim)
       setCodeError(null)
       setStep(response.data.claim.method === 'paid' ? 'payment' : 'badge')
@@ -372,6 +397,14 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
           ? 'attempts'
           : 'invalid'
     )
+  }
+
+  /** Back to the code step, which offers a new code for the confirmed address. */
+  function confirmAgain(confirmed: ClaimView) {
+    setEmail(confirmed.email)
+    setCode('')
+    setCodeError('expired')
+    setStep('code')
   }
 
   async function verifyBadge() {
@@ -399,10 +432,7 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
     if (elsewhere(response.status, error)) return
     if (error.code === 'confirmation_expired') {
       // 24 hours after the address was confirmed: confirm it again with a new code.
-      setEmail(claim.email)
-      setCode('')
-      setCodeError('expired')
-      setStep('code')
+      confirmAgain(claim)
     } else if (error.code === 'cooldown') {
       setBadgeWaitUntil(Date.now() + (error.retryAfterSeconds ?? BADGE_COOLDOWN_SECONDS) * 1000)
     } else if (error.code === 'checks_used') {
@@ -696,6 +726,15 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
           href={claim ? `/claims/${claim.id}/checkout/` : '#claim'}
           aria-disabled={!claim}
           className={buttonVariants()}
+          onClick={event => {
+            // Left open until too little of the confirmation is left for a checkout (#128). On
+            // the browser's clock: the route decides on the server's and sends a refused claim
+            // back to `CONFIRM_AGAIN_HASH` (#476).
+            if (claim && confirmationRunOut(claim, Date.now())) {
+              event.preventDefault()
+              confirmAgain(claim)
+            }
+          }}
         >
           {`Continue to payment: ${usd(priceCents, false)}`}
           <ArrowRight />

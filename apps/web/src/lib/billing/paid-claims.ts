@@ -51,9 +51,9 @@ export function createPaidClaims(input: {
     async forCheckout(claim) {
       const found = await operations.claim(claim)
       if (found?.method !== 'paid' || found.status !== 'email_verified') return null
+      // A confirmation that ran out comes back too: the checkout asks for it again (#476).
       const verifiedAt = found.emailVerifiedAt ? Date.parse(found.emailVerifiedAt) : 0
       const confirmedUntil = new Date(verifiedAt + CLAIM_VERIFIED_TTL_HOURS * 60 * 60 * 1000)
-      if (confirmedUntil.getTime() <= now().getTime()) return null
       const target = await operations.listing({ id: found.listingId })
       if (!target || target.ownerUserId) return null
       return {

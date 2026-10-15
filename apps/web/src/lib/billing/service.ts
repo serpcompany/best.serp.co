@@ -32,6 +32,7 @@ import type { EmailRequest } from '../email/service'
 import type { TemplateInput } from '../email/templates'
 import { CodedError } from '../telemetry/coded-error'
 import { errorFields } from '../telemetry/error-fields'
+import { confirmAgainPath, tooLateForCheckout } from './checkout-window'
 import type { GuardrailResult } from './guardrails'
 import {
   type BillingEvent,
@@ -61,8 +62,6 @@ export const BILLING_ACTOR = 'billing'
 const BILLING_WORKFLOW = 'app/billing'
 /** A checkout stays open this long; an unpaid order is then failed and a new one opened. */
 export const CHECKOUT_LIFETIME_MS = 60 * 60 * 1000
-/** The shortest checkout the provider opens (Stripe: 30 minutes), with a minute's margin. */
-const SHORTEST_CHECKOUT_MS = 31 * 60 * 1000
 /** An open checkout is reused unless it closes sooner than this. */
 const CHECKOUT_REUSE_MARGIN_MS = 5 * 60 * 1000
 /** The sweep looks again at orders this long after their checkout closed or they were paid. */
@@ -109,8 +108,9 @@ export interface PaidClaims {
     userId: string
   }): Promise<boolean>
   /**
-   * The claim the user may pay for: the paid method, the listing unowned, and confirmed in time,
-   * with when the confirmation lapses (a checkout must close before that).
+   * The claim the user may pay for: the paid method, the listing unowned, and the address
+   * confirmed, with when the confirmation lapses (a checkout must close before that; one that
+   * already lapsed comes back too, so the checkout can ask for a new code).
    */
   forCheckout(input: {
     claimId: string
@@ -385,9 +385,11 @@ export async function startClaimCheckout(
   const claim = await deps.paidClaims.forCheckout(input)
   if (!claim) return { ok: true, redirect: dialog }
   // The checkout closes with the confirmation, so nobody pays for a claim that can't complete;
-  // with less left than a checkout's shortest life, the address is confirmed again first.
-  if (claim.confirmedUntil.getTime() - deps.now().getTime() < SHORTEST_CHECKOUT_MS) {
-    return failure(409, 'not_payable', 'This claim can’t be paid for.')
+  // with less left than a checkout's shortest life, or none, the address is confirmed again
+  // first: back to the dialog, told to ask for a new code whatever the browser's clock says
+  // (#128, #476). The dialog asks before linking here too, on the browser's clock.
+  if (tooLateForCheckout(claim.confirmedUntil.getTime(), deps.now().getTime())) {
+    return { ok: true, redirect: confirmAgainPath(listing.listingSlug) }
   }
   return openCheckout(deps, input, {
     cancelPath: dialog,
