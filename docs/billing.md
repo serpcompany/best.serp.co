@@ -12,11 +12,31 @@ the admin sidebar shows Orders, the draft reminder and the badge program's email
 paid offers, and the hourly sweep runs. Turned off, all of that is hidden, every checkout route
 and the webhook answer 404, `/admin/orders/` is a 404, and the sweep does nothing.
 
+## Decisions
+
+- **Stripe.** serp's [Payments](https://github.com/serpcompany/serp/blob/main/docs/engineering/standards/web-stack/payments.md#choosing-the-provider)
+  standard starts websites on Stripe. Polar was considered and rejected: its merchant-of-record
+  advantage is temporary, and its policy fit for selling listings is unclear (serp's submissions
+  [decisions](https://github.com/serpcompany/serp/blob/main/docs/engineering/websites/features/submissions/decisions.md)).
+  Stripe sits behind `BillingProvider` because SERP's Lago is the planned replacement.
+- **No Stripe SDK** (owner decision on #156, 2026-10-15). The provider calls four Stripe
+  endpoints with the Worker's `fetch` at a pinned API version, and checks webhook signatures with
+  Web Crypto. The standard expects the SDK, a three-operation interface and
+  `/api/webhooks/<provider>`; serpcompany/serp#1494 proposes it accept this shape. The webhook
+  stays at `/api/billing/webhook/`: moving it means registering both Stripe endpoints again and
+  changing staging's password bypass.
+- **One-click pay links** (owner decision on #156, 2026-10-15). The checkout routes are GET page
+  routes, so an emailed link (the draft reminder's "Complete checkout") or a page's "$49" link
+  reaches checkout in one click. That is a deliberate exception to serp's rule that writes are
+  `/api/` route handlers with an `Origin` check
+  ([Next.js on Workers](https://github.com/serpcompany/serp/blob/main/docs/engineering/standards/web-stack/nextjs-on-workers.md#rendering-and-requests)).
+  A mail scanner opening the link only creates an unused checkout session; nobody is charged.
+
 ## Module
 
 | Piece | Where | Does |
 |---|---|---|
-| Provider interface | `apps/web/src/lib/billing/provider.ts` | `createCheckout`, `getCheckout`, `verifyWebhook`, `refund` |
+| Provider interface | `apps/web/src/lib/billing/provider.ts` | `createCheckout`, `getCheckout`, `expireCheckout`, `verifyWebhook`, `refund`, `dashboardUrl` |
 | Provider | `apps/web/src/lib/billing/providers/{index,stripe}.ts` | The only Stripe code (secrets, key modes, API): `fetch` and Web Crypto, no Node SDK |
 | Service | `apps/web/src/lib/billing/service.ts` | Checkout, webhook, fulfilment, refunds, the sweep |
 | Guardrails | `apps/web/src/lib/billing/guardrails.ts` | Checks before a paid submission goes live |
@@ -178,11 +198,11 @@ Tax: billing refuses to start while `site.submissions.automaticTax` is on, since
 wouldn't match its order.
 
 `features.orders` is `true` since #133: the staging Worker has its test-mode secrets and
-webhook. **Production needs its live secrets before the promotion that ships #133.** A Worker
-with orders on but without them still shows the paid options, but every checkout answers 503,
-the webhook 503, admin refunds are unavailable, and the hourly trigger fails on the billing
-sweep (logged as `scheduled_job_failed`, `job: "billing-sweep"`) after the draft and badge jobs
-ran. A local Worker is the same unless you pass test-mode values through `LOCAL_PREVIEW_VARS`
+webhook, and the production Worker its live ones (#249). A Worker with orders on but without
+them still shows the paid options, but every checkout answers 503, the webhook 503, admin
+refunds are unavailable, and the hourly trigger fails on the billing sweep (logged as
+`scheduled_job_failed`, `job: "billing-sweep"`) after the draft and badge jobs ran. A local
+Worker is the same unless you pass test-mode values through `LOCAL_PREVIEW_VARS`
 (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `LOCAL_STRIPE_MOCK_PORT` for a mocked API),
 as the end-to-end suite does. `LOCAL_ORDERS=on` still turns orders on for a local Worker with
 the flag off; nothing uses it while the flag is on.

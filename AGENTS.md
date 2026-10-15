@@ -108,9 +108,9 @@ Deliberate differences from serp's `web-stack/` standard; change one only throug
   `--custom`, which would re-emit tables ([why](./docs/data-model.md#hand-finished-migrations)).
 - `orders.currency` keeps its `GLOB` CHECK: replacing it rebuilds a referenced table.
 - Worker Sentry skips public pages and `/api/search`, which only log errors (#355, #401).
-- The Stripe webhook is `/api/billing/webhook/` behind a provider-neutral `BillingProvider`
-  with no Stripe SDK, until the payments audit (#156) decides. Brand icons use
-  `@icons-pack/react-simple-icons` because lucide has no brand icons.
+- Stripe: `fetch`, no SDK, webhook `/api/billing/webhook/` ([why](./docs/billing.md#decisions)).
+- Pay links open checkout on GET, with no `Origin` check ([why](./docs/billing.md#decisions)).
+- Brand icons use `@icons-pack/react-simple-icons` because lucide has no brand icons.
 
 ## Completion contract
 
