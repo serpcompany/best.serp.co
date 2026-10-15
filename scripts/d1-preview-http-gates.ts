@@ -742,6 +742,18 @@ async function readBoundedText(
   label: string,
   options: { maxBytes?: number; stopAt?: RegExp } = {}
 ): Promise<string> {
+  return (await readBoundedBody(response, label, options)).text
+}
+
+/**
+ * The body until `stopAt` matches, read to at most `maxBytes`; `capped` when the cap ended the
+ * read before `stopAt` matched.
+ */
+async function readBoundedBody(
+  response: Response,
+  label: string,
+  options: { maxBytes?: number; stopAt?: RegExp } = {}
+): Promise<{ text: string; capped: boolean }> {
   if (!response.body) throw new Error(`${label} returned an empty body.`)
   const maxBytes = options.maxBytes ?? maxTextProbeBytes
   const stopAt = options.stopAt ?? /<\/head>/iu
@@ -760,27 +772,34 @@ async function readBoundedText(
   } finally {
     await reader.cancel().catch(() => undefined)
   }
-  return text + decoder.decode()
+  text += decoder.decode()
+  return { text, capped: observed >= maxBytes && !stopAt.test(text) }
 }
 
 /**
  * The document through `</body>` (bounded), so both the `<head>` and the Cloudflare Web
  * Analytics beacon at the end of `<body>` are read (#272): `loadsWebAnalytics` is any mention of
- * its host, `rendersWebAnalyticsBeacon` its `<script>` element.
+ * its host, `rendersWebAnalyticsBeacon` its `<script>` element. A page that passes the read cap
+ * before `</body>` fails with the cap named (#474), since the rest of it went unchecked.
  */
 async function readDocument(
   response: Response,
-  label: string
+  label: string,
+  url: URL
 ): Promise<{
   html: string
   loadsGoogleTagManager: boolean
   loadsWebAnalytics: boolean
   rendersWebAnalyticsBeacon: boolean
 }> {
-  const html = await readBoundedText(response, label, {
+  const { text: html, capped } = await readBoundedBody(response, label, {
     maxBytes: maxDocumentProbeBytes,
     stopAt: /<\/body>/iu
   })
+  if (capped)
+    throw new Error(
+      `${label} (${url.href}) passed the gates' ${maxDocumentProbeBytes / 1_048_576} MiB read cap before </body>, so the rest of the page went unchecked (maxDocumentProbeBytes in scripts/d1-preview-http-gates.ts).`
+    )
   const lowercase = html.toLowerCase()
   return {
     html,
@@ -826,7 +845,7 @@ async function expectNonProductionPolicy(target: GateTarget, listingPath: string
         )
       }
       if (path === '/') {
-        const document = await readDocument(response, `${mode} route /`)
+        const document = await readDocument(response, `${mode} route /`, routeUrl(baseUrl, path))
         if (document.loadsGoogleTagManager)
           throw new Error(`${mode} route / loads Google Tag Manager.`)
         if (document.loadsWebAnalytics)
@@ -1008,7 +1027,11 @@ async function expectPublicPolicy(
       throw new Error(`best.serp.co route / returned ${response.status}.`)
     }
     const header = xRobotsTagBlocksIndexing(response.headers.get('x-robots-tag'))
-    const document = await readDocument(response, 'best.serp.co route /')
+    const document = await readDocument(
+      response,
+      'best.serp.co route /',
+      routeUrl(canonicalOrigin, '/')
+    )
     if (header || metaRobotsBlocksIndexing(document.html))
       throw new Error(
         `best.serp.co route / sent noindex in its ${header ? 'X-Robots-Tag header' : 'robots meta'}.`
