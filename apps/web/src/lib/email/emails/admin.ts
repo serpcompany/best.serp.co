@@ -1,8 +1,8 @@
 /**
  * Admin alerts (#70 screen 15): a submission is ready for review, and a submitter sent a
- * message. They go to `EMAIL_ADMIN_RECIPIENT` (site-config); the footer links to the review
- * queue (`audience: 'admin'`). Subjects never carry a submitter's full address: the
- * new-message alert names the sender or their domain.
+ * message; and a payment changed outside the site (#473). They go to `EMAIL_ADMIN_RECIPIENT`
+ * (site-config); the footer links to the review queue (`audience: 'admin'`). Subjects never
+ * carry a submitter's full address: the new-message alert names the sender or their domain.
  */
 import { clip, defineEmailTemplate, EmailTemplateError } from '../templates'
 import {
@@ -142,6 +142,67 @@ export const adminNewMessageEmail = defineEmailTemplate<AdminNewMessageInput>({
         preheader: `${required(input.kind, 'a thread kind')} · ${input.unread} unread ${input.unread === 1 ? 'message' : 'messages'}`,
         reason: `You’re getting this because ${context.recipient} receives inbox alerts for ${host}.`,
         subject: `New message from ${clip(sender, SUBJECT_NAME_MAX)}: ${clip(required(input.topic, 'a topic'), SUBJECT_NAME_MAX)}`
+      },
+      context
+    )
+  }
+})
+
+/** What happened to the payment (#473). */
+export type PaymentAlertKind = 'disputed' | 'partially_refunded' | 'refund_failed' | 'refunded'
+
+export interface AdminPaymentAlertInput {
+  kind: PaymentAlertKind
+  /** Whether the order's listing is live now; null when the order has none. */
+  listingLive: boolean | null
+  /** The order number people see (`ORD-<number>`). */
+  orderNumber: number
+  /** The order's listing or submission name, when it has one. */
+  productName: string | null
+}
+
+const PAYMENT_ALERTS: Readonly<Record<PaymentAlertKind, { heading: string; subject: string }>> = {
+  disputed: { heading: 'A payment was disputed', subject: 'Payment disputed' },
+  partially_refunded: {
+    heading: 'A payment was partly refunded outside the site',
+    subject: 'Partly refunded outside the site'
+  },
+  refund_failed: { heading: 'A refund failed', subject: 'Refund failed' },
+  refunded: {
+    heading: 'A payment was refunded outside the site',
+    subject: 'Refunded outside the site'
+  }
+}
+
+/**
+ * A dispute, a refund made outside the site, or a refund that failed (#473), with whether the
+ * listing is still live: a dispute or a full refund takes a paid listing down.
+ */
+export const adminPaymentAlertEmail = defineEmailTemplate<AdminPaymentAlertInput>({
+  audience: 'admin',
+  id: 'admin-payment-alert',
+  render(input, context) {
+    const alert = Object.hasOwn(PAYMENT_ALERTS, input.kind) ? PAYMENT_ALERTS[input.kind] : null
+    if (!alert) throw new EmailTemplateError('Unknown payment alert.')
+    if (!Number.isInteger(input.orderNumber) || input.orderNumber < 1) {
+      throw new EmailTemplateError('Expected an order number.')
+    }
+    const order = `ORD-${input.orderNumber}`
+    const name = input.productName?.trim() || null
+    const entries: Array<readonly [string, string]> = [['Order', order]]
+    if (name) entries.push(['Product', name])
+    if (input.listingLive !== null) {
+      entries.push(['Listing', input.listingLive ? 'Live' : 'Unpublished'])
+    }
+    const host = new URL(context.links.origin).host
+    return composeEmail(
+      {
+        body: [rows(entries)],
+        cta: { label: 'Open orders', url: context.links.url(sitePath('admin', 'orders')) },
+        heading: alert.heading,
+        preheader: name ? `${order} · ${name}` : order,
+        reason: `You’re getting this because ${context.recipient} receives order alerts for ${host}.`,
+        subject: `${alert.subject}: ${order}${name ? ` (${clip(name, SUBJECT_NAME_MAX)})` : ''}`
       },
       context
     )

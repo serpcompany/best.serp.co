@@ -3,12 +3,12 @@ import { notFound } from 'next/navigation'
 import { AdminCrumbs } from '@/components/admin/admin-shell'
 import { type OrderRow, OrdersManager } from '@/components/admin/orders-manager'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
-import type { AdminOrderRow } from '@/db/billing'
+import { type AdminOrderRow, PROVIDER_ACTOR } from '@/db/billing'
 import { formatUsd } from '@/lib/admin/format'
 import { getAdminOrders } from '@/lib/admin/runtime'
 import { requireAdmin } from '@/lib/auth/server'
 import { billing, ordersEnabled } from '@/lib/billing/runtime'
-import { orderDiscountCents } from '@/lib/billing/service'
+import { disputeBlocksRefund, orderDiscountCents } from '@/lib/billing/service'
 import { mediaBaseUrl } from '@/lib/media/media-base'
 import { renderableImage } from '@/lib/media/renderable-image'
 import { site } from '@/lib/site'
@@ -21,7 +21,12 @@ export const metadata: Metadata = { title: 'Orders' }
 function note(order: AdminOrderRow): string | null {
   // The provider kept refusing this refund; the sweep stopped, and "Refund…" retries it.
   if (order.attention === 'refund_failed') return 'Refund failed'
+  // A dispute, and a refund made outside the site, both reported by the webhook (#473).
+  if (order.disputeStatus === 'open') return 'Disputed'
+  if (order.disputeStatus === 'won') return 'Dispute won'
+  if (order.disputeStatus === 'lost') return 'Dispute lost'
   if (order.status === 'refunded') {
+    if (order.refundedBy === PROVIDER_ACTOR) return 'Refunded outside the site'
     if (order.refundReason === 'rejected') return 'Auto refund on reject'
     if (order.refundListingAction === 'unpublish') return 'Listing unpublished (no badge)'
     return null
@@ -84,8 +89,10 @@ export default async function OrdersPage() {
         : null,
       note: note(order),
       number: order.number,
-      // A refund a failure left can be finished from here too (the sweep also retries it).
-      refundable: order.status === 'paid' || order.status === 'refunding',
+      // A refund a failure left can be finished from here too (the sweep also retries it); a
+      // disputed payment can't be refunded (#473).
+      refundable:
+        (order.status === 'paid' || order.status === 'refunding') && !disputeBlocksRefund(order),
       status: order.status,
       paymentRef,
       paymentUrl: paymentRef && deps ? deps.provider.dashboardUrl(paymentRef) : null

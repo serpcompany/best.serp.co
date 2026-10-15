@@ -3,7 +3,8 @@ import {
   type BillingProvider,
   BillingProviderError,
   BillingWebhookError,
-  type CheckoutState
+  type CheckoutState,
+  type PaymentChange
 } from '../provider'
 
 /**
@@ -168,6 +169,46 @@ const CHECKOUT_EVENTS: Readonly<Record<string, BillingEvent['type']>> = {
   'checkout.session.async_payment_succeeded': 'checkout_paid',
   'checkout.session.completed': 'checkout_paid',
   'checkout.session.expired': 'checkout_expired'
+}
+
+/**
+ * The payment events (#473): refunds and disputes, made in the dashboard or by the buyer's bank,
+ * and the object each must carry. The owner subscribes both endpoints to them; until then none
+ * arrives.
+ */
+const PAYMENT_EVENTS: Readonly<
+  Record<string, { object: string; type: Exclude<BillingEvent['type'], `checkout_${string}`> }>
+> = {
+  'charge.dispute.closed': { object: 'dispute', type: 'dispute_closed' },
+  'charge.dispute.created': { object: 'dispute', type: 'payment_disputed' },
+  'charge.refunded': { object: 'charge', type: 'payment_refunded' },
+  'refund.failed': { object: 'refund', type: 'payment_refund_failed' }
+}
+
+/**
+ * A payment event's change, found by its PaymentIntent (the order's payment reference). Null,
+ * so the event is ignored, without one (a charge made outside Checkout), or for a dispute that
+ * closed in a state that isn't an outcome. A charge is partly refunded until `refunded` says all
+ * of it was; `warning_closed` is an inquiry that closed without a chargeback, so the payment
+ * stands, as when a dispute is won.
+ */
+function stripePaymentChange(
+  type: (typeof PAYMENT_EVENTS)[string]['type'],
+  object: StripeObject
+): PaymentChange | null {
+  const paymentId = idOf(object.payment_intent)
+  if (!paymentId) return null
+  if (type === 'dispute_closed') {
+    const status = object.status
+    const disputeOutcome =
+      status === 'lost' ? 'lost' : status === 'won' || status === 'warning_closed' ? 'won' : null
+    return disputeOutcome ? { disputeOutcome, partial: false, paymentId } : null
+  }
+  return {
+    disputeOutcome: null,
+    partial: type === 'payment_refunded' && object.refunded !== true,
+    paymentId
+  }
 }
 
 export function createStripeProvider(config: StripeConfig): BillingProvider {
@@ -341,9 +382,14 @@ export function createStripeProvider(config: StripeConfig): BillingProvider {
       const foreign =
         event.livemode !== config.live ||
         (typeof event.account === 'string' && event.account !== config.accountId)
-      const type = foreign ? 'ignored' : (CHECKOUT_EVENTS[providerType] ?? 'ignored')
       const object = ((event.data as StripeObject | undefined)?.object ??
         null) as StripeObject | null
+      const paymentEvent = foreign ? undefined : PAYMENT_EVENTS[providerType]
+      if (paymentEvent && object?.object === paymentEvent.object) {
+        const payment = stripePaymentChange(paymentEvent.type, object)
+        if (payment) return { checkout: null, id, payment, providerType, type: paymentEvent.type }
+      }
+      const type = foreign ? 'ignored' : (CHECKOUT_EVENTS[providerType] ?? 'ignored')
       if (type === 'ignored' || !object || object.object !== 'checkout.session') {
         return { checkout: null, id, providerType, type: 'ignored' }
       }

@@ -162,8 +162,9 @@ const BILLING_SWEEP_LIMIT = 50
 
 /**
  * The billing sweep (#68, `runBillingSweep`): refunds still owed after an `other` rejection,
- * pending orders whose checkout closed (reconciled with the provider), and paid orders a crash
- * left unapplied. Off while orders are off.
+ * pending orders whose checkout closed (reconciled with the provider), paid orders left
+ * unapplied (usually by a webhook fulfilment that failed or ran out of time after its answer),
+ * and the recent payment emails that may not have gone (#481). Off while orders are off.
  */
 export function createBillingJob(features: SiteFeatures = siteFeatures): ScheduledJob {
   return {

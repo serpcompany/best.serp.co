@@ -67,8 +67,11 @@ the target (submission, listing, or claim), amount and currency, provider and it
 (checkout, payment, refund), what was actually charged, `status` (`pending` → `paid` →
 `refunding` → `refunded`, or `failed`), `outcome` once applied (`published`, `held`,
 `upgraded`, `relisted`, `claimed`, `unapplied`), the refund reason (`rejected`, `admin`,
-`unapplied`), actor, note, and an admin refund's listing decision and badge check, `attention`
-(`amount_mismatch`, `refund_failed`), refund attempts and their backoff, and timestamps. A partial unique index allows
+`unapplied`; `admin` with the actor `provider` is a refund made in Stripe's dashboard, #473),
+actor, note, and an admin refund's listing decision and badge check, `attention`
+(`amount_mismatch`, `refund_failed`), refund attempts and their backoff, a dispute's
+`dispute_status` (`open`, `won`, `lost`) and `disputed_at` (`0016_order_disputes`), and
+timestamps. A partial unique index allows
 one `pending` order per target, so a double click or a second tab reuses the open checkout.
 `billing_events` records each provider event once by `(provider, event_id)`.
 
@@ -120,6 +123,26 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
   currency less exactly the promotion code's discount (`chargedCents` records what was paid). A
   100%-off checkout has no payment, so its session id is the payment reference and a refund of
   it calls nothing. Any other charge is flagged `amount_mismatch` and refunded in full.
+- **Refunds and disputes outside the site (#473).** The webhook also takes `charge.refunded`,
+  `charge.dispute.created`, `charge.dispute.closed` and `refund.failed`, with the same signature
+  check and once-per-event handling, and finds the order by the charge's PaymentIntent (an
+  unknown one is recorded as `unknown_order` and answered 200). Everything is recorded before the
+  answer; only the admin's email goes after it, and the sweep sends it again if it didn't go. A
+  dispute that opens (`dispute_status` `open`), or a refund of the whole payment made in Stripe's
+  dashboard (`refunded`, as an admin's refund by `provider`, and the submission recorded
+  refunded so the listing reads as free), takes down the listing the payment made or kept live
+  (a paid submission's, an upgrade's, a relist's), in the same batch, even while its submission
+  is in review (owner decision on #156), and emails the admin (`admin-payment-alert`). A claim's
+  payment bought ownership, not the listing's place, so a claim's listing stays up; a payment
+  held for review has none live. A closed dispute records `won` or `lost` only: nothing
+  republishes the listing, and an admin decides in /admin. A partial refund changes nothing
+  and emails the admin. `refund.failed` flags a refund the site made `refund_failed` and emails
+  the admin. The site's own refund is claimed `refunding` before Stripe is asked, so its
+  `charge.refunded` finds the order `refunding` or `refunded` and changes nothing. A disputed
+  payment is never applied by fulfilment, and admin Orders shows "Disputed", "Dispute won",
+  "Dispute lost" or "Refunded outside the site", with no "Refund…" while a dispute is open or
+  lost (Stripe refuses those refunds; the refund routes answer 409). The four events stay dormant
+  until the owner ticks them on both webhooks ([Configuration](#configuration-owner)).
 - **Paid submission.** The guardrails run: a public address under the safe-fetch rules, the site
   answers with an HTML page, no listing has the website, and no prohibited block covers it. Pass:
   the listing is created and published (catalog version bump) and the submission is
@@ -166,13 +189,19 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
   dialog previews again, so a refund never does other than the button said. A listing that went
   down meanwhile is refunded as it is. No email: #70 has none for it.
 - **Sweep.** The hourly cron (`billing-sweep` in `lib/worker/scheduled.ts`) works most urgent
-  first, with at most 20 Stripe calls a run: paid orders a crash or a failed fulfilment left
-  unapplied (ten minutes after payment), claimed refunds
+  first, with at most 20 Stripe calls a run: paid orders left unapplied (ten minutes after
+  payment; usually by a webhook fulfilment that failed or outlived `waitUntil`, else by a Worker
+  stopped before applying; never a disputed one), claimed refunds
   (at most half the calls; a refund Stripe refuses backs off 1, 2, 4, 8 and 16 hours and is
   flagged `refund_failed` for an admin after five failures, after which only "Refund…" retries
   it), pending orders whose checkout closed (paid → applied, otherwise `failed`), failed
   orders whose superseded checkout couldn't be confirmed expired (for three days; it expires an
   open one and drops one Stripe expired), then refunds still owed after an `other` rejection.
+  Last, it sends again the emails of payments applied, and the admin alerts of payment events
+  (#473), between ten minutes and six hours ago (#481): an apply late in `waitUntil`'s 30
+  seconds, or a Worker stopped after it, may never have sent them. The email ledger sends each
+  once, and claims again a send cut off mid-way while useSend's idempotency key still answers a
+  repeat with the original message ([Email](./email.md)).
 
 No self-withdraw after payment (#59): the withdraw plans already refuse a paid submission.
 
@@ -211,7 +240,10 @@ account, so a key from another account can't open a checkout. A restricted key n
 access to Products and Prices as well.
 
 Events: `checkout.session.completed`, `checkout.session.expired`,
-`checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`. No Stripe
+`checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`. The code
+also handles `charge.refunded`, `charge.dispute.created`, `charge.dispute.closed` and
+`refund.failed` (#473), but they stay dormant until the owner ticks those four events on both
+endpoints (test and live) in the "SERP Directories" account; agents have no access to it. No Stripe
 Tax: billing refuses to start while `site.submissions.automaticTax` is on, since a taxed charge
 wouldn't match its order.
 
@@ -227,7 +259,8 @@ the flag off; nothing uses it while the flag is on.
 
 ## Tests
 
-`apps/web/src/lib/billing/{service,providers/stripe}.test.ts` (node:sqlite and a fake provider),
+`apps/web/src/lib/billing/{service,providers/stripe,providers/stripe-events}.test.ts` (node:sqlite
+and a fake provider; `stripe-events` maps the refund and dispute events, #473),
 `apps/web/src/lib/billing/http.test.ts` (the checkout routes' return URLs under a spoofed host),
 `scripts/d1-drizzle-local.test.ts` (the migration), and `apps/web/e2e/billing.spec.ts`
 (Playwright on the admin panel suite's Worker and D1, `PLAYWRIGHT_PORT` + 3, started with the

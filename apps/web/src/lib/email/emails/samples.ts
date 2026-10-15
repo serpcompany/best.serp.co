@@ -41,6 +41,23 @@ export const EMAIL_SAMPLES: SampleInputs = {
       to: 'devin@serp.co'
     }
   ],
+  'admin-payment-alert': [
+    {
+      input: {
+        kind: 'disputed',
+        listingLive: false,
+        orderNumber: 1042,
+        productName: 'Quillmate'
+      },
+      mockup: 'adminpaymentalert',
+      to: 'devin@serp.co'
+    },
+    {
+      input: { kind: 'refund_failed', listingLive: null, orderNumber: 1043, productName: null },
+      mockup: 'adminpaymentalert',
+      to: 'devin@serp.co'
+    }
+  ],
   'admin-review-ready': [
     {
       input: {

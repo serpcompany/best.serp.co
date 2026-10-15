@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, lt, sql } from 'drizzle-orm'
+import { and, asc, eq, gte, inArray, lt, lte, or, sql } from 'drizzle-orm'
 import type { CompiledQuery, Database } from './client'
 import { emailDeliveries } from './schema'
 
@@ -12,7 +12,9 @@ import { emailDeliveries } from './schema'
  * request, a re-run cron, or a double submit never sends the same email twice. One event may
  * still send several templates (the submitter's receipt and the admin notice). A `sending`
  * row is never re-claimed automatically: its outcome is unknown, and a missed email is
- * preferred over a duplicate one.
+ * preferred over a duplicate one. Only a recovery (`recover`, the billing sweep's, #481)
+ * re-claims one, once it is stale and while the provider still holds its idempotency key, so a
+ * send that did reach the provider is answered with the original message instead of a second.
  *
  * Rows hold no recipient, subject, or body. Event keys may not contain `@`, so an address
  * cannot be used as one (the table's CHECK enforces it too). Timestamps use SQLite's
@@ -21,6 +23,13 @@ import { emailDeliveries } from './schema'
  */
 
 export const EMAIL_DELIVERY_MAX_ATTEMPTS = 5
+/** A `sending` row this old is an attempt whose Worker stopped before it finished (#481). */
+export const EMAIL_STALE_SENDING_MS = 10 * 60 * 1000
+/**
+ * A stale `sending` row is recovered only this long after its first claim: inside useSend's
+ * 24-hour idempotency window (`emailIdempotencyKey`), less an hour's margin.
+ */
+export const EMAIL_RECOVERY_WINDOW_MS = 23 * 60 * 60 * 1000
 export const EMAIL_EVENT_KEY_PATTERN = /^[a-z0-9][a-z0-9:._-]{2,199}$/u
 export const EMAIL_TEMPLATE_ID_PATTERN = /^[a-z][a-z0-9-]{0,63}$/u
 const PROVIDER_PATTERN = /^[a-z][a-z0-9-]{0,31}$/u
@@ -42,6 +51,11 @@ export type EmailDeliveryClaim =
 export interface EmailDeliveryClaimInput {
   eventKey: string
   provider: string
+  /**
+   * Also re-claims a stale `sending` row (`EMAIL_STALE_SENDING_MS`) first claimed within
+   * `EMAIL_RECOVERY_WINDOW_MS`: an attempt whose Worker stopped mid-send (#481).
+   */
+  recover?: boolean
   templateId: string
 }
 
@@ -109,6 +123,17 @@ export function createEmailDeliveryLedger(config: {
       const templateId = requirePattern(input.templateId, EMAIL_TEMPLATE_ID_PATTERN, 'template id')
       const provider = requirePattern(input.provider, PROVIDER_PATTERN, 'provider')
       const timestamp = now()
+      const retryable = and(
+        eq(emailDeliveries.status, 'failed'),
+        lt(emailDeliveries.attempts, EMAIL_DELIVERY_MAX_ATTEMPTS)
+      )
+      const at = clock().getTime()
+      const stalled = and(
+        eq(emailDeliveries.status, 'sending'),
+        lt(emailDeliveries.attempts, EMAIL_DELIVERY_MAX_ATTEMPTS),
+        lte(emailDeliveries.updatedAt, sqliteTimestamp(new Date(at - EMAIL_STALE_SENDING_MS))),
+        gte(emailDeliveries.createdAt, sqliteTimestamp(new Date(at - EMAIL_RECOVERY_WINDOW_MS)))
+      )
       const claimed = await prepare(
         client,
         client.database
@@ -131,10 +156,7 @@ export function createEmailDeliveryLedger(config: {
               status: 'sending',
               updatedAt: timestamp
             },
-            setWhere: and(
-              eq(emailDeliveries.status, 'failed'),
-              lt(emailDeliveries.attempts, EMAIL_DELIVERY_MAX_ATTEMPTS)
-            ),
+            setWhere: input.recover ? or(retryable, stalled) : retryable,
             target: [emailDeliveries.templateId, emailDeliveries.eventKey]
           })
           .returning({ attempts: emailDeliveries.attempts })

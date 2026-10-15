@@ -1432,6 +1432,129 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
     ])
   })
 
+  it('records refunds and disputes made outside the site (#473)', async () => {
+    const order = async (id: string) =>
+      (await all<Record<string, unknown>>(B.selectOrderPlan(id)))[0] ?? null
+    const window = {
+      before: '2026-10-07T00:00:00.000Z',
+      limit: 10,
+      since: '2026-10-06T00:00:00.000Z'
+    }
+    // A paid submission, live and in review.
+    await insertDraft('sub-dispute', 'https://dispute.example/')
+    await choose('sub-dispute', 'paid')
+    await run(
+      B.buildCreateOrderPlans({
+        amountCents: 4900,
+        currency: 'usd',
+        id: 'ord-dispute',
+        now: NOW,
+        provider: 'stripe',
+        purpose: 'submission',
+        submissionId: 'sub-dispute',
+        userId: 'user_owner'
+      })
+    )
+    await run(
+      B.buildMarkOrderPaidPlans({
+        chargedCents: 4900,
+        chargedCurrency: 'usd',
+        now: NOW,
+        orderId: 'ord-dispute',
+        paymentId: 'pi_dispute'
+      })
+    )
+    await run([
+      ...S.buildRecordSubmissionPaymentPlans({
+        actor: 'billing',
+        listingId: 'lst-dispute',
+        now: NOW,
+        outcome: 'publish',
+        publication: await publication('paid-listing', 'sub-dispute'),
+        submissionId: 'sub-dispute'
+      }),
+      ...B.buildMarkOrderAppliedPlans({ now: NOW, orderId: 'ord-dispute', outcome: 'published' })
+    ])
+    expect(await all(B.selectOrderByPaymentPlan('stripe', 'pi_dispute'))).toEqual([
+      expect.objectContaining({ id: 'ord-dispute' })
+    ])
+    expect(await all(B.selectRecentlyAppliedOrdersPlan(window))).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'ord-dispute' })])
+    )
+    // A dispute takes the listing down although its submission is in review, and is recorded
+    // once; its outcome is recorded alone.
+    await run([
+      ...L.buildUnpublishListingPlans({
+        listingId: 'lst-dispute',
+        publication: await publication('dispute-unpublish', 'lst-dispute'),
+        reason: 'disputed',
+        whileInReview: true
+      }),
+      ...B.buildRecordDisputePlans({ now: NOW, orderId: 'ord-dispute' })
+    ])
+    expect(await listing('lst-dispute')).toMatchObject({ is_active: 0 })
+    await expect(
+      run(B.buildRecordDisputePlans({ now: NOW, orderId: 'ord-dispute' }))
+    ).rejects.toThrow()
+    expect(await all(B.selectRecentlyAppliedOrdersPlan(window))).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'ord-dispute' })])
+    )
+    await run(B.buildCloseDisputePlans({ now: NOW, orderId: 'ord-dispute', outcome: 'won' }))
+    expect(await order('ord-dispute')).toMatchObject({
+      dispute_status: 'won',
+      disputed_at: NOW,
+      status: 'paid'
+    })
+    expect(await all(B.selectAdminOrderPlan('ord-dispute'))).toEqual([
+      expect.objectContaining({
+        dispute_status: 'won',
+        listing_live: 0,
+        product_name: 'sub-dispute'
+      })
+    ])
+    // A refund made at the provider is compared on the outcome it was decided on.
+    const refund = (outcome: 'held' | 'published') =>
+      B.buildRecordProviderRefundPlans({
+        listingAction: 'already_unpublished',
+        now: NOW,
+        orderId: 'ord-dispute',
+        outcome
+      })
+    await expect(run(refund('held'))).rejects.toThrow()
+    await run(refund('published'))
+    expect(await order('ord-dispute')).toMatchObject({
+      refund_listing_action: 'already_unpublished',
+      refund_reason: 'admin',
+      refunded_by: 'provider',
+      status: 'refunded'
+    })
+    await expect(run(refund('published'))).rejects.toThrow()
+    // A refund that failed after it was accepted is flagged.
+    await run(B.buildFlagRefundFailedPlans({ now: NOW, orderId: 'ord-dispute' }))
+    expect(await order('ord-dispute')).toMatchObject({ attention: 'refund_failed' })
+    // The alerts the sweep sends again come from the events' outcomes.
+    const event = {
+      eventId: 'evt_dispute',
+      eventType: 'charge.dispute.created',
+      now: NOW,
+      provider: 'stripe'
+    }
+    await run(B.buildRecordBillingEventPlans(event))
+    await run(
+      B.buildFinishBillingEventPlans({ ...event, orderId: 'ord-dispute', outcome: 'disputed' })
+    )
+    expect(
+      await all(B.selectRecentBillingEventsPlan({ ...window, outcomes: ['disputed'] }))
+    ).toEqual([{ order_id: 'ord-dispute', outcome: 'disputed' }])
+    // The added columns keep their CHECKs.
+    await expect(
+      db.prepare(`UPDATE orders SET dispute_status='pending' WHERE id='ord-dispute'`).run()
+    ).rejects.toThrow(/orders_dispute_status_valid/u)
+    await expect(
+      db.prepare(`UPDATE orders SET disputed_at=NULL WHERE id='ord-dispute'`).run()
+    ).rejects.toThrow(/orders_dispute_recorded/u)
+  })
+
   it('applies a publication plan on D1 and refuses a stale one with nothing written (#95 release blocker)', async () => {
     // D1's authorizer refuses temporary tables, which the publisher's old guard table used:
     // Publish D1 Catalog (staging) run 37471283341 failed with exactly this.

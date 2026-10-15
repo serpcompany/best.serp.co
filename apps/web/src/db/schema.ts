@@ -1690,7 +1690,11 @@ export const orderOutcomes = [
 ] as const
 export type OrderOutcome = (typeof orderOutcomes)[number]
 
-/** Why an order was refunded: an `other` rejection, an admin's refund, or an unapplied payment. */
+/**
+ * Why an order was refunded: an `other` rejection, an admin's refund, or an unapplied payment.
+ * `admin` also records a refund made at the provider, outside the site (#473): its
+ * `refunded_by` is then `provider` (`PROVIDER_ACTOR`).
+ */
 export const orderRefundReasons = ['rejected', 'admin', 'unapplied'] as const
 export type OrderRefundReason = (typeof orderRefundReasons)[number]
 
@@ -1712,6 +1716,14 @@ export type OrderRefundListingAction = (typeof orderRefundListingActions)[number
  */
 export const orderAttentions = ['amount_mismatch', 'refund_failed'] as const
 export type OrderAttention = (typeof orderAttentions)[number]
+
+/**
+ * A buyer's dispute of the payment with their bank (#473): `open` from the provider's report
+ * until it closes, then `won` (the payment stands) or `lost` (the money went back to the buyer).
+ * The webhook takes the paid listing down when one opens; nothing republishes it.
+ */
+export const orderDisputeStatuses = ['open', 'won', 'lost'] as const
+export type OrderDisputeStatus = (typeof orderDisputeStatuses)[number]
 
 export const orders = sqliteTable(
   'orders',
@@ -1757,6 +1769,9 @@ export const orders = sqliteTable(
     refundRetryAt: text('refund_retry_at'),
     /** The admin's reason for the activity log (#70 screen 13). */
     refundNote: text('refund_note'),
+    /** The payment's dispute, if the buyer opened one (#473), and when it was first reported. */
+    disputeStatus: text('dispute_status', { enum: orderDisputeStatuses }),
+    disputedAt: text('disputed_at'),
     paidAt: text('paid_at'),
     appliedAt: text('applied_at'),
     refundedAt: text('refunded_at'),
@@ -1784,6 +1799,14 @@ export const orders = sqliteTable(
     check(
       'orders_refund_reason_valid',
       sql`${table.refundReason} IS NULL OR ${table.refundReason} IN (${sqlList(orderRefundReasons)})`
+    ),
+    check(
+      'orders_dispute_status_valid',
+      sql`${table.disputeStatus} IS NULL OR ${table.disputeStatus} IN (${sqlList(orderDisputeStatuses)})`
+    ),
+    check(
+      'orders_dispute_recorded',
+      sql`(${table.disputeStatus} IS NULL) = (${table.disputedAt} IS NULL)`
     ),
     check(
       'orders_target_matches_purpose',
