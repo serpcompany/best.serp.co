@@ -365,9 +365,11 @@ const operation = z.discriminatedUnion('action', [
    * logo and image rows (kind, source url, and hosted key, ordered by kind then sort order) when
    * the manifest was generated: the batch refuses a listing whose media changed since (a
    * row-level compare-and-swap, so the operation fits any environment whose rows match). Keys
-   * belong to the slug. The listing's queued media slots are dropped: the manifest wins. An empty
-   * update (`expected: []`, no logo or image) is refused while a logo or image is queued for the
-   * listing (#336): it says the listing has none, and would drop one an approval queued.
+   * belong to the slug. The listing's queued media slots are dropped: the manifest wins where it
+   * writes the slot's kind and sort order with new media, neither the same source nor the same
+   * bytes (the key's digest) as an `expected` row of that kind. It is refused while the listing has a pending or failed logo or image slot it would drop without
+   * replacing (#336, #458), such as an approval's new logo behind a renamed listing's update,
+   * empty (`expected: []`, `media: {}`), naming images, or re-hosting the old logo.
    */
   z
     .object({
@@ -1831,8 +1833,31 @@ export function buildPublicationPlan(
     }
     if (op.action === 'listing-media-update') {
       const expected = expectedMediaJson(op.expected)
-      const empty =
-        op.expected.length === 0 && !op.media.logo && (op.media.images ?? []).length === 0
+      // The rows it writes: the logo at sort order 0, and its images at 0..n-1.
+      const written = [
+        ...(op.media.logo ? [['logo', op.media.logo, 0] as const] : []),
+        ...(op.media.images ?? []).map((image, order) => ['image', image, order] as const)
+      ]
+      // The slots it replaces: those it writes with new media, neither the same source nor the
+      // same bytes as a row the listing already has of that kind. A re-host of an old row (a
+      // renamed listing's follow-up, whose source may be the old slug's CDN copy, as in #337's
+      // moves between slugs) would revert a newer upload queued at its position, not replace it
+      // (#458 review). Same bytes: the row's key carries the digest prefix that `hostedImage`
+      // holds the written key to; an imported row with no key matches on its source only. Any
+      // other queued slot is one the `DELETE` below would drop.
+      const rehost = (kind: string, image: HostedImageEntry) =>
+        op.expected.some(
+          row =>
+            row.kind === kind &&
+            (row.url === image.source ||
+              (row.key !== null &&
+                parseMediaKey(row.key)?.hash === image.sha256.slice(0, MEDIA_HASH_LENGTH)))
+        )
+      const replaced = written
+        .filter(([kind, image]) => !rehost(kind, image))
+        .map(([kind, , order]) => `${kind} ${order}`)
+      const dropped = `media_ingestions WHERE listing_id=? AND kind IN ('logo','image') AND kind || ' ' || sort_order NOT IN (SELECT value FROM json_each(?))`
+      const droppedParams = [op.id, JSON.stringify(replaced)]
       statements.push(
         statement(
           `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=?) AND ${CURRENT_MEDIA_JSON}=? THEN 1 ELSE ${GUARD_FAILURE} END`,
@@ -1841,18 +1866,20 @@ export function buildPublicationPlan(
           op.id,
           expected
         ),
-        // An empty update says the listing has no logo or image (docs/media.md, a renamed one),
-        // but an approval's new logo waits in the queue until the cron hosts it (#336). Refuse it
-        // rather than drop that slot below; a pending or a failed slot counts.
-        ...(empty
-          ? [
-              statement(
-                `SELECT CASE WHEN EXISTS (SELECT 1 FROM media_ingestions WHERE listing_id=? AND kind IN ('logo','image')) THEN ${REASONED_GUARD_FAILURE} ELSE 1 END`,
-                op.id,
-                `listing-media-update ${op.slug}: a logo or image is queued for the listing, so it is not empty`
-              )
-            ]
-          : []),
+        // `expected` lists `listing_media` rows, never a queued upload, so a pending or failed
+        // slot is one this update was not generated against: an approval's new logo or image, or
+        // an admin's new logo whose first fetch failed, waits in the queue until the cron hosts
+        // it, and a renamed listing's update names only the rows it had (#336, #458). Refuse
+        // rather than drop it below, naming the slot (its reviewed pending key, or the source an
+        // admin queued) and what to do. The reason is never NULL, so it fails like
+        // `REASONED_GUARD_FAILURE`.
+        statement(
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM ${dropped}) THEN json_extract('{}', ? || COALESCE((SELECT group_concat(kind || ' ' || COALESCE(copy_from_key,source_url) || ' (' || status || ')', ', ') FROM (SELECT kind,copy_from_key,source_url,status FROM ${dropped} ORDER BY kind,sort_order)),'') || ?) ELSE 1 END`,
+          ...droppedParams,
+          `listing-media-update ${op.slug} (${op.id}) would drop a pending or failed upload it does not replace: `,
+          ...droppedParams,
+          '. Let the media cron host a pending one, or host a failed one with a media upload plan, then ship an update that names it (docs/media.md)'
+        ),
         statement(
           "DELETE FROM listing_media WHERE listing_id=? AND kind IN ('logo','image')",
           op.id
@@ -1861,10 +1888,7 @@ export function buildPublicationPlan(
           "DELETE FROM media_ingestions WHERE listing_id=? AND kind IN ('logo','image')",
           op.id
         ),
-        ...[
-          ...(op.media.logo ? [['logo', op.media.logo, 0] as const] : []),
-          ...(op.media.images ?? []).map((image, order) => ['image', image, order] as const)
-        ].map(([kind, image, order]) =>
+        ...written.map(([kind, image, order]) =>
           statement(
             'INSERT INTO listing_media (listing_id,kind,url,sort_order,media_key,sha256,content_type,bytes,width,height) VALUES (?,?,?,?,?,?,?,?,?,?)',
             op.id,

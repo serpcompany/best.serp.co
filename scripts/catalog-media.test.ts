@@ -120,9 +120,10 @@ function foreignMediaKeys(database: DatabaseSync): string[] {
  * Committed renames no later manifest follows with a media update of the listing under the slug
  * it has by then: the new slug, or the one a later rename gives it (a→b, then b→c, with the
  * update under c). A listing with no logo or image ships an empty update (`expected: []`,
- * `media: {}`), which the publisher refuses if the listing has hosted media after all, or a logo
- * or image queued for the cron (#336). A manifest holds one operation per listing, so the update
- * is always in a later manifest.
+ * `media: {}`), which the publisher refuses if the listing has media after all. Any update is
+ * refused while it would drop a pending or failed logo or image it doesn't replace (#336, #458;
+ * `docs/media.md`). A manifest holds one operation per listing, so the update is always in a
+ * later manifest.
  */
 function unrehostedRenames(manifests: ReadonlyArray<ReturnType<typeof parseManifest>>): string[] {
   return manifests.flatMap((manifest, index) =>

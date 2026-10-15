@@ -47,11 +47,19 @@ under a live listing's path.
   manifest keeps the listing's media rows: re-host them under the new slug with a later
   `listing-media-update`, or media health reports them as `foreign_key`
   (`scripts/catalog-media.test.ts` holds committed manifests to that). A listing with no logo or
-  image gets an empty update (`expected: []`, `media: {}`). Every media update drops the
-  listing's queued slots, so the publisher refuses an empty one if the listing has hosted media
-  after all, or a pending or failed logo or image slot: an approval's new logo waits in the queue
-  until the `*/15` cron hosts it. Once it is hosted, ship an update that names it instead. After a
-  second rename, the update goes under the latest slug.
+  image gets an empty update (`expected: []`, `media: {}`), which the publisher refuses if it has
+  media after all. Every media update drops the listing's queued slots, so the publisher refuses
+  one, empty or not, that would drop a pending or failed logo or image slot it doesn't replace
+  (it writes no row at the slot's kind and sort order, or writes there only a re-host: the same
+  source or the same bytes as one of its `expected` rows of that kind, such as the old slug's
+  CDN copy), and the refusal names the slot: an approval's
+  new logo or image, or an admin's new logo whose first fetch failed, waits in the queue until
+  the `*/15` cron hosts it, and a renamed listing's update names only the rows it had. Once a
+  pending one is hosted, ship an update that names it instead. A failed one stopped retrying and
+  is never hosted: host that logo or image yourself with a media upload plan (`d1/media/`) and
+  ship an update that names it, which replaces the slot, or withdraw an admin's logo edit in
+  `/admin` by saving the current logo again. After a second rename, the update goes under the
+  latest slug.
 - **The production bucket is shared with serp.co.** `storeHostedMedia` is the only write to the
   bucket and refuses any key outside this site's three scopes, whatever bucket it is handed;
   `scopedMediaBucket` refuses the same before R2, and deletes only pending keys. The Worker never
