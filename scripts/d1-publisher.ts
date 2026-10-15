@@ -366,9 +366,10 @@ const operation = z.discriminatedUnion('action', [
    * the manifest was generated: the batch refuses a listing whose media changed since (a
    * row-level compare-and-swap, so the operation fits any environment whose rows match). Keys
    * belong to the slug. The listing's queued media slots are dropped: the manifest wins where it
-   * writes the slot's kind and sort order. It is refused while the listing has a pending or failed
-   * logo or image slot it would drop without replacing (#336, #458), such as an approval's new
-   * logo behind a renamed listing's update, empty (`expected: []`, `media: {}`) or naming images.
+   * writes the slot's kind and sort order with a source `expected` doesn't list for that kind. It
+   * is refused while the listing has a pending or failed logo or image slot it would drop without
+   * replacing (#336, #458), such as an approval's new logo behind a renamed listing's update,
+   * empty (`expected: []`, `media: {}`), naming images, or re-hosting the old logo.
    */
   z
     .object({
@@ -1832,10 +1833,22 @@ export function buildPublicationPlan(
     }
     if (op.action === 'listing-media-update') {
       const expected = expectedMediaJson(op.expected)
-      // The listing's queued slots this update does not replace: it writes the logo at sort
-      // order 0 and its images at 0..n-1, so a slot at or past its kind's count is dropped below.
-      const dropped = `media_ingestions WHERE listing_id=? AND kind IN ('logo','image') AND sort_order>=CASE kind WHEN 'logo' THEN ? ELSE ? END`
-      const droppedParams = [op.id, op.media.logo ? 1 : 0, (op.media.images ?? []).length]
+      // The rows it writes: the logo at sort order 0, and its images at 0..n-1.
+      const written = [
+        ...(op.media.logo ? [['logo', op.media.logo, 0] as const] : []),
+        ...(op.media.images ?? []).map((image, order) => ['image', image, order] as const)
+      ]
+      // The slots it replaces: those it writes with a source the listing's rows don't already
+      // list for that kind. A re-host of an old row (a renamed listing's follow-up) would revert
+      // a newer upload queued at its position, not replace it (#458 review). Any other queued
+      // slot is one the `DELETE` below would drop.
+      const rehost = (kind: string, source: string) =>
+        op.expected.some(row => row.kind === kind && row.url === source)
+      const replaced = written
+        .filter(([kind, image]) => !rehost(kind, image.source))
+        .map(([kind, , order]) => `${kind} ${order}`)
+      const dropped = `media_ingestions WHERE listing_id=? AND kind IN ('logo','image') AND kind || ' ' || sort_order NOT IN (SELECT value FROM json_each(?))`
+      const droppedParams = [op.id, JSON.stringify(replaced)]
       statements.push(
         statement(
           `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=?) AND ${CURRENT_MEDIA_JSON}=? THEN 1 ELSE ${GUARD_FAILURE} END`,
@@ -1845,11 +1858,12 @@ export function buildPublicationPlan(
           expected
         ),
         // `expected` lists `listing_media` rows, never a queued upload, so a pending or failed
-        // slot is one this update was not generated against: an approval's new logo waits in the
-        // queue until the cron hosts it, and a renamed listing's update names only the rows it
-        // had (#336, #458). Refuse rather than drop it below, naming the slot (its reviewed
-        // pending key, or the source an admin queued) and what to do. The reason is never NULL,
-        // so it fails like `REASONED_GUARD_FAILURE`.
+        // slot is one this update was not generated against: an approval's new logo or image, or
+        // an admin's new logo whose first fetch failed, waits in the queue until the cron hosts
+        // it, and a renamed listing's update names only the rows it had (#336, #458). Refuse
+        // rather than drop it below, naming the slot (its reviewed pending key, or the source an
+        // admin queued) and what to do. The reason is never NULL, so it fails like
+        // `REASONED_GUARD_FAILURE`.
         statement(
           `SELECT CASE WHEN EXISTS (SELECT 1 FROM ${dropped}) THEN json_extract('{}', ? || COALESCE((SELECT group_concat(kind || ' ' || COALESCE(copy_from_key,source_url) || ' (' || status || ')', ', ') FROM (SELECT kind,copy_from_key,source_url,status FROM ${dropped} ORDER BY kind,sort_order)),'') || ?) ELSE 1 END`,
           ...droppedParams,
@@ -1865,10 +1879,7 @@ export function buildPublicationPlan(
           "DELETE FROM media_ingestions WHERE listing_id=? AND kind IN ('logo','image')",
           op.id
         ),
-        ...[
-          ...(op.media.logo ? [['logo', op.media.logo, 0] as const] : []),
-          ...(op.media.images ?? []).map((image, order) => ['image', image, order] as const)
-        ].map(([kind, image, order]) =>
+        ...written.map(([kind, image, order]) =>
           statement(
             'INSERT INTO listing_media (listing_id,kind,url,sort_order,media_key,sha256,content_type,bytes,width,height) VALUES (?,?,?,?,?,?,?,?,?,?)',
             op.id,

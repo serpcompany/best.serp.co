@@ -556,17 +556,19 @@ describe('publisher plan in SQLite transaction (D1 batch emulator)', () => {
     // #336, #458: an approval deletes the listing's logo row and queues its new logo for the cron
     // (`adoptStagedLogoPlans`), and `expected` lists rows, never the queue. An update generated
     // in that window would drop the logo, so the publisher refuses any update that drops a
-    // pending or failed slot without writing that slot's kind and sort order.
+    // pending or failed slot without writing that slot's kind and sort order, or writes there
+    // only a re-host of a row it expects (#458 review).
     describe('a pending or failed upload the update does not replace (#336, #458)', () => {
       const reviewedKey = `best.serp.co/revisions/rev_sqlite/logo/${'d'.repeat(16)}.png`
       const refusal = (slug: string, slots: string) =>
         `bad JSON path: 'listing-media-update ${slug} (lst_sqlite_test) would drop a pending or failed upload it does not replace: ${slots}. Let the media cron host a pending one, or host a failed one with a media upload plan, then ship an update that names it (docs/media.md)'`
-      /** Queues a slot as an approval (a logo, with its reviewed key) or an admin edit would. */
+      /** Queues a slot as an approval (with its reviewed key) or an admin edit (none) would. */
       const queue = (
         db: DatabaseSync,
         status: 'failed' | 'pending',
         kind: 'image' | 'logo' = 'logo',
-        order = 0
+        order = 0,
+        copyFrom: string | null = kind === 'logo' ? reviewedKey : null
       ) =>
         db
           .prepare(
@@ -577,7 +579,7 @@ describe('publisher plan in SQLite transaction (D1 batch emulator)', () => {
             kind,
             order,
             `https://queued.example/${kind}.png`,
-            kind === 'logo' ? reviewedKey : null,
+            copyFrom,
             status,
             status === 'failed' ? 5 : 0,
             status === 'pending' ? now : null,
@@ -613,6 +615,16 @@ describe('publisher plan in SQLite transaction (D1 batch emulator)', () => {
       }
       const imageRow = { kind: 'image', url: oldImage.source, key: oldImage.key }
       const rehost = { images: [hosted('image', 'b', 'new-slug')] }
+      const oldLogo = hosted('logo', 'a')
+      const logoRow = { kind: 'logo', url: oldLogo.source, key: oldLogo.key }
+      // An admin's logo edit whose first fetch failed (retryable) keeps the hosted old logo row
+      // and queues the new source at logo slot 0 (`changedLogoPlans`), with no reviewed key.
+      const adminLogo = 'https://queued.example/logo.png'
+      const adminEdited = (db: DatabaseSync, status: 'failed' | 'pending') => {
+        insertHosted(db, 'logo', oldLogo)
+        queue(db, status, 'logo', 0, null)
+        return db
+      }
       const queueAndVersion = (db: DatabaseSync) => ({
         queue: db.prepare('SELECT kind,status FROM media_ingestions ORDER BY kind').all(),
         rows: db.prepare('SELECT kind,media_key FROM listing_media ORDER BY kind').all(),
@@ -652,6 +664,63 @@ describe('publisher plan in SQLite transaction (D1 batch emulator)', () => {
           ],
           version: { version: 5 }
         })
+      })
+
+      it('refuses an update that re-hosts the old logo while an admin’s new logo waits', () => {
+        for (const status of ['pending', 'failed'] as const) {
+          const db = adminEdited(database(), status)
+          const before = queueAndVersion(db)
+          const revert = mediaUpdate({ expected: [logoRow], media: { logo: oldLogo } })
+          expect(
+            () => executeInTestTransaction(db, plan({ operations: [revert] })),
+            status
+          ).toThrow(refusal('old-slug', `logo ${adminLogo} (${status})`))
+          expect(queueAndVersion(db), status).toEqual(before)
+        }
+        // Hosting the admin's logo and naming it replaces the slot (docs/media.md).
+        const db = adminEdited(database(), 'failed')
+        const logo = { ...hosted('logo', 'c'), source: adminLogo }
+        executeInTestTransaction(
+          db,
+          plan({ operations: [mediaUpdate({ expected: [logoRow], media: { logo } })] })
+        )
+        expect(queueAndVersion(db)).toEqual({
+          queue: [],
+          rows: [{ kind: 'logo', media_key: logo.key }],
+          version: { version: 5 }
+        })
+      })
+
+      it('refuses an update that re-hosts the old image while a paid submission’s image waits', () => {
+        // Approving a paid submission on a live listing queues its reviewed image at image slot
+        // 0 (`adoptSubmissionImagePlans`) over the old image row, which only the cron replaces.
+        const submissionKey = `best.serp.co/submissions/sub_sqlite/image/${'e'.repeat(16)}.png`
+        const db = database()
+        insertHosted(db, 'image', oldImage)
+        queue(db, 'pending', 'image', 0, submissionKey)
+        const before = queueAndVersion(db)
+        const revert = mediaUpdate({ expected: [imageRow], media: { images: [oldImage] } })
+        expect(() => executeInTestTransaction(db, plan({ operations: [revert] }))).toThrow(
+          refusal('old-slug', `image ${submissionKey} (pending)`)
+        )
+        expect(queueAndVersion(db)).toEqual(before)
+      })
+
+      it('refuses a renamed listing’s follow-up that re-hosts its old logo while a new one waits', () => {
+        for (const status of ['pending', 'failed'] as const) {
+          const db = adminEdited(renamed(), status)
+          const before = queueAndVersion(db)
+          const followUp = mediaUpdate({
+            slug: 'new-slug',
+            expected: [imageRow, logoRow],
+            media: { ...rehost, logo: hosted('logo', 'a', 'new-slug') }
+          })
+          expect(
+            () => executeInTestTransaction(db, plan({ operations: [followUp] })),
+            status
+          ).toThrow(refusal('new-slug', `logo ${adminLogo} (${status})`))
+          expect(queueAndVersion(db), status).toEqual(before)
+        }
       })
 
       it('refuses every update that drops a slot, and applies one that replaces it', () => {
