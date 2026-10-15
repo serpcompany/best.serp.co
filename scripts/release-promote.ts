@@ -1,7 +1,8 @@
 /**
  * Promotes `staging` to `main` by fast-forward (#171; serp
  * docs/engineering/standards/git-workflow.md, Promoting Staging to Production), so `main`
- * receives exactly the squash commits Deploy Staging verified. Owner only: agents never run it.
+ * receives exactly the squash commits Deploy Staging verified. The owner's command: an agent runs
+ * it only on the owner's "you do it" for the release (docs/owner-rules.md).
  *
  *   pnpm release:promote
  *
@@ -148,7 +149,7 @@ export async function promoteStaging(
 export function assertInteractive(stdinIsTty: boolean | undefined): void {
   if (!stdinIsTty) {
     throw new Error(
-      "Refusing: pnpm release:promote is the owner's command and needs a terminal to confirm. Agents never run it."
+      'Refusing: pnpm release:promote is the owner\'s command and needs a terminal to confirm. An agent runs it only on the owner\'s "you do it" for this release.'
     )
   }
 }

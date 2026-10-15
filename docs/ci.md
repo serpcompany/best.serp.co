@@ -62,11 +62,12 @@ The rulesets require no approving review and no resolved conversations. Admins c
 `staging` only through a pull request. The owner's fast-forward promotion
 (`pnpm release:promote`, #171) is a direct push to `main`, and a bypass covers a whole ruleset,
 so `main`'s pull request and check rules sit in `main pull requests`, which admins may bypass,
-and `main` keeps the deletion and force-push blocks nobody can bypass. Agents never push. Rulesets cannot restrict
+and `main` keeps the deletion and force-push blocks nobody can bypass. Agents push to `main` only
+by running that promotion on the owner's "you do it" for a release. Rulesets cannot restrict
 a pull request's head branch, so `check` fails a pull request into `main` whose
 head is not a `hotfix-*` branch. That only catches mis-targeted pull requests; Deploy
-Production's tree check is the control. Agents never merge: the owner approves every merge
-([Release guards](./release-guards.md#promotion)).
+Production's tree check is the control. Agents squash-merge only their own green, reviewed
+pull requests into `staging` ([Owner rules](./owner-rules.md)).
 
 After a pull request merges, the push run checks the exact resulting revision again; when it
 merged up to date its tree is the one the pull request tested, so only the quick checks repeat.

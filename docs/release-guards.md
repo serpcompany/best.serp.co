@@ -41,8 +41,10 @@ ambiguous `db:migrate`. The root `package.json` holds them.
 The repository follows the serp git-workflow standard for repositories with Staging:
 
 - **`staging` is the base branch.** Branch from it as `issue-<n>-<slug>` and open pull
-  requests into it. The owner squash-merges them (the hotfix merge-back below is the one
-  merge commit), and each push to `staging` runs Deploy Staging. Agents never merge.
+  requests into it. They are squash-merged (the hotfix merge-back below is the one merge
+  commit) by the owner, or by the agent that opened one once it is green and reviewed clean
+  ([Owner rules](./owner-rules.md#merging-to-staging)), and each push to `staging` runs Deploy
+  Staging.
 - **`main` is production.** `staging` reaches it by a **fast-forward**: the owner runs
   `pnpm release:promote` (`scripts/release-promote.ts`), so `main` receives exactly the squash
   commits staging verified, with no promotion pull request and no merge commit. The push needs
@@ -50,8 +52,11 @@ The repository follows the serp git-workflow standard for repositories with Stag
   deletion and force pushes stay blocked for everyone. Any other change to `main` is a
   `hotfix-*` pull request. Each push to `main` runs Deploy Production, which waits for the
   reviewers.
-- **Only the owner releases.** Agents never dispatch a production workflow, never type a
-  production confirmation, and never approve a deployment.
+- **Releases are the owner's.** Each needs the owner's go for that release, and a go never
+  carries over. Only on that release's "you do it" may an agent run `pnpm release:promote`,
+  approve that release's Deploy Production gate, and run its approved publications
+  ([Owner rules](./owner-rules.md#production-releases)). Otherwise agents never dispatch a
+  production workflow, never type a production confirmation, and never approve a deployment.
 - **CI catches mis-targeted pull requests.** Rulesets cannot restrict a head branch, so
   `web.yml`'s `check` fails a pull request into `main` unless its head is a `hotfix-*` branch
   of this repository. It is an accident guard, not the control: a pull request runs its own
@@ -59,8 +64,9 @@ The repository follows the serp git-workflow standard for repositories with Stag
 
 `pnpm release:promote` fetches, then refuses unless `main` is an ancestor of `staging` (after a
 hotfix, merge `main` back first; see [Hotfixes](#hotfixes)), Deploy Staging verified the head of
-`staging` (below), and the owner types the short SHA it shows at a terminal. It pushes that
-exact commit, never forced. Agents never run it.
+`staging` (below), and the short SHA it shows is typed at a terminal: by the owner, or by an agent
+under `expect` on the owner's "you do it" for that release. It pushes that exact commit, never
+forced.
 
 ## Staging before production
 

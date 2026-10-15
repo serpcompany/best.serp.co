@@ -89,8 +89,10 @@ branch head as `GITHUB_SHA` rather than the released commit.
 1. Wait until Deploy Staging is green for the `staging` head. If the head has no verified
    attempt, start one with `gh workflow run web.yml --ref staging`
    ([Release guards](./release-guards.md#staging-before-production)).
-2. The owner runs `pnpm release:promote` at a terminal and types the short SHA it shows. It
-   fast-forwards `main` to that verified commit ([Promotion](./release-guards.md#promotion)).
+2. The owner runs `pnpm release:promote` at a terminal and types the short SHA it shows, or
+   says "you do it" and an agent runs it under `expect`
+   ([Owner rules](./owner-rules.md#production-releases)). It fast-forwards `main` to that
+   verified commit ([Promotion](./release-guards.md#promotion)).
 3. The push to `main` runs Deploy Production: the staging check finds that commit's own run,
    the `production` reviewers approve, and the release bookmarks and migrates D1 first only
    when `apps/web/drizzle` migrations are pending.

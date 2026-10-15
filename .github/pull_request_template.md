@@ -26,4 +26,5 @@ Review: <rounds>, <outcome> (a fresh review agent; the author never reviews its 
 
 > **Note:** best.serp.co is D1-backed. Public intake is staged in normalized D1
 > tables and versioned maintainer publications live under `d1/publications/`;
-> catalog JSON files are forbidden. Only the owner merges.
+> catalog JSON files are forbidden. Agents merge only their own green, reviewed
+> pull requests into `staging` (`docs/owner-rules.md`).
