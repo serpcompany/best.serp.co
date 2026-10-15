@@ -1067,6 +1067,20 @@ describe('environment-specific crawl policy gates', () => {
       ).rejects.toThrow(missing)
     })
 
+    // #474: the read stops at 4 MiB. A page that outgrew it, with the beacon past the cap, fails
+    // with the cap named, not as a page without the beacon.
+    it.each(['production', 'public'])(
+      'names the 4 MiB read cap in %s gates when best.serp.co passes it before </body>',
+      async mode => {
+        stubHome(head, '<main>', 'x'.repeat(4 * 1_048_576), '</main>', beacon, '</body></html>')
+        const gate = gates(mode, origin, undefined, { wranglerConfigPath: tokenConfig(token) })
+        await expect(gate).rejects.toThrow(
+          "best.serp.co route / (https://best.serp.co/) passed the gates' 4 MiB read cap before </body>"
+        )
+        await expect(gate).rejects.not.toThrow(missing)
+      }
+    )
+
     it.each([undefined, '', '  '])(
       'needs no beacon while production has no site token (%o)',
       async productionToken => {

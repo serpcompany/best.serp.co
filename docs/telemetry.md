@@ -31,8 +31,9 @@ no beacon.
    request. Staging and local never set it.
 3. After the production deploy, best.serp.co's HTML ends with a
    `static.cloudflareinsights.com/beacon.min.js` script; the workers.dev host and staging have
-   none. Deploy Production's HTTP gates check both (`scripts/d1-preview-http-gates.ts`, #272):
-   while production has a site token, best.serp.co without the beacon fails the deploy.
+   none. Deploy Production's HTTP gates check best.serp.co and the workers.dev host, and Deploy
+   Staging's gates check staging (`scripts/d1-preview-http-gates.ts`, #272): while production
+   has a site token, best.serp.co without the beacon fails the deploy.
 
 ## Error reporting (Sentry)
 
