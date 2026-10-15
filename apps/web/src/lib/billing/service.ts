@@ -32,7 +32,7 @@ import type { EmailRequest } from '../email/service'
 import type { TemplateInput } from '../email/templates'
 import { CodedError } from '../telemetry/coded-error'
 import { errorFields } from '../telemetry/error-fields'
-import { tooLateForCheckout } from './checkout-window'
+import { confirmAgainPath, tooLateForCheckout } from './checkout-window'
 import type { GuardrailResult } from './guardrails'
 import {
   type BillingEvent,
@@ -108,8 +108,9 @@ export interface PaidClaims {
     userId: string
   }): Promise<boolean>
   /**
-   * The claim the user may pay for: the paid method, the listing unowned, and confirmed in time,
-   * with when the confirmation lapses (a checkout must close before that).
+   * The claim the user may pay for: the paid method, the listing unowned, and the address
+   * confirmed, with when the confirmation lapses (a checkout must close before that; one that
+   * already lapsed comes back too, so the checkout can ask for a new code).
    */
   forCheckout(input: {
     claimId: string
@@ -384,10 +385,11 @@ export async function startClaimCheckout(
   const claim = await deps.paidClaims.forCheckout(input)
   if (!claim) return { ok: true, redirect: dialog }
   // The checkout closes with the confirmation, so nobody pays for a claim that can't complete;
-  // with less left than a checkout's shortest life, the address is confirmed again first (the
-  // claim dialog asks for a new code then, #128; this answer is the backstop).
+  // with less left than a checkout's shortest life, or none, the address is confirmed again
+  // first: back to the dialog, told to ask for a new code whatever the browser's clock says
+  // (#128, #476). The dialog asks before linking here too, on the browser's clock.
   if (tooLateForCheckout(claim.confirmedUntil.getTime(), deps.now().getTime())) {
-    return failure(409, 'not_payable', 'This claim can’t be paid for.')
+    return { ok: true, redirect: confirmAgainPath(listing.listingSlug) }
   }
   return openCheckout(deps, input, {
     cancelPath: dialog,

@@ -1,4 +1,5 @@
 import { type APIRequestContext, expect, type Page } from '@playwright/test'
+import { CONFIRM_AGAIN_HASH } from '../src/lib/billing/checkout-window'
 import {
   ADMIN_EMAIL_PREFIXES,
   type Client,
@@ -22,6 +23,8 @@ import {
   startStripeMock,
   stripeSignatureHeader
 } from './billing-fixture'
+import { claimCode } from './claims-fixture'
+import { escapeRegExp } from './site-fixture'
 import { type FixtureProduct, type FixtureSite, startFixtureSite } from './submit-fixture'
 import { test } from './test'
 
@@ -35,7 +38,9 @@ import { test } from './test'
  * - upgrade: a live free listing's "Upgrade: $49 one-off" makes it paid;
  * - refunds from Orders: the badge is checked once at refund; a pass keeps the listing live as
  *   free, a miss unpublishes it (410);
- * - a paid submission rejected as `other` is refunded automatically.
+ * - a paid submission rejected as `other` is refunded automatically;
+ * - a paid claim with too little of its confirmation left: the checkout route sends it back to
+ *   the claim dialog's request for a new code, whatever the browser's clock (#128, #476).
  */
 
 test.skip(!billingSuiteEnabled, 'needs the local orders Worker from playwright.suites.config.ts')
@@ -643,6 +648,100 @@ test('a paid claim: the payment makes the claimer the owner (#67)', async ({ pag
       `SELECT user_id, verified_via FROM listing_owners WHERE listing_id = ${q(listingId)} AND revoked_at IS NULL`
     )
   ).toEqual([{ user_id: claimer.id, verified_via: 'paid_claim' }])
+})
+
+test('a paid claim with too little of its confirmation left goes back to the dialog for a new code, whatever the browser clock (#128, #476)', async ({
+  page
+}) => {
+  const claimer = await signInSubmitter(page, 'late-claim')
+  const key = `late-claim-${unique()}`
+  site.set(key, product(`Late ${key.slice(-5)}`, 'missing'))
+  const slug = site.slug(key)
+  const listingId = `e2e-billing-late-claim-${key}`
+  const claimId = crypto.randomUUID()
+  const address = `team@${slug}`
+  seedBillingListing({
+    checksum: `e2e-${key}`,
+    content: 'Content.',
+    description: 'A curated listing.',
+    id: listingId,
+    name: `Late ${key.slice(-5)}`,
+    published_at: '2026-05-16',
+    slug,
+    source_identity: listingId,
+    source_kind: 'e2e',
+    website: site.website(key)
+  })
+  // Confirmed 23 h 40 min ago on the Worker's clock: 20 minutes left, less than a checkout needs.
+  const verifiedAt = new Date(Date.now() - (23 * 60 + 40) * 60 * 1000).toISOString()
+  billingD1(`
+    INSERT INTO listing_claims (id, listing_id, user_id, method, status, email, email_domain,
+      product_url, listing_website, code_sent_at, code_expires_at, email_verified_at)
+    VALUES (${q(claimId)}, ${q(listingId)}, ${q(claimer.id)}, 'paid', 'email_verified',
+      ${q(address)}, ${q(slug)}, ${q(site.website(key))}, ${q(site.website(key))},
+      ${q(verifiedAt)}, ${q(verifiedAt)}, ${q(verifiedAt)});
+  `)
+  const route = `/claims/${claimId}/checkout/`
+  const dialog = page.getByRole('dialog')
+  const pay = dialog.getByRole('link', { name: 'Continue to payment: $49' })
+  const checkoutRequests: string[] = []
+  page.on('request', request => {
+    if (new URL(request.url()).pathname === route) checkoutRequests.push(request.url())
+  })
+  async function asksForANewCode(): Promise<void> {
+    // Read once: the state becomes `#claim`, so a reload doesn't ask again after a new code.
+    await expect(page).toHaveURL(new RegExp(`/products/${escapeRegExp(slug)}/#claim$`, 'u'))
+    await expect(dialog.getByText('Step 3 of 4')).toBeVisible()
+    await expect(dialog.getByText('This code has expired. Send a new one.')).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Send a new code' })).toBeVisible()
+  }
+
+  // Opened in a new tab (a middle click, the context menu): no 409, but back to the dialog's
+  // request for a new code, on a relative path.
+  const answer = await page.request.get(route, { maxRedirects: 0 })
+  expect(answer.status()).toBe(303)
+  expect(answer.headers().location).toBe(`/products/${slug}/${CONFIRM_AGAIN_HASH}`)
+
+  // The server decided, so the dialog asks whether the browser's clock is behind or ahead.
+  for (const hours of [-2, 2]) {
+    await page.clock.setFixedTime(Date.now() + hours * 60 * 60 * 1000)
+    checkoutRequests.length = 0
+    await page.goto(route)
+    await asksForANewCode()
+    expect(checkoutRequests).toHaveLength(1)
+  }
+
+  // Two hours behind, the dialog still offers the payment; the click comes back the same way.
+  await page.clock.setFixedTime(Date.now() - 2 * 60 * 60 * 1000)
+  await page.goto(`/products/${slug}/`)
+  await page.getByRole('button', { name: 'Claim this listing' }).click()
+  checkoutRequests.length = 0
+  await pay.click()
+  await asksForANewCode()
+  expect(checkoutRequests).toHaveLength(1)
+
+  // Past the confirmation altogether (an hour ago; that clock still sees an hour left): the
+  // same, where the route used to send the dialog back to the payment step.
+  billingD1(`UPDATE listing_claims
+    SET email_verified_at = ${q(new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString())}
+    WHERE id = ${q(claimId)}`)
+  await page.goto(`/products/${slug}/`)
+  await page.getByRole('button', { name: 'Claim this listing' }).click()
+  checkoutRequests.length = 0
+  await pay.click()
+  await asksForANewCode()
+  expect(checkoutRequests).toHaveLength(1)
+
+  // A new code confirms the address for another day, and the payment opens.
+  await dialog.getByRole('button', { name: 'Send a new code' }).click()
+  await dialog
+    .locator('input[autocomplete="one-time-code"]')
+    .fill(await claimCode(page.request, address))
+  await expect(dialog.getByText('Step 4 of 4')).toBeVisible()
+  await page.reload()
+  await expect(dialog.getByText('Step 4 of 4')).toBeVisible()
+  await pay.click()
+  await expect(page).toHaveURL(/\/pay\/cs_test_/u)
 })
 
 test('a paid submission rejected as other is refunded automatically', async ({ page }) => {

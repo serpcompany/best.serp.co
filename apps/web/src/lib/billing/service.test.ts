@@ -16,7 +16,7 @@ import { buildRejectSubmissionPlans } from '@/db/submission-plans'
 import { insertPublishedListing, SqliteD1 } from '@/db/test-support'
 import { checkBadgeAtRefund } from '../badge-program/refund'
 import { features, type SiteFeatures } from '../features'
-import { SHORTEST_CHECKOUT_MS } from './checkout-window'
+import { CONFIRM_AGAIN_HASH, SHORTEST_CHECKOUT_MS } from './checkout-window'
 import type { GuardrailResult } from './guardrails'
 import { createPaidClaims } from './paid-claims'
 import {
@@ -854,6 +854,7 @@ describe('paid claims (#67)', () => {
     return f
   }
   const claim = { claimId: '00000000-0000-4000-8000-00000000c1a1', userId: 'user_maya' }
+  const CONFIRM_AGAIN = `/products/claimable.example/${CONFIRM_AGAIN_HASH}`
 
   it('pays for a confirmed paid claim, and the payment makes the claimer the owner', async () => {
     const f = claimFixture()
@@ -962,11 +963,11 @@ describe('paid claims (#67)', () => {
       checkout_expires_at: '2026-10-06T12:40:00.000Z'
     })
     f.db.exec(`DELETE FROM orders`)
-    // 20 minutes left: shorter than the shortest checkout.
+    // 20 minutes left: shorter than the shortest checkout, so back to the dialog for a new code.
     f.db.exec(`UPDATE listing_claims SET email_verified_at='2026-10-05T12:20:00.000Z'`)
     await expect(
       startClaimCheckout(f.deps, { ...claim, email: 'maya@example.com', origin: ORIGIN })
-    ).resolves.toMatchObject({ ok: false, status: 409 })
+    ).resolves.toEqual({ ok: true, redirect: CONFIRM_AGAIN })
     expect(f.rows('SELECT id FROM orders')).toEqual([])
   })
 
@@ -984,7 +985,23 @@ describe('paid claims (#67)', () => {
     f.clock.now = new Date(confirmedUntil - SHORTEST_CHECKOUT_MS + 1000)
     await expect(
       startClaimCheckout(f.deps, { ...claim, email: 'maya@example.com', origin: ORIGIN })
-    ).resolves.toMatchObject({ error: 'not_payable', ok: false, status: 409 })
+    ).resolves.toEqual({ ok: true, redirect: CONFIRM_AGAIN })
+    expect(f.rows('SELECT id FROM orders')).toEqual([])
+  })
+
+  it('sends a claim whose confirmation ran out back to the dialog for a new code, an owned one as it stands (#476)', async () => {
+    const f = claimFixture()
+    // Confirmed 25 hours before NOW: the confirmation ended an hour ago.
+    f.db.exec(`UPDATE listing_claims SET email_verified_at='2026-10-05T11:00:00.000Z'`)
+    await expect(
+      startClaimCheckout(f.deps, { ...claim, email: 'maya@example.com', origin: ORIGIN })
+    ).resolves.toEqual({ ok: true, redirect: CONFIRM_AGAIN })
+    // Owned meanwhile: nothing to confirm again; the dialog shows where the claim stands.
+    f.db.exec(`INSERT INTO listing_owners (listing_id, user_id, verified_via, verified_at)
+      VALUES ('lst_claim', 'user_priya', 'badge_claim', '2026-10-06T11:30:00.000Z')`)
+    await expect(
+      startClaimCheckout(f.deps, { ...claim, email: 'maya@example.com', origin: ORIGIN })
+    ).resolves.toEqual({ ok: true, redirect: '/products/claimable.example/#claim' })
     expect(f.rows('SELECT id FROM orders')).toEqual([])
   })
 

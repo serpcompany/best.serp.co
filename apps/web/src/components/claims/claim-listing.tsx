@@ -42,7 +42,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Separator } from '@/components/ui/separator'
 import { buildFeaturedOnBadgeEmbedHtml } from '@/components/website/featured-on-badge-embed-panel'
 import { useIsMobile } from '@/hooks/use-mobile'
-import { tooLateForCheckout } from '@/lib/billing/checkout-window'
+import { CONFIRM_AGAIN_HASH, tooLateForCheckout } from '@/lib/billing/checkout-window'
 
 /**
  * Claiming a listing (serpcompany/best.serp.co#67, #70 screens 8 and 9a): the "Claim this
@@ -200,6 +200,11 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
   const [badgeWaitUntil, setBadgeWaitUntil] = useState(0)
   const [busy, setBusy] = useState(false)
   const inFlight = useRef(false)
+  /**
+   * The checkout route refused the paid claim's confirmation on the server's clock (#476): the
+   * dialog asks for a new code, whatever the browser's clock says, until one confirms.
+   */
+  const refusedByServer = useRef(false)
   const name = listing.name
   const domain = target?.domain ?? ''
   const embed = buildFeaturedOnBadgeEmbedHtml({
@@ -260,7 +265,11 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
         resumed.lockedUntil && Date.parse(resumed.lockedUntil) > Date.now() ? 'attempts' : null
       )
       setStep('code')
-    } else if (resumed?.status === 'email_verified' && confirmationRunOut(resumed, Date.now())) {
+    } else if (
+      resumed?.status === 'email_verified' &&
+      ((refusedByServer.current && resumed.method === 'paid') ||
+        confirmationRunOut(resumed, Date.now()))
+    ) {
       // Past the confirmation (for a paid claim, too near its end), a new code confirms again.
       setEmail(resumed.email)
       setCodeError('expired')
@@ -298,8 +307,14 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
     void load()
   }, [load])
 
-  // After signing in, the login page brings the visitor back to `#claim`.
+  // After signing in, the login page brings the visitor back to `#claim`. The checkout route
+  // sends a paid claim it refused for its confirmation back to `CONFIRM_AGAIN_HASH`: read once
+  // (it becomes `#claim`), so a reload after the new code opens the dialog as the claim stands.
   useEffect(() => {
+    if (window.location.hash === CONFIRM_AGAIN_HASH) {
+      refusedByServer.current = true
+      window.history.replaceState(null, '', '#claim')
+    }
     if (window.location.hash === '#claim') openDialog()
   }, [openDialog])
 
@@ -366,6 +381,8 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
     inFlight.current = false
     setBusy(false)
     if (response.ok) {
+      // A new confirmation: the route's refusal was of the one before.
+      refusedByServer.current = false
       setClaim(response.data.claim)
       setCodeError(null)
       setStep(response.data.claim.method === 'paid' ? 'payment' : 'badge')
@@ -710,7 +727,9 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
           aria-disabled={!claim}
           className={buttonVariants()}
           onClick={event => {
-            // Left open until too little of the confirmation is left for a checkout (#128).
+            // Left open until too little of the confirmation is left for a checkout (#128). On
+            // the browser's clock: the route decides on the server's and sends a refused claim
+            // back to `CONFIRM_AGAIN_HASH` (#476).
             if (claim && confirmationRunOut(claim, Date.now())) {
               event.preventDefault()
               confirmAgain(claim)

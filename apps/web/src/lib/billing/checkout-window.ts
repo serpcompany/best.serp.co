@@ -15,3 +15,15 @@ export const SHORTEST_CHECKOUT_MS = 31 * 60 * 1000
 export function tooLateForCheckout(closesBy: number, now: number): boolean {
   return closesBy - now < SHORTEST_CHECKOUT_MS
 }
+
+/**
+ * Where the checkout route sends a paid claim it refused because too little of the confirmation
+ * is left, or none: the listing's claim dialog, told to ask for a new code (#128, #476). The
+ * server's clock decided, so the dialog asks whatever the browser's clock says. Relative: the
+ * browser stays on the origin it came from.
+ */
+export const CONFIRM_AGAIN_HASH = '#claim-confirm-again'
+
+export function confirmAgainPath(listingSlug: string): string {
+  return `/products/${listingSlug}/${CONFIRM_AGAIN_HASH}`
+}
