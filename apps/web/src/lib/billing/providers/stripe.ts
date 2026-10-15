@@ -384,7 +384,10 @@ export function createStripeProvider(config: StripeConfig): BillingProvider {
         (typeof event.account === 'string' && event.account !== config.accountId)
       const object = ((event.data as StripeObject | undefined)?.object ??
         null) as StripeObject | null
-      const paymentEvent = foreign ? undefined : PAYMENT_EVENTS[providerType]
+      const paymentEvent =
+        foreign || !Object.hasOwn(PAYMENT_EVENTS, providerType)
+          ? undefined
+          : PAYMENT_EVENTS[providerType]
       if (paymentEvent && object?.object === paymentEvent.object) {
         const payment = stripePaymentChange(paymentEvent.type, object)
         if (payment) return { checkout: null, id, payment, providerType, type: paymentEvent.type }
