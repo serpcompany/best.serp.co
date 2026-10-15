@@ -1027,8 +1027,13 @@ describe('environment-specific crawl policy gates', () => {
 
     /** best.serp.co's home page, streamed one chunk per part as the Worker streams it. */
     function stubHome(...parts: string[]): void {
+      stubHomeAt(origin, ...parts)
+    }
+
+    /** The home page at `homeOrigin`, streamed one chunk per part as the Worker streams it. */
+    function stubHomeAt(homeOrigin: string, ...parts: string[]): void {
       stubCrawlPolicy((url, response) => {
-        if (url.origin !== origin || url.pathname !== '/') return response
+        if (url.origin !== homeOrigin || url.pathname !== '/') return response
         const encoder = new TextEncoder()
         const body = new ReadableStream<Uint8Array>({
           start(controller) {
@@ -1080,6 +1085,24 @@ describe('environment-specific crawl policy gates', () => {
         await expect(gate).rejects.not.toThrow(missing)
       }
     )
+
+    // #474: the same cap covers the staging and workers.dev home read. Cut off at 4 MiB, a beacon
+    // past the cap went unseen and the page passed; now it fails with the cap named.
+    it('names the 4 MiB read cap in staging gates when the staging home passes it before </body>', async () => {
+      stubHomeAt(
+        stagingOrigin,
+        '<html><head><title>SERP</title></head><body><main>',
+        'x'.repeat(4 * 1_048_576),
+        '</main>',
+        beacon,
+        '</body></html>'
+      )
+      await expect(
+        gates('staging', stagingOrigin, undefined, { wranglerConfigPath: tokenConfig(token) })
+      ).rejects.toThrow(
+        `staging route / (${stagingOrigin}/) passed the gates' 4 MiB read cap before </body>`
+      )
+    })
 
     it.each([undefined, '', '  '])(
       'needs no beacon while production has no site token (%o)',
