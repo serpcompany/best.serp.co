@@ -38,6 +38,15 @@ export async function billing(): Promise<BillingDependencies | null> {
 }
 
 /**
+ * The request's `ctx.waitUntil`, for work that runs on after the response (the webhook's
+ * fulfilment, #468), as the email and media helpers hand theirs over.
+ */
+export async function requestWaitUntil(): Promise<(task: Promise<unknown>) => void> {
+  const { ctx } = await getCloudflareContext({ async: true })
+  return task => ctx.waitUntil(task)
+}
+
+/**
  * The Worker's public origin for the provider's return URLs: `BETTER_AUTH_URL` (staging and
  * production set it to this Worker's https origin), else, on a local Worker, the request's own
  * host, so the buyer comes back to the origin their session cookie belongs to.

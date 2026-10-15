@@ -1,4 +1,4 @@
-import { billing } from '@/lib/billing/runtime'
+import { billing, requestWaitUntil } from '@/lib/billing/runtime'
 import { handleWebhook } from '@/lib/billing/service'
 import { errorFields } from '@/lib/telemetry/error-fields'
 
@@ -14,7 +14,8 @@ function answer(body: Record<string, unknown>, status: number): Response {
 /**
  * `POST /api/billing/webhook/` (#68): the billing provider's webhook. The raw
  * body is verified against the signature header and its timestamp before anything is read, and
- * each event id is processed once (`billing_events`). 404 while orders are off.
+ * each event id is processed once (`billing_events`). It answers before a payment's fulfilment,
+ * which runs on in the request's `waitUntil` (#468). 404 while orders are off.
  */
 export async function POST(request: Request): Promise<Response> {
   let deps: Awaited<ReturnType<typeof billing>>
@@ -36,7 +37,11 @@ export async function POST(request: Request): Promise<Response> {
   const body = await request.text()
   if (body.length > MAX_WEBHOOK_BYTES) return answer({ error: 'payload_too_large' }, 413)
   try {
-    const result = await handleWebhook(deps, { body, headers: request.headers })
+    const result = await handleWebhook(deps, {
+      body,
+      headers: request.headers,
+      waitUntil: await requestWaitUntil()
+    })
     return answer(result.body, result.status)
   } catch (error) {
     console.error(

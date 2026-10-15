@@ -6,7 +6,7 @@
  * the rejection or the badge check at refund.
  */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createBadgeProgramOperations } from '@/db/badge-program'
 import { createBillingOperations } from '@/db/billing'
 import { createDatabase } from '@/db/client'
@@ -266,8 +266,33 @@ function paidEvent(f: Fixture, checkoutId: string, id = `evt_${checkoutId}`): st
   } satisfies BillingEvent)
 }
 
-const webhook = (f: Fixture, body: string) =>
-  handleWebhook(f.deps, { body, headers: new Headers() })
+/**
+ * One delivery and the work it handed to `waitUntil` (the payment's fulfilment, #468), run to
+ * the end as the Worker runs it after the answer.
+ */
+async function webhook(f: Fixture, body: string) {
+  const { answer, settled } = deliver(f, body)
+  const result = await answer
+  await settled()
+  return result
+}
+
+/** One delivery: its answer, and the background work it handed over, still running. */
+function deliver(f: Fixture, body: string) {
+  const background: Promise<unknown>[] = []
+  const answer = handleWebhook(f.deps, {
+    body,
+    headers: new Headers(),
+    waitUntil: task => {
+      background.push(task)
+    }
+  })
+  return {
+    answer,
+    background,
+    settled: () => Promise.all(background)
+  }
+}
 
 describe('checkout', () => {
   it('chooses paid on a draft and opens one checkout per submission, for its owner only', async () => {
@@ -333,8 +358,9 @@ describe('payment', () => {
       'admin-review-ready',
       'listing-live-paid'
     ])
+    // Recorded as paid before the answer; the fulfilment after it published the listing.
     expect(f.rows('SELECT outcome, processed_at IS NOT NULL AS done FROM billing_events')).toEqual([
-      { done: 1, outcome: 'published' }
+      { done: 1, outcome: 'paid' }
     ])
   })
 
@@ -430,6 +456,209 @@ describe('payment', () => {
       ])
     )
     expect(f.refunds).toHaveLength(1)
+  })
+})
+
+describe('the webhook answers before fulfilment (#468)', () => {
+  /** Guardrails that wait for `release()`, as a slow buyer site does; `calls` counts them. */
+  function slowGuardrails(f: Fixture) {
+    let release: () => void = () => undefined
+    const gate = new Promise<void>(resolve => {
+      release = resolve
+    })
+    const calls = { count: 0 }
+    f.deps.guardrails = async () => {
+      calls.count += 1
+      await gate
+      return { ok: true }
+    }
+    return { calls, release: () => release() }
+  }
+
+  it('answers once the payment is recorded, and publishes after the answer', async () => {
+    const f = fixture()
+    const slow = slowGuardrails(f)
+    f.submission('s1', 'draft', null)
+    const delivery = deliver(f, paidEvent(f, await checkout(f, 's1')))
+    // Answered while the buyer's site still hasn't: the fulfilment runs on in `waitUntil`.
+    await expect(delivery.answer).resolves.toEqual({ body: { received: true }, status: 200 })
+    expect(delivery.background).toHaveLength(1)
+    expect(f.row('SELECT status, applied_at, outcome FROM orders')).toEqual({
+      applied_at: null,
+      outcome: null,
+      status: 'paid'
+    })
+    expect(f.rows('SELECT outcome, processed_at IS NOT NULL AS done FROM billing_events')).toEqual([
+      { done: 1, outcome: 'paid' }
+    ])
+    expect(f.rows('SELECT slug FROM listings')).toEqual([])
+    expect(f.emails).toEqual([])
+    slow.release()
+    await delivery.settled()
+    expect(f.row('SELECT status, outcome FROM orders')).toEqual({
+      outcome: 'published',
+      status: 'paid'
+    })
+    expect(f.rows('SELECT slug FROM listings WHERE is_active=1')).toEqual([{ slug: 's1.example' }])
+    expect(f.emails.map(email => email.template).sort()).toEqual([
+      'admin-review-ready',
+      'listing-live-paid'
+    ])
+    expect(slow.calls.count).toBe(1)
+  })
+
+  it('leaves a fulfilment that fails after the answer to the sweep, which applies it once', async () => {
+    const f = fixture()
+    f.submission('s1', 'draft', null)
+    const body = paidEvent(f, await checkout(f, 's1'))
+    let calls = 0
+    f.deps.guardrails = async () => {
+      calls += 1
+      if (calls === 1) throw new Error('the buyer site hung up')
+      return { ok: true }
+    }
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    try {
+      // The failure never reaches the answer, nor rejects the work handed to `waitUntil`.
+      await expect(webhook(f, body)).resolves.toEqual({ body: { received: true }, status: 200 })
+      expect(errors).toHaveBeenCalledWith(
+        expect.stringContaining('"event":"billing_webhook_fulfilment_failed"')
+      )
+    } finally {
+      errors.mockRestore()
+    }
+    // Paid and unapplied: what the sweep looks for.
+    expect(f.row('SELECT status, applied_at FROM orders')).toEqual({
+      applied_at: null,
+      status: 'paid'
+    })
+    // The provider's retry of the delivery is a replay, and runs nothing again.
+    await expect(webhook(f, body)).resolves.toEqual({
+      body: { received: true, replayed: true },
+      status: 200
+    })
+    expect(calls).toBe(1)
+    // The sweep takes it once it has waited ten minutes, and applies it.
+    await expect(runBillingSweep(f.deps, { limit: 10 })).resolves.toMatchObject({ applied: 0 })
+    f.clock.now = new Date(NOW.getTime() + 11 * 60 * 1000)
+    await expect(runBillingSweep(f.deps, { limit: 10 })).resolves.toMatchObject({
+      applied: 1,
+      errors: 0
+    })
+    expect(f.row('SELECT status, outcome FROM orders')).toEqual({
+      outcome: 'published',
+      status: 'paid'
+    })
+    expect(f.rows('SELECT slug FROM listings WHERE is_active=1')).toEqual([{ slug: 's1.example' }])
+    expect(f.row('SELECT version FROM publication_state')).toEqual({ version: 2 })
+    // Applied: the next run leaves it alone.
+    f.clock.now = new Date(NOW.getTime() + 71 * 60 * 1000)
+    await expect(runBillingSweep(f.deps, { limit: 10 })).resolves.toMatchObject({ applied: 0 })
+    expect(calls).toBe(2)
+  })
+
+  it('leaves a refund the provider refused after the answer to the sweep', async () => {
+    const f = fixture()
+    f.submission('s1', 'draft', null)
+    const first = await checkout(f, 's1')
+    // Withdrawn while the checkout was open: the payment is refunded, after the answer.
+    f.db.exec(
+      `UPDATE listing_submissions SET status='withdrawn', withdrawal_reason='owner' WHERE id='s1'`
+    )
+    f.failNextRefund.value = true
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    try {
+      await expect(webhook(f, paidEvent(f, first))).resolves.toEqual({
+        body: { received: true },
+        status: 200
+      })
+    } finally {
+      errors.mockRestore()
+    }
+    expect(f.row('SELECT status, refund_reason FROM orders')).toEqual({
+      refund_reason: 'unapplied',
+      status: 'refunding'
+    })
+    expect(f.refunds).toEqual([])
+    // Backed off an hour, then the sweep finishes the same refund.
+    f.clock.now = new Date(NOW.getTime() + 61 * 60 * 1000)
+    await expect(runBillingSweep(f.deps, { limit: 10 })).resolves.toMatchObject({
+      errors: 0,
+      refunds: 1
+    })
+    expect(f.row('SELECT status, outcome FROM orders')).toEqual({
+      outcome: 'unapplied',
+      status: 'refunded'
+    })
+    expect(f.refunds).toHaveLength(1)
+  })
+
+  it('fulfils a payment once when its deliveries overlap, or one is retried', async () => {
+    const f = fixture()
+    const slow = slowGuardrails(f)
+    f.submission('s1', 'draft', null)
+    const checkoutId = await checkout(f, 's1')
+    const completed = paidEvent(f, checkoutId, 'evt_completed')
+    // The first delivery answers, but its fulfilment is still waiting on the buyer's site.
+    const first = deliver(f, completed)
+    await first.answer
+    // The provider sends the same event again, and a second event for the same payment.
+    const replay = deliver(f, completed)
+    await expect(replay.answer).resolves.toEqual({
+      body: { received: true, replayed: true },
+      status: 200
+    })
+    expect(replay.background).toEqual([])
+    const succeeded = deliver(f, paidEvent(f, checkoutId, 'evt_async_succeeded'))
+    await expect(succeeded.answer).resolves.toEqual({ body: { received: true }, status: 200 })
+    slow.release()
+    await Promise.all([first.settled(), succeeded.settled()])
+    expect(f.row('SELECT status, outcome FROM orders')).toEqual({
+      outcome: 'published',
+      status: 'paid'
+    })
+    expect(f.rows('SELECT slug FROM listings')).toEqual([{ slug: 's1.example' }])
+    expect(f.row('SELECT version FROM publication_state')).toEqual({ version: 2 })
+    expect(f.emails.map(email => email.template).sort()).toEqual([
+      'admin-review-ready',
+      'listing-live-paid'
+    ])
+    expect(f.refunds).toEqual([])
+    // A delivery after it applied answers the recorded outcome and hands nothing over.
+    const late = deliver(f, paidEvent(f, checkoutId, 'evt_late'))
+    await expect(late.answer).resolves.toEqual({ body: { received: true }, status: 200 })
+    expect(late.background).toEqual([])
+    expect(f.rows('SELECT event_id, outcome FROM billing_events ORDER BY event_id')).toEqual([
+      { event_id: 'evt_async_succeeded', outcome: 'paid' },
+      { event_id: 'evt_completed', outcome: 'paid' },
+      { event_id: 'evt_late', outcome: 'published' }
+    ])
+  })
+
+  it('applies a payment once when marking its event processed fails and the delivery is retried', async () => {
+    const f = fixture()
+    f.submission('s1', 'draft', null)
+    const body = paidEvent(f, await checkout(f, 's1'))
+    const finishEvent = f.deps.operations.finishEvent
+    f.deps.operations.finishEvent = async () => {
+      f.deps.operations.finishEvent = finishEvent
+      throw new Error('D1 unavailable')
+    }
+    // The route answers 500 and the provider retries; the fulfilment handed over still runs.
+    const failed = deliver(f, body)
+    await expect(failed.answer).rejects.toThrow('D1 unavailable')
+    await failed.settled()
+    expect(f.row('SELECT status, outcome FROM orders')).toEqual({
+      outcome: 'published',
+      status: 'paid'
+    })
+    await expect(webhook(f, body)).resolves.toEqual({ body: { received: true }, status: 200 })
+    expect(f.rows('SELECT outcome, processed_at IS NOT NULL AS done FROM billing_events')).toEqual([
+      { done: 1, outcome: 'published' }
+    ])
+    expect(f.rows('SELECT slug FROM listings')).toEqual([{ slug: 's1.example' }])
+    expect(f.row('SELECT version FROM publication_state')).toEqual({ version: 2 })
+    expect(f.emails).toHaveLength(2)
   })
 })
 
