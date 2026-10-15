@@ -373,7 +373,18 @@ describe('provider secrets in URLs (#469)', () => {
       'a signature, encoded twice': `${RETURN_URL}&s=${encodeURIComponent(encodeURIComponent(signature))}`,
       'a signature parameter': `${RETURN_URL}&signature=abc`,
       'an api key parameter': `${RETURN_URL}&apiKey=abc`,
-      'the configured key': `https://best.serp.co/?k=${KEY}`
+      'a clientSecret parameter': `${RETURN_URL}&clientSecret=abc`,
+      'a webhookSecret parameter': `${RETURN_URL}&webhookSecret=abc`,
+      'a secretKey parameter': `${RETURN_URL}&secretKey=abc`,
+      'a sessionToken parameter': `${RETURN_URL}&sessionToken=abc`,
+      'an accessToken parameter': 'https://best.serp.co/thanks/?accessToken=abc',
+      'the configured key': `https://best.serp.co/?k=${KEY}`,
+      // A Checkout Session id belongs only on the provider's own hosts.
+      'a session id on a site return URL': `${RETURN_URL}&session_id=cs_live_a1B2c3`,
+      'a session id in a site path': 'https://best.serp.co/thanks/cs_test_a1B2c3/',
+      'a session id in a sign-in return, encoded': `/login/?callbackUrl=${encodeURIComponent('/thanks/?session_id=cs_test_a1B2c3')}`,
+      'a session id on a lookalike host':
+        'https://checkout.stripe.com.evil.example/c/pay/cs_test_a1B2c3'
     }
     for (const [name, url] of Object.entries(leaks)) {
       expect(providerSecretsIn(url, KNOWN), name).not.toEqual([])
@@ -383,10 +394,13 @@ describe('provider secrets in URLs (#469)', () => {
       'https://best.serp.co/account/listings/example.com/',
       'https://best.serp.co/products/example.com/#claim',
       `/login/?callbackUrl=${encodeURIComponent(new URL(RETURN_URL).pathname + new URL(RETURN_URL).search)}`,
-      // Public identifiers: a Checkout Session id (Stripe documents it for return URLs), a
-      // payment id in the admin's dashboard link, and a publishable key.
+      // Parameters the site uses.
+      'https://best.serp.co/products/?q=crm&category=a&page=2&sort=name&tab=b&view=c&ref=d&utm_source=e&next=f',
+      // Public identifiers: a Checkout Session id on the provider's own hosts (API, checkout
+      // page, dashboard), a payment id in the admin's dashboard link, and a publishable key.
+      'https://api.stripe.com/v1/checkout/sessions/cs_live_a1B2c3/expire',
       'https://checkout.stripe.com/c/pay/cs_test_a1B2c3',
-      'https://best.serp.co/thanks/?session_id=cs_live_a1B2c3',
+      'https://dashboard.stripe.com/test/checkout/sessions/cs_test_a1B2c3',
       'https://dashboard.stripe.com/test/payments/pi_3Abc',
       'https://best.serp.co/?pk=pk_live_abc123'
     ]

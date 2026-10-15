@@ -21,16 +21,19 @@ import type { CheckoutRequest } from './provider'
 import { providerSecretsIn, TEST_PROVIDER_SECRETS } from './providers/test-support'
 import type { BillingDependencies } from './service'
 
-const { current, getCloudflareContext, USER } = vi.hoisted(() => ({
-  current: { deps: null as unknown },
-  getCloudflareContext: vi.fn(),
-  USER: { email: 'owner@example.com', id: 'user-1' }
-}))
+const { current, getCloudflareContext, USER } = vi.hoisted(() => {
+  const USER = { email: 'owner@example.com', id: 'user-1' }
+  return {
+    current: { deps: null as unknown, user: USER as typeof USER | null },
+    getCloudflareContext: vi.fn(),
+    USER
+  }
+})
 
 vi.mock('server-only', () => ({}))
 vi.mock('@opennextjs/cloudflare', () => ({ getCloudflareContext }))
 vi.mock('@/lib/billing/worker-billing', () => ({ createBillingDependencies: () => current.deps }))
-vi.mock('@/lib/auth/server', () => ({ getRequestUser: async () => USER }))
+vi.mock('@/lib/auth/server', () => ({ getRequestUser: async () => current.user }))
 vi.mock('@/lib/account/pages', () => ({ requireAccountUser: async () => USER }))
 
 const SPOOFED = 'evil.example'
@@ -161,6 +164,7 @@ function spoofed(path: string): Request {
 }
 
 beforeEach(() => {
+  current.user = USER
   vi.spyOn(console, 'info').mockImplementation(() => {})
   vi.spyOn(console, 'error').mockImplementation(() => {})
 })
@@ -208,6 +212,24 @@ describe.each([
         expect(response.status).toBe(503)
         expect(response.headers.get('location')).toBeNull()
       }
+      expect(checkouts).toEqual([])
+    }
+  )
+
+  // #477: the configured origin is looked up before the sign-in check, so a misconfigured
+  // environment answers 503 to everyone instead of sending a signed-out visitor to sign in first.
+  it.each(ROUTES.filter(route => route.name !== 'listing upgrade'))(
+    'answers a signed-out visitor 503, not the sign-in page, on the $name checkout when the configured origin is missing',
+    async route => {
+      const { BETTER_AUTH_URL: _configured, ...rest } = env
+      worker(rest)
+      current.user = null
+      const checkouts = stubBilling()
+
+      const response = await route.call(spoofed(route.path))
+
+      expect(response.status).toBe(503)
+      expect(response.headers.get('location')).toBeNull()
       expect(checkouts).toEqual([])
     }
   )
@@ -270,9 +292,9 @@ describe('no provider secret in a checkout URL (#469)', () => {
       const urls = [response.headers.get('location') ?? '', checkout.successUrl, checkout.cancelUrl]
       for (const url of urls) expect(providerSecretsIn(url, SECRETS), url).toEqual([])
       // The provider sends the buyer back with our own order id and nothing else. A Checkout
-      // Session id (`{CHECKOUT_SESSION_ID}`) would be a public identifier, not a secret, but the
-      // order id already finds the checkout; adding one means first redirecting the return page
-      // to its bare URL (serp's payments standard).
+      // Session id (`{CHECKOUT_SESSION_ID}`) is a public identifier, not a secret, but the order id
+      // already finds the checkout, and adding one means first redirecting the return page to its
+      // bare URL (serp's payments standard), so `providerSecretsIn` flags one on a site URL too.
       expect([...new URL(checkout.successUrl).searchParams]).toEqual([['order', ORDER]])
       expect(new URL(checkout.cancelUrl).search).toBe('')
     }
