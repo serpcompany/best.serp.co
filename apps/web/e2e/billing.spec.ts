@@ -153,6 +153,15 @@ function order(where: string) {
   return row
 }
 
+/**
+ * The order once its payment is applied: the webhook answers once the payment is recorded and
+ * applies it after the answer (#468), so a test waits for the outcome rather than reading it.
+ */
+async function appliedOrder(where: string, outcome: string) {
+  await expect.poll(() => order(where).outcome).toBe(outcome)
+  return order(where)
+}
+
 async function emailSubjects(request: APIRequestContext, to: string): Promise<string[]> {
   const response = await request.get(`/api/dev/email-outbox?to=${encodeURIComponent(to)}`)
   expect(response.status()).toBe(200)
@@ -277,7 +286,7 @@ test('promotion codes: a discounted and a 100%-off checkout both go live; a chan
     type: 'checkout.session.completed'
   })
   expect((await postEvent(page.request, halfEvent)).status()).toBe(200)
-  const halfOrder = order(`submission_id = ${q(half.id)}`)
+  const halfOrder = await appliedOrder(`submission_id = ${q(half.id)}`, 'published')
   expect(halfOrder).toMatchObject({ outcome: 'published', status: 'paid' })
   expect(
     billingD1(`SELECT charged_cents, attention FROM orders WHERE id = ${q(halfOrder.id)}`)
@@ -298,7 +307,7 @@ test('promotion codes: a discounted and a 100%-off checkout both go live; a chan
     type: 'checkout.session.completed'
   })
   expect((await postEvent(page.request, freeEvent)).status()).toBe(200)
-  const freeOrder = order(`submission_id = ${q(free.id)}`)
+  const freeOrder = await appliedOrder(`submission_id = ${q(free.id)}`, 'published')
   expect(freeOrder).toMatchObject({ outcome: 'published', status: 'paid' })
   expect(
     billingD1(`SELECT charged_cents, provider_payment_id FROM orders WHERE id = ${q(freeOrder.id)}`)
@@ -324,7 +333,7 @@ test('promotion codes: a discounted and a 100%-off checkout both go live; a chan
     type: 'checkout.session.completed'
   })
   expect((await postEvent(page.request, upgradeEvent)).status()).toBe(200)
-  const upgradeOrder = order(`listing_id = ${q(listing.listingId)}`)
+  const upgradeOrder = await appliedOrder(`listing_id = ${q(listing.listingId)}`, 'upgraded')
   expect(upgradeOrder).toMatchObject({ outcome: 'upgraded', status: 'paid' })
 
   // A catalog price that isn't the site's $49: no checkout opens, and the session is expired.
@@ -461,16 +470,17 @@ test('webhook replay: verified events are processed once; forged and stale ones 
   expect(replay.status()).toBe(200)
   expect(await replay.json()).toEqual({ received: true, replayed: true })
 
-  const paid = order(`submission_id = ${q(draft.id)}`)
+  const paid = await appliedOrder(`submission_id = ${q(draft.id)}`, 'published')
   expect(paid).toMatchObject({ outcome: 'published', status: 'paid' })
   expect(billingD1(`SELECT COUNT(*) AS n FROM listings WHERE slug = ${q(draft.slug)}`)).toEqual([
     { n: 1 }
   ])
+  // Recorded as paid before the answer; the listing was published after it.
   expect(
     billingD1(
       `SELECT outcome, processed_at IS NOT NULL AS done FROM billing_events WHERE order_id = ${q(paid.id)}`
     )
-  ).toEqual([{ done: 1, outcome: 'published' }])
+  ).toEqual([{ done: 1, outcome: 'paid' }])
 })
 
 async function upgrade(page: Page, slug: string): Promise<void> {
@@ -749,7 +759,7 @@ test('a paid submission rejected as other is refunded automatically', async ({ p
   const draft = seedDraft(submitter.id, 'reject')
   const sessionId = await openCheckout(page.request, `/submit/${draft.id}/checkout/start/`)
   expect((await postEvent(page.request, completedEvent(sessionId))).status()).toBe(200)
-  const paid = order(`submission_id = ${q(draft.id)}`)
+  const paid = await appliedOrder(`submission_id = ${q(draft.id)}`, 'published')
   expect(paid).toMatchObject({ outcome: 'published', status: 'paid' })
 
   const admin = await asAdmin(page)

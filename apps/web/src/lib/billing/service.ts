@@ -436,6 +436,21 @@ export interface WebhookAnswer {
 }
 
 /**
+ * What acting on an event did before the answer (`outcome`, recorded on the event), and the work
+ * that runs after it (`after`, through the request's `waitUntil`). Each event type the webhook
+ * handles adds its branch to `actOnEvent`.
+ */
+interface EventAction {
+  /**
+   * Slow work (guardrails, publication, refunds) that runs after the answer. Its failure leaves
+   * the order where the sweep and the buyer's return finish it, so it never fails the delivery.
+   */
+  after?: () => Promise<string>
+  orderId: string | null
+  outcome: string
+}
+
+/**
  * The order an event's checkout belongs to: the order holding that checkout id. The order id
  * the checkout echoes is trusted only for an order that never recorded its checkout.
  */
@@ -455,10 +470,21 @@ async function orderForCheckout(
  * event from another mode or account as `ignored`), record the event once by its id, act on
  * it, and mark it processed. A replay of a processed event is a no-op. A failure midway answers
  * 500 and leaves the event unprocessed, so the provider's retry runs it again.
+ *
+ * It answers before the slow work (#468): a paid checkout is recorded on its order (`paid`)
+ * before the answer, and fulfilled (guardrails, publication, refunds) after it, in `waitUntil`.
+ * A fulfilment that fails or runs out of time leaves the order `paid` and unapplied (or a claimed
+ * refund `refunding`), which the buyer's return and the hourly sweep finish; a later delivery of
+ * the event is a replay, and every fulfilment step is a compare-and-swap, so it applies once.
  */
 export async function handleWebhook(
   deps: BillingDependencies,
-  input: { body: string; headers: Headers }
+  input: {
+    body: string
+    headers: Headers
+    /** The request's `ctx.waitUntil`: the work handed to it runs on after the answer. */
+    waitUntil: (task: Promise<unknown>) => void
+  }
 ): Promise<WebhookAnswer> {
   let event: BillingEvent
   try {
@@ -479,20 +505,39 @@ export async function handleWebhook(
     provider
   })
   if (claim === 'processed') return { body: { received: true, replayed: true }, status: 200 }
-  let orderId: string | null = null
-  let outcome = 'ignored'
-  if (event.checkout && event.type !== 'ignored') {
-    const order = await orderForCheckout(deps, event.checkout)
-    if (order) {
-      orderId = order.id
-      outcome = await actOnCheckout(deps, order, event.type, event.checkout)
-    } else {
-      outcome = 'unknown_order'
-    }
+  const { after, orderId, outcome } = await actOnEvent(deps, event)
+  if (after) {
+    // Handed over before the event is marked processed: if that write fails (500, so the
+    // provider retries), the payment is still applied, and the retry finds it applied.
+    input.waitUntil(
+      after().then(
+        result =>
+          log('billing_webhook_fulfilled', {
+            order: orderId,
+            outcome: result,
+            type: event.providerType
+          }),
+        error =>
+          logError('billing_webhook_fulfilment_failed', error, {
+            order: orderId,
+            type: event.providerType
+          })
+      )
+    )
   }
   await deps.operations.finishEvent({ eventId: event.id, now, orderId, outcome, provider })
-  log('billing_webhook_processed', { event: event.providerType, order: orderId, outcome })
+  log('billing_webhook_processed', { order: orderId, outcome, type: event.providerType })
   return { body: { received: true }, status: 200 }
+}
+
+async function actOnEvent(deps: BillingDependencies, event: BillingEvent): Promise<EventAction> {
+  if (!event.checkout || event.type === 'ignored') return { orderId: null, outcome: 'ignored' }
+  const order = await orderForCheckout(deps, event.checkout)
+  if (!order) return { orderId: null, outcome: 'unknown_order' }
+  return {
+    orderId: order.id,
+    ...(await actOnCheckout(deps, order, event.type, event.checkout))
+  }
 }
 
 async function actOnCheckout(
@@ -500,10 +545,20 @@ async function actOnCheckout(
   order: OrderRecord,
   type: Exclude<BillingEvent['type'], 'ignored'>,
   checkout: CheckoutState
-): Promise<string> {
-  if (type === 'checkout_paid') return recordPayment(deps, order, checkout)
-  if (type === 'checkout_processing') return 'processing'
-  if (order.status !== 'pending') return `already_${order.status}`
+): Promise<Omit<EventAction, 'orderId'>> {
+  if (type === 'checkout_paid') {
+    const refused = await markPaid(deps, order, checkout)
+    if (refused) return { outcome: refused }
+    const owed =
+      order.status === 'pending' ||
+      order.status === 'failed' ||
+      (order.status === 'paid' && order.appliedAt === null)
+    // Applied or refunded already (the buyer's return came first): answered as it stands.
+    if (!owed) return { outcome: order.outcome ?? order.status }
+    return { after: () => fulfilOrder(deps, order.id), outcome: 'paid' }
+  }
+  if (type === 'checkout_processing') return { outcome: 'processing' }
+  if (order.status !== 'pending') return { outcome: `already_${order.status}` }
   await deps.operations.apply(
     buildMarkOrderFailedPlans({
       now: nowIso(deps),
@@ -511,7 +566,7 @@ async function actOnCheckout(
       reason: type === 'checkout_expired' ? 'expired' : 'payment_failed'
     })
   )
-  return 'failed'
+  return { outcome: 'failed' }
 }
 
 /**
@@ -544,17 +599,30 @@ export function orderDiscountCents(order: OrderRecord): number {
 }
 
 /**
- * A paid checkout: the order becomes `paid` (once), recording what was actually charged, then
- * the payment is applied. A promotion code's discount is charged less (#250); a 100%-off code
- * charges nothing and has no payment, so the checkout stands as its reference. A charge that
- * doesn't match the order is never applied: it is flagged for an admin (`amount_mismatch`) and
- * refunded in full.
+ * A paid checkout, recorded and then applied: the buyer's return and the sweep apply it now;
+ * the webhook records it now and applies it after its answer (`handleWebhook`).
  */
 async function recordPayment(
   deps: BillingDependencies,
   order: OrderRecord,
   checkout: CheckoutState
 ): Promise<string> {
+  return (await markPaid(deps, order, checkout)) ?? fulfilOrder(deps, order.id)
+}
+
+/**
+ * Records a paid checkout on its order: the order becomes `paid` (once), recording what was
+ * actually charged. A promotion code's discount is charged less (#250); a 100%-off code charges
+ * nothing and has no payment, so the checkout stands as its reference. A charge that doesn't
+ * match the order is flagged for an admin (`amount_mismatch`), and fulfilment refunds it in full
+ * instead of applying it. The outcome of a payment it refuses, or null when the payment stands
+ * (recorded now or before).
+ */
+async function markPaid(
+  deps: BillingDependencies,
+  order: OrderRecord,
+  checkout: CheckoutState
+): Promise<string | null> {
   if (order.providerCheckoutId && checkout.checkoutId !== order.providerCheckoutId) {
     return 'checkout_mismatch'
   }
@@ -580,7 +648,7 @@ async function recordPayment(
     }
     log('billing_order_paid', { order: order.id })
   }
-  return fulfilOrder(deps, order.id)
+  return null
 }
 
 // ---------------------------------------------------------------------------------------------

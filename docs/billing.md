@@ -108,7 +108,12 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
   if the webhook hasn't. Cancelling returns to the cancelled page (or the account listing).
 - **Webhook.** `POST /api/billing/webhook/` verifies the raw body's `Stripe-Signature` within 300
   seconds, records the event, acts, and marks it processed; a processed event answers
-  `replayed: true`. A failure answers 500 and the retry runs it again. An event of the other
+  `replayed: true`. A failure answers 500 and the retry runs it again. It answers before the slow
+  work (#468): a paid checkout is recorded on its order (`paid`, the event's outcome) before the
+  answer, and the order is fulfilled (guardrails, publication, refunds) after it, in the
+  request's `ctx.waitUntil`. A fulfilment that fails, or outlives `waitUntil`'s 30 seconds,
+  leaves the order `paid` and unapplied (or its refund `refunding`), and the buyer's return or
+  the sweep finishes it. An event of the other
   mode (`livemode` against the environment) or naming another account is recorded as ignored,
   and an event acts only on the order holding its session id (the session's order reference
   only for an order that never recorded its session). A charge must be the order's amount and
@@ -161,7 +166,8 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
   dialog previews again, so a refund never does other than the button said. A listing that went
   down meanwhile is refunded as it is. No email: #70 has none for it.
 - **Sweep.** The hourly cron (`billing-sweep` in `lib/worker/scheduled.ts`) works most urgent
-  first, with at most 20 Stripe calls a run: paid orders a crash left unapplied, claimed refunds
+  first, with at most 20 Stripe calls a run: paid orders a crash or a failed fulfilment left
+  unapplied (ten minutes after payment), claimed refunds
   (at most half the calls; a refund Stripe refuses backs off 1, 2, 4, 8 and 16 hours and is
   flagged `refund_failed` for an admin after five failures, after which only "Refund…" retries
   it), pending orders whose checkout closed (paid → applied, otherwise `failed`), failed
