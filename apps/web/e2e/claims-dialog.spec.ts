@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { type BrowserContext, expect, type Page } from '@playwright/test'
+import { SHORTEST_CHECKOUT_MS } from '../src/lib/billing/checkout-window'
 import { client, q, signIn, unique, uniqueIp } from './admin-fixture'
 import {
   claimCode,
@@ -30,7 +31,8 @@ test.use({
  * payment options, the four steps with their approved errors (webmail, another domain, a wrong,
  * expired, or over-attempt code), the badge check and the badge program's weekly-check copy,
  * success, the "Verified owner" badge, the already-owned dialog, and the contact path for a held
- * listing or one whose slug and website disagree. Paying for a claim is `billing.spec.ts`'s.
+ * listing or one whose slug and website disagree, and a new code for a paid claim with too little
+ * of its confirmation left to pay (#128). Paying for a claim is `billing.spec.ts`'s.
  * Desktop uses the dialog; a phone gets the drawer.
  *
  * Set CLAIM_SCREENSHOT_DIRECTORY to save each state (desktop and mobile, in the color scheme the
@@ -456,6 +458,52 @@ test('says when the hourly caps stop a send, and when a confirmation ran out', a
   await expect(dialog(page).getByText('This code has expired. Send a new one.')).toBeVisible()
   await expect(dialog(page).getByRole('button', { name: 'Send a new code' })).toBeVisible()
   await capture(page, '8m-confirmation-expired')
+})
+
+test('asks a paid claim for a new code once too little of the confirmation is left to pay (#128)', async ({
+  context,
+  page
+}) => {
+  const listing = await seed('Late product')
+  const email = `late-${unique()}@example.com`
+  await signedIn(context, email)
+  const address = `team@${listing.slug}`
+  // A paid claim confirmed 23 hours ago on the Worker's clock: the confirmation ends in an hour.
+  const confirmedAt = Date.now() - 23 * 60 * 60 * 1000
+  const confirmedUntil = confirmedAt + 24 * 60 * 60 * 1000
+  const at = q(new Date(confirmedAt).toISOString())
+  const website = q(fixture.website(listing.label))
+  await claimsD1(`
+    INSERT INTO listing_claims (id, listing_id, user_id, method, status, email, email_domain,
+      product_url, listing_website, code_sent_at, code_expires_at, email_verified_at)
+    SELECT ${q(crypto.randomUUID())}, ${q(listing.id)}, id, 'paid', 'email_verified', ${q(address)},
+      'localtest.me', ${website}, ${website}, ${at}, ${at}, ${at}
+    FROM users WHERE email = ${q(email)}`)
+
+  // On the page's clock, just over the shortest checkout before the confirmation ends: payment.
+  await page.clock.setFixedTime(confirmedUntil - SHORTEST_CHECKOUT_MS - 1000)
+  await page.goto(`/products/${listing.slug}/#claim`)
+  await expect(dialog(page).getByText('Step 4 of 4')).toBeVisible()
+  const pay = dialog(page).getByRole('link', { name: 'Continue to payment: $49' })
+  await expect(pay).toBeVisible()
+
+  // Left open until just under it: a new code first, instead of a checkout the route refuses.
+  await page.clock.setFixedTime(confirmedUntil - SHORTEST_CHECKOUT_MS + 1000)
+  await pay.click()
+  await expect(dialog(page).getByText('Step 3 of 4')).toBeVisible()
+  await expect(dialog(page).getByText('This code has expired. Send a new one.')).toBeVisible()
+  await expect(page).toHaveURL(new RegExp(`/products/${escapeRegExp(listing.slug)}/#claim$`, 'u'))
+  // Opened again then, the dialog starts there.
+  await page.reload()
+  await expect(dialog(page).getByText('Step 3 of 4')).toBeVisible()
+  await expect(dialog(page).getByText('This code has expired. Send a new one.')).toBeVisible()
+  await capture(page, '8n-confirm-again-before-payment')
+
+  // The new code confirms the address for another day, and the payment step is back.
+  await dialog(page).getByRole('button', { name: 'Send a new code' }).click()
+  await enterCode(page, await claimCode(page.request, address))
+  await expect(dialog(page).getByText('Step 4 of 4')).toBeVisible()
+  await expect(pay).toBeVisible()
 })
 
 test.describe('on a phone', () => {

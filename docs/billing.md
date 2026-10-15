@@ -12,11 +12,34 @@ the admin sidebar shows Orders, the draft reminder and the badge program's email
 paid offers, and the hourly sweep runs. Turned off, all of that is hidden, every checkout route
 and the webhook answer 404, `/admin/orders/` is a 404, and the sweep does nothing.
 
+## Decisions
+
+- **Stripe.** serp's [Payments](https://github.com/serpcompany/serp/blob/main/docs/engineering/standards/web-stack/payments.md#choosing-the-provider)
+  standard starts websites on Stripe. Polar was considered and rejected: its merchant-of-record
+  advantage is temporary, and its policy fit for selling listings is unclear (serp's submissions
+  [decisions](https://github.com/serpcompany/serp/blob/main/docs/engineering/websites/features/submissions/decisions.md)).
+  Stripe sits behind `BillingProvider` because SERP's Lago is the planned replacement.
+- **No Stripe SDK** (owner decision on #156, 2026-10-15). The provider calls four Stripe
+  endpoints with the Worker's `fetch` at a pinned API version, and checks webhook signatures with
+  Web Crypto. The standard expects the SDK, a three-operation interface and
+  `/api/webhooks/<provider>`; serpcompany/serp#1494 proposes it accept this shape. The webhook
+  stays at `/api/billing/webhook/`: moving it means registering both Stripe endpoints again and
+  changing staging's password bypass.
+- **One-click pay links** (owner decision on #156, 2026-10-15). The checkout routes are GET route
+  handlers at page URLs, so an emailed link (the draft reminder's "Complete checkout") or a page's
+  "$49" link reaches checkout in one click. That is a deliberate exception to serp's rule that writes are
+  `/api/` route handlers with an `Origin` check
+  ([Next.js on Workers](https://github.com/serpcompany/serp/blob/main/docs/engineering/standards/web-stack/nextjs-on-workers.md#rendering-and-requests)).
+  A signed-out request, such as a mail scanner's, goes to sign-in and opens nothing. Without an
+  `Origin` check, a link on another site can make a signed-in owner's browser open a checkout for
+  their own listing: that creates a pending order and an unused Stripe session, and nobody is
+  charged.
+
 ## Module
 
 | Piece | Where | Does |
 |---|---|---|
-| Provider interface | `apps/web/src/lib/billing/provider.ts` | `createCheckout`, `getCheckout`, `verifyWebhook`, `refund` |
+| Provider interface | `apps/web/src/lib/billing/provider.ts` | Checkout, webhook verification and refunds, plus the reads the sweep and admin Orders use |
 | Provider | `apps/web/src/lib/billing/providers/{index,stripe}.ts` | The only Stripe code (secrets, key modes, API): `fetch` and Web Crypto, no Node SDK |
 | Service | `apps/web/src/lib/billing/service.ts` | Checkout, webhook, fulfilment, refunds, the sweep |
 | Guardrails | `apps/web/src/lib/billing/guardrails.ts` | Checks before a paid submission goes live |
@@ -109,11 +132,16 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
   The claim dialog's "Continue to payment" opens `GET /claims/<id>/checkout/` for a confirmed
   paid claim (in time, the listing unowned); the return `/claims/<id>/checkout/success/` and a
   cancel both go back to `/products/<slug>/#claim`. The checkout closes when the confirmation
-  does (none opens in its last half hour). The payment completes the claim through
-  `completePaidClaim` (the claimer becomes the owner, `paid_claim`) in one D1 batch with the
-  order's applied record, so a payment completed the claim exactly when it is applied. Any other
-  payment for it (a second tab, a claim completed by the badge, one an admin refunded meanwhile,
-  someone else owning the listing, an expired confirmation) is refunded.
+  does, so none opens in its last 31 minutes (`SHORTEST_CHECKOUT_MS`, `checkout-window.ts`): the
+  dialog then asks for a new code, as for an expired confirmation (#128). The dialog checks on
+  the browser's clock; the route decides on the Worker's, and sends a claim in that window or
+  past its confirmation (opened in a new tab, or from a browser clock that's behind) back to
+  `/products/<slug>/#claim-confirm-again`, where the dialog asks for the new code whatever the
+  browser's clock says (#476). The payment completes the claim through `completePaidClaim` (the
+  claimer becomes the owner, `paid_claim`) in one D1 batch with the order's applied record, so a
+  payment completed the claim exactly when it is applied. Any other payment for it (a second tab,
+  a claim completed by the badge, one an admin refunded meanwhile, someone else owning the
+  listing, an expired confirmation) is refunded.
 - **Unapplied payments.** A payment the target can no longer accept (withdrawn or expired, already
   paid by another checkout, rejected, unlisted by an admin) is refunded in full and recorded
   (`unapplied`); a withdrawn submission records it with `buildRecordUnappliedPaymentPlans`.
@@ -185,11 +213,11 @@ Tax: billing refuses to start while `site.submissions.automaticTax` is on, since
 wouldn't match its order.
 
 `features.orders` is `true` since #133: the staging Worker has its test-mode secrets and
-webhook. **Production needs its live secrets before the promotion that ships #133.** A Worker
-with orders on but without them still shows the paid options, but every checkout answers 503,
-the webhook 503, admin refunds are unavailable, and the hourly trigger fails on the billing
-sweep (logged as `scheduled_job_failed`, `job: "billing-sweep"`) after the draft and badge jobs
-ran. A local Worker is the same unless you pass test-mode values through `LOCAL_PREVIEW_VARS`
+webhook, and the production Worker its live ones (#249). A Worker with orders on but without
+them still shows the paid options, but every checkout answers 503, the webhook 503, admin
+refunds are unavailable, and the hourly trigger fails on the billing sweep (logged as
+`scheduled_job_failed`, `job: "billing-sweep"`) after the draft and badge jobs ran. A local
+Worker is the same unless you pass test-mode values through `LOCAL_PREVIEW_VARS`
 (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `LOCAL_STRIPE_MOCK_PORT` for a mocked API),
 as the end-to-end suite does. `LOCAL_ORDERS=on` still turns orders on for a local Worker with
 the flag off; nothing uses it while the flag is on.
