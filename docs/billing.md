@@ -106,6 +106,9 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
 - **Return.** Stripe returns to the return page (or, for an upgrade or relist, the account
   listing's success route): it asks Stripe about the order's own session and applies a paid one
   if the webhook hasn't. Cancelling returns to the cancelled page (or the account listing).
+  No URL the site builds or redirects to carries a Stripe key, webhook secret, client secret or
+  signature (#469): the return URL carries only the order's own id (`?order=`), the Stripe
+  session id stays out of it, and the claim and upgrade returns redirect to bare pages.
 - **Webhook.** `POST /api/billing/webhook/` verifies the raw body's `Stripe-Signature` within 300
   seconds, records the event, acts, and marks it processed; a processed event answers
   `replayed: true`. A failure answers 500 and the retry runs it again. It answers before the slow
@@ -228,7 +231,8 @@ the flag off; nothing uses it while the flag is on.
 ## Tests
 
 `apps/web/src/lib/billing/{service,providers/stripe}.test.ts` (node:sqlite and a fake provider),
-`apps/web/src/lib/billing/http.test.ts` (the checkout routes' return URLs under a spoofed host),
+`apps/web/src/lib/billing/http.test.ts` (the checkout routes' return URLs under a spoofed host,
+and no provider secret in any URL they build or redirect to, #469),
 `scripts/d1-drizzle-local.test.ts` (the migration), and `apps/web/e2e/billing.spec.ts`
 (Playwright on the admin panel suite's Worker and D1, `PLAYWRIGHT_PORT` + 3, started with the
 mocked provider's test values (`BILLING_PREVIEW_VARS` in `apps/web/e2e/orders-worker.ts`;
