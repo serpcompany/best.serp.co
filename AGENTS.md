@@ -107,7 +107,7 @@ Deliberate differences from serp's `web-stack/` standard; change one only throug
 - `STRICT` is hand-finished in the generated migration, where serp's data-and-storage standard uses
   `--custom`, which would re-emit tables ([why](./docs/data-model.md#hand-finished-migrations)).
 - `orders.currency` keeps its `GLOB` CHECK: replacing it rebuilds a referenced table.
-- Worker Sentry runs only on signed-in and operational surfaces; public pages log errors (#355).
+- Worker Sentry skips public pages and `/api/search`, which only log errors (#355, #401).
 - The Stripe webhook is `/api/billing/webhook/` behind a provider-neutral `BillingProvider`
   with no Stripe SDK, until the payments audit (#156) decides. Brand icons use
   `@icons-pack/react-simple-icons` because lucide has no brand icons.

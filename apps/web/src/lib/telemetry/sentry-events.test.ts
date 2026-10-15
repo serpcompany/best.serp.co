@@ -159,9 +159,9 @@ describe('what reaches Sentry (#211)', () => {
         // Staging's admin key (#408) is a header too.
         headers: { cookie: `session=${PRIVATE}`, 'x-staging-admin-token': `key-${PRIVATE}` },
         method: 'GET',
-        path: `/api/search/?q=${PRIVATE}`
+        path: `/api/submissions/prefill/?url=${PRIVATE}`
       },
-      { routePath: '/api/search', routeType: 'route', routerKind: 'App Router' }
+      { routePath: '/api/submissions/prefill', routeType: 'route', routerKind: 'App Router' }
     )
     const [event] = await waitForEvents(1)
     // The request data integration copied the cookie into the event, before the scrubber.

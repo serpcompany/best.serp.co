@@ -4,9 +4,9 @@
  * The Sentry server SDK costs about 110 ms of CPU in each fresh isolate (#334), and search
  * crawlers mostly see uncached public pages in fresh isolates. So only the signed-in and
  * operational surfaces start it: `/admin`, `/account`, `/submit`, `/login`, `/claims` and
- * `/api`. Every other path is a public page. Request errors from every path also go to the
- * Worker's logs as one JSON line with their digest (`logRequestError`, #204), which Workers
- * Observability keeps.
+ * `/api`, apart from the anonymous search API (`LOG_ONLY_ROUTES`, #401). Every other path is a
+ * public page. Request errors from every path also go to the Worker's logs as one JSON line with
+ * their digest (`logRequestError`, #204), which Workers Observability keeps.
  *
  * Starting the SDK takes both halves of the isolate, which share only `globalThis`:
  * - the Worker entry (`worker.ts`, bundled by Wrangler) sees every request first, and calls
@@ -30,11 +30,25 @@ import { stripQuery } from './sentry'
 export const SERVER_SENTRY_SURFACES = ['account', 'admin', 'api', 'claims', 'login', 'submit']
 
 /**
+ * Routes inside a surface whose errors only go to the Worker's logs, like a public page's (#401,
+ * the owner's option 1): `/api/search`, which every public page's search box calls on each pause
+ * in typing. During an outage of the route, Sentry would get one event per search, and each
+ * fresh isolate would start the SDK just to serve it. The browser doesn't report the route's
+ * error statuses either (`use-search.ts`), so its `request_error` line is the error's record. A
+ * route matches itself and the paths under it, by whole segments.
+ */
+export const LOG_ONLY_ROUTES = ['/api/search']
+
+/**
  * Whether a request for this path reports its errors to Sentry. Next.js passes the path with its
  * query string, or, behind a proxy, an absolute URL; only the pathname counts.
  */
 export function reportsToServerSentry(path: string): boolean {
-  const [, first] = new URL(path, 'http://path.invalid').pathname.split('/')
+  const { pathname } = new URL(path, 'http://path.invalid')
+  if (LOG_ONLY_ROUTES.some(route => pathname === route || pathname.startsWith(`${route}/`))) {
+    return false
+  }
+  const [, first] = pathname.split('/')
   return first !== undefined && SERVER_SENTRY_SURFACES.includes(first)
 }
 

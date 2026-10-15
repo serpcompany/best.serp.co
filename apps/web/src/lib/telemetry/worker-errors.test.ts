@@ -91,13 +91,15 @@ describe('a request error that escapes the Worker entry (#210)', () => {
     expect(sdk.reportWorkerErrors).toHaveBeenCalledTimes(5)
   })
 
-  it('never imports the SDK for a public page: the runtime logs its exception, as before', async () => {
+  it('never imports the SDK for a public page or the search API (#401): the runtime logs its exception', async () => {
     const errors = await reporter()
     const { context, pending } = executionContext()
     for (const path of [
       '/',
       '/products/fixture-studio/',
       '/search/?q=admin',
+      '/api/search?q=admin',
+      '/api/search/?q=admin',
       '/sitemap-products.xml',
       '/products/admin/',
       '/no-such-page/'
@@ -136,7 +138,12 @@ describe('a request error that escapes the Worker entry (#210)', () => {
     const error = new Error('gate failed')
 
     await expect(
-      errors.fetch(new Request('https://best.serp.co/api/search/'), {}, context, failing(error))
+      errors.fetch(
+        new Request('https://best.serp.co/api/billing/webhook/'),
+        {},
+        context,
+        failing(error)
+      )
     ).rejects.toBe(error)
     await expect(settled()).resolves.toBeDefined()
 
