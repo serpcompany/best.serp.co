@@ -1,6 +1,7 @@
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { unstable_readConfig } from 'wrangler'
+import { WEB_ANALYTICS_TOKEN_PATTERN } from '../apps/web/src/lib/environment/site-environment'
 import { project } from './project'
 
 // Each environment as Wrangler resolves it for a deploy (`--env`), so inherited keys and
@@ -34,9 +35,9 @@ describe('Worker configuration (serp web-stack/nextjs-on-workers.md)', () => {
     for (const [name, config] of environments.slice(0, 2)) {
       expect(config.vars.CF_WEB_ANALYTICS_TOKEN, name).toBeUndefined()
     }
-    // The same pattern `analyticsForRequest` accepts (apps/web/src/lib/environment). Set since
+    // The pattern `analyticsForRequest` accepts, imported so the two can't drift (#272). Set since
     // 2026-10-09: the best.serp.co site in the SERP account's Web Analytics (docs/telemetry.md).
-    expect(resolved('production').vars.CF_WEB_ANALYTICS_TOKEN).toMatch(/^[0-9a-f]{32}$/u)
+    expect(resolved('production').vars.CF_WEB_ANALYTICS_TOKEN).toMatch(WEB_ANALYTICS_TOKEN_PATTERN)
   })
 
   it.each(environments)('uploads source maps in %s', (_name, config) => {
