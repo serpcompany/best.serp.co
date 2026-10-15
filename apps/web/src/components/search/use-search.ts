@@ -18,9 +18,9 @@ import {
 
 /**
  * A search the API answered with an error status. It isn't reported from the browser (#401): the
- * route answers only 200 or a server error, which `onRequestError` already reports (`/api` reports
- * to Sentry), and a 4xx comes from in front of it, such as a 429 throttle, a challenge or
- * staging's password.
+ * route answers only 200 or a server error, which the Worker logs as `request_error` (Workers
+ * Logs only, not Sentry: `LOG_ONLY_ROUTES` in `lib/telemetry/server-errors.ts`), and a 4xx comes
+ * from in front of it, such as a 429 throttle, a challenge or staging's password.
  */
 export class SearchResponseError extends Error {
   constructor(readonly status: number) {

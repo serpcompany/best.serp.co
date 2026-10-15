@@ -61,6 +61,38 @@ describe('instrumentation (#48, #355)', () => {
     expect(line).not.toContain('render failed')
   })
 
+  it('logs a search route error and never loads Sentry for it (#401)', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { onRequestError } = await import('./instrumentation')
+    // What the route throws when D1 drops mid-query: Drizzle puts the statement and its bound
+    // values (the visitor's search) in the message.
+    const error = new Error('Failed query: select … where name like ?\nparams: %hidden-term%', {
+      cause: new Error('D1_ERROR: Network connection lost.')
+    })
+    const request = { headers: {}, method: 'GET', path: '/api/search?q=hidden-term&limit=100' }
+    await onRequestError(error, request, {
+      ...context,
+      routePath: '/api/search',
+      routeType: 'route'
+    })
+    expect(sentry.startServerSentry).not.toHaveBeenCalled()
+    expect(sentry.captureRequestError).not.toHaveBeenCalled()
+    expect(logged).toHaveBeenCalledTimes(1)
+    const line = String(logged.mock.calls[0]?.[0])
+    expect(JSON.parse(line)).toMatchObject({
+      code: 'D1_ERROR:connection_lost',
+      event: 'request_error',
+      method: 'GET',
+      name: 'Error',
+      path: '/api/search',
+      route: '/api/search',
+      routeType: 'route'
+    })
+    expect(JSON.parse(line).stack).toMatch(/^\s+at /u)
+    expect(line).not.toContain('hidden-term')
+    expect(line).not.toContain('Failed query')
+  })
+
   it('reports a signed-in or operational surface error to Sentry, and logs it', async () => {
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
     const { onRequestError } = await import('./instrumentation')
