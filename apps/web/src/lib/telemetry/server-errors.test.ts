@@ -1,8 +1,10 @@
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { SEARCH_API_PATH } from '../directory/search-contract'
 import { SITEMAP_INDEX_PATH, sitemapPaths, siteRoutes } from '../site/site-routes'
 import {
+  LOG_ONLY_ROUTES,
   logRequestError,
   registerServerSentryStarter,
   reportsToServerSentry,
@@ -30,7 +32,6 @@ describe('which requests report to the Worker Sentry SDK (#355)', () => {
       '/submit/0f0c/choose/',
       '/login/',
       '/claims/0f0c/checkout/success/',
-      '/api/search/?q=private',
       '/api/auth/sign-in/email-otp',
       '/api/billing/webhook/',
       '/api/admin/listings/1/approve/'
@@ -66,9 +67,55 @@ describe('which requests report to the Worker Sentry SDK (#355)', () => {
 
   it('reads only the pathname of an absolute URL', () => {
     expect(reportsToServerSentry('https://best.serp.co/admin/listings/?q=1')).toBe(true)
-    expect(reportsToServerSentry('https://best.serp.co/api/search/')).toBe(true)
+    expect(reportsToServerSentry('https://best.serp.co/api/billing/webhook/')).toBe(true)
     expect(reportsToServerSentry('https://best.serp.co/products/admin/')).toBe(false)
     expect(reportsToServerSentry('https://best.serp.co/')).toBe(false)
+  })
+})
+
+describe('the search API logs only (#401)', () => {
+  it('in every form its path takes', () => {
+    for (const path of [
+      SEARCH_API_PATH,
+      '/api/search',
+      '/api/search/',
+      '/api/search?q=private',
+      '/api/search/?q=private&limit=100',
+      '/api/search/suggestions/',
+      'https://best.serp.co/api/search?q=private'
+    ]) {
+      expect(reportsToServerSentry(path), path).toBe(false)
+    }
+  })
+
+  it('and only it: the other API routes, and paths that merely start like it, still report', () => {
+    for (const path of [
+      '/api',
+      '/api/',
+      '/api/searchx',
+      '/api/searchx/',
+      '/api/search-index/',
+      '/api/account/listings/1/',
+      '/api/submissions/0f0c/media/'
+    ]) {
+      expect(reportsToServerSentry(path), path).toBe(true)
+    }
+  })
+
+  it('for every API route folder in src/app/api but search, and names only routes that exist', () => {
+    const api = join(import.meta.dirname, '../../app/api')
+    const folders = readdirSync(api, { withFileTypes: true })
+      .filter(entry => entry.isDirectory())
+      .map(entry => entry.name)
+    expect(folders).toContain('search')
+    for (const folder of folders) {
+      expect(reportsToServerSentry(`/api/${folder}/`), `/api/${folder}/`).toBe(folder !== 'search')
+    }
+    for (const route of LOG_ONLY_ROUTES) {
+      expect(existsSync(join(import.meta.dirname, '../../app', route, 'route.ts')), route).toBe(
+        true
+      )
+    }
   })
 })
 
@@ -134,8 +181,16 @@ describe('starting the Worker Sentry SDK (#355)', () => {
     expect(start).not.toHaveBeenCalled()
 
     await startServerSentryFor(request('/admin/'))
-    await startServerSentryFor(request('/api/search/'))
+    await startServerSentryFor(request('/api/billing/webhook/'))
     expect(start).toHaveBeenCalledTimes(1)
+  })
+
+  it('never starts it for a search, the API route that logs only (#401)', async () => {
+    const start = vi.fn(async () => {})
+    await registerServerSentryStarter(start)
+    await startServerSentryFor(request('/api/search?q=video'))
+    await startServerSentryFor(request('/api/search/?q=video'))
+    expect(start).not.toHaveBeenCalled()
   })
 
   it('starts it in register() when the reporting request came first', async () => {
