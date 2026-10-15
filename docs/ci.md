@@ -66,8 +66,8 @@ and `main` keeps the deletion and force-push blocks nobody can bypass. Agents pu
 by running that promotion on the owner's "you do it" for a release. Rulesets cannot restrict
 a pull request's head branch, so `check` fails a pull request into `main` whose
 head is not a `hotfix-*` branch. That only catches mis-targeted pull requests; Deploy
-Production's tree check is the control. Agents squash-merge only their own green, reviewed
-pull requests into `staging` ([Owner rules](./owner-rules.md)).
+Production's tree check is the control. Agents squash-merge only agent pull requests into
+`staging`, once green and reviewed clean (no blocking findings; [Owner rules](./owner-rules.md)).
 
 After a pull request merges, the push run checks the exact resulting revision again; when it
 merged up to date its tree is the one the pull request tested, so only the quick checks repeat.

@@ -42,11 +42,11 @@ The repository follows the serp git-workflow standard for repositories with Stag
 
 - **`staging` is the base branch.** Branch from it as `issue-<n>-<slug>` and open pull
   requests into it. They are squash-merged (the hotfix merge-back below is the one merge
-  commit) by the owner, or by the agent that opened one once it is green and reviewed clean
-  ([Owner rules](./owner-rules.md#merging-to-staging)), and each push to `staging` runs Deploy
-  Staging.
-- **`main` is production.** `staging` reaches it by a **fast-forward**: the owner runs
-  `pnpm release:promote` (`scripts/release-promote.ts`), so `main` receives exactly the squash
+  commit) by the owner, or an agent pull request by an agent, including a lead merging its
+  builders', once green and reviewed clean (no blocking findings;
+  [Owner rules](./owner-rules.md#merging-to-staging)). Each push to `staging` runs Deploy Staging.
+- **`main` is production.** `staging` reaches it by a **fast-forward**: `pnpm release:promote`
+  (`scripts/release-promote.ts`) pushes it, so `main` receives exactly the squash
   commits staging verified, with no promotion pull request and no merge commit. The push needs
   the owner's bypass of `main`'s pull request and check rules, kept in a ruleset of their own so
   deletion and force pushes stay blocked for everyone. Any other change to `main` is a
