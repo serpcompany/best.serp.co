@@ -81,7 +81,10 @@ describe('Stripe payment events (#473)', () => {
         payment_intent: { id: 'pi_1' },
         status: 'failed'
       })
-    ).resolves.toMatchObject({ payment: { paymentId: 'pi_1' }, type: 'payment_refund_failed' })
+    ).resolves.toMatchObject({
+      payment: { paymentId: 'pi_1', refundId: 're_1' },
+      type: 'payment_refund_failed'
+    })
     await expect(event('charge.dispute.created', dispute({}))).resolves.toMatchObject({
       payment: { disputeOutcome: null, paymentId: 'pi_1' },
       type: 'payment_disputed'

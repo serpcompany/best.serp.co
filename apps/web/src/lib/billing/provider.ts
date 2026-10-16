@@ -85,6 +85,12 @@ export interface PaymentChange {
   /** How much of the payment is refunded so far, in all (a refund's). */
   refundedCents?: number | null
   /**
+   * The refund a failed refund's report is about, when the provider reports it: compared with the
+   * refund the order recorded (`orders.provider_refund_id`), so an earlier one's failure, reported
+   * after a newer refund succeeded, flags nothing (#485).
+   */
+  refundId?: string | null
+  /**
    * The idempotency key of the request that made the change, when the provider reports it: the
    * site's own refund carries its `refund:<order>` (#484).
    */

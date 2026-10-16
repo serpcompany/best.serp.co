@@ -196,7 +196,8 @@ const PAYMENT_EVENTS: Readonly<
  * names the order, and its amount and running refund total come with it (#484). A dispute carries
  * neither: the service finds its checkout by the PaymentIntent when it needs to
  * (`checkoutForPayment`). `request.idempotency_key` is the key of the API request that made the
- * change: the site's own refund's `refund:<order>`.
+ * change: the site's own refund's `refund:<order>`. A failed refund's report is the Refund itself,
+ * so its id names the refund that failed (#485).
  */
 function stripePaymentChange(
   type: (typeof PAYMENT_EVENTS)[string]['type'],
@@ -210,6 +211,9 @@ function stripePaymentChange(
     const disputeOutcome =
       status === 'lost' ? 'lost' : status === 'won' || status === 'warning_closed' ? 'won' : null
     return disputeOutcome ? { disputeOutcome, partial: false, paymentId } : null
+  }
+  if (type === 'payment_refund_failed') {
+    return { disputeOutcome: null, partial: false, paymentId, refundId: text(object.id) }
   }
   if (type !== 'payment_refunded') return { disputeOutcome: null, partial: false, paymentId }
   const metadata = (object.metadata ?? {}) as Record<string, unknown>

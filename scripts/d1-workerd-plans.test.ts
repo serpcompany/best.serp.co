@@ -1584,6 +1584,9 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
       run(B.buildFlagRefundFailedPlans({ now: NOW, orderId: 'ord-dispute', refunded: true }))
     ).rejects.toThrow()
     await run(B.buildFlagRefundFailedPlans({ disputed: true, now: NOW, orderId: 'ord-dispute' }))
+    // A later refund that succeeded clears a refunded order's flag (#485 round 2).
+    await run(B.buildClearRefundFailedPlans({ now: NOW, orderId: 'ord-dispute' }))
+    expect(await order('ord-dispute')).toMatchObject({ attention: null, status: 'refunded' })
     // The alerts the sweep sends again come from the events' outcomes.
     const event = {
       eventId: 'evt_dispute',

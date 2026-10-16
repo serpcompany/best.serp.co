@@ -2,6 +2,7 @@ import {
   type BillingOperations,
   buildAttachCheckoutPlans,
   buildClaimRefundPlans,
+  buildClearRefundFailedPlans,
   buildCloseDisputePlans,
   buildFinishRefundPlans,
   buildFlagRefundFailedPlans,
@@ -1616,7 +1617,7 @@ async function actOnPayment(
         ? alertPartialRefund(deps, order, payment)
         : recordPaymentChange(deps, order, 'refunded', payment.requestKey ?? null)
     case 'payment_refund_failed':
-      return flagRefundFailed(deps, order)
+      return flagRefundFailed(deps, order, payment.refundId ?? null)
   }
 }
 
@@ -1739,6 +1740,21 @@ async function recordPaymentChange(
   for (let attempt = 0; attempt < PUBLICATION_ATTEMPTS; attempt += 1) {
     const current = attempt === 0 ? order : await deps.operations.order(order.id)
     if (!current) return 'unknown_order'
+    // A later refund of the whole payment succeeded after one that failed (refunded again in the
+    // provider's dashboard, #485): the money went back, so the flag no longer decides a dispute's
+    // takedown. The site's own refund's report (its request key) is the refund that failed,
+    // delivered late, so it clears nothing.
+    if (
+      change === 'refunded' &&
+      current.status === 'refunded' &&
+      current.attention === 'refund_failed' &&
+      requestKey !== `refund:${current.id}`
+    ) {
+      await deps.operations.apply(
+        buildClearRefundFailedPlans({ now: nowIso(deps), orderId: current.id })
+      )
+      log('billing_refund_failed_cleared', { order: current.id })
+    }
     const recorded =
       change === 'disputed'
         ? current.disputeStatus === 'open'
@@ -1903,13 +1919,29 @@ async function alertPartialRefund(
  * way. On a `refunded` order whose dispute is open or lost (it arrived while the refund looked
  * done), the listing comes down now, by the dispute's rules (`takedownPlans`, #484), in the same
  * batch; one with no such dispute is flagged only if none was recorded meanwhile, so the
- * dispute's own takedown reads the flag. Three lost writes throw, so the provider's retry runs it
- * again.
+ * dispute's own takedown reads the flag. A failure of a refund other than the one the order
+ * recorded (`provider_refund_id`) flags nothing. Three lost writes throw, so the provider's retry
+ * runs it again.
  */
-async function flagRefundFailed(deps: BillingDependencies, order: OrderRecord): Promise<string> {
+async function flagRefundFailed(
+  deps: BillingDependencies,
+  order: OrderRecord,
+  /** The refund that failed (`PaymentChange.refundId`), when the provider reports it. */
+  refundId: string | null
+): Promise<string> {
   for (let attempt = 0; attempt < PUBLICATION_ATTEMPTS; attempt += 1) {
     const current = attempt === 0 ? order : await deps.operations.order(order.id)
     if (!current) return 'unknown_order'
+    // An earlier refund's failure, reported after a newer one (the site's retry once its request
+    // key expired) succeeded and was recorded (#485): the money went back, so it flags nothing.
+    if (
+      refundId !== null &&
+      current.providerRefundId !== null &&
+      refundId !== current.providerRefundId
+    ) {
+      log('billing_refund_failed_superseded', { order: current.id })
+      return 'refund_failed_superseded'
+    }
     const disputed = current.status === 'refunded' && disputeBlocksRefund(current)
     const takedown = disputed ? await takedownPlans(deps, current, 'disputed', true) : null
     const flagged = await deps.operations.apply([

@@ -499,6 +499,25 @@ export function buildFlagRefundFailedPlans(input: {
 }
 
 /**
+ * Clears a `refunded` order's `refund_failed` flag once a later refund of the whole payment
+ * succeeded at the provider (refunded again in its dashboard, #485): the money went back, so a
+ * dispute no longer takes its listing down. Compared and swapped on the flag, so it changes
+ * nothing once the order moved on.
+ */
+export function buildClearRefundFailedPlans(input: {
+  now: string
+  orderId: string
+}): StatementPlan[] {
+  return [
+    {
+      sql: `UPDATE orders SET attention=NULL,updated_at=?
+        WHERE id=? AND status='refunded' AND attention='refund_failed'`,
+      params: [input.now, input.orderId]
+    }
+  ]
+}
+
+/**
  * How much of a payment a partial refund outside the site sent back so far (#484): the
  * provider's running total, so a report that arrives late never lowers it. Only on an order not
  * refunded in full (`refunding` or `refunded` records the whole refund instead).

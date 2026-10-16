@@ -69,7 +69,11 @@ rejection that a dispute opens on mid-refund answers 409 `disputed` and refunds 
 A partial refund changes nothing but records the amount refunded so far
 (`partial_refund_cents`, `0017_order_partial_refunds`), which admin Orders shows ("Partly refunded
 outside the site: $…"), and emails the admin (#484). `refund.failed` flags the site's refund
-`refund_failed` and emails the admin; a refund that then succeeds clears it.
+`refund_failed` and emails the admin; a refund that then succeeds clears it: the site's retry,
+or a full refund in Stripe's dashboard of an order already `refunded` (#485). The site's own
+refund's `charge.refunded` (its `refund:<order>` key) is the refund that failed, delivered late,
+and clears nothing. A `refund.failed` for a refund other than the one the order recorded
+(`provider_refund_id`: an earlier one, reported after the site's retry succeeded) flags nothing.
 
 The site's own refund's `charge.refunded` finds the order `refunded`, or `refunding` while that
 refund may still run (claimed under ten minutes ago, never failed), and changes nothing. After it
