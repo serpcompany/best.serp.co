@@ -428,11 +428,11 @@ describe('submission decisions', () => {
     // #68's refund fails once (a provider outage): the rejection stands, the refund stays
     // pending, and a replay of the rejection retries it.
     const refundRejectedSubmission = vi
-      .fn<(input: { actor: string; submissionId: string }) => Promise<void>>()
+      .fn<(input: { actor: string; submissionId: string }) => Promise<'disputed' | 'refunded'>>()
       .mockRejectedValueOnce(
         new BillingProviderError('Stripe is unreachable.', 'provider_unreachable', 503)
       )
-      .mockResolvedValue(undefined)
+      .mockResolvedValue('refunded')
     const reject = () =>
       rejectSubmission(context({ refunds: { refundRejectedSubmission } }), {
         category: 'other',

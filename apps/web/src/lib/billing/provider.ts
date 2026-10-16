@@ -65,12 +65,36 @@ export interface CheckoutState {
  * buyer opened with their bank, and its outcome.
  */
 export interface PaymentChange {
+  /**
+   * What the payment charged and in which currency, when the event carries it (a refund's), so a
+   * payment the site hasn't recorded yet can be (#484).
+   */
+  amountCents?: number | null
+  currency?: string | null
   /** A closed dispute: the payment stands (`won`), or the money went back to the buyer (`lost`). */
   disputeOutcome: 'lost' | 'won' | null
+  /**
+   * The order the payment names (the order id the checkout put on it), when the event carries
+   * it: it finds a payment the site hasn't recorded yet (#484).
+   */
+  orderId?: string | null
   /** A refund of only part of the payment. */
   partial: boolean
   /** The provider's payment reference, as the order recorded it (`orders.provider_payment_id`). */
   paymentId: string
+  /** How much of the payment is refunded so far, in all (a refund's). */
+  refundedCents?: number | null
+  /**
+   * The refund a failed refund's report is about, when the provider reports it: compared with the
+   * refund the order recorded (`orders.provider_refund_id`), so an earlier one's failure, reported
+   * after a newer refund succeeded, flags nothing (#485).
+   */
+  refundId?: string | null
+  /**
+   * The idempotency key of the request that made the change, when the provider reports it: the
+   * site's own refund carries its `refund:<order>` (#484).
+   */
+  requestKey?: string | null
 }
 
 /**
@@ -116,6 +140,12 @@ export interface BillingProvider {
    */
   expireCheckout(checkoutId: string): Promise<boolean>
   getCheckout(checkoutId: string): Promise<CheckoutState>
+  /**
+   * The checkout that took a payment, by the payment's reference, or null when none did (a charge
+   * made outside checkout). It finds the order of a dispute reported before the site recorded its
+   * payment, which names no order itself (#484).
+   */
+  checkoutForPayment(paymentId: string): Promise<CheckoutState | null>
   /** The provider's refund id, or null when the payment had already been refunded. */
   refund(request: RefundRequest): Promise<{ refundId: string | null }>
   /**

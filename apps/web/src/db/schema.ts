@@ -1775,6 +1775,11 @@ export const orders = sqliteTable(
     /** The payment's dispute, if the buyer opened one (#473), and when it was first reported. */
     disputeStatus: text('dispute_status', { enum: orderDisputeStatuses }),
     disputedAt: text('disputed_at'),
+    /**
+     * How much of the payment a partial refund outside the site sent back so far (#484), in its
+     * currency's minor units; a refund of all of it is `refunded` instead.
+     */
+    partialRefundCents: integer('partial_refund_cents'),
     paidAt: text('paid_at'),
     appliedAt: text('applied_at'),
     refundedAt: text('refunded_at'),
@@ -1810,6 +1815,10 @@ export const orders = sqliteTable(
     check(
       'orders_dispute_recorded',
       sql`(${table.disputeStatus} IS NULL) = (${table.disputedAt} IS NULL)`
+    ),
+    check(
+      'orders_partial_refund_valid',
+      sql`${table.partialRefundCents} IS NULL OR ${table.partialRefundCents} > 0`
     ),
     check(
       'orders_target_matches_purpose',

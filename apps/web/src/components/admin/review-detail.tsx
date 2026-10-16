@@ -60,6 +60,7 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { paidPlanKept } from '@/db/payment-kept'
 import {
   ageWords,
   formatDateTime,
@@ -770,7 +771,8 @@ export function ReviewDetail({
         chips={
           <>
             <StatusBadge kind={chips.kind} label={chips.label} />
-            <PlanBadge paid={view.paid} />
+            {/* A payment refunded, or disputed and not won, reads as free, as in the queue. */}
+            <PlanBadge paid={paidPlanKept(view.paid, view.paymentLoss)} />
             {isSubmission && !view.paid && view.badge?.verifiedAt ? (
               <StatusBadge kind="pass" label="Badge pass" />
             ) : null}
@@ -917,9 +919,12 @@ export function ReviewDetail({
                   ? liveNow
                     ? `${view.name} is live and paid (${amount}). Rejecting unpublishes it right away.`
                     : `${view.name} is paid (${amount}).`
-                  : liveNow
-                    ? `${view.name} is live. Rejecting unpublishes it right away.`
-                    : 'Free submission. No payment to refund.'}
+                  : view.paid && view.paymentLoss === 'disputed'
+                    ? // No refund while disputed (#483): the provider refuses one.
+                      `${liveNow ? `${view.name} is live. Rejecting unpublishes it right away. ` : ''}Its payment is disputed, so nothing is refunded: the dispute decides the money.`
+                    : liveNow
+                      ? `${view.name} is live. Rejecting unpublishes it right away.`
+                      : 'Free submission. No payment to refund.'}
             </DialogDescription>
           </DialogHeader>
           <FieldGroup className="gap-6">

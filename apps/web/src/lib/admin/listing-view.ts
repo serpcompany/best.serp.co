@@ -129,10 +129,13 @@ export function listingDetailView(
     `${added}, ${formatLongDate(listing.publishedAt ?? listing.createdAt)}`,
     listing.adminStatus === 'live' ? `/products/${listing.slug}/` : 'not public'
   ].join(' · ')
+  // By the one rule for a payment still kept (`payment-kept.ts`, #484): one refunded at the
+  // provider, or disputed and not won, never reads as paid.
+  const loss = listing.submission?.refundedAt ? 'refunded' : listing.submission?.paymentLoss
   const paid = listing.submission?.paidAt
     ? `${formatUsd(PAID_LISTING_PRICE_CENTS)} · ${
-        listing.submission.refundedAt
-          ? 'refunded'
+        loss
+          ? loss
           : listing.submission.rejectionCategory === 'prohibited'
             ? 'not refunded (prohibited)'
             : 'paid'

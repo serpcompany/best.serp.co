@@ -93,7 +93,7 @@ second `pnpm db:generate` reports no changes. Keep these properties in every mig
   cascade-delete its memberships, media, links, and FAQs and drop the primary-category triggers.
   `listing_submissions` and `listing_revisions` gain columns the same way
   (`0012_taxonomy.sql`), and so does `orders`, which `billing_events` references
-  (`0016_order_disputes.sql`).
+  (`0016_order_disputes.sql`, `0017_order_partial_refunds.sql`).
 - When a referenced table must be rebuilt, rebuild its children as `__new_*` tables that
   reference the new parent, and drop the old children before the old parent, so no drop
   cascades; the renames carry the references over. Recreate the table's triggers.

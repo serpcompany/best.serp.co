@@ -410,6 +410,7 @@ export function selectAdminListingPlans(slug: string): StatementPlan[] {
             AS logo_queue,
           s.id AS submission_id,s.status AS submission_status,s.paid_at AS submission_paid_at,
           s.refunded_at AS submission_refunded_at,s.rejection_reason,s.rejection_category,
+          ${submissionPaymentLossSql('s')} AS submission_payment_loss,
           s.reviewed_by AS submission_reviewed_by,s.reviewed_at AS submission_reviewed_at,
           su.email AS submitter_email,su.created_at AS submitter_created_at,
           ${activeBlockColumns('COALESCE(s.block_key,s.slug)')}
@@ -927,6 +928,8 @@ export interface AdminListingDetail extends AdminListingRow {
   submission: {
     id: string
     paidAt: string | null
+    /** Its payment no longer kept (`payment-kept.ts`): refunded, or disputed and not won. */
+    paymentLoss: PaymentLoss | null
     refundedAt: string | null
     rejectionCategory: RejectionCategory | null
     rejectionReason: string | null
@@ -1251,6 +1254,7 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
           ? {
               id: submissionId,
               paidAt: toInstant(row.submission_paid_at),
+              paymentLoss: toPaymentLoss(row.submission_payment_loss),
               refundedAt: toInstant(row.submission_refunded_at),
               rejectionCategory: optionalText(row.rejection_category) as RejectionCategory | null,
               rejectionReason: optionalText(row.rejection_reason),

@@ -37,6 +37,7 @@ async function event(type: string, object: Record<string, unknown>, extra = {}) 
 const charge = (extra: Record<string, unknown>) => ({
   amount: 4900,
   amount_refunded: 4900,
+  currency: 'usd',
   id: 'ch_1',
   object: 'charge',
   payment_intent: 'pi_1',
@@ -57,7 +58,16 @@ describe('Stripe payment events (#473)', () => {
     await expect(event('charge.refunded', charge({}))).resolves.toEqual({
       checkout: null,
       id: 'evt_charge.refunded',
-      payment: { disputeOutcome: null, partial: false, paymentId: 'pi_1' },
+      payment: {
+        amountCents: 4900,
+        currency: 'usd',
+        disputeOutcome: null,
+        orderId: null,
+        partial: false,
+        paymentId: 'pi_1',
+        refundedCents: 4900,
+        requestKey: null
+      },
       providerType: 'charge.refunded',
       type: 'payment_refunded'
     })
@@ -71,11 +81,46 @@ describe('Stripe payment events (#473)', () => {
         payment_intent: { id: 'pi_1' },
         status: 'failed'
       })
-    ).resolves.toMatchObject({ payment: { paymentId: 'pi_1' }, type: 'payment_refund_failed' })
+    ).resolves.toMatchObject({
+      payment: { paymentId: 'pi_1', refundId: 're_1' },
+      type: 'payment_refund_failed'
+    })
     await expect(event('charge.dispute.created', dispute({}))).resolves.toMatchObject({
       payment: { disputeOutcome: null, paymentId: 'pi_1' },
       type: 'payment_disputed'
     })
+  })
+
+  it('carries the order a refund names, what it charged, its running total and request key (#484)', async () => {
+    await expect(
+      event(
+        'charge.refunded',
+        charge({ amount_refunded: 1000, metadata: { order_id: 'ord_1' }, refunded: false }),
+        { request: { id: 'req_1', idempotency_key: 'refund:ord_1' } }
+      )
+    ).resolves.toMatchObject({
+      payment: {
+        amountCents: 4900,
+        currency: 'usd',
+        orderId: 'ord_1',
+        partial: true,
+        paymentId: 'pi_1',
+        refundedCents: 1000,
+        requestKey: 'refund:ord_1'
+      },
+      type: 'payment_refunded'
+    })
+    // A dispute carries no copy of the PaymentIntent's metadata: it names no order.
+    await expect(
+      event('charge.dispute.created', dispute({ metadata: {} }), {
+        request: { id: null, idempotency_key: null }
+      })
+    ).resolves.toMatchObject({
+      payment: { disputeOutcome: null, partial: false, paymentId: 'pi_1' },
+      type: 'payment_disputed'
+    })
+    const disputed = await event('charge.dispute.created', dispute({}))
+    expect(disputed.payment).toEqual({ disputeOutcome: null, partial: false, paymentId: 'pi_1' })
   })
 
   it('maps a closed dispute’s outcome: an inquiry that closed stands as won', async () => {

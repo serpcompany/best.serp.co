@@ -17,7 +17,11 @@ import {
 
 export type ReviewPlan =
   | { badgeVerifiedAt: Date | string; kind: 'free' }
-  | { kind: 'paid'; live: boolean }
+  /**
+   * `loss`: the payment was refunded, or disputed and not won (`payment-kept.ts`, #484), so it's
+   * no longer kept; it says so, and never reads as a free plan with a badge check.
+   */
+  | { kind: 'paid'; live: boolean; loss?: 'disputed' | 'refunded' | null }
   /** A listing with no plan: its owner was assigned by an admin (a revision, #65). */
   | { kind: 'none' }
 
@@ -42,6 +46,9 @@ function planLabels(plan: ReviewPlan): { row: string; subject: string } {
     }
   }
   if (plan.kind === 'paid') {
+    if (plan.loss === 'disputed' || plan.loss === 'refunded') {
+      return { row: `Paid. Payment ${plan.loss}`, subject: `paid, payment ${plan.loss}` }
+    }
     return plan.live
       ? { row: 'Paid. Live now', subject: 'paid, live now' }
       : { row: 'Paid. Waiting for review', subject: 'paid, waiting for review' }
@@ -149,7 +156,13 @@ export const adminNewMessageEmail = defineEmailTemplate<AdminNewMessageInput>({
 })
 
 /** What happened to the payment (#473). */
-export type PaymentAlertKind = 'disputed' | 'partially_refunded' | 'refund_failed' | 'refunded'
+export type PaymentAlertKind =
+  | 'disputed'
+  /** A dispute won on a payment whose rejection asked no refund while it was open (#483). */
+  | 'dispute_won_refund'
+  | 'partially_refunded'
+  | 'refund_failed'
+  | 'refunded'
 
 export interface AdminPaymentAlertInput {
   kind: PaymentAlertKind
@@ -163,6 +176,10 @@ export interface AdminPaymentAlertInput {
 
 const PAYMENT_ALERTS: Readonly<Record<PaymentAlertKind, { heading: string; subject: string }>> = {
   disputed: { heading: 'A payment was disputed', subject: 'Payment disputed' },
+  dispute_won_refund: {
+    heading: 'A dispute was won, so the rejection’s refund goes ahead',
+    subject: 'Dispute won, refunding the rejection'
+  },
   partially_refunded: {
     heading: 'A payment was partly refunded outside the site',
     subject: 'Partly refunded outside the site'

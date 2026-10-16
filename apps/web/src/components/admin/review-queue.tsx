@@ -24,6 +24,7 @@ import {
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { paidPlanKept } from '@/db/payment-kept'
 import { ageLabel, formatUsd, listingPath } from '@/lib/admin/format'
 import { DataTableView, FacetFilter, PaginationFooter } from './data-table'
 import { ProductCell } from './product-cell'
@@ -172,7 +173,8 @@ export function ReviewQueue({
           row.slug.includes(text) ||
           row.website.toLowerCase().includes(text)) &&
         (source.length === 0 || source.includes(row.kind)) &&
-        (plan.length === 0 || plan.includes(row.paid ? 'paid' : 'free')) &&
+        (plan.length === 0 ||
+          plan.includes(paidPlanKept(row.paid, row.paymentLoss) ? 'paid' : 'free')) &&
         (badge.length === 0 || badge.includes(badgeOf(row)))
     )
   }, [badge, plan, query, rows, source])
@@ -219,7 +221,10 @@ export function ReviewQueue({
         id: 'source'
       },
       {
-        cell: ({ row }) => <PlanBadge paid={row.original.paid} />,
+        // A payment refunded, or disputed and not won, reads as free (`payment-kept.ts`, #484).
+        cell: ({ row }) => (
+          <PlanBadge paid={paidPlanKept(row.original.paid, row.original.paymentLoss)} />
+        ),
         header: 'Plan',
         id: 'plan'
       },
