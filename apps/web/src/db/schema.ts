@@ -1714,7 +1714,8 @@ export type OrderRefundListingAction = (typeof orderRefundListingActions)[number
 
 /**
  * Why an order needs an admin: a charge that didn't match its order (refunded), or a refund
- * the provider kept refusing (`refund_failed`, after `REFUND_MAX_ATTEMPTS`; the sweep stops).
+ * the provider kept refusing (`refund_failed`, after `REFUND_MAX_ATTEMPTS`; the sweep stops),
+ * cleared when that refund then succeeds.
  */
 export const orderAttentions = ['amount_mismatch', 'refund_failed'] as const
 export type OrderAttention = (typeof orderAttentions)[number]

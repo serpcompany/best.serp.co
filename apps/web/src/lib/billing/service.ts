@@ -1526,7 +1526,9 @@ interface Takedown {
  * applied, or one held for review, has no listing live; and a refunded order's listing no longer
  * rides on its payment (a refund decided its listing already): those take nothing down (`none`).
  * A dispute also takes it down while the site's own refund hasn't returned the money (still
- * `refunding`, or flagged `refund_failed`; a dispute usually makes that refund fail). A listing
+ * `refunding`: in flight, retrying, or flagged `refund_failed`; a dispute usually makes that refund
+ * fail), but never a `refunded` order's, whatever its flag says: that refund decided its listing,
+ * and a `refund.failed` reported after it is the admin's to decide, from its alert. A listing
  * already down, by that refund's rejection or listing change say, stays as it is
  * (`already_unpublished`).
  */
@@ -1536,9 +1538,7 @@ async function takedownPlans(
   reason: 'disputed' | 'refunded'
 ): Promise<Takedown> {
   const none: Takedown = { listingAction: 'none', plans: [], submission: null }
-  const kept =
-    order.status === 'paid' ||
-    (reason === 'disputed' && (order.status === 'refunding' || order.attention === 'refund_failed'))
+  const kept = order.status === 'paid' || (reason === 'disputed' && order.status === 'refunding')
   if (!kept || order.appliedAt === null || order.outcome === 'unapplied') return none
   if (order.purpose === 'claim') {
     // The listing whose ownership this payment bought, while the payer still owns it through it:

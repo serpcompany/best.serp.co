@@ -134,26 +134,27 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
   (`dispute_status` `open`), or a full refund made in Stripe's dashboard (`refunded`, an admin's
   refund by `provider`), takes down the listing the payment made or kept live (a paid submission's,
   an upgrade's, a relist's) in the same batch, even in review (owner decision on #156), and emails
-  the admin (`admin-payment-alert`); a dispute does too while the site's refund is `refunding` or
-  `refund_failed` (one it took down stays down). A paid claim's listing comes down too (owner, #473,
-  2026-10-16) while its payer still owns it by that payment (after an admin's revoke or transfer:
-  record and email only), owner kept for an admin to decide; one refunded in /admin stays up. A held
-  payment has none live. Neither returns as paid: by one rule (`db/payment-kept.ts`: the paying
+  the admin (`admin-payment-alert`); a dispute does too while the site's refund hasn't succeeded
+  (`refunding` or `refund_failed`; one it took down stays down). A paid claim's listing comes down
+  too (owner, #473, 2026-10-16) while its payer still owns it by that payment (after an admin's
+  revoke or transfer: record and email only), owner kept for an admin to decide; one refunded in
+  /admin stays up unless a dispute opens while its refund is still `refunding` or `refund_failed`. A
+  held payment has none live. Neither returns as paid: by one rule (`db/payment-kept.ts`: the paying
   order, a claim's latest, refunded or disputed and not won), /admin and the account read it free,
   the review queue shows "Refunded" or "Disputed", Approve answers 409, and the weekly badge check
   takes a live one in. The refund also records an approved or held submission refunded
   (`at_provider`; `paid_pending_review` can't hold `refunded_at`, a CHECK). A closed dispute records
   `won` or `lost` only, and an admin decides; a lost one never reported open is opened first
   (takedown, email). A partial refund changes nothing and emails the admin. `refund.failed` flags
-  the site's refund `refund_failed` and emails the admin. The site's own refund's `charge.refunded`
-  finds the order `refunded`, or `refunding` while that refund may still run (claimed under ten
-  minutes ago, never failed), and changes nothing; after it failed, the dashboard refund finishes it
-  (its listing change, none for a claim, `refunded`, the admin's email; a rejection's own refund
-  then records the submission and emails the owner). Fulfilment never applies a disputed payment
-  (the apply refuses one disputed meanwhile). Admin Orders shows "Disputed", "Dispute won", "Dispute
-  lost" or "Refunded outside the site", with no "Refund…" while a dispute is open or lost (Stripe
-  refuses; the routes answer 409). The four events stay dormant until the owner ticks them on both
-  webhooks ([Configuration](#configuration-owner)).
+  the site's refund `refund_failed` and emails the admin; a refund that then succeeds clears it. The
+  site's own refund's `charge.refunded` finds the order `refunded`, or `refunding` while that refund
+  may still run (claimed under ten minutes ago, never failed), and changes nothing; after it failed,
+  the dashboard refund finishes it (its listing change, none for a claim, `refunded`, the admin's
+  email; a rejection's own refund then records the submission and emails the owner). Fulfilment
+  never applies a disputed payment (the apply refuses one disputed meanwhile). Admin Orders shows
+  "Disputed", "Dispute won", "Dispute lost" or "Refunded outside the site", with no "Refund…" while
+  a dispute is open or lost (Stripe refuses; the routes answer 409). The four events stay dormant
+  until the owner ticks them on both webhooks ([Configuration](#configuration-owner)).
 - **A listing taken down in review** (`paid_pending_review`, `changes_requested`) can't be
   approved or resubmitted until it is live: the reviewer republishes it, then approves it, or
   rejects it. Approve refuses a payment refunded (reject it instead), or disputed and not won.
@@ -202,20 +203,19 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
   dialog replaced, one over an hour old, or a decision that no longer holds answers 409 and the
   dialog previews again, so a refund never does other than the button said. A listing that went
   down meanwhile is refunded as it is. No email: #70 has none for it.
-- **Sweep.** The hourly cron (`billing-sweep` in `lib/worker/scheduled.ts`) works most urgent
-  first, with at most 20 Stripe calls a run: paid orders left unapplied (ten minutes after
-  payment; usually by a webhook fulfilment that failed or outlived `waitUntil`, else by a Worker
-  stopped before applying; never a disputed one), claimed refunds
-  (at most half the calls; a refund Stripe refuses backs off 1, 2, 4, 8 and 16 hours and is
-  flagged `refund_failed` for an admin after five failures, after which only "Refund…" retries
-  it), pending orders whose checkout closed (paid → applied, otherwise `failed`), failed
-  orders whose superseded checkout couldn't be confirmed expired (for three days; it expires an
-  open one and drops one Stripe expired), then refunds still owed after an `other` rejection.
-  Last, it sends again the emails of payments applied, and the admin alerts of payment events
-  (#473), between ten minutes and six hours ago (#481): an apply late in `waitUntil`'s 30
-  seconds, or a Worker stopped after it, may never have sent them. The email ledger sends each
-  once, and claims again a send cut off mid-way while useSend's idempotency key still answers a
-  repeat with the original message ([Email](./email.md)).
+- **Sweep.** The hourly cron (`billing-sweep` in `lib/worker/scheduled.ts`) works most urgent first,
+  with at most 20 Stripe calls a run: paid orders left unapplied (ten minutes after payment; usually
+  by a webhook fulfilment that failed or outlived `waitUntil`, else by a Worker stopped before
+  applying; never a disputed one), claimed refunds (at most half the calls; a refund Stripe refuses
+  backs off 1, 2, 4, 8 and 16 hours and is flagged `refund_failed` for an admin after five failures,
+  after which only "Refund…" retries it, and its success clears the flag), pending orders whose
+  checkout closed (paid → applied, otherwise `failed`), failed orders whose superseded checkout
+  couldn't be confirmed expired (for three days; it expires an open one and drops one Stripe
+  expired), then refunds still owed after an `other` rejection. Last, it sends again the emails of
+  payments applied, and the admin alerts of payment events (#473), between ten minutes and six hours
+  ago (#481): an apply late in `waitUntil`'s 30 seconds, or a Worker stopped after it, may never
+  have sent them. The email ledger sends each once, and claims again a send cut off mid-way while
+  useSend's idempotency key still answers a repeat with the original message ([Email](./email.md)).
 
 No self-withdraw after payment (#59): the withdraw plans already refuse a paid submission.
 

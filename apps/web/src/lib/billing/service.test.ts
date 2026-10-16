@@ -2294,12 +2294,9 @@ describe('refunds and disputes made outside the site (#473)', () => {
     ])
   })
 
-  it.each([
-    [false, 1],
-    [true, 0]
-  ])(
-    'takes a refunded claim’s listing down on a dispute only if its refund failed (%s)',
-    async (failed, live) => {
+  it.each([false, true])(
+    'keeps a refunded claim’s listing up on a dispute, whatever its flag says (refund.failed after: %s)',
+    async failed => {
       const f = fixture()
       claimedListing(f)
       await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
@@ -2310,10 +2307,52 @@ describe('refunds and disputes made outside the site (#473)', () => {
         dispute_status: 'open',
         status: 'refunded'
       })
-      expect(liveOf(f, 'lst_claimed')).toBe(live)
+      expect(liveOf(f, 'lst_claimed')).toBe(1)
       expect(f.emails.map(email => email.input)).toContainEqual({
         kind: 'disputed',
-        listingLive: live === 1,
+        listingLive: true,
+        orderNumber: 1001,
+        productName: 'Claimed'
+      })
+    }
+  )
+
+  it.each(['the admin’s retry', 'a refund in Stripe'])(
+    'clears a failed refund’s flag when %s succeeds, so a later dispute keeps the listing up',
+    async how => {
+      const f = fixture()
+      claimedListing(f)
+      f.failNextRefund.value = true
+      await expect(
+        refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+      ).rejects.toThrow('provider down')
+      await webhook(f, paymentEvent('payment_refund_failed', 'pi_claim'))
+      expect(f.row('SELECT status, attention FROM orders')).toEqual({
+        attention: 'refund_failed',
+        status: 'refunding'
+      })
+      if (how === 'the admin’s retry') {
+        await expect(
+          refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+        ).resolves.toMatchObject({ ok: true })
+      } else {
+        await webhook(f, paymentEvent('payment_refunded', 'pi_claim'))
+      }
+      expect(f.row('SELECT status, attention FROM orders')).toEqual({
+        attention: null,
+        status: 'refunded'
+      })
+      await webhook(f, paymentEvent('payment_disputed', 'pi_claim'))
+      expect(f.row('SELECT status, attention, dispute_status FROM orders')).toEqual({
+        attention: null,
+        dispute_status: 'open',
+        status: 'refunded'
+      })
+      expect(liveOf(f, 'lst_claimed')).toBe(1)
+      expect(claimOwner(f)).toMatchObject({ revoked_at: null, user_id: 'user_maya' })
+      expect(f.emails.map(email => email.input)).toContainEqual({
+        kind: 'disputed',
+        listingLive: true,
         orderNumber: 1001,
         productName: 'Claimed'
       })

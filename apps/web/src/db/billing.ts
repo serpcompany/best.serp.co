@@ -394,7 +394,11 @@ export function buildRecordRefundFailurePlans(input: {
   ]
 }
 
-/** `refunding` → `refunded`, once the provider confirmed the refund. */
+/**
+ * `refunding` → `refunded`, once the provider confirmed the refund (the site's, the sweep's, or
+ * one made in its dashboard). A `refund_failed` flag from an earlier failure is cleared: the money
+ * went back. A `refund.failed` reported later flags it again.
+ */
 export function buildFinishRefundPlans(input: {
   now: string
   orderId: string
@@ -402,7 +406,8 @@ export function buildFinishRefundPlans(input: {
 }): StatementPlan[] {
   return [
     {
-      sql: `UPDATE orders SET status='refunded',provider_refund_id=?,refunded_at=?,updated_at=?
+      sql: `UPDATE orders SET status='refunded',provider_refund_id=?,refunded_at=?,
+          attention=CASE WHEN attention='refund_failed' THEN NULL ELSE attention END,updated_at=?
         WHERE id=? AND status='refunding'`,
       params: [input.refundId, input.now, input.now, input.orderId]
     },
