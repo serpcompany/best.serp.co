@@ -29,8 +29,9 @@ function note(order: AdminOrderRow): string | null {
       ? ' · rejected: the dispute decides the refund'
       : ''
   if (order.disputeStatus === 'open') return `Disputed${rejected}`
+  // Won: the sweep refunds the rejection now (#485).
   if (order.disputeStatus === 'won')
-    return `Dispute won${rejected ? ' · rejected, not refunded' : ''}`
+    return `Dispute won${rejected ? ' · rejected: refund pending' : ''}`
   if (order.disputeStatus === 'lost') return `Dispute lost${rejected}`
   if (order.status === 'refunded') {
     if (order.refundedBy === PROVIDER_ACTOR) return 'Refunded outside the site'

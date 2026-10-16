@@ -194,6 +194,21 @@ function submissionRow(submission: AccountSubmission, now: Date, showPaid: boole
         tab: 'review'
       }
     case 'paid_pending_review':
+      // Taken down in review: by a dispute or a refund outside the site (#482, #484), say.
+      if (submission.paymentLoss !== null || submission.listing?.live === false) {
+        return {
+          ...base,
+          action: null,
+          next: {
+            text: submission.paymentLoss
+              ? `Unpublished: payment ${submission.paymentLoss}`
+              : 'Unpublished; a reviewer still signs off',
+            tone: 'warning'
+          },
+          status: 'in_review',
+          tab: 'review'
+        }
+      }
       return {
         ...base,
         action: null,

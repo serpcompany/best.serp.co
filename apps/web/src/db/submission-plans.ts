@@ -1175,8 +1175,9 @@ export const DISPUTE_DECIDES_REFUND_NOTE =
  * and `rejection_category='other'` on a row with `paid_at` set and `refunded_at` null, and
  * `buildRefundSubmissionPlans` (`after_rejection`) clears it by recording `refunded_at`. A
  * replayed rejection and #68's refund sweep retry the rows this returns. One whose order records
- * that the dispute decides the refund (`DISPUTE_DECIDES_REFUND_NOTE`, #483) isn't retried: after
- * a won dispute, an admin's "Refund…" refunds it.
+ * that the dispute decides the refund (`DISPUTE_DECIDES_REFUND_NOTE`, #483) isn't retried while
+ * that dispute is open or lost (the provider refuses); once it's won, the refund resumes, as the
+ * Terms promise for a rejection (#485).
  */
 export function selectRefundPendingSubmissionsPlan(limit: number): StatementPlan {
   return {
@@ -1184,7 +1185,7 @@ export function selectRefundPendingSubmissionsPlan(limit: number): StatementPlan
       WHERE s.status='rejected' AND s.rejection_category='other'
         AND s.paid_at IS NOT NULL AND s.refunded_at IS NULL
         AND NOT EXISTS (SELECT 1 FROM orders d WHERE d.submission_id=s.id AND d.status='paid'
-          AND d.refund_note=?)
+          AND d.refund_note=? AND d.dispute_status IN ('open','lost'))
       ORDER BY s.reviewed_at,s.id LIMIT ?`,
     params: [DISPUTE_DECIDES_REFUND_NOTE, limit]
   }

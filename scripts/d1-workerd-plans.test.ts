@@ -1568,8 +1568,22 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
     await expect(
       run(B.buildFlagRefundFailedPlans({ disputed: true, now: NOW, orderId: 'ord-dispute' }))
     ).rejects.toThrow()
-    await run(B.buildFlagRefundFailedPlans({ now: NOW, orderId: 'ord-dispute' }))
+    await run(B.buildFlagRefundFailedPlans({ now: NOW, orderId: 'ord-dispute', refunded: true }))
     expect(await order('ord-dispute')).toMatchObject({ attention: 'refund_failed' })
+    // On a refunded order, a dispute and a failed refund compare and swap on each other (#485): a
+    // dispute read without the flag is refused once it's set, and a flag read without an open
+    // dispute is refused once one is recorded.
+    await db
+      .prepare(`UPDATE orders SET dispute_status=NULL,disputed_at=NULL WHERE id='ord-dispute'`)
+      .run()
+    await expect(
+      run(B.buildRecordDisputePlans({ now: NOW, orderId: 'ord-dispute', refundFailed: false }))
+    ).rejects.toThrow()
+    await run(B.buildRecordDisputePlans({ now: NOW, orderId: 'ord-dispute', refundFailed: true }))
+    await expect(
+      run(B.buildFlagRefundFailedPlans({ now: NOW, orderId: 'ord-dispute', refunded: true }))
+    ).rejects.toThrow()
+    await run(B.buildFlagRefundFailedPlans({ disputed: true, now: NOW, orderId: 'ord-dispute' }))
     // The alerts the sweep sends again come from the events' outcomes.
     const event = {
       eventId: 'evt_dispute',

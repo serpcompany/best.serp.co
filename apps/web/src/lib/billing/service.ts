@@ -33,7 +33,8 @@ import {
   buildRecordUnappliedPaymentPlans,
   buildRefundSubmissionPlans,
   buildRelistListingToPaidPlans,
-  buildUpgradeListingToPaidPlans
+  buildUpgradeListingToPaidPlans,
+  DISPUTE_DECIDES_REFUND_NOTE
 } from '@/db/submission-plans'
 import type { PaymentAlertKind } from '../email/emails/admin'
 import type { AppEmailTemplates } from '../email/registry'
@@ -590,7 +591,8 @@ async function actOnEvent(deps: BillingDependencies, event: BillingEvent): Promi
  * no payment recorded, as a checkout's reference is (`orderForCheckout`). A refund of all of it
  * records the payment first, at the amount the event reports, so the refund is then recorded as on
  * any paid order and nothing applies the payment later; a partial one is recorded on the order as
- * it stands. Null for anything else: a dispute names no order (the provider's carries none).
+ * it stands. A dispute names no order (the provider's carries none), so one that opened, or
+ * closed lost, has its checkout asked of the provider (`orderForDispute`). Null for anything else.
  */
 async function orderForPayment(
   deps: BillingDependencies,
@@ -599,7 +601,15 @@ async function orderForPayment(
 ): Promise<OrderRecord | null> {
   const provider = deps.provider.name
   const recorded = await deps.operations.orderByPayment(provider, payment.paymentId)
-  if (recorded || type !== 'payment_refunded' || !payment.orderId) return recorded
+  if (recorded) return recorded
+  // A won dispute's payment stands: its checkout's own report records and applies it.
+  if (
+    type === 'payment_disputed' ||
+    (type === 'dispute_closed' && payment.disputeOutcome === 'lost')
+  ) {
+    return orderForDispute(deps, payment.paymentId)
+  }
+  if (type !== 'payment_refunded' || !payment.orderId) return null
   const named = await deps.operations.order(payment.orderId)
   if (!named || named.providerPaymentId !== null) return null
   if (payment.partial) return named
@@ -616,6 +626,26 @@ async function orderForPayment(
   log('billing_order_paid', { order: named.id, reportedBy: 'refund' })
   // Recorded now, or a moment ago by the checkout's own report: by this payment either way.
   return deps.operations.orderByPayment(provider, payment.paymentId)
+}
+
+/**
+ * The order of a dispute reported before the site recorded its payment (#484): the provider's
+ * checkout that took the payment names it, as a checkout event does (`orderForCheckout`). The
+ * payment is recorded on it first, as that checkout's own report would (`markPaid`), so the
+ * dispute is then recorded as on any paid order, and fulfilment never applies the payment (it
+ * refuses a disputed one). Null when no checkout of this site's took the payment. A provider that
+ * can't answer throws, so the delivery answers 500 and the provider's retry asks again.
+ */
+async function orderForDispute(
+  deps: BillingDependencies,
+  paymentId: string
+): Promise<OrderRecord | null> {
+  const checkout = await deps.provider.checkoutForPayment(paymentId)
+  if (!checkout || checkout.paymentId !== paymentId || checkout.state !== 'paid') return null
+  const order = await orderForCheckout(deps, checkout)
+  if (!order || (await markPaid(deps, order, checkout))) return null
+  // Recorded now, or a moment ago by the checkout's own report: by this payment either way.
+  return deps.operations.orderByPayment(deps.provider.name, paymentId)
 }
 
 async function actOnCheckout(
@@ -1517,10 +1547,12 @@ export async function refundOrder(
     return CHANGED
   }
   if (decision.kind === 'rejection') {
-    await refundRejectedSubmission(deps, {
+    const refunded = await refundRejectedSubmission(deps, {
       actor: input.actor,
       submissionId: decision.submissionId
     })
+    // A dispute opened since the check above: nothing was refunded, and the dispute decides.
+    if (refunded === 'disputed') return DISPUTED
     return { listing: 'unchanged', ok: true, replayed: false }
   }
   const claimed = await claimRefund(deps, order, {
@@ -1552,6 +1584,7 @@ export async function refundOrder(
 const PAYMENT_ALERTS: Readonly<Record<string, PaymentAlertKind>> = {
   disputed: 'disputed',
   disputed_lost: 'disputed',
+  dispute_won_refund: 'dispute_won_refund',
   partially_refunded: 'partially_refunded',
   refund_failed: 'refund_failed',
   refunded_at_provider: 'refunded'
@@ -1603,16 +1636,18 @@ interface Takedown {
  * rides on its payment (a refund decided its listing already): those take nothing down (`none`).
  * A dispute also takes it down while the site's own refund hasn't returned the money (still
  * `refunding`: in flight, retrying, or flagged `refund_failed`; a dispute usually makes that refund
- * fail), but never a `refunded` order's when the dispute arrives, whatever its flag says: that
- * refund decided its listing, and a `refund.failed` reported before the dispute is the admin's to
- * decide, from its alert. A `refund.failed` reported after the dispute (`refundFailed`, #484)
- * takes it down then: the money never went back and the buyer disputes it. A listing already
- * down, by that refund's rejection or listing change say, stays as it is (`already_unpublished`).
+ * fail), and on a `refunded` order whose refund failed (`refundFailed`, #484), whether its
+ * `refund.failed` arrived before the dispute (flagged when the dispute arrives) or after it (the
+ * lead's decision on #485): the money never went back and the buyer disputes it. A refund that
+ * succeeded (`refunded`, not flagged) decided its listing, so a dispute on it takes nothing down.
+ * A listing already down, by that refund's rejection or listing change say, stays as it is
+ * (`already_unpublished`).
  */
 async function takedownPlans(
   deps: BillingDependencies,
   order: OrderRecord,
   reason: 'disputed' | 'refunded',
+  /** A `refunded` order's refund failed: flagged `refund_failed`, or being flagged now. */
   refundFailed = false
 ): Promise<Takedown> {
   const none: Takedown = { listingAction: 'none', plans: [], submission: null }
@@ -1726,11 +1761,14 @@ async function recordPaymentChange(
     // The site's own refund: its finish records it.
     if (change === 'refunded' && current.status !== 'paid') return `already_${current.status}`
     const now = nowIso(deps)
-    const takedown = await takedownPlans(deps, current, change)
+    // A refund that failed before the dispute arrived (#485's lead decision); the dispute's
+    // record compares and swaps on the flag, so a `refund.failed` racing it is never missed.
+    const refundFailed = current.attention === 'refund_failed'
+    const takedown = await takedownPlans(deps, current, change, refundFailed)
     const submission = takedown.submission
     const plans =
       change === 'disputed'
-        ? buildRecordDisputePlans({ now, orderId: current.id })
+        ? buildRecordDisputePlans({ now, orderId: current.id, refundFailed })
         : [
             ...(submission &&
             REFUNDABLE_AT_PROVIDER.has(submission.status) &&
@@ -1805,7 +1843,10 @@ async function finishRefundAtProvider(
  * A dispute's outcome: the listing stays down until an admin republishes it. A lost dispute
  * whose opening was never recorded (it opened before the events were ticked, or its report is
  * still to come) is recorded as opened first, with its takedown and the admin's alert: the money
- * went back to the buyer. A won one is recorded only.
+ * went back to the buyer. A won one is recorded only, unless a rejection asked no refund while it
+ * was open (`DISPUTE_DECIDES_REFUND_NOTE`, #483): the payment is the site's again, so the sweep
+ * now refunds it, as the Terms promise for a rejection (`selectRefundPendingSubmissionsPlan`),
+ * and the admin is told.
  */
 async function closeDispute(
   deps: BillingDependencies,
@@ -1818,7 +1859,17 @@ async function closeDispute(
     buildCloseDisputePlans({ now: nowIso(deps), orderId: order.id, outcome })
   )
   log('billing_dispute_closed', { order: order.id, outcome })
-  return unrecorded ? 'disputed_lost' : `dispute_${outcome}`
+  if (unrecorded) return 'disputed_lost'
+  const current = outcome === 'won' ? await deps.operations.order(order.id) : null
+  if (
+    current?.disputeStatus === 'won' &&
+    current.status === 'paid' &&
+    current.refundNote === DISPUTE_DECIDES_REFUND_NOTE
+  ) {
+    await alertAdmin(deps, current, 'dispute_won_refund')
+    return 'dispute_won_refund'
+  }
+  return `dispute_${outcome}`
 }
 
 /**
@@ -1851,7 +1902,9 @@ async function alertPartialRefund(
  * site made is flagged `refund_failed` (the sweep stops retrying it); the admin is told either
  * way. On a `refunded` order whose dispute is open or lost (it arrived while the refund looked
  * done), the listing comes down now, by the dispute's rules (`takedownPlans`, #484), in the same
- * batch; three lost writes throw, so the provider's retry runs it again.
+ * batch; one with no such dispute is flagged only if none was recorded meanwhile, so the
+ * dispute's own takedown reads the flag. Three lost writes throw, so the provider's retry runs it
+ * again.
  */
 async function flagRefundFailed(deps: BillingDependencies, order: OrderRecord): Promise<string> {
   for (let attempt = 0; attempt < PUBLICATION_ATTEMPTS; attempt += 1) {
@@ -1861,7 +1914,12 @@ async function flagRefundFailed(deps: BillingDependencies, order: OrderRecord): 
     const takedown = disputed ? await takedownPlans(deps, current, 'disputed', true) : null
     const flagged = await deps.operations.apply([
       ...(takedown?.plans ?? []),
-      ...buildFlagRefundFailedPlans({ disputed, now: nowIso(deps), orderId: current.id })
+      ...buildFlagRefundFailedPlans({
+        disputed,
+        now: nowIso(deps),
+        orderId: current.id,
+        refunded: current.status === 'refunded'
+      })
     ])
     if (flagged) {
       logWarning('billing_refund_failed_at_provider', {

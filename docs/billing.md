@@ -164,7 +164,8 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
 - **Rejection refund.** Rejecting a paid submission as `other` refunds its order through the admin
   panel's `AdminRefunds` hook and sends `submission-rejected-refunded`; `prohibited` never
   refunds. The hook runs after the rejection, on every replay, and from the sweep. A disputed
-  payment is not refunded: the dispute decides (#483, [details](./billing-disputes.md#disputes)).
+  payment is not refunded while its dispute is open or lost (#483,
+  [details](./billing-disputes.md#disputes)).
 - **Refund from Orders.** `/admin/orders/` (#70 screen 13) lists orders. "Refund…" first asks
   `POST /api/admin/orders/<id>/refund-preview`, which decides the refund and, for a live paid
   listing, runs `checkBadgeAtRefund` once (#66), so the dialog shows 13c (keeps a passing badge)

@@ -22,6 +22,7 @@ function submission(id: string, overrides: Partial<AccountSubmission> = {}): Acc
     logoUrl: `https://${id}.example/logo.png`,
     name: id,
     paidAt: null,
+    paymentLoss: null,
     plan: 'free',
     refundedAt: null,
     rejection: null,
@@ -108,6 +109,47 @@ describe('account rows', () => {
       next: { text: 'Draft expired after 30 days' },
       tab: 'closed'
     })
+  })
+
+  it('shows a paid submission whose payment was disputed or refunded as free and unpublished (#484)', () => {
+    const paid = (id: string, overrides: Partial<AccountSubmission>) =>
+      submission(id, {
+        listing: { live: true, slug: `${id}.example` },
+        paidAt: '2026-10-05T10:00:00.000Z',
+        plan: 'paid',
+        status: 'paid_pending_review',
+        ...overrides
+      })
+    const table = rows({
+      listings: [],
+      submissions: [
+        paid('kept', {}),
+        paid('disputed', {
+          listing: { live: false, slug: 'disputed.example' },
+          paymentLoss: 'disputed'
+        }),
+        paid('refunded', {
+          listing: { live: false, slug: 'refunded.example' },
+          paymentLoss: 'refunded'
+        })
+      ]
+    })
+    const by = Object.fromEntries(table.map(row => [row.id, row]))
+    expect(by.kept).toMatchObject({
+      next: { text: 'Live; a reviewer still signs off' },
+      plan: 'paid',
+      status: 'live_paid',
+      tab: 'live'
+    })
+    for (const loss of ['disputed', 'refunded'] as const) {
+      expect(by[loss]).toMatchObject({
+        next: { text: `Unpublished: payment ${loss}`, tone: 'warning' },
+        plan: 'free',
+        status: 'in_review',
+        tab: 'review'
+      })
+    }
+    expect(accountCards(table).live).toEqual({ count: 1, names: ['kept'], paid: 1 })
   })
 
   it('offers Withdraw only before payment, and "Message us" once paid', () => {

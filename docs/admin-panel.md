@@ -146,8 +146,9 @@ nothing. The contract:
   `{ok: true, refundPending: true}`, and the refund stays pending for the next replay or sweep.
 - A payment whose dispute is open or lost is not refunded (the provider refuses, #483): the hook
   records on the order that the dispute decides the refund, which takes the row off the pending
-  list, sends the plain `submission-rejected`, and the decision answers
-  `{ok: true, refundPending: false, refunded: false}`.
+  list while the dispute is open or lost, sends the plain `submission-rejected`, and the decision
+  answers `{ok: true, refundPending: false, refunded: false}`. Once the dispute is won, the sweep
+  refunds it and the admin is emailed (#485).
 
 ## Tags, the taxonomy, and category suggestions
 

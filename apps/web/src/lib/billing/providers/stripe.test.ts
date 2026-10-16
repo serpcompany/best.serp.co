@@ -186,6 +186,48 @@ describe('Stripe provider', () => {
     await expect(stripe.getCheckout('../v1/customers')).rejects.toBeInstanceOf(BillingProviderError)
   })
 
+  it('finds the checkout that took a payment, for a dispute that names no order (#484)', async () => {
+    const session = {
+      amount_total: 4900,
+      client_reference_id: 'order-1',
+      currency: 'usd',
+      id: 'cs_test_1',
+      livemode: false,
+      payment_intent: 'pi_1',
+      payment_status: 'paid',
+      status: 'complete'
+    }
+    const { calls, fetcher } = recorder([
+      { body: { data: [session], object: 'list' } },
+      { body: { data: [], object: 'list' } },
+      { body: { data: [{ ...session, livemode: true }], object: 'list' } }
+    ])
+    const stripe = createStripeProvider({
+      fetcher,
+      live: false,
+      prices: PRICES,
+      secretKey: 'sk_test_x',
+      webhookSecret: SECRET
+    })
+    await expect(stripe.checkoutForPayment('pi_1')).resolves.toMatchObject({
+      checkoutId: 'cs_test_1',
+      orderId: 'order-1',
+      paymentId: 'pi_1',
+      state: 'paid'
+    })
+    // The Checkout Sessions read `getCheckout` makes, filtered by the PaymentIntent.
+    expect(calls[0]).toMatchObject({
+      method: 'GET',
+      url: 'https://api.stripe.com/v1/checkout/sessions?limit=1&payment_intent=pi_1'
+    })
+    await expect(stripe.checkoutForPayment('pi_2')).resolves.toBeNull()
+    // Another mode's session is never this Worker's.
+    await expect(stripe.checkoutForPayment('pi_1')).resolves.toBeNull()
+    // Anything but a PaymentIntent id is never sent.
+    await expect(stripe.checkoutForPayment('../v1/customers')).resolves.toBeNull()
+    expect(calls).toHaveLength(3)
+  })
+
   it('reads a promotion code’s discount, and a 100%-off checkout as paid with no payment', () => {
     expect(
       stripeCheckoutState({
@@ -425,7 +467,13 @@ describe('provider secrets in URLs (#469)', () => {
       },
       { body: { client_secret: clientSecret, id: 'cs_test_469', livemode: false, status: 'open' } },
       { body: { id: 'cs_test_469', status: 'expired' } },
-      { body: { id: 're_469', status: 'succeeded' } }
+      { body: { id: 're_469', status: 'succeeded' } },
+      {
+        body: {
+          data: [{ client_secret: clientSecret, id: 'cs_test_469', livemode: false }],
+          object: 'list'
+        }
+      }
     ])
     const stripe = createStripeProvider({
       fetcher,
@@ -455,6 +503,7 @@ describe('provider secrets in URLs (#469)', () => {
       orderId: 'order-1',
       paymentId: 'pi_469'
     })
+    await stripe.checkoutForPayment('pi_469')
     const form = new URLSearchParams(calls[0]?.body ?? '')
     // The return URLs go to the provider exactly as the site built them, with nothing added.
     expect(form.get('success_url')).toBe(request.successUrl)
@@ -469,7 +518,7 @@ describe('provider secrets in URLs (#469)', () => {
       stripe.dashboardUrl('pi_469') ?? '',
       stripe.dashboardUrl('cs_test_469') ?? ''
     ]
-    expect(calls).toHaveLength(4)
+    expect(calls).toHaveLength(5)
     for (const url of urls) {
       expect(providerSecretsIn(url, [...KNOWN, clientSecret, signature]), url).toEqual([])
     }

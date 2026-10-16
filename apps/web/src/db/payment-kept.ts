@@ -14,6 +14,11 @@ export function toPaymentLoss(value: unknown): PaymentLoss | null {
   return value === 'refunded' || value === 'disputed' ? value : null
 }
 
+/** Whether a paid plan still reads "Paid" (the plan badges, #484): its payment is kept. */
+export function paidPlanKept(paid: boolean, loss: PaymentLoss | null): boolean {
+  return paid && loss === null
+}
+
 /** Why order `o`'s payment is no longer kept: `refunded`, `disputed`, or NULL while kept. */
 export const orderPaymentLossSql = (order: string) => `(CASE WHEN ${order}.status='refunded'
     THEN 'refunded' WHEN ${order}.dispute_status IN ('open','lost') THEN 'disputed' END)`

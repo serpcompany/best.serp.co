@@ -134,6 +134,12 @@ export interface BillingProvider {
    */
   expireCheckout(checkoutId: string): Promise<boolean>
   getCheckout(checkoutId: string): Promise<CheckoutState>
+  /**
+   * The checkout that took a payment, by the payment's reference, or null when none did (a charge
+   * made outside checkout). It finds the order of a dispute reported before the site recorded its
+   * payment, which names no order itself (#484).
+   */
+  checkoutForPayment(paymentId: string): Promise<CheckoutState | null>
   /** The provider's refund id, or null when the payment had already been refunded. */
   refund(request: RefundRequest): Promise<{ refundId: string | null }>
   /**

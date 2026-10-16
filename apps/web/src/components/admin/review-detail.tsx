@@ -60,6 +60,7 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { paidPlanKept } from '@/db/payment-kept'
 import {
   ageWords,
   formatDateTime,
@@ -770,7 +771,8 @@ export function ReviewDetail({
         chips={
           <>
             <StatusBadge kind={chips.kind} label={chips.label} />
-            <PlanBadge paid={view.paid} />
+            {/* A payment refunded, or disputed and not won, reads as free, as in the queue. */}
+            <PlanBadge paid={paidPlanKept(view.paid, view.paymentLoss)} />
             {isSubmission && !view.paid && view.badge?.verifiedAt ? (
               <StatusBadge kind="pass" label="Badge pass" />
             ) : null}

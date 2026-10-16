@@ -462,23 +462,31 @@ export function buildRecordProviderRefundPlans(input: {
 /**
  * A provider refund that failed after it was accepted (#473): the money never went back, so the
  * order is flagged `refund_failed` for an admin, and the sweep stops retrying a claimed one.
- * Changes nothing on an order the site never refunded. `disputed`: sent with the takedown of a
- * refunded order's listing under an open or lost dispute (#484), so it compares and swaps on
- * that state and refuses the batch once the order moved on.
+ * Changes nothing on an order the site never refunded. On a `refunded` order (`refunded`) it
+ * compares and swaps on the dispute it read (#484): `disputed` (open or lost) is sent with the
+ * takedown of its listing, and a flag without one asserts no such dispute was recorded meanwhile,
+ * so a dispute and a failed refund that race always meet (one of them takes the listing down).
+ * Either refuses the batch once the order moved on.
  */
 export function buildFlagRefundFailedPlans(input: {
   disputed?: boolean
   now: string
   orderId: string
+  refunded?: boolean
 }): StatementPlan[] {
-  if (input.disputed) {
+  if (input.disputed || input.refunded) {
+    const dispute = input.disputed
+      ? `dispute_status IN ('open','lost')`
+      : `COALESCE(dispute_status,'') NOT IN ('open','lost')`
     return [
       {
         sql: `UPDATE orders SET attention='refund_failed',updated_at=?
-          WHERE id=? AND status='refunded' AND dispute_status IN ('open','lost')`,
+          WHERE id=? AND status='refunded' AND ${dispute}`,
         params: [input.now, input.orderId]
       },
-      assertPreviousStatementChangedOne('order_refund_failed_disputed')
+      assertPreviousStatementChangedOne(
+        input.disputed ? 'order_refund_failed_disputed' : 'order_refund_failed_undisputed'
+      )
     ]
   }
   return [
@@ -532,13 +540,27 @@ export function buildRecordDisputedRejectionPlans(input: {
 /**
  * A dispute the buyer opened (#473), recorded once: a dispute already recorded (this one again,
  * or one that closed before its opening arrived) is refused, so it takes the listing down once.
+ * `refundFailed`: whether a `refunded` order's refund was read as failed (flagged `refund_failed`),
+ * which decides its takedown (#484); the batch is refused once that flag changed.
  */
-export function buildRecordDisputePlans(input: { now: string; orderId: string }): StatementPlan[] {
+export function buildRecordDisputePlans(input: {
+  now: string
+  orderId: string
+  refundFailed?: boolean
+}): StatementPlan[] {
+  const unguarded = input.refundFailed === undefined
   return [
     {
       sql: `UPDATE orders SET dispute_status='open',disputed_at=?,updated_at=?
-        WHERE id=? AND dispute_status IS NULL AND status IN ('paid','refunding','refunded')`,
-      params: [input.now, input.now, input.orderId]
+        WHERE id=? AND dispute_status IS NULL AND status IN ('paid','refunding','refunded')${
+          unguarded ? '' : ` AND (status<>'refunded' OR (attention IS 'refund_failed')=?)`
+        }`,
+      params: [
+        input.now,
+        input.now,
+        input.orderId,
+        ...(unguarded ? [] : [input.refundFailed ? 1 : 0])
+      ]
     },
     assertPreviousStatementChangedOne('order_disputed')
   ]

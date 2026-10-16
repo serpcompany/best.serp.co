@@ -194,8 +194,9 @@ const PAYMENT_EVENTS: Readonly<
  *
  * A charge carries a copy of its PaymentIntent's metadata, so its `order_id` (set at checkout)
  * names the order, and its amount and running refund total come with it (#484). A dispute carries
- * neither. `request.idempotency_key` is the key of the API request that made the change: the
- * site's own refund's `refund:<order>`.
+ * neither: the service finds its checkout by the PaymentIntent when it needs to
+ * (`checkoutForPayment`). `request.idempotency_key` is the key of the API request that made the
+ * change: the site's own refund's `refund:<order>`.
  */
 function stripePaymentChange(
   type: (typeof PAYMENT_EVENTS)[string]['type'],
@@ -329,6 +330,19 @@ export function createStripeProvider(config: StripeConfig): BillingProvider {
         throw new BillingProviderError('The session is from the other mode.', 'mode_mismatch', 409)
       }
       return stripeCheckoutState(session)
+    },
+
+    async checkoutForPayment(paymentId) {
+      if (!/^pi_[A-Za-z0-9_]+$/u.test(paymentId)) return null
+      // The same Checkout Sessions read `getCheckout` makes, filtered by the PaymentIntent.
+      const list = await call(
+        'GET',
+        `/v1/checkout/sessions?${form({ limit: 1, payment_intent: paymentId })}`
+      )
+      const session = Array.isArray(list.data) ? (list.data[0] as StripeObject | undefined) : null
+      if (!session || session.livemode !== config.live) return null
+      const checkout = stripeCheckoutState(session)
+      return checkout.paymentId === paymentId ? checkout : null
     },
 
     dashboardUrl(reference) {

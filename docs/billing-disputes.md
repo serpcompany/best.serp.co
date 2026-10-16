@@ -18,8 +18,12 @@ A refund of a payment the site hasn't recorded yet (before the checkout's own re
 return or the sweep) finds its order by the `order_id` the checkout put on the PaymentIntent,
 which the charge carries a copy of, but only an order with no payment recorded (#484): a full
 refund records the payment, at the charge's amount, then the refund, so nothing applies the
-payment later. A dispute carries no such copy, so one reported before its payment is recorded
-stays `unknown_order`; its close is recorded once the payment is.
+payment later. A dispute carries no such copy, so one that opens, or closes lost, before its
+payment is recorded asks Stripe for the Checkout Session that took the PaymentIntent
+(`GET /v1/checkout/sessions?payment_intent=`, the read access `getCheckout` already uses) and
+records the payment on that session's order, then the dispute: fulfilment never applies it (#484).
+A charge no checkout of the site's took stays `unknown_order`, as does a dispute closed `won`
+first, whose payment stands and is applied by its checkout's own report.
 
 ## Takedown
 
@@ -27,17 +31,21 @@ A dispute that opens (`dispute_status` `open`), or a full refund made in Stripe'
 (`refunded`, an admin's refund by `provider`), takes down the listing the payment made or kept
 live (a paid submission's, an upgrade's, a relist's) in the same batch, even in review (owner
 decision on #156), and emails the admin. A dispute does too while the site's own refund is still
-`refunding` (flagged `refund_failed` or not), never once it is `refunded`, unless that refund's
-`refund.failed` arrives after the dispute, which takes the listing down then (#484); one the
-refund took down stays down. A paid claim's listing comes down too (owner, #473, 2026-10-16)
-while its payer still owns it by that payment (after an admin's revoke or transfer: record and
-email only), owner kept for an admin to decide; one refunded in /admin stays up unless a dispute
-opens while its refund is still `refunding` (flagged or not). A held payment has none live.
+`refunding` (flagged `refund_failed` or not), and on a `refunded` order whose refund failed,
+whether its `refund.failed` arrives before the dispute or after it (#484, the lead's decision on
+#485): the money never went back. A refund that succeeded (`refunded`, not flagged) decided its
+listing, so a dispute on it takes nothing down; one the refund took down stays down. The dispute
+and the flag compare and swap on each other, so neither order of arrival is missed. A paid
+claim's listing comes down too (owner, #473, 2026-10-16) while its payer still owns it by that
+payment (after an admin's revoke or transfer: record and email only), owner kept for an admin to
+decide, by the same rules. A held payment has none live.
 
 Neither returns as paid: by one rule (`db/payment-kept.ts`: the paying order, a claim's latest,
-refunded or disputed and not won), /admin (the listing page, the review queue's plan) and the
-account read it free, the review queue shows "Refunded" or "Disputed", Approve answers 409, and
-the weekly badge check takes a live one in. The refund also records an approved or held
+refunded or disputed and not won), /admin (the listing page, the plan badge in the review queue
+and on the review page) and the account read it free, the review queue shows "Refunded" or
+"Disputed", Approve answers 409, and the weekly badge check takes a live one in. An account row
+taken down in review says "Unpublished: payment disputed" (or refunded), and a resubmission's
+review email says "Paid. Payment disputed", never a badge check. The refund also records an approved or held
 submission refunded (`at_provider`; `paid_pending_review` can't hold `refunded_at`, a CHECK).
 Fulfilment never applies a disputed payment (the apply refuses one disputed meanwhile).
 
@@ -49,9 +57,12 @@ lost (Stripe refuses): admin Orders offers no "Refund…" and the refund routes 
 
 Rejecting such a submission as `other` makes no refund call either (#483). The order records that
 the dispute decides the refund (`refund_note`), the owner gets the plain `submission-rejected`,
-the sweep stops retrying it, the reject dialog says so, and admin Orders shows "Disputed ·
-rejected: the dispute decides the refund". After a won dispute, an admin's "Refund…" refunds it
-with the rejection's email.
+the sweep stops retrying it while the dispute is open or lost, the reject dialog says so, and
+admin Orders shows "Disputed · rejected: the dispute decides the refund". Once the dispute is won,
+the payment is the site's again, so the sweep refunds it with the rejection's email, as the Terms
+promise for a rejection; the admin is emailed ("Dispute won, refunding the rejection") and Orders
+shows "Dispute won · rejected: refund pending" until then (#485). An admin's "Refund…" of a
+rejection that a dispute opens on mid-refund answers 409 `disputed` and refunds nothing.
 
 ## Refunds
 
