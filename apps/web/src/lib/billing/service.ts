@@ -1525,7 +1525,10 @@ interface Takedown {
  * ownership stays as it is for an admin to decide. A payment nothing
  * applied, or one held for review, has no listing live; and a refunded order's listing no longer
  * rides on its payment (a refund decided its listing already): those take nothing down (`none`).
- * A listing already down stays as it is (`already_unpublished`).
+ * A dispute also takes it down while the site's own refund hasn't returned the money (still
+ * `refunding`, or flagged `refund_failed`; a dispute usually makes that refund fail). A listing
+ * already down, by that refund's rejection or listing change say, stays as it is
+ * (`already_unpublished`).
  */
 async function takedownPlans(
   deps: BillingDependencies,
@@ -1533,9 +1536,10 @@ async function takedownPlans(
   reason: 'disputed' | 'refunded'
 ): Promise<Takedown> {
   const none: Takedown = { listingAction: 'none', plans: [], submission: null }
-  if (order.status !== 'paid' || order.appliedAt === null || order.outcome === 'unapplied') {
-    return none
-  }
+  const kept =
+    order.status === 'paid' ||
+    (reason === 'disputed' && (order.status === 'refunding' || order.attention === 'refund_failed'))
+  if (!kept || order.appliedAt === null || order.outcome === 'unapplied') return none
   if (order.purpose === 'claim') {
     // The listing whose ownership this payment bought, while the payer still owns it through it:
     // after an admin's revoke or transfer (a stolen card, say) it belongs to someone else, so

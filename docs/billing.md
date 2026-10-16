@@ -134,10 +134,10 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
   (`dispute_status` `open`), or a full refund made in Stripe's dashboard (`refunded`, an admin's
   refund by `provider`), takes down the listing the payment made or kept live (a paid submission's,
   an upgrade's, a relist's) in the same batch, even in review (owner decision on #156), and emails
-  the admin (`admin-payment-alert`). A paid claim's listing comes down too (owner decision on #473,
-  2026-10-16) while its payer still owns it through that payment (after an admin's revoke or
-  transfer: the record and email only); the owner stays until an admin decides. A claim refunded in
-  /admin (the site's own refund) stays up; one refunded or disputed in Stripe comes down. A held
+  the admin (`admin-payment-alert`); a dispute does too while the site's refund is `refunding` or
+  `refund_failed` (one it took down stays down). A paid claim's listing comes down too (owner, #473,
+  2026-10-16) while its payer still owns it by that payment (after an admin's revoke or transfer:
+  record and email only), owner kept for an admin to decide; one refunded in /admin stays up. A held
   payment has none live. Neither returns as paid: by one rule (`db/payment-kept.ts`: the paying
   order, a claim's latest, refunded or disputed and not won), /admin and the account read it free,
   the review queue shows "Refunded" or "Disputed", Approve answers 409, and the weekly badge check

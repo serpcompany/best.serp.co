@@ -1459,6 +1459,31 @@ describe('refunds', () => {
     )
   })
 
+  it('leaves a rejected listing down when a dispute opens while its refund is pending (#473)', async () => {
+    const f = fixture()
+    await paidLive(f)
+    await rejectLiveAsOther(f)
+    f.failNextRefund.value = true
+    await expect(
+      refundRejectedSubmission(f.deps, { actor: 'devin@serp.co', submissionId: 's1' })
+    ).rejects.toThrow('provider down')
+    const version = f.row('SELECT version FROM publication_state')
+    const payment = f.row<{ id: string }>('SELECT provider_payment_id AS id FROM orders').id
+    await webhook(f, paymentEvent('payment_disputed', payment))
+    expect(f.row('SELECT status, dispute_status FROM orders')).toEqual({
+      dispute_status: 'open',
+      status: 'refunding'
+    })
+    // The rejection took it down: nothing more is published.
+    expect(f.row('SELECT version FROM publication_state')).toEqual(version)
+    expect(
+      f.row(`SELECT outcome FROM billing_events WHERE event_id LIKE 'evt_payment_d%'`)
+    ).toEqual({ outcome: 'disputed' })
+    expect(f.emails.filter(email => email.template === 'admin-payment-alert')).toEqual([
+      expect.objectContaining({ input: expect.objectContaining({ kind: 'disputed' }) })
+    ])
+  })
+
   it('closes a 100%-off order rejected as other without a provider refund (#250)', async () => {
     const f = fixture()
     f.submission('s1', 'draft', null)
@@ -2213,6 +2238,87 @@ describe('refunds and disputes made outside the site (#473)', () => {
       })
     ])
   })
+
+  it('takes a paid listing down when a dispute opens while the site’s refund runs', async () => {
+    const f = fixture({ badge: 'pass' })
+    const order = await publishedOrder(f)
+    f.db.exec(`UPDATE listing_submissions SET status='approved' WHERE id='s1'`)
+    // The admin's refund (keep it live as free) is claimed; the dispute arrives before it lands.
+    const refund = f.provider.refund
+    let during: unknown
+    f.provider.refund = async request => {
+      await webhook(f, paymentEvent('payment_disputed', order.payment))
+      during = {
+        live: liveOf(f, order.listing),
+        ...f.row('SELECT status, dispute_status FROM orders')
+      }
+      return refund(request)
+    }
+    await expect(
+      refundOrder(f.deps, { actor: 'devin@serp.co', orderId: order.id })
+    ).resolves.toEqual({ listing: 'unchanged', ok: true, replayed: false })
+    expect(during).toEqual({ dispute_status: 'open', live: 0, status: 'refunding' })
+    expect(f.row(`SELECT detail FROM listing_events WHERE event_type='unpublished'`)).toEqual({
+      detail: expect.stringContaining('"reason":"disputed"')
+    })
+    expect(f.emails.filter(email => email.template === 'admin-payment-alert')).toEqual([
+      expect.objectContaining({
+        eventKey: `payment-alert:disputed:${order.id}`,
+        input: { kind: 'disputed', listingLive: false, orderNumber: 1001, productName: 'Name s1' }
+      })
+    ])
+    // The refund then finds it down and records it as it is.
+    expect(f.row('SELECT status FROM orders')).toEqual({ status: 'refunded' })
+    expect(liveOf(f, order.listing)).toBe(0)
+  })
+
+  it('takes a claim’s listing down when a dispute opens while its failed refund is pending', async () => {
+    const f = fixture()
+    claimedListing(f)
+    f.failNextRefund.value = true
+    await expect(
+      refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+    ).rejects.toThrow('provider down')
+    await webhook(f, paymentEvent('payment_disputed', 'pi_claim'))
+    expect(f.row('SELECT status, dispute_status FROM orders')).toEqual({
+      dispute_status: 'open',
+      status: 'refunding'
+    })
+    expect(liveOf(f, 'lst_claimed')).toBe(0)
+    expect(claimOwner(f)).toMatchObject({ revoked_at: null, user_id: 'user_maya' })
+    expect(f.emails.filter(email => email.template === 'admin-payment-alert')).toEqual([
+      expect.objectContaining({
+        eventKey: 'payment-alert:disputed:ord_claim',
+        input: { kind: 'disputed', listingLive: false, orderNumber: 1001, productName: 'Claimed' }
+      })
+    ])
+  })
+
+  it.each([
+    [false, 1],
+    [true, 0]
+  ])(
+    'takes a refunded claim’s listing down on a dispute only if its refund failed (%s)',
+    async (failed, live) => {
+      const f = fixture()
+      claimedListing(f)
+      await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+      if (failed) await webhook(f, paymentEvent('payment_refund_failed', 'pi_claim'))
+      await webhook(f, paymentEvent('payment_disputed', 'pi_claim'))
+      expect(f.row('SELECT status, attention, dispute_status FROM orders')).toEqual({
+        attention: failed ? 'refund_failed' : null,
+        dispute_status: 'open',
+        status: 'refunded'
+      })
+      expect(liveOf(f, 'lst_claimed')).toBe(live)
+      expect(f.emails.map(email => email.input)).toContainEqual({
+        kind: 'disputed',
+        listingLive: live === 1,
+        orderNumber: 1001,
+        productName: 'Claimed'
+      })
+    }
+  )
 
   it('never applies a disputed payment that nothing applied yet', async () => {
     const f = fixture()
