@@ -15,6 +15,7 @@ import { executePlans } from '@/db/plan-runner'
 import { prepareCatalogPublication } from '@/db/plan-support'
 import { buildRejectSubmissionPlans } from '@/db/submission-plans'
 import { insertPublishedListing, SqliteD1 } from '@/db/test-support'
+import { planLabel } from '../admin/listing-labels'
 import { checkBadgeAtRefund } from '../badge-program/refund'
 import { features, type SiteFeatures } from '../features'
 import { CONFIRM_AGAIN_HASH, SHORTEST_CHECKOUT_MS } from './checkout-window'
@@ -1710,6 +1711,44 @@ function insertPaidOrder(
 const liveOf = (f: Fixture, listingId: string) =>
   f.row<{ is_active: number }>(`SELECT is_active FROM listings WHERE id='${listingId}'`).is_active
 
+/** A live listing a paid claim made `user_maya`'s (`ord_claim`, paid by `pi_claim`), no submission. */
+function claimedListing(f: Fixture) {
+  insertPublishedListing(f.db, {
+    categoryIds: [1],
+    content: 'Content',
+    description: 'Description',
+    displayOrder: 0,
+    id: 'lst_claimed',
+    isFeatured: false,
+    name: 'Claimed',
+    publishedAt: '2026-05-16',
+    slug: 'claimed.example',
+    website: 'https://claimed.example/'
+  })
+  f.db.exec(`INSERT INTO listing_owners (listing_id, user_id, verified_via, verified_at)
+    VALUES ('lst_claimed', 'user_maya', 'paid_claim', '2026-10-06T09:00:00.000Z')`)
+  insertPaidOrder(f, {
+    claimId: 'claim_a',
+    id: 'ord_claim',
+    listingId: 'lst_claimed',
+    outcome: 'claimed',
+    paymentId: 'pi_claim'
+  })
+}
+
+const claimOwner = (f: Fixture) =>
+  f.row(
+    `SELECT user_id, verified_via, revoked_at FROM listing_owners WHERE listing_id='lst_claimed'`
+  )
+
+/** The claimed listing's plan as /admin reads it, and its plan column. */
+function claimPlan(f: Fixture): { label: string; plan: string } {
+  const [query] = selectAdminListingPlans('claimed.example')
+  if (!query) throw new Error('no admin listing plan')
+  const plan = f.db.prepare(query.sql).get(...(query.params as string[]))?.plan as 'free' | 'paid'
+  return { label: planLabel({ ownerVerifiedVia: 'paid_claim', plan }), plan }
+}
+
 /**
  * The listing's plan as /admin reads it once the submission is approved and its listing live
  * (republished, or published by the approval of a held one): `paid` or `free`.
@@ -1951,22 +1990,129 @@ describe('refunds and disputes made outside the site (#473)', () => {
     ])
   })
 
-  it('records a claim’s dispute and leaves the claimed listing up', async () => {
+  it('takes a disputed claim’s listing down, keeps its owner, and reads it free until won', async () => {
     const f = fixture()
-    f.listing('a', 'free')
-    insertPaidOrder(f, {
-      claimId: 'claim_a',
-      id: 'ord_claim',
-      listingId: 'lst_a',
-      outcome: 'claimed',
-      paymentId: 'pi_claim'
-    })
+    claimedListing(f)
     await webhook(f, paymentEvent('payment_disputed', 'pi_claim'))
-    expect(f.row('SELECT dispute_status FROM orders')).toEqual({ dispute_status: 'open' })
-    expect(liveOf(f, 'lst_a')).toBe(1)
+    expect(f.row('SELECT status, dispute_status FROM orders')).toEqual({
+      dispute_status: 'open',
+      status: 'paid'
+    })
+    expect(liveOf(f, 'lst_claimed')).toBe(0)
+    expect(f.row(`SELECT detail FROM listing_events WHERE event_type='unpublished'`)).toEqual({
+      detail: expect.stringContaining('"reason":"disputed"')
+    })
+    expect(claimOwner(f)).toEqual({
+      revoked_at: null,
+      user_id: 'user_maya',
+      verified_via: 'paid_claim'
+    })
+    expect(claimPlan(f)).toEqual({ label: 'Free', plan: 'free' })
     expect(f.emails).toEqual([
       expect.objectContaining({
-        input: { kind: 'disputed', listingLive: true, orderNumber: 1001, productName: 'Listing a' }
+        eventKey: 'payment-alert:disputed:ord_claim',
+        input: { kind: 'disputed', listingLive: false, orderNumber: 1001, productName: 'Claimed' }
+      })
+    ])
+    // Won: recorded only. The listing stays down for an admin to republish; the claim is paid again.
+    f.emails.length = 0
+    await webhook(f, paymentEvent('dispute_closed', 'pi_claim', { disputeOutcome: 'won' }))
+    expect(f.row('SELECT dispute_status FROM orders')).toEqual({ dispute_status: 'won' })
+    expect(liveOf(f, 'lst_claimed')).toBe(0)
+    expect(f.emails).toEqual([])
+    expect(claimPlan(f)).toEqual({ label: 'Paid claim', plan: 'paid' })
+  })
+
+  it('takes down a claim’s listing on a lost dispute whose opening never arrived', async () => {
+    const f = fixture()
+    claimedListing(f)
+    await webhook(f, paymentEvent('dispute_closed', 'pi_claim', { disputeOutcome: 'lost' }))
+    expect(f.row('SELECT dispute_status FROM orders')).toEqual({ dispute_status: 'lost' })
+    expect(liveOf(f, 'lst_claimed')).toBe(0)
+    expect(claimOwner(f)).toMatchObject({ revoked_at: null, user_id: 'user_maya' })
+    expect(claimPlan(f)).toEqual({ label: 'Free', plan: 'free' })
+    expect(f.emails).toEqual([
+      expect.objectContaining({
+        input: expect.objectContaining({ kind: 'disputed', listingLive: false })
+      })
+    ])
+    expect(f.row(`SELECT outcome FROM billing_events WHERE event_id LIKE 'evt_dispute%'`)).toEqual({
+      outcome: 'disputed_lost'
+    })
+  })
+
+  it('takes down a claim’s listing refunded outside the site and keeps its owner', async () => {
+    const f = fixture()
+    claimedListing(f)
+    await webhook(f, paymentEvent('payment_refunded', 'pi_claim'))
+    expect(
+      f.row('SELECT status, outcome, refund_reason, refunded_by, refund_listing_action FROM orders')
+    ).toEqual({
+      outcome: 'claimed',
+      refund_listing_action: 'unpublish',
+      refund_reason: 'admin',
+      refunded_by: 'provider',
+      status: 'refunded'
+    })
+    expect(liveOf(f, 'lst_claimed')).toBe(0)
+    expect(f.row(`SELECT detail FROM listing_events WHERE event_type='unpublished'`)).toEqual({
+      detail: expect.stringContaining('"reason":"refunded"')
+    })
+    expect(claimOwner(f)).toEqual({
+      revoked_at: null,
+      user_id: 'user_maya',
+      verified_via: 'paid_claim'
+    })
+    expect(claimPlan(f)).toEqual({ label: 'Free', plan: 'free' })
+    expect(f.emails).toEqual([
+      expect.objectContaining({
+        input: { kind: 'refunded', listingLive: false, orderNumber: 1001, productName: 'Claimed' }
+      })
+    ])
+    expect(f.refunds).toEqual([])
+  })
+
+  it('leaves the site’s own claim refund as it was: the listing stays up', async () => {
+    const f = fixture()
+    claimedListing(f)
+    await expect(
+      refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+    ).resolves.toEqual({ listing: 'unchanged', ok: true, replayed: false })
+    await webhook(f, paymentEvent('payment_refunded', 'pi_claim'))
+    expect(f.row('SELECT status, refunded_by, refund_listing_action FROM orders')).toEqual({
+      refund_listing_action: 'none',
+      refunded_by: 'devin@serp.co',
+      status: 'refunded'
+    })
+    expect(f.row(`SELECT outcome FROM billing_events WHERE event_id LIKE 'evt_payment%'`)).toEqual({
+      outcome: 'already_refunded'
+    })
+    expect(liveOf(f, 'lst_claimed')).toBe(1)
+    expect(claimOwner(f)).toMatchObject({ revoked_at: null, user_id: 'user_maya' })
+    expect(claimPlan(f)).toEqual({ label: 'Free', plan: 'free' })
+    expect(f.emails.filter(email => email.template === 'admin-payment-alert')).toEqual([])
+  })
+
+  it('finishes the site’s failed claim refund made in the dashboard as the admin decided it', async () => {
+    const f = fixture()
+    claimedListing(f)
+    f.failNextRefund.value = true
+    await expect(
+      refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+    ).rejects.toThrow('provider down')
+    await webhook(f, paymentEvent('payment_refunded', 'pi_claim'))
+    // The admin's refund of a claim keeps the listing (the order alone), and so does its finish.
+    expect(f.row('SELECT status, refunded_by, refund_listing_action FROM orders')).toEqual({
+      refund_listing_action: 'none',
+      refunded_by: 'devin@serp.co',
+      status: 'refunded'
+    })
+    expect(liveOf(f, 'lst_claimed')).toBe(1)
+    expect(claimOwner(f)).toMatchObject({ revoked_at: null, user_id: 'user_maya' })
+    expect(claimPlan(f)).toEqual({ label: 'Free', plan: 'free' })
+    expect(f.emails.filter(email => email.template === 'admin-payment-alert')).toEqual([
+      expect.objectContaining({
+        input: { kind: 'refunded', listingLive: true, orderNumber: 1001, productName: 'Claimed' }
       })
     ])
   })

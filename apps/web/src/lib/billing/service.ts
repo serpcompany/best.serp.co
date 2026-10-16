@@ -1519,11 +1519,12 @@ interface Takedown {
 
 /**
  * The plans that take down the listing an order's payment made or kept live (a paid
- * submission's, an upgrade's, or a relist's), even while its submission is in review. A claim's
- * payment bought the listing's ownership, not its place on the site; a payment nothing applied,
- * or one held for review, has no listing live; and a refunded order's listing no longer rides on
- * its payment (a refund decided its listing already): those take nothing down (`none`). A
- * listing already down stays as it is (`already_unpublished`).
+ * submission's, an upgrade's, or a relist's), even while its submission is in review, or the
+ * listing whose ownership a paid claim's payment bought: a claim's comes down too (the owner's
+ * decision on #473, 2026-10-16), and its ownership stays as it is for an admin to decide. A payment nothing
+ * applied, or one held for review, has no listing live; and a refunded order's listing no longer
+ * rides on its payment (a refund decided its listing already): those take nothing down (`none`).
+ * A listing already down stays as it is (`already_unpublished`).
  */
 async function takedownPlans(
   deps: BillingDependencies,
@@ -1531,31 +1532,51 @@ async function takedownPlans(
   reason: 'disputed' | 'refunded'
 ): Promise<Takedown> {
   const none: Takedown = { listingAction: 'none', plans: [], submission: null }
-  if (
-    order.status !== 'paid' ||
-    order.purpose === 'claim' ||
-    order.appliedAt === null ||
-    order.outcome === 'unapplied' ||
-    !order.submissionId
-  ) {
+  if (order.status !== 'paid' || order.appliedAt === null || order.outcome === 'unapplied') {
     return none
   }
+  if (order.purpose === 'claim') {
+    const slug = (await deps.operations.adminOrder(order.id))?.listingSlug
+    return order.listingId && slug
+      ? unpublishTakedown(deps, { listingId: order.listingId, reason, slug, submission: null })
+      : none
+  }
+  if (!order.submissionId) return none
   const submission = await deps.operations.checkoutSubmission(order.submissionId)
   if (!submission?.listingId) return { ...none, submission }
-  if (!(await deps.operations.listingLive(submission.listingId))) {
+  return unpublishTakedown(deps, {
+    listingId: submission.listingId,
+    reason,
+    slug: submission.slug,
+    submission
+  })
+}
+
+/** Unpublishes a live listing, through the /admin unpublish path, even while in review. */
+async function unpublishTakedown(
+  deps: BillingDependencies,
+  input: {
+    listingId: string
+    reason: 'disputed' | 'refunded'
+    slug: string
+    submission: CheckoutSubmission | null
+  }
+): Promise<Takedown> {
+  const { listingId, reason, submission } = input
+  if (!(await deps.operations.listingLive(listingId))) {
     return { listingAction: 'already_unpublished', plans: [], submission }
   }
   const now = nowIso(deps)
   return {
     listingAction: 'unpublish',
     plans: buildUnpublishListingPlans({
-      listingId: submission.listingId,
+      listingId,
       publication: await publicationFor(deps, {
         action: reason === 'disputed' ? 'dispute-unpublish' : 'provider-refund-unpublish',
         actor: BILLING_ACTOR,
-        entityId: submission.listingId,
+        entityId: listingId,
         now,
-        slug: submission.slug
+        slug: input.slug
       }),
       reason,
       whileInReview: true

@@ -45,13 +45,18 @@ const revisionStatusesByView: Record<ReviewQueueView, string> = {
 }
 
 /**
- * Whether a listing is on the paid plan: a paid claim, or a paid, unrefunded submission whose
- * payment stands. The order that paid it (applied to it: a submission is paid once) must not be
- * refunded, which a refund made at the provider records there for a submission in review, nor
- * disputed (open, or lost; a won dispute leaves it paid, #473).
+ * Whether a listing is on the paid plan: a paid claim, or a paid, unrefunded submission, whose
+ * payment stands. The order that paid it (applied to it: a submission is paid once; a claim's
+ * is its owner's latest claim payment) must not be refunded, which a refund made at the provider
+ * records there for a submission in review, nor disputed (open, or lost; a won dispute leaves it
+ * paid, #473); a paid claim's owner stays the owner until an admin decides.
  */
 const listingPaidSql = (listingIdSql: string) => `CASE WHEN EXISTS (SELECT 1 FROM listing_owners po
-    WHERE po.listing_id=${listingIdSql} AND po.revoked_at IS NULL AND po.verified_via='paid_claim')
+    WHERE po.listing_id=${listingIdSql} AND po.revoked_at IS NULL AND po.verified_via='paid_claim'
+    AND NOT EXISTS (SELECT 1 FROM orders pc WHERE pc.id=(SELECT lc.id FROM orders lc
+        WHERE lc.purpose='claim' AND lc.listing_id=po.listing_id AND lc.user_id=po.user_id
+          AND lc.outcome='claimed' ORDER BY lc.applied_at DESC,lc.id DESC LIMIT 1)
+      AND (pc.status='refunded' OR pc.dispute_status IN ('open','lost'))))
   OR EXISTS (SELECT 1 FROM listing_submissions ps WHERE ps.listing_id=${listingIdSql}
     AND ps.plan='paid' AND ps.paid_at IS NOT NULL AND ps.refunded_at IS NULL
     AND ps.status IN ('paid_pending_review','approved')
