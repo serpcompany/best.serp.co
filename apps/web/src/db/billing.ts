@@ -501,8 +501,10 @@ export function buildFlagRefundFailedPlans(input: {
 /**
  * Clears a `refunded` order's `refund_failed` flag once a later refund of the whole payment
  * succeeded at the provider (refunded again in its dashboard, #485): the money went back, so a
- * dispute no longer takes its listing down. Compared and swapped on the flag, so it changes
- * nothing once the order moved on.
+ * dispute no longer takes its listing down. It blanks the recorded refund too: the order no
+ * longer knows which refund sent the money back, so any later failure (that dashboard refund's
+ * own) flags it again. Compared and swapped on the flag, so it changes nothing once the order
+ * moved on.
  */
 export function buildClearRefundFailedPlans(input: {
   now: string
@@ -510,7 +512,7 @@ export function buildClearRefundFailedPlans(input: {
 }): StatementPlan[] {
   return [
     {
-      sql: `UPDATE orders SET attention=NULL,updated_at=?
+      sql: `UPDATE orders SET attention=NULL,provider_refund_id=NULL,updated_at=?
         WHERE id=? AND status='refunded' AND attention='refund_failed'`,
       params: [input.now, input.orderId]
     }

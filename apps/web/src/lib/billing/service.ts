@@ -1742,8 +1742,9 @@ async function recordPaymentChange(
     if (!current) return 'unknown_order'
     // A later refund of the whole payment succeeded after one that failed (refunded again in the
     // provider's dashboard, #485): the money went back, so the flag no longer decides a dispute's
-    // takedown. The site's own refund's report (its request key) is the refund that failed,
-    // delivered late, so it clears nothing.
+    // takedown. The clear blanks the recorded refund, so that refund's own failure flags again.
+    // The site's own refund's report (its request key) is the refund that failed, delivered late,
+    // so it clears nothing.
     if (
       change === 'refunded' &&
       current.status === 'refunded' &&
@@ -1920,8 +1921,9 @@ async function alertPartialRefund(
  * done), the listing comes down now, by the dispute's rules (`takedownPlans`, #484), in the same
  * batch; one with no such dispute is flagged only if none was recorded meanwhile, so the
  * dispute's own takedown reads the flag. A failure of a refund other than the one the order
- * recorded (`provider_refund_id`) flags nothing. Three lost writes throw, so the provider's retry
- * runs it again.
+ * records (`provider_refund_id`) flags nothing; one with no recorded refund (blanked when a refund
+ * outside the site cleared the flag) always flags. Three lost writes throw, so the provider's
+ * retry runs it again.
  */
 async function flagRefundFailed(
   deps: BillingDependencies,

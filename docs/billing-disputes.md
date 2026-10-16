@@ -72,8 +72,10 @@ outside the site: $…"), and emails the admin (#484). `refund.failed` flags the
 `refund_failed` and emails the admin; a refund that then succeeds clears it: the site's retry,
 or a full refund in Stripe's dashboard of an order already `refunded` (#485). The site's own
 refund's `charge.refunded` (its `refund:<order>` key) is the refund that failed, delivered late,
-and clears nothing. A `refund.failed` for a refund other than the one the order recorded
-(`provider_refund_id`: an earlier one, reported after the site's retry succeeded) flags nothing.
+and clears nothing. A `refund.failed` for a refund other than the one the order records
+(`provider_refund_id`: an earlier one, reported after the site's retry succeeded) flags nothing,
+but only while the order still records the site's refund: the dashboard refund's clear blanks it,
+so that refund's own failure flags the order again and a later dispute takes the listing down.
 
 The site's own refund's `charge.refunded` finds the order `refunded`, or `refunding` while that
 refund may still run (claimed under ten minutes ago, never failed), and changes nothing. After it

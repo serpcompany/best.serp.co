@@ -2417,8 +2417,11 @@ describe('refunds and disputes made outside the site (#473)', () => {
         f,
         paymentEvent('payment_refunded', 'pi_claim', { id: 'evt_refunded_again', requestKey })
       )
-      expect(f.row('SELECT status, attention, refunded_by FROM orders')).toEqual({
+      expect(
+        f.row('SELECT status, attention, refunded_by, provider_refund_id FROM orders')
+      ).toEqual({
         attention: clears ? null : 'refund_failed',
+        provider_refund_id: clears ? null : 're_1',
         refunded_by: 'devin@serp.co',
         status: 'refunded'
       })
@@ -2440,6 +2443,55 @@ describe('refunds and disputes made outside the site (#473)', () => {
       })
     }
   )
+
+  // The refund in Stripe's dashboard that cleared the flag can fail too (#485 round 3): a retry to
+  // the payment method that refused the site's refund often does. The clear forgot the site's
+  // refund, so that failure flags the order again and a later dispute takes the listing down.
+  it('flags a refunded claim again when the refund in Stripe that cleared its flag fails', async () => {
+    const f = fixture()
+    claimedListing(f)
+    await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+    await webhook(f, paymentEvent('payment_refund_failed', 'pi_claim', { refundId: 're_1' }))
+    await webhook(
+      f,
+      paymentEvent('payment_refunded', 'pi_claim', {
+        id: 'evt_refunded_again',
+        requestKey: 'dashboard-request'
+      })
+    )
+    expect(f.row('SELECT attention, provider_refund_id FROM orders')).toEqual({
+      attention: null,
+      provider_refund_id: null
+    })
+    await webhook(
+      f,
+      paymentEvent('payment_refund_failed', 'pi_claim', {
+        id: 'evt_dashboard_refund_failed',
+        refundId: 're_2'
+      })
+    )
+    expect(f.row('SELECT status, attention FROM orders')).toEqual({
+      attention: 'refund_failed',
+      status: 'refunded'
+    })
+    expect(
+      f.row(`SELECT outcome FROM billing_events WHERE event_id='evt_dashboard_refund_failed'`)
+    ).toEqual({ outcome: 'refund_failed' })
+    expect(liveOf(f, 'lst_claimed')).toBe(1)
+    await webhook(f, paymentEvent('payment_disputed', 'pi_claim'))
+    expect(f.row('SELECT attention, dispute_status FROM orders')).toEqual({
+      attention: 'refund_failed',
+      dispute_status: 'open'
+    })
+    expect(liveOf(f, 'lst_claimed')).toBe(0)
+    expect(claimOwner(f)).toMatchObject({ revoked_at: null, user_id: 'user_maya' })
+    expect(f.emails.map(email => email.input)).toContainEqual({
+      kind: 'disputed',
+      listingLive: false,
+      orderNumber: 1001,
+      productName: 'Claimed'
+    })
+  })
 
   // A failed refund's report names its refund (#485 round 2): an earlier refund's failure,
   // reported after the order's own refund succeeded, flags nothing; the order's own refund's does.
