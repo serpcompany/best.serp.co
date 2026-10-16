@@ -65,12 +65,30 @@ export interface CheckoutState {
  * buyer opened with their bank, and its outcome.
  */
 export interface PaymentChange {
+  /**
+   * What the payment charged and in which currency, when the event carries it (a refund's), so a
+   * payment the site hasn't recorded yet can be (#484).
+   */
+  amountCents?: number | null
+  currency?: string | null
   /** A closed dispute: the payment stands (`won`), or the money went back to the buyer (`lost`). */
   disputeOutcome: 'lost' | 'won' | null
+  /**
+   * The order the payment names (the order id the checkout put on it), when the event carries
+   * it: it finds a payment the site hasn't recorded yet (#484).
+   */
+  orderId?: string | null
   /** A refund of only part of the payment. */
   partial: boolean
   /** The provider's payment reference, as the order recorded it (`orders.provider_payment_id`). */
   paymentId: string
+  /** How much of the payment is refunded so far, in all (a refund's). */
+  refundedCents?: number | null
+  /**
+   * The idempotency key of the request that made the change, when the provider reports it: the
+   * site's own refund carries its `refund:<order>` (#484).
+   */
+  requestKey?: string | null
 }
 
 /**

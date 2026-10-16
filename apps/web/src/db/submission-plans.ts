@@ -1162,18 +1162,30 @@ export function buildLiftSubmissionUrlBlockPlans(input: {
 }
 
 /**
+ * `orders.refund_note` on a paid order whose submission's `other` rejection made no refund
+ * because the payment is disputed (#483, `buildRecordDisputedRejectionPlans` in `billing.ts`):
+ * the provider refuses a refund then, and the dispute decides the money.
+ */
+export const DISPUTE_DECIDES_REFUND_NOTE =
+  'Rejected while disputed: the dispute decides the refund.'
+
+/**
  * Paid submissions rejected as `other` whose refund isn't recorded yet, oldest rejection first
  * (#64 review). The rejection batch is the refund-pending marker: it sets `status='rejected'`
  * and `rejection_category='other'` on a row with `paid_at` set and `refunded_at` null, and
  * `buildRefundSubmissionPlans` (`after_rejection`) clears it by recording `refunded_at`. A
- * replayed rejection and #68's refund sweep retry the rows this returns.
+ * replayed rejection and #68's refund sweep retry the rows this returns. One whose order records
+ * that the dispute decides the refund (`DISPUTE_DECIDES_REFUND_NOTE`, #483) isn't retried: after
+ * a won dispute, an admin's "Refund…" refunds it.
  */
 export function selectRefundPendingSubmissionsPlan(limit: number): StatementPlan {
   return {
-    sql: `SELECT id,slug,paid_at,reviewed_at FROM listing_submissions
-      WHERE status='rejected' AND rejection_category='other'
-        AND paid_at IS NOT NULL AND refunded_at IS NULL
-      ORDER BY reviewed_at,id LIMIT ?`,
-    params: [limit]
+    sql: `SELECT s.id,s.slug,s.paid_at,s.reviewed_at FROM listing_submissions s
+      WHERE s.status='rejected' AND s.rejection_category='other'
+        AND s.paid_at IS NOT NULL AND s.refunded_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM orders d WHERE d.submission_id=s.id AND d.status='paid'
+          AND d.refund_note=?)
+      ORDER BY s.reviewed_at,s.id LIMIT ?`,
+    params: [DISPUTE_DECIDES_REFUND_NOTE, limit]
   }
 }

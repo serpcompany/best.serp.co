@@ -95,10 +95,15 @@ export type AdminNotify = <K extends keyof AppEmailTemplates & string>(
  * on every replay of it, and from #68's sweep. It must be idempotent (a provider idempotency
  * key such as `refund:<submissionId>`), record the refund with `buildRefundSubmissionPlans`
  * (`after_rejection`), and send `submission-rejected-refunded`. When it throws, the
- * rejection stands and the refund stays pending.
+ * rejection stands and the refund stays pending. It answers `disputed` when the payment's
+ * dispute is open or lost (#483): nothing is refunded, the order records that the dispute
+ * decides the money, and the refund is no longer pending.
  */
 export interface AdminRefunds {
-  refundRejectedSubmission(input: { actor: string; submissionId: string }): Promise<void>
+  refundRejectedSubmission(input: {
+    actor: string
+    submissionId: string
+  }): Promise<'disputed' | 'refunded'>
 }
 
 /** What a refund from Orders did to the order's listing (#70 screen 13). */
@@ -379,8 +384,12 @@ async function afterRejection(
     if (review.refundedAt !== null) return { refundPending: false, refunded: true }
     if (!context.refunds) return { refundPending: true, refunded: false }
     try {
-      await context.refunds.refundRejectedSubmission({ actor: context.actor, submissionId })
-      return { refundPending: false, refunded: true }
+      const refund = await context.refunds.refundRejectedSubmission({
+        actor: context.actor,
+        submissionId
+      })
+      // Disputed (#483): nothing refunded, and nothing pending; the dispute decides the money.
+      return { refundPending: false, refunded: refund === 'refunded' }
     } catch (error) {
       log(context, 'refund_rejected_submission', submissionId, 'refund_pending')
       console.error(JSON.stringify({ event: 'admin_refund_failed', ...errorFields(error) }))

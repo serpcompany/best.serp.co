@@ -1502,11 +1502,27 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
     await expect(
       run(B.buildRecordDisputePlans({ now: NOW, orderId: 'ord-dispute' }))
     ).rejects.toThrow()
+    // A rejection asks no refund while the dispute is open (#483), and partial refunds outside
+    // the site are totalled, never lowered by a late report (#484).
+    await run(B.buildRecordDisputedRejectionPlans({ now: NOW, orderId: 'ord-dispute' }))
+    await run(
+      B.buildRecordPartialRefundPlans({ now: NOW, orderId: 'ord-dispute', refundedCents: 1500 })
+    )
+    await run(
+      B.buildRecordPartialRefundPlans({ now: NOW, orderId: 'ord-dispute', refundedCents: 1000 })
+    )
+    expect(await order('ord-dispute')).toMatchObject({
+      partial_refund_cents: 1500,
+      refund_note: S.DISPUTE_DECIDES_REFUND_NOTE
+    })
     expect(await all(B.selectRecentlyAppliedOrdersPlan(window))).not.toEqual(
       expect.arrayContaining([expect.objectContaining({ id: 'ord-dispute' })])
     )
     await run(B.buildCloseDisputePlans({ now: NOW, orderId: 'ord-dispute', outcome: 'won' }))
     expect(await loss()).toBeNull()
+    await expect(
+      run(B.buildRecordDisputedRejectionPlans({ now: NOW, orderId: 'ord-dispute' }))
+    ).rejects.toThrow()
     expect(await order('ord-dispute')).toMatchObject({
       dispute_status: 'won',
       disputed_at: NOW,
@@ -1547,7 +1563,11 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
       status: 'refunded'
     })
     await expect(run(refund('published'))).rejects.toThrow()
-    // A refund that failed after it was accepted is flagged.
+    // A refund that failed after it was accepted is flagged; with a takedown, only under an open
+    // or lost dispute (#484), and this one was won.
+    await expect(
+      run(B.buildFlagRefundFailedPlans({ disputed: true, now: NOW, orderId: 'ord-dispute' }))
+    ).rejects.toThrow()
     await run(B.buildFlagRefundFailedPlans({ now: NOW, orderId: 'ord-dispute' }))
     expect(await order('ord-dispute')).toMatchObject({ attention: 'refund_failed' })
     // The alerts the sweep sends again come from the events' outcomes.
@@ -1571,6 +1591,9 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
     await expect(
       db.prepare(`UPDATE orders SET disputed_at=NULL WHERE id='ord-dispute'`).run()
     ).rejects.toThrow(/orders_dispute_recorded/u)
+    await expect(
+      db.prepare(`UPDATE orders SET partial_refund_cents=0 WHERE id='ord-dispute'`).run()
+    ).rejects.toThrow(/orders_partial_refund_valid/u)
   })
 
   it('applies a publication plan on D1 and refuses a stale one with nothing written (#95 release blocker)', async () => {

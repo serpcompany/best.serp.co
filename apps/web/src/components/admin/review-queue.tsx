@@ -219,7 +219,8 @@ export function ReviewQueue({
         id: 'source'
       },
       {
-        cell: ({ row }) => <PlanBadge paid={row.original.paid} />,
+        // A payment refunded, or disputed and not won, reads as free (`payment-kept.ts`, #484).
+        cell: ({ row }) => <PlanBadge paid={row.original.paid && !row.original.paymentLoss} />,
         header: 'Plan',
         id: 'plan'
       },

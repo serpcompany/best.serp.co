@@ -155,7 +155,8 @@ function submissionRow(submission: AccountSubmission, now: Date, showPaid: boole
     logoUrl: submission.logoUrl || null,
     menu: { messageUs: submission.paidAt !== null, withdraw: isWithdrawable(submission) },
     name: submission.name,
-    plan: submission.plan,
+    // A payment refunded, or disputed and not won, shows no "Paid" (`payment-kept.ts`, #484).
+    plan: submission.paymentLoss ? 'free' : submission.plan,
     revision: null,
     slug: submission.slug,
     upgrade: null,

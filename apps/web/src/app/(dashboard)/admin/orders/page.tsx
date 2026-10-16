@@ -4,6 +4,7 @@ import { AdminCrumbs } from '@/components/admin/admin-shell'
 import { type OrderRow, OrdersManager } from '@/components/admin/orders-manager'
 import { DashboardPageHeader } from '@/components/dashboard/page-header'
 import { type AdminOrderRow, PROVIDER_ACTOR } from '@/db/billing'
+import { DISPUTE_DECIDES_REFUND_NOTE } from '@/db/submission-plans'
 import { formatUsd } from '@/lib/admin/format'
 import { getAdminOrders } from '@/lib/admin/runtime'
 import { requireAdmin } from '@/lib/auth/server'
@@ -21,10 +22,16 @@ export const metadata: Metadata = { title: 'Orders' }
 function note(order: AdminOrderRow): string | null {
   // The provider kept refusing this refund; the sweep stopped, and "Refund…" retries it.
   if (order.attention === 'refund_failed') return 'Refund failed'
-  // A dispute, and a refund made outside the site, both reported by the webhook (#473).
-  if (order.disputeStatus === 'open') return 'Disputed'
-  if (order.disputeStatus === 'won') return 'Dispute won'
-  if (order.disputeStatus === 'lost') return 'Dispute lost'
+  // A dispute, and a refund made outside the site, both reported by the webhook (#473). A
+  // rejection made no refund while the payment was disputed (#483).
+  const rejected =
+    order.status === 'paid' && order.refundNote === DISPUTE_DECIDES_REFUND_NOTE
+      ? ' · rejected: the dispute decides the refund'
+      : ''
+  if (order.disputeStatus === 'open') return `Disputed${rejected}`
+  if (order.disputeStatus === 'won')
+    return `Dispute won${rejected ? ' · rejected, not refunded' : ''}`
+  if (order.disputeStatus === 'lost') return `Dispute lost${rejected}`
   if (order.status === 'refunded') {
     if (order.refundedBy === PROVIDER_ACTOR) return 'Refunded outside the site'
     if (order.refundReason === 'rejected') return 'Auto refund on reject'
@@ -35,6 +42,10 @@ function note(order: AdminOrderRow): string | null {
     return order.failureReason === 'payment_failed' ? 'Card declined' : null
   }
   if (order.status === 'paid') {
+    // Part of it refunded outside the site (#484): the amount sent back so far.
+    if (order.partialRefundCents !== null) {
+      return `Partly refunded outside the site: ${formatUsd(order.partialRefundCents)}`
+    }
     if (order.rejectionCategory === 'prohibited') return 'Rejected: prohibited'
     if (
       order.listingLive &&

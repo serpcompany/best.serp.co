@@ -191,10 +191,16 @@ const PAYMENT_EVENTS: Readonly<
  * closed in a state that isn't an outcome. A charge is partly refunded until `refunded` says all
  * of it was; `warning_closed` is an inquiry that closed without a chargeback, so the payment
  * stands, as when a dispute is won.
+ *
+ * A charge carries a copy of its PaymentIntent's metadata, so its `order_id` (set at checkout)
+ * names the order, and its amount and running refund total come with it (#484). A dispute carries
+ * neither. `request.idempotency_key` is the key of the API request that made the change: the
+ * site's own refund's `refund:<order>`.
  */
 function stripePaymentChange(
   type: (typeof PAYMENT_EVENTS)[string]['type'],
-  object: StripeObject
+  object: StripeObject,
+  request: unknown
 ): PaymentChange | null {
   const paymentId = idOf(object.payment_intent)
   if (!paymentId) return null
@@ -204,10 +210,21 @@ function stripePaymentChange(
       status === 'lost' ? 'lost' : status === 'won' || status === 'warning_closed' ? 'won' : null
     return disputeOutcome ? { disputeOutcome, partial: false, paymentId } : null
   }
+  if (type !== 'payment_refunded') return { disputeOutcome: null, partial: false, paymentId }
+  const metadata = (object.metadata ?? {}) as Record<string, unknown>
+  const requestKey =
+    request && typeof request === 'object' && 'idempotency_key' in request
+      ? text(request.idempotency_key)
+      : null
   return {
+    amountCents: cents(object.amount),
+    currency: text(object.currency),
     disputeOutcome: null,
-    partial: type === 'payment_refunded' && object.refunded !== true,
-    paymentId
+    orderId: text(metadata.order_id),
+    partial: object.refunded !== true,
+    paymentId,
+    refundedCents: cents(object.amount_refunded),
+    requestKey
   }
 }
 
@@ -389,7 +406,7 @@ export function createStripeProvider(config: StripeConfig): BillingProvider {
           ? undefined
           : PAYMENT_EVENTS[providerType]
       if (paymentEvent && object?.object === paymentEvent.object) {
-        const payment = stripePaymentChange(paymentEvent.type, object)
+        const payment = stripePaymentChange(paymentEvent.type, object, event.request)
         if (payment) return { checkout: null, id, payment, providerType, type: paymentEvent.type }
       }
       const type = foreign ? 'ignored' : (CHECKOUT_EVENTS[providerType] ?? 'ignored')

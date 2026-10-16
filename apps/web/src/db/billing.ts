@@ -22,7 +22,7 @@ import type {
   SubmissionPlan,
   SubmissionStatus
 } from './schema'
-import { selectRefundPendingSubmissionsPlan } from './submission-plans'
+import { DISPUTE_DECIDES_REFUND_NOTE, selectRefundPendingSubmissionsPlan } from './submission-plans'
 import { selectActiveUrlBlockStatement } from './submissions'
 
 /**
@@ -57,6 +57,8 @@ export interface OrderRecord {
   number: number
   outcome: OrderOutcome | null
   paidAt: string | null
+  /** How much a partial refund outside the site sent back so far (#484). */
+  partialRefundCents: number | null
   provider: string
   providerCheckoutId: string | null
   providerPaymentId: string | null
@@ -86,7 +88,7 @@ const ORDER_COLUMNS = `o.id,o.number,o.check_problem,o.refund_note,o.user_id,o.k
   o.failure_reason,o.refund_reason,o.refunded_by,o.paid_at,o.applied_at,o.refunded_at,
   o.charged_cents,o.charged_currency,o.attention,o.refund_listing_action,o.refund_badge_check_id,
   o.refund_requested_at,o.refund_attempts,o.refund_retry_at,o.dispute_status,o.disputed_at,
-  o.created_at,o.updated_at`
+  o.partial_refund_cents,o.created_at,o.updated_at`
 
 function optional(value: unknown): string | null {
   return value === null || value === undefined ? null : String(value)
@@ -117,6 +119,10 @@ function toOrder(row: Row): OrderRecord {
     number: Number(row.number),
     outcome: optional(row.outcome) as OrderOutcome | null,
     paidAt: optional(row.paid_at),
+    partialRefundCents:
+      row.partial_refund_cents === null || row.partial_refund_cents === undefined
+        ? null
+        : Number(row.partial_refund_cents),
     provider: String(row.provider),
     providerCheckoutId: optional(row.provider_checkout_id),
     providerPaymentId: optional(row.provider_payment_id),
@@ -456,18 +462,70 @@ export function buildRecordProviderRefundPlans(input: {
 /**
  * A provider refund that failed after it was accepted (#473): the money never went back, so the
  * order is flagged `refund_failed` for an admin, and the sweep stops retrying a claimed one.
- * Changes nothing on an order the site never refunded.
+ * Changes nothing on an order the site never refunded. `disputed`: sent with the takedown of a
+ * refunded order's listing under an open or lost dispute (#484), so it compares and swaps on
+ * that state and refuses the batch once the order moved on.
  */
 export function buildFlagRefundFailedPlans(input: {
+  disputed?: boolean
   now: string
   orderId: string
 }): StatementPlan[] {
+  if (input.disputed) {
+    return [
+      {
+        sql: `UPDATE orders SET attention='refund_failed',updated_at=?
+          WHERE id=? AND status='refunded' AND dispute_status IN ('open','lost')`,
+        params: [input.now, input.orderId]
+      },
+      assertPreviousStatementChangedOne('order_refund_failed_disputed')
+    ]
+  }
   return [
     {
       sql: `UPDATE orders SET attention='refund_failed',updated_at=?
         WHERE id=? AND status IN ('refunding','refunded')`,
       params: [input.now, input.orderId]
     }
+  ]
+}
+
+/**
+ * How much of a payment a partial refund outside the site sent back so far (#484): the
+ * provider's running total, so a report that arrives late never lowers it. Only on an order not
+ * refunded in full (`refunding` or `refunded` records the whole refund instead).
+ */
+export function buildRecordPartialRefundPlans(input: {
+  now: string
+  orderId: string
+  refundedCents: number
+}): StatementPlan[] {
+  return [
+    {
+      sql: `UPDATE orders SET partial_refund_cents=MAX(COALESCE(partial_refund_cents,0),?),
+          updated_at=?
+        WHERE id=? AND status IN ('pending','failed','paid')`,
+      params: [input.refundedCents, input.now, input.orderId]
+    }
+  ]
+}
+
+/**
+ * Records on a disputed paid order (dispute `open` or `lost`) that its submission's `other`
+ * rejection made no refund (#483), compared and swapped on that state: false once the order
+ * moved on (its dispute won, or a refund recorded), and the rejection's refund decides again.
+ */
+export function buildRecordDisputedRejectionPlans(input: {
+  now: string
+  orderId: string
+}): StatementPlan[] {
+  return [
+    {
+      sql: `UPDATE orders SET refund_note=?,updated_at=?
+        WHERE id=? AND status='paid' AND dispute_status IN ('open','lost')`,
+      params: [DISPUTE_DECIDES_REFUND_NOTE, input.now, input.orderId]
+    },
+    assertPreviousStatementChangedOne('order_rejection_disputed')
   ]
 }
 

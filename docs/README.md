@@ -22,6 +22,7 @@ Each doc covers one topic. Open the one whose "read it when" matches the task.
 | [Email](./email.md) | Transactional email, environments, owner prerequisites | You send mail or change where it may go |
 | [Email templates](./email-templates.md) | Every email, its trigger, recipient, and link | You add or reword an email |
 | [Billing](./billing.md) | Paid listings: Stripe behind the billing module, orders, refunds | You touch a payment, an order, or the billing sweep |
+| [Disputes and refunds outside the site](./billing-disputes.md) | Refunds made in Stripe, failed refunds, and disputes: what the webhook records and takes down | You change how a dispute or an outside refund is handled |
 | [Submitter dashboard](./account-dashboard.md) | `/account`: statuses, edits, revisions, the badge panel | You change a `/account` screen |
 | [Accounts](./accounts.md) | Better Auth sign-in codes, admins, Cloudflare Access | You change sign-in, sessions, the dashboard shell, or the admin gate |
 | [Admin panel](./admin-panel.md) | `/admin` screens, decisions, the production-write exception | You change an `/admin` screen or a decision it writes |

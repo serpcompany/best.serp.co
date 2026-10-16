@@ -917,9 +917,12 @@ export function ReviewDetail({
                   ? liveNow
                     ? `${view.name} is live and paid (${amount}). Rejecting unpublishes it right away.`
                     : `${view.name} is paid (${amount}).`
-                  : liveNow
-                    ? `${view.name} is live. Rejecting unpublishes it right away.`
-                    : 'Free submission. No payment to refund.'}
+                  : view.paid && view.paymentLoss === 'disputed'
+                    ? // No refund while disputed (#483): the provider refuses one.
+                      `${liveNow ? `${view.name} is live. Rejecting unpublishes it right away. ` : ''}Its payment is disputed, so nothing is refunded: the dispute decides the money.`
+                    : liveNow
+                      ? `${view.name} is live. Rejecting unpublishes it right away.`
+                      : 'Free submission. No payment to refund.'}
             </DialogDescription>
           </DialogHeader>
           <FieldGroup className="gap-6">

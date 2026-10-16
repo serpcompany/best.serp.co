@@ -23,8 +23,9 @@ export async function sendResubmittedAlert(input: {
     ),
     input: {
       category: submission.categoryName ?? submission.categorySlug,
+      // A payment refunded, or disputed and not won, reads as free (`payment-kept.ts`, #484).
       plan:
-        submission.plan === 'paid'
+        submission.plan === 'paid' && submission.paymentLoss === null
           ? { kind: 'paid', live: submission.listing?.live === true }
           : { badgeVerifiedAt: submission.badgeVerifiedAt ?? new Date(), kind: 'free' },
       source: 'submission',
