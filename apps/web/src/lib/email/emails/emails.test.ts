@@ -95,6 +95,7 @@ describe('email registry', () => {
   it('registers every approved email under a stable id', () => {
     expect(Object.keys(appEmailTemplates).sort()).toEqual([
       'admin-new-message',
+      'admin-payment-alert',
       'admin-review-ready',
       'badge-missing',
       'changes-requested',
@@ -168,6 +169,7 @@ describe('submitter text is escaped', () => {
     'checkedAt',
     'code',
     'expiresInDays',
+    'kind',
     'type',
     'lastReminder',
     'paidCents',

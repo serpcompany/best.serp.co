@@ -6,7 +6,8 @@
  * the rejection or the badge check at refund.
  */
 
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createAdminReadOperations, selectAdminListingPlans } from '@/db/admin-queries'
 import { createBadgeProgramOperations } from '@/db/badge-program'
 import { createBillingOperations } from '@/db/billing'
 import { createDatabase } from '@/db/client'
@@ -14,6 +15,9 @@ import { executePlans } from '@/db/plan-runner'
 import { prepareCatalogPublication } from '@/db/plan-support'
 import { buildRejectSubmissionPlans } from '@/db/submission-plans'
 import { insertPublishedListing, SqliteD1 } from '@/db/test-support'
+import { type AdminContext, approveSubmission, republishListing } from '../admin/decisions'
+import { planLabel } from '../admin/listing-labels'
+import { submissionView } from '../admin/review-view'
 import { checkBadgeAtRefund } from '../badge-program/refund'
 import { features, type SiteFeatures } from '../features'
 import { CONFIRM_AGAIN_HASH, SHORTEST_CHECKOUT_MS } from './checkout-window'
@@ -24,11 +28,13 @@ import {
   type BillingProvider,
   BillingWebhookError,
   type CheckoutState,
+  type PaymentChange,
   type RefundRequest
 } from './provider'
 import {
   type BillingDependencies,
   confirmReturn,
+  fulfilOrder,
   handleWebhook,
   orderDiscountCents,
   previewRefund,
@@ -157,7 +163,13 @@ function fixture(options: { guardrails?: GuardrailResult; badge?: 'missing' | 'p
     fakeProvider()
   const clock = { now: NOW }
   const badgeChecks = { count: 0 }
-  const emails: Array<{ eventKey: string; input: unknown; template: string; to: string }> = []
+  const emails: Array<{
+    eventKey: string
+    input: unknown
+    recover?: true
+    template: string
+    to: string
+  }> = []
   let ids = 0
   const deps: BillingDependencies = {
     adminRecipient: 'devin@serp.co',
@@ -179,7 +191,13 @@ function fixture(options: { guardrails?: GuardrailResult; badge?: 'missing' | 'p
       return `00000000-0000-4000-8000-${String(ids).padStart(12, '0')}`
     },
     notify: async (template, request) => {
-      emails.push({ eventKey: request.eventKey, input: request.input, template, to: request.to })
+      emails.push({
+        eventKey: request.eventKey,
+        input: request.input,
+        ...(request.recover ? { recover: true as const } : {}),
+        template,
+        to: request.to
+      })
     },
     now: () => clock.now,
     operations,
@@ -1415,6 +1433,57 @@ describe('refunds', () => {
     ).toHaveLength(2)
   })
 
+  it('records a rejection’s failed refund made in the dashboard; its own refund emails the owner', async () => {
+    const f = fixture()
+    await paidLive(f)
+    await rejectLiveAsOther(f)
+    f.failNextRefund.value = true
+    await expect(
+      refundRejectedSubmission(f.deps, { actor: 'devin@serp.co', submissionId: 's1' })
+    ).rejects.toThrow('provider down')
+    const payment = f.row<{ id: string }>('SELECT provider_payment_id AS id FROM orders').id
+    await webhook(f, paymentEvent('payment_refunded', payment))
+    expect(f.row('SELECT status, refund_reason, refunded_by FROM orders')).toEqual({
+      refund_reason: 'rejected',
+      refunded_by: 'devin@serp.co',
+      status: 'refunded'
+    })
+    // The order only: the rejection's refund (the sweep's) records the submission and emails.
+    const refunded = `SELECT refunded_at IS NOT NULL AS refunded FROM listing_submissions WHERE id='s1'`
+    expect(f.row(refunded)).toEqual({ refunded: 0 })
+    await runBillingSweep(f.deps, { limit: 10 })
+    expect(f.row(refunded)).toEqual({ refunded: 1 })
+    expect(f.refunds).toEqual([])
+    expect(f.emails.map(email => email.template)).toEqual(
+      expect.arrayContaining(['admin-payment-alert', 'submission-rejected-refunded'])
+    )
+  })
+
+  it('leaves a rejected listing down when a dispute opens while its refund is pending (#473)', async () => {
+    const f = fixture()
+    await paidLive(f)
+    await rejectLiveAsOther(f)
+    f.failNextRefund.value = true
+    await expect(
+      refundRejectedSubmission(f.deps, { actor: 'devin@serp.co', submissionId: 's1' })
+    ).rejects.toThrow('provider down')
+    const version = f.row('SELECT version FROM publication_state')
+    const payment = f.row<{ id: string }>('SELECT provider_payment_id AS id FROM orders').id
+    await webhook(f, paymentEvent('payment_disputed', payment))
+    expect(f.row('SELECT status, dispute_status FROM orders')).toEqual({
+      dispute_status: 'open',
+      status: 'refunding'
+    })
+    // The rejection took it down: nothing more is published.
+    expect(f.row('SELECT version FROM publication_state')).toEqual(version)
+    expect(
+      f.row(`SELECT outcome FROM billing_events WHERE event_id LIKE 'evt_payment_d%'`)
+    ).toEqual({ outcome: 'disputed' })
+    expect(f.emails.filter(email => email.template === 'admin-payment-alert')).toEqual([
+      expect.objectContaining({ input: expect.objectContaining({ kind: 'disputed' }) })
+    ])
+  })
+
   it('closes a 100%-off order rejected as other without a provider refund (#250)', async () => {
     const f = fixture()
     f.submission('s1', 'draft', null)
@@ -1583,6 +1652,7 @@ describe('sweep', () => {
     f.db.exec(`UPDATE orders SET checkout_expires_at='2026-10-06T10:00:00.000Z'`)
     await expect(runBillingSweep(f.deps, { limit: 10 })).resolves.toEqual({
       applied: 1,
+      emails: 0,
       errors: 0,
       failed: 1,
       refunds: 0,
@@ -1591,6 +1661,1093 @@ describe('sweep', () => {
     expect(f.rows(`SELECT target_key, status, outcome FROM orders ORDER BY target_key`)).toEqual([
       { outcome: null, status: 'failed', target_key: 'submission:s1' },
       { outcome: 'published', status: 'paid', target_key: 'submission:s2' }
+    ])
+  })
+})
+
+/** A payment event (#473): a refund, a failed refund, or a dispute, of `paymentId`. */
+function paymentEvent(
+  type: 'dispute_closed' | 'payment_disputed' | 'payment_refund_failed' | 'payment_refunded',
+  paymentId: string,
+  options: { disputeOutcome?: 'lost' | 'won'; id?: string; partial?: boolean } = {}
+): string {
+  const payment: PaymentChange = {
+    disputeOutcome: options.disputeOutcome ?? null,
+    partial: options.partial ?? false,
+    paymentId
+  }
+  return JSON.stringify({
+    checkout: null,
+    id: options.id ?? `evt_${type}_${paymentId}`,
+    payment,
+    providerType: `fake.${type}`,
+    type
+  } satisfies BillingEvent)
+}
+
+/** A paid submission, published and in review (`paid_pending_review`): its order and listing. */
+async function publishedOrder(f: Fixture, submissionId = 's1') {
+  f.submission(submissionId, 'draft', null)
+  await webhook(f, paidEvent(f, await checkout(f, submissionId)))
+  f.emails.length = 0
+  return f.row<{ id: string; listing: string; payment: string }>(
+    `SELECT o.id, o.provider_payment_id AS payment, s.listing_id AS listing
+      FROM orders o JOIN listing_submissions s ON s.id=o.submission_id
+      WHERE o.submission_id='${submissionId}'`
+  )
+}
+
+/** An order inserted as paid and applied (or not): for a claim, or a payment never applied. */
+function insertPaidOrder(
+  f: Fixture,
+  input: {
+    claimId?: string
+    id: string
+    listingId?: string
+    outcome: 'claimed' | 'published' | null
+    paymentId: string
+    submissionId?: string
+  }
+) {
+  const claim = input.claimId !== undefined
+  f.db
+    .prepare(
+      `INSERT INTO orders (id, number, user_id, kind, purpose, target_key, submission_id,
+        listing_id, claim_id, amount_cents, currency, provider, provider_payment_id, charged_cents,
+        charged_currency, status, outcome, paid_at, applied_at, created_at, updated_at)
+      VALUES (?, (SELECT COALESCE(MAX(number), 1000) + 1 FROM orders), 'user_maya', ?, ?, ?, ?, ?,
+        ?, 4900, 'usd', 'fake', ?, 4900, 'usd', 'paid', ?, ?, ?, ?, ?)`
+    )
+    .run(
+      input.id,
+      claim ? 'paid_claim' : 'paid_listing',
+      claim ? 'claim' : 'submission',
+      claim ? `claim:${input.claimId}` : `submission:${input.submissionId}`,
+      input.submissionId ?? null,
+      input.listingId ?? null,
+      input.claimId ?? null,
+      input.paymentId,
+      input.outcome,
+      '2026-10-06T09:00:00.000Z',
+      input.outcome ? '2026-10-06T09:00:00.000Z' : null,
+      '2026-10-06T09:00:00.000Z',
+      '2026-10-06T09:00:00.000Z'
+    )
+}
+
+const liveOf = (f: Fixture, listingId: string) =>
+  f.row<{ is_active: number }>(`SELECT is_active FROM listings WHERE id='${listingId}'`).is_active
+
+/** A live listing a paid claim made `user_maya`'s (`ord_claim`, paid by `pi_claim`), no submission. */
+function claimedListing(f: Fixture) {
+  insertPublishedListing(f.db, {
+    categoryIds: [1],
+    content: 'Content',
+    description: 'Description',
+    displayOrder: 0,
+    id: 'lst_claimed',
+    isFeatured: false,
+    name: 'Claimed',
+    publishedAt: '2026-05-16',
+    slug: 'claimed.example',
+    website: 'https://claimed.example/'
+  })
+  f.db.exec(`INSERT INTO listing_owners (listing_id, user_id, verified_via, verified_at)
+    VALUES ('lst_claimed', 'user_maya', 'paid_claim', '2026-10-06T09:00:00.000Z')`)
+  insertPaidOrder(f, {
+    claimId: 'claim_a',
+    id: 'ord_claim',
+    listingId: 'lst_claimed',
+    outcome: 'claimed',
+    paymentId: 'pi_claim'
+  })
+}
+
+const claimOwner = (f: Fixture) =>
+  f.row(
+    `SELECT user_id, verified_via, revoked_at FROM listing_owners WHERE listing_id='lst_claimed'`
+  )
+
+/** The claimed listing's plan as /admin reads it, and its plan column. */
+function claimPlan(f: Fixture): { label: string; plan: string } {
+  const [query] = selectAdminListingPlans('claimed.example')
+  if (!query) throw new Error('no admin listing plan')
+  const plan = f.db.prepare(query.sql).get(...(query.params as string[]))?.plan as 'free' | 'paid'
+  return { label: planLabel({ ownerVerifiedVia: 'paid_claim', plan }), plan }
+}
+
+/**
+ * The listing's plan as /admin reads it once the submission is approved and its listing live
+ * (republished, or published by the approval of a held one): `paid` or `free`.
+ */
+function planOnceApproved(f: Fixture, submissionId = 's1'): string {
+  const { listing_id: listingId, slug } = f.row<{ listing_id: string | null; slug: string }>(
+    `SELECT listing_id, slug FROM listing_submissions WHERE id='${submissionId}'`
+  )
+  const id = listingId ?? `lst_${submissionId}`
+  if (!listingId) {
+    insertPublishedListing(f.db, {
+      categoryIds: [1],
+      content: 'Content',
+      description: 'Description',
+      displayOrder: 0,
+      id,
+      isFeatured: false,
+      name: `Name ${submissionId}`,
+      publishedAt: '2026-10-06',
+      slug,
+      website: `https://${slug}/`
+    })
+  }
+  f.db.exec(`
+    UPDATE listings SET is_active=1, source='submission' WHERE id='${id}';
+    UPDATE listing_submissions SET status='approved', listing_id='${id}' WHERE id='${submissionId}';
+  `)
+  const [plan] = selectAdminListingPlans(slug)
+  if (!plan) throw new Error('no admin listing plan')
+  return f.db.prepare(plan.sql).get(...(plan.params as string[]))?.plan as string
+}
+
+/** /admin as the reviewer uses it, on the fixture's database and clock. */
+function adminContext(f: Fixture): AdminContext {
+  return {
+    actor: 'devin@serp.co',
+    client: f.client,
+    eventKey: (event, ...ids) => [event, ...ids].join(':'),
+    notify: (async () => undefined) as AdminContext['notify'],
+    now: () => f.clock.now
+  }
+}
+
+/** The reviewer's Approve of a submission in the review queue, as its screen sends it. */
+async function approve(f: Fixture, submissionId = 's1') {
+  const { content_version: version } = f.row<{ content_version: number }>(
+    `SELECT content_version FROM listing_submissions WHERE id='${submissionId}'`
+  )
+  return approveSubmission(adminContext(f), { expectedContentVersion: version, submissionId })
+}
+
+/** What the review queue and the review screen show of a submission's payment. */
+async function reviewPayment(f: Fixture, submissionId = 's1') {
+  const reads = createAdminReadOperations({ client: f.client })
+  const queued = (await reads.listReviewQueue('all')).find(item => item.id === submissionId)
+  const review = await reads.getSubmissionReview(submissionId)
+  if (!queued || !review) throw new Error(`${submissionId} is not in review`)
+  const view = submissionView(review, 'https://media.example')
+  return {
+    queue: { paymentLoss: queued.paymentLoss },
+    screen: { paidAmountCents: view.paidAmountCents, paymentLoss: view.paymentLoss }
+  }
+}
+
+const REFUSED_REFUNDED = {
+  error: 'payment_refunded',
+  message: 'This payment was refunded, so it can’t be approved. Reject it instead.',
+  ok: false,
+  status: 409
+}
+const REFUSED_DISPUTED = {
+  error: 'payment_disputed',
+  message: 'This payment is disputed, so it can’t be approved unless the dispute is won.',
+  ok: false,
+  status: 409
+}
+
+describe('refunds and disputes made outside the site (#473)', () => {
+  it('takes a disputed paid listing down while in review, once, and alerts the admin', async () => {
+    const f = fixture()
+    const order = await publishedOrder(f)
+    const body = paymentEvent('payment_disputed', order.payment)
+    await expect(webhook(f, body)).resolves.toEqual({ body: { received: true }, status: 200 })
+    expect(f.row('SELECT status, dispute_status, disputed_at FROM orders')).toEqual({
+      dispute_status: 'open',
+      disputed_at: NOW.toISOString(),
+      status: 'paid'
+    })
+    expect(liveOf(f, order.listing)).toBe(0)
+    expect(f.row(`SELECT status FROM listing_submissions WHERE id='s1'`)).toEqual({
+      status: 'paid_pending_review'
+    })
+    expect(f.row(`SELECT detail FROM listing_events WHERE event_type='unpublished'`)).toEqual({
+      detail: expect.stringContaining('"reason":"disputed"')
+    })
+    expect(f.emails).toEqual([
+      {
+        eventKey: `payment-alert:disputed:${order.id}`,
+        input: { kind: 'disputed', listingLive: false, orderNumber: 1001, productName: 'Name s1' },
+        template: 'admin-payment-alert',
+        to: 'devin@serp.co'
+      }
+    ])
+    // A duplicate delivery is a replay; a second report of the same dispute changes nothing.
+    await expect(webhook(f, body)).resolves.toMatchObject({ body: { replayed: true } })
+    await webhook(f, paymentEvent('payment_disputed', order.payment, { id: 'evt_again' }))
+    expect(f.row('SELECT version FROM publication_state')).toEqual({ version: 3 })
+    expect(new Set(f.emails.map(email => email.eventKey)).size).toBe(1)
+    expect(f.rows('SELECT outcome FROM billing_events ORDER BY received_at, event_id')).toEqual(
+      expect.arrayContaining([{ outcome: 'disputed' }, { outcome: 'disputed' }])
+    )
+    // A disputed payment can't be refunded here: the provider refuses.
+    await expect(previewRefund(f.deps, { orderId: order.id })).resolves.toMatchObject({
+      error: 'disputed',
+      status: 409
+    })
+    await expect(
+      refundOrder(f.deps, { actor: 'devin@serp.co', orderId: order.id })
+    ).resolves.toMatchObject({ error: 'disputed', status: 409 })
+  })
+
+  it('records a closed dispute’s outcome only: the listing stays down', async () => {
+    const f = fixture()
+    const order = await publishedOrder(f)
+    await webhook(f, paymentEvent('payment_disputed', order.payment))
+    f.emails.length = 0
+    const closed = paymentEvent('dispute_closed', order.payment, { disputeOutcome: 'won' })
+    await webhook(f, closed)
+    await expect(webhook(f, closed)).resolves.toMatchObject({ body: { replayed: true } })
+    expect(f.row('SELECT status, dispute_status FROM orders')).toEqual({
+      dispute_status: 'won',
+      status: 'paid'
+    })
+    expect(liveOf(f, order.listing)).toBe(0)
+    expect(f.emails).toEqual([])
+    expect(f.row(`SELECT outcome FROM billing_events WHERE event_id LIKE '%closed%'`)).toEqual({
+      outcome: 'dispute_won'
+    })
+    // A won dispute can be refunded again.
+    await expect(previewRefund(f.deps, { orderId: order.id })).resolves.not.toMatchObject({
+      error: 'disputed'
+    })
+  })
+
+  it('takes down and records a paid listing refunded outside the site', async () => {
+    const f = fixture()
+    const order = await publishedOrder(f)
+    f.db.exec(`UPDATE listing_submissions SET status='approved' WHERE id='s1'`)
+    const body = paymentEvent('payment_refunded', order.payment)
+    await webhook(f, body)
+    expect(
+      f.row(
+        'SELECT status, outcome, refund_reason, refunded_by, refund_listing_action, refunded_at FROM orders'
+      )
+    ).toEqual({
+      outcome: 'published',
+      refund_listing_action: 'unpublish',
+      refund_reason: 'admin',
+      refunded_at: NOW.toISOString(),
+      refunded_by: 'provider',
+      status: 'refunded'
+    })
+    expect(liveOf(f, order.listing)).toBe(0)
+    // Recorded on the submission as an admin's refund is, so the listing reads as free.
+    expect(
+      f.row(
+        `SELECT plan, refunded_at IS NOT NULL AS refunded FROM listing_submissions WHERE id='s1'`
+      )
+    ).toEqual({ plan: 'paid', refunded: 1 })
+    expect(f.emails).toEqual([
+      expect.objectContaining({
+        input: { kind: 'refunded', listingLive: false, orderNumber: 1001, productName: 'Name s1' },
+        template: 'admin-payment-alert'
+      })
+    ])
+    expect(f.refunds).toEqual([])
+    await expect(webhook(f, body)).resolves.toMatchObject({ body: { replayed: true } })
+    expect(f.rows('SELECT outcome FROM billing_events WHERE order_id IS NOT NULL')).toEqual(
+      expect.arrayContaining([{ outcome: 'refunded_at_provider' }])
+    )
+  })
+
+  it('answers the site’s own refund as it stands while it runs', async () => {
+    const f = fixture({ badge: 'missing' })
+    const order = await publishedOrder(f)
+    f.db.exec(`UPDATE listing_submissions SET status='approved' WHERE id='s1'`)
+    // The provider reports the refund before the site's refund records it.
+    const refund = f.provider.refund
+    f.provider.refund = async request => {
+      const result = await refund(request)
+      await webhook(f, paymentEvent('payment_refunded', order.payment, { id: 'evt_refunding' }))
+      return result
+    }
+    await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: order.id })
+    await webhook(f, paymentEvent('payment_refunded', order.payment, { id: 'evt_refunded' }))
+    expect(
+      f.rows(`SELECT event_id, outcome FROM billing_events WHERE event_id LIKE 'evt_refund%'`)
+    ).toEqual(
+      expect.arrayContaining([
+        { event_id: 'evt_refunding', outcome: 'already_refunding' },
+        { event_id: 'evt_refunded', outcome: 'already_refunded' }
+      ])
+    )
+    expect(
+      f.row('SELECT refunded_by, refund_listing_action, provider_refund_id FROM orders')
+    ).toEqual({
+      provider_refund_id: 're_1',
+      refund_listing_action: 'unpublish',
+      refunded_by: 'devin@serp.co'
+    })
+    expect(f.emails.filter(email => email.template === 'admin-payment-alert')).toEqual([])
+  })
+
+  it('finishes the site’s failed refund once it is made in the dashboard, and alerts the admin', async () => {
+    const f = fixture({ badge: 'missing' })
+    const order = await publishedOrder(f)
+    f.db.exec(`UPDATE listing_submissions SET status='approved' WHERE id='s1'`)
+    // Claimed and asked of the provider, which failed: the refund is still `refunding`.
+    f.failNextRefund.value = true
+    await expect(
+      refundOrder(f.deps, { actor: 'devin@serp.co', orderId: order.id })
+    ).rejects.toThrow('provider down')
+    expect(liveOf(f, order.listing)).toBe(1)
+    await webhook(f, paymentEvent('payment_refunded', order.payment))
+    // The claimed refund, as the site's would have recorded it: its listing change, `refunded`.
+    expect(
+      f.row('SELECT status, refunded_by, refund_listing_action, provider_refund_id FROM orders')
+    ).toEqual({
+      provider_refund_id: null,
+      refund_listing_action: 'unpublish',
+      refunded_by: 'devin@serp.co',
+      status: 'refunded'
+    })
+    expect(liveOf(f, order.listing)).toBe(0)
+    expect(
+      f.row(`SELECT refunded_at IS NOT NULL AS refunded FROM listing_submissions WHERE id='s1'`)
+    ).toEqual({ refunded: 1 })
+    expect(f.emails.filter(email => email.template === 'admin-payment-alert')).toEqual([
+      expect.objectContaining({
+        input: { kind: 'refunded', listingLive: false, orderNumber: 1001, productName: 'Name s1' }
+      })
+    ])
+    expect(
+      f.row(`SELECT outcome FROM billing_events WHERE event_id LIKE 'evt_payment_refunded%'`)
+    ).toEqual({ outcome: 'refunded_at_provider' })
+    // "Refund…" again finds it refunded: nothing more is asked of the provider.
+    await expect(
+      refundOrder(f.deps, { actor: 'devin@serp.co', orderId: order.id })
+    ).resolves.toEqual({ listing: 'unpublished', ok: true, replayed: true })
+    expect(f.refunds).toEqual([])
+  })
+
+  it('alerts the admin to a partial refund without changing the order or the listing', async () => {
+    const f = fixture()
+    const order = await publishedOrder(f)
+    await webhook(f, paymentEvent('payment_refunded', order.payment, { partial: true }))
+    expect(f.row('SELECT status, refunded_at FROM orders')).toEqual({
+      refunded_at: null,
+      status: 'paid'
+    })
+    expect(liveOf(f, order.listing)).toBe(1)
+    expect(f.emails).toEqual([
+      expect.objectContaining({
+        input: expect.objectContaining({ kind: 'partially_refunded', listingLive: true })
+      })
+    ])
+  })
+
+  it('flags the site’s refund that failed at the provider and alerts the admin', async () => {
+    const f = fixture({ badge: 'missing' })
+    const order = await publishedOrder(f)
+    f.db.exec(`UPDATE listing_submissions SET status='approved' WHERE id='s1'`)
+    await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: order.id })
+    f.emails.length = 0
+    const failed = paymentEvent('payment_refund_failed', order.payment)
+    await webhook(f, failed)
+    await expect(webhook(f, failed)).resolves.toMatchObject({ body: { replayed: true } })
+    expect(f.row('SELECT status, attention FROM orders')).toEqual({
+      attention: 'refund_failed',
+      status: 'refunded'
+    })
+    expect(f.emails).toEqual([
+      expect.objectContaining({ input: expect.objectContaining({ kind: 'refund_failed' }) })
+    ])
+  })
+
+  it('takes a disputed claim’s listing down, keeps its owner, and reads it free until won', async () => {
+    const f = fixture()
+    claimedListing(f)
+    await webhook(f, paymentEvent('payment_disputed', 'pi_claim'))
+    expect(f.row('SELECT status, dispute_status FROM orders')).toEqual({
+      dispute_status: 'open',
+      status: 'paid'
+    })
+    expect(liveOf(f, 'lst_claimed')).toBe(0)
+    expect(f.row(`SELECT detail FROM listing_events WHERE event_type='unpublished'`)).toEqual({
+      detail: expect.stringContaining('"reason":"disputed"')
+    })
+    expect(claimOwner(f)).toEqual({
+      revoked_at: null,
+      user_id: 'user_maya',
+      verified_via: 'paid_claim'
+    })
+    expect(claimPlan(f)).toEqual({ label: 'Free', plan: 'free' })
+    expect(f.emails).toEqual([
+      expect.objectContaining({
+        eventKey: 'payment-alert:disputed:ord_claim',
+        input: { kind: 'disputed', listingLive: false, orderNumber: 1001, productName: 'Claimed' }
+      })
+    ])
+    // Won: recorded only. The listing stays down for an admin to republish; the claim is paid again.
+    f.emails.length = 0
+    await webhook(f, paymentEvent('dispute_closed', 'pi_claim', { disputeOutcome: 'won' }))
+    expect(f.row('SELECT dispute_status FROM orders')).toEqual({ dispute_status: 'won' })
+    expect(liveOf(f, 'lst_claimed')).toBe(0)
+    expect(f.emails).toEqual([])
+    expect(claimPlan(f)).toEqual({ label: 'Paid claim', plan: 'paid' })
+  })
+
+  it('takes down a claim’s listing on a lost dispute whose opening never arrived', async () => {
+    const f = fixture()
+    claimedListing(f)
+    await webhook(f, paymentEvent('dispute_closed', 'pi_claim', { disputeOutcome: 'lost' }))
+    expect(f.row('SELECT dispute_status FROM orders')).toEqual({ dispute_status: 'lost' })
+    expect(liveOf(f, 'lst_claimed')).toBe(0)
+    expect(claimOwner(f)).toMatchObject({ revoked_at: null, user_id: 'user_maya' })
+    expect(claimPlan(f)).toEqual({ label: 'Free', plan: 'free' })
+    expect(f.emails).toEqual([
+      expect.objectContaining({
+        input: expect.objectContaining({ kind: 'disputed', listingLive: false })
+      })
+    ])
+    expect(f.row(`SELECT outcome FROM billing_events WHERE event_id LIKE 'evt_dispute%'`)).toEqual({
+      outcome: 'disputed_lost'
+    })
+  })
+
+  it('takes down a claim’s listing refunded outside the site and keeps its owner', async () => {
+    const f = fixture()
+    claimedListing(f)
+    await webhook(f, paymentEvent('payment_refunded', 'pi_claim'))
+    expect(
+      f.row('SELECT status, outcome, refund_reason, refunded_by, refund_listing_action FROM orders')
+    ).toEqual({
+      outcome: 'claimed',
+      refund_listing_action: 'unpublish',
+      refund_reason: 'admin',
+      refunded_by: 'provider',
+      status: 'refunded'
+    })
+    expect(liveOf(f, 'lst_claimed')).toBe(0)
+    expect(f.row(`SELECT detail FROM listing_events WHERE event_type='unpublished'`)).toEqual({
+      detail: expect.stringContaining('"reason":"refunded"')
+    })
+    expect(claimOwner(f)).toEqual({
+      revoked_at: null,
+      user_id: 'user_maya',
+      verified_via: 'paid_claim'
+    })
+    expect(claimPlan(f)).toEqual({ label: 'Free', plan: 'free' })
+    expect(f.emails).toEqual([
+      expect.objectContaining({
+        input: { kind: 'refunded', listingLive: false, orderNumber: 1001, productName: 'Claimed' }
+      })
+    ])
+    expect(f.refunds).toEqual([])
+  })
+
+  it('leaves up a claimed listing an admin took from its payer before a dispute, and alerts the admin', async () => {
+    const f = fixture()
+    claimedListing(f)
+    f.db.exec(`UPDATE listing_owners SET revoked_at='2026-10-06T10:00:00.000Z',
+      revoked_reason='admin' WHERE listing_id='lst_claimed'`)
+    await webhook(f, paymentEvent('payment_disputed', 'pi_claim'))
+    expect(f.row('SELECT status, dispute_status FROM orders')).toEqual({
+      dispute_status: 'open',
+      status: 'paid'
+    })
+    expect(liveOf(f, 'lst_claimed')).toBe(1)
+    expect(f.rows(`SELECT id FROM listing_events WHERE event_type='unpublished'`)).toEqual([])
+    expect(f.emails).toEqual([
+      expect.objectContaining({
+        eventKey: 'payment-alert:disputed:ord_claim',
+        input: { kind: 'disputed', listingLive: true, orderNumber: 1001, productName: 'Claimed' }
+      })
+    ])
+  })
+
+  it('leaves up a claimed listing transferred to a new owner before a refund outside the site', async () => {
+    const f = fixture()
+    claimedListing(f)
+    f.db.exec(`
+      UPDATE listing_owners SET revoked_at='2026-10-06T10:00:00.000Z', revoked_reason='transferred'
+        WHERE listing_id='lst_claimed';
+      INSERT INTO users (id, name, email, email_verified)
+        VALUES ('user_ines', 'Ines', 'ines@example.com', 1);
+      INSERT INTO listing_owners (listing_id, user_id, verified_via, verified_at)
+        VALUES ('lst_claimed', 'user_ines', 'admin', '2026-10-06T10:00:00.000Z');
+    `)
+    await webhook(f, paymentEvent('payment_refunded', 'pi_claim'))
+    expect(f.row('SELECT status, refunded_by, refund_listing_action FROM orders')).toEqual({
+      refund_listing_action: 'none',
+      refunded_by: 'provider',
+      status: 'refunded'
+    })
+    expect(liveOf(f, 'lst_claimed')).toBe(1)
+    expect(
+      f.row(
+        `SELECT user_id FROM listing_owners WHERE listing_id='lst_claimed' AND revoked_at IS NULL`
+      )
+    ).toEqual({ user_id: 'user_ines' })
+    expect(f.emails).toEqual([
+      expect.objectContaining({
+        input: { kind: 'refunded', listingLive: true, orderNumber: 1001, productName: 'Claimed' }
+      })
+    ])
+  })
+
+  it('leaves the site’s own claim refund as it was: the listing stays up', async () => {
+    const f = fixture()
+    claimedListing(f)
+    await expect(
+      refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+    ).resolves.toEqual({ listing: 'unchanged', ok: true, replayed: false })
+    await webhook(f, paymentEvent('payment_refunded', 'pi_claim'))
+    expect(f.row('SELECT status, refunded_by, refund_listing_action FROM orders')).toEqual({
+      refund_listing_action: 'none',
+      refunded_by: 'devin@serp.co',
+      status: 'refunded'
+    })
+    expect(f.row(`SELECT outcome FROM billing_events WHERE event_id LIKE 'evt_payment%'`)).toEqual({
+      outcome: 'already_refunded'
+    })
+    expect(liveOf(f, 'lst_claimed')).toBe(1)
+    expect(claimOwner(f)).toMatchObject({ revoked_at: null, user_id: 'user_maya' })
+    expect(claimPlan(f)).toEqual({ label: 'Free', plan: 'free' })
+    expect(f.emails.filter(email => email.template === 'admin-payment-alert')).toEqual([])
+  })
+
+  it('finishes the site’s failed claim refund made in the dashboard as the admin decided it', async () => {
+    const f = fixture()
+    claimedListing(f)
+    f.failNextRefund.value = true
+    await expect(
+      refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+    ).rejects.toThrow('provider down')
+    await webhook(f, paymentEvent('payment_refunded', 'pi_claim'))
+    // The admin's refund of a claim keeps the listing (the order alone), and so does its finish.
+    expect(f.row('SELECT status, refunded_by, refund_listing_action FROM orders')).toEqual({
+      refund_listing_action: 'none',
+      refunded_by: 'devin@serp.co',
+      status: 'refunded'
+    })
+    expect(liveOf(f, 'lst_claimed')).toBe(1)
+    expect(claimOwner(f)).toMatchObject({ revoked_at: null, user_id: 'user_maya' })
+    expect(claimPlan(f)).toEqual({ label: 'Free', plan: 'free' })
+    expect(f.emails.filter(email => email.template === 'admin-payment-alert')).toEqual([
+      expect.objectContaining({
+        input: { kind: 'refunded', listingLive: true, orderNumber: 1001, productName: 'Claimed' }
+      })
+    ])
+  })
+
+  it('takes a paid listing down when a dispute opens while the site’s refund runs', async () => {
+    const f = fixture({ badge: 'pass' })
+    const order = await publishedOrder(f)
+    f.db.exec(`UPDATE listing_submissions SET status='approved' WHERE id='s1'`)
+    // The admin's refund (keep it live as free) is claimed; the dispute arrives before it lands.
+    const refund = f.provider.refund
+    let during: unknown
+    f.provider.refund = async request => {
+      await webhook(f, paymentEvent('payment_disputed', order.payment))
+      during = {
+        live: liveOf(f, order.listing),
+        ...f.row('SELECT status, dispute_status FROM orders')
+      }
+      return refund(request)
+    }
+    await expect(
+      refundOrder(f.deps, { actor: 'devin@serp.co', orderId: order.id })
+    ).resolves.toEqual({ listing: 'unchanged', ok: true, replayed: false })
+    expect(during).toEqual({ dispute_status: 'open', live: 0, status: 'refunding' })
+    expect(f.row(`SELECT detail FROM listing_events WHERE event_type='unpublished'`)).toEqual({
+      detail: expect.stringContaining('"reason":"disputed"')
+    })
+    expect(f.emails.filter(email => email.template === 'admin-payment-alert')).toEqual([
+      expect.objectContaining({
+        eventKey: `payment-alert:disputed:${order.id}`,
+        input: { kind: 'disputed', listingLive: false, orderNumber: 1001, productName: 'Name s1' }
+      })
+    ])
+    // The refund then finds it down and records it as it is.
+    expect(f.row('SELECT status FROM orders')).toEqual({ status: 'refunded' })
+    expect(liveOf(f, order.listing)).toBe(0)
+  })
+
+  it('takes a claim’s listing down when a dispute opens while its failed refund is pending', async () => {
+    const f = fixture()
+    claimedListing(f)
+    f.failNextRefund.value = true
+    await expect(
+      refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+    ).rejects.toThrow('provider down')
+    await webhook(f, paymentEvent('payment_disputed', 'pi_claim'))
+    expect(f.row('SELECT status, dispute_status FROM orders')).toEqual({
+      dispute_status: 'open',
+      status: 'refunding'
+    })
+    expect(liveOf(f, 'lst_claimed')).toBe(0)
+    expect(claimOwner(f)).toMatchObject({ revoked_at: null, user_id: 'user_maya' })
+    expect(f.emails.filter(email => email.template === 'admin-payment-alert')).toEqual([
+      expect.objectContaining({
+        eventKey: 'payment-alert:disputed:ord_claim',
+        input: { kind: 'disputed', listingLive: false, orderNumber: 1001, productName: 'Claimed' }
+      })
+    ])
+  })
+
+  it.each([false, true])(
+    'keeps a refunded claim’s listing up on a dispute, whatever its flag says (refund.failed after: %s)',
+    async failed => {
+      const f = fixture()
+      claimedListing(f)
+      await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+      if (failed) await webhook(f, paymentEvent('payment_refund_failed', 'pi_claim'))
+      await webhook(f, paymentEvent('payment_disputed', 'pi_claim'))
+      expect(f.row('SELECT status, attention, dispute_status FROM orders')).toEqual({
+        attention: failed ? 'refund_failed' : null,
+        dispute_status: 'open',
+        status: 'refunded'
+      })
+      expect(liveOf(f, 'lst_claimed')).toBe(1)
+      expect(f.emails.map(email => email.input)).toContainEqual({
+        kind: 'disputed',
+        listingLive: true,
+        orderNumber: 1001,
+        productName: 'Claimed'
+      })
+    }
+  )
+
+  it.each(['the admin’s retry', 'a refund in Stripe'])(
+    'clears a failed refund’s flag when %s succeeds, so a later dispute keeps the listing up',
+    async how => {
+      const f = fixture()
+      claimedListing(f)
+      f.failNextRefund.value = true
+      await expect(
+        refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+      ).rejects.toThrow('provider down')
+      await webhook(f, paymentEvent('payment_refund_failed', 'pi_claim'))
+      expect(f.row('SELECT status, attention FROM orders')).toEqual({
+        attention: 'refund_failed',
+        status: 'refunding'
+      })
+      if (how === 'the admin’s retry') {
+        await expect(
+          refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+        ).resolves.toMatchObject({ ok: true })
+      } else {
+        await webhook(f, paymentEvent('payment_refunded', 'pi_claim'))
+      }
+      expect(f.row('SELECT status, attention FROM orders')).toEqual({
+        attention: null,
+        status: 'refunded'
+      })
+      await webhook(f, paymentEvent('payment_disputed', 'pi_claim'))
+      expect(f.row('SELECT status, attention, dispute_status FROM orders')).toEqual({
+        attention: null,
+        dispute_status: 'open',
+        status: 'refunded'
+      })
+      expect(liveOf(f, 'lst_claimed')).toBe(1)
+      expect(claimOwner(f)).toMatchObject({ revoked_at: null, user_id: 'user_maya' })
+      expect(f.emails.map(email => email.input)).toContainEqual({
+        kind: 'disputed',
+        listingLive: true,
+        orderNumber: 1001,
+        productName: 'Claimed'
+      })
+    }
+  )
+
+  it('never applies a disputed payment that nothing applied yet', async () => {
+    const f = fixture()
+    f.submission('s1', 'draft', 'paid')
+    insertPaidOrder(f, {
+      id: 'ord_unapplied',
+      outcome: null,
+      paymentId: 'pi_x',
+      submissionId: 's1'
+    })
+    await webhook(f, paymentEvent('payment_disputed', 'pi_x'))
+    expect(f.row('SELECT dispute_status FROM orders')).toEqual({ dispute_status: 'open' })
+    await expect(runBillingSweep(f.deps, { limit: 10 })).resolves.toMatchObject({ applied: 0 })
+    await expect(
+      confirmReturn(f.deps, { orderId: 'ord_unapplied', userId: 'user_maya' })
+    ).resolves.toMatchObject({
+      appliedAt: null,
+      status: 'paid'
+    })
+    expect(f.rows('SELECT id FROM listings')).toEqual([])
+  })
+
+  it('records a held payment refunded in the dashboard, so its approval reads as free', async () => {
+    const f = fixture({
+      guardrails: { code: 'fetch_timeout', ok: false, problem: 'the connection timed out' }
+    })
+    f.submission('s1', 'draft', null)
+    await webhook(f, paidEvent(f, await checkout(f, 's1')))
+    f.emails.length = 0
+    const payment = f.row<{ id: string }>('SELECT provider_payment_id AS id FROM orders').id
+    await webhook(f, paymentEvent('payment_refunded', payment))
+    expect(f.row('SELECT status, outcome, refunded_by, refund_listing_action FROM orders')).toEqual(
+      {
+        outcome: 'held',
+        refund_listing_action: 'none',
+        refunded_by: 'provider',
+        status: 'refunded'
+      }
+    )
+    expect(
+      f.row(
+        `SELECT status, plan, refunded_at IS NOT NULL AS refunded FROM listing_submissions WHERE id='s1'`
+      )
+    ).toEqual({ plan: 'paid', refunded: 1, status: 'verified' })
+    expect(
+      f.row(`SELECT detail FROM listing_submission_events WHERE event_type='refunded'`)
+    ).toEqual({ detail: 'at_provider' })
+    expect(f.emails).toEqual([
+      expect.objectContaining({
+        input: { kind: 'refunded', listingLive: null, orderNumber: 1001, productName: 'Name s1' }
+      })
+    ])
+    // The queue and the screen show it refunded with no amount paid, and Approve refuses it.
+    expect(await reviewPayment(f)).toEqual({
+      queue: { paymentLoss: 'refunded' },
+      screen: { paidAmountCents: null, paymentLoss: 'refunded' }
+    })
+    await expect(approve(f)).resolves.toEqual(REFUSED_REFUNDED)
+    expect(f.row(`SELECT status, listing_id FROM listing_submissions WHERE id='s1'`)).toEqual({
+      listing_id: null,
+      status: 'verified'
+    })
+    expect(planOnceApproved(f)).toBe('free')
+  })
+
+  it('records a listing in review refunded in the dashboard, so it never returns as paid', async () => {
+    const f = fixture()
+    const order = await publishedOrder(f)
+    await webhook(f, paymentEvent('payment_refunded', order.payment))
+    expect(liveOf(f, order.listing)).toBe(0)
+    expect(f.row('SELECT refund_listing_action FROM orders')).toEqual({
+      refund_listing_action: 'unpublish'
+    })
+    // In review, the refunded order is the record (`paid_pending_review` holds no refund).
+    expect(
+      f.row(
+        `SELECT status, refunded_at IS NOT NULL AS refunded FROM listing_submissions WHERE id='s1'`
+      )
+    ).toEqual({ refunded: 0, status: 'paid_pending_review' })
+    // Republished and approved by its reviewer: a free listing.
+    expect(planOnceApproved(f)).toBe('free')
+  })
+
+  it('reads a disputed payment’s listing as free until its dispute is won', async () => {
+    const f = fixture({
+      guardrails: { code: 'fetch_timeout', ok: false, problem: 'the connection timed out' }
+    })
+    f.submission('s1', 'draft', null)
+    await webhook(f, paidEvent(f, await checkout(f, 's1')))
+    const payment = f.row<{ id: string }>('SELECT provider_payment_id AS id FROM orders').id
+    await webhook(f, paymentEvent('payment_disputed', payment))
+    // Held: nothing was live to take down. Approve refuses it while the dispute is open, and
+    // the queue shows it disputed with no amount paid.
+    expect(f.row('SELECT dispute_status FROM orders')).toEqual({ dispute_status: 'open' })
+    expect(await reviewPayment(f)).toEqual({
+      queue: { paymentLoss: 'disputed' },
+      screen: { paidAmountCents: null, paymentLoss: 'disputed' }
+    })
+    await expect(approve(f)).resolves.toEqual(REFUSED_DISPUTED)
+    // Won: the payment stands, so it is approved as a paid listing.
+    await webhook(f, paymentEvent('dispute_closed', payment, { disputeOutcome: 'won' }))
+    expect(await reviewPayment(f)).toEqual({
+      queue: { paymentLoss: null },
+      screen: { paidAmountCents: 4900, paymentLoss: null }
+    })
+    await expect(approve(f)).resolves.toMatchObject({ ok: true, replayed: false })
+    expect(planOnceApproved(f)).toBe('paid')
+  })
+
+  it('refuses to approve a held payment whose dispute was lost', async () => {
+    const f = fixture({
+      guardrails: { code: 'fetch_timeout', ok: false, problem: 'the connection timed out' }
+    })
+    f.submission('s1', 'draft', null)
+    await webhook(f, paidEvent(f, await checkout(f, 's1')))
+    const payment = f.row<{ id: string }>('SELECT provider_payment_id AS id FROM orders').id
+    await webhook(f, paymentEvent('dispute_closed', payment, { disputeOutcome: 'lost' }))
+    expect(f.row('SELECT dispute_status FROM orders')).toEqual({ dispute_status: 'lost' })
+    await expect(approve(f)).resolves.toEqual(REFUSED_DISPUTED)
+    expect(f.row(`SELECT status FROM listing_submissions WHERE id='s1'`)).toEqual({
+      status: 'verified'
+    })
+  })
+
+  for (const change of ['refunded', 'disputed'] as const) {
+    it(`refuses to approve a listing in review republished after a ${change} takedown`, async () => {
+      const f = fixture()
+      const order = await publishedOrder(f)
+      await webhook(
+        f,
+        paymentEvent(change === 'refunded' ? 'payment_refunded' : 'payment_disputed', order.payment)
+      )
+      expect(liveOf(f, order.listing)).toBe(0)
+      // The reviewer republishes it (Approve needs it live), then approves: refused.
+      await expect(
+        republishListing(adminContext(f), { listingId: order.listing })
+      ).resolves.toMatchObject({ ok: true })
+      expect(liveOf(f, order.listing)).toBe(1)
+      expect(await reviewPayment(f)).toEqual({
+        queue: { paymentLoss: change },
+        screen: { paidAmountCents: null, paymentLoss: change }
+      })
+      await expect(approve(f)).resolves.toEqual(
+        change === 'refunded' ? REFUSED_REFUNDED : REFUSED_DISPUTED
+      )
+      expect(f.row(`SELECT status FROM listing_submissions WHERE id='s1'`)).toEqual({
+        status: 'paid_pending_review'
+      })
+    })
+  }
+
+  it('records a won dispute that closed before its opening arrived, and nothing else', async () => {
+    const f = fixture()
+    const order = await publishedOrder(f)
+    await webhook(f, paymentEvent('dispute_closed', order.payment, { disputeOutcome: 'won' }))
+    await webhook(f, paymentEvent('payment_disputed', order.payment))
+    expect(f.row('SELECT dispute_status, disputed_at FROM orders')).toEqual({
+      dispute_status: 'won',
+      disputed_at: NOW.toISOString()
+    })
+    expect(liveOf(f, order.listing)).toBe(1)
+    expect(f.emails).toEqual([])
+    expect(
+      f.rows(`SELECT outcome FROM billing_events WHERE event_id LIKE 'evt_%dispute%' ORDER BY 1`)
+    ).toEqual([{ outcome: 'dispute_won' }, { outcome: 'dispute_won' }])
+  })
+
+  it('takes down a lost dispute whose opening never arrived, and alerts the admin', async () => {
+    const f = fixture()
+    const order = await publishedOrder(f)
+    await webhook(f, paymentEvent('dispute_closed', order.payment, { disputeOutcome: 'lost' }))
+    expect(f.row('SELECT dispute_status, disputed_at FROM orders')).toEqual({
+      dispute_status: 'lost',
+      disputed_at: NOW.toISOString()
+    })
+    expect(liveOf(f, order.listing)).toBe(0)
+    expect(f.emails).toEqual([
+      expect.objectContaining({
+        eventKey: `payment-alert:disputed:${order.id}`,
+        input: expect.objectContaining({ kind: 'disputed', listingLive: false })
+      })
+    ])
+    // Its opening, arriving late, changes nothing.
+    await webhook(f, paymentEvent('payment_disputed', order.payment))
+    expect(f.row('SELECT version FROM publication_state')).toEqual({ version: 3 })
+    expect(
+      f.rows(`SELECT event_id, outcome FROM billing_events WHERE event_id LIKE 'evt_%dispute%'`)
+    ).toEqual(
+      expect.arrayContaining([
+        { event_id: `evt_dispute_closed_${order.payment}`, outcome: 'disputed_lost' },
+        { event_id: `evt_payment_disputed_${order.payment}`, outcome: 'dispute_lost' }
+      ])
+    )
+    expect(new Set(f.emails.map(email => email.eventKey)).size).toBe(1)
+  })
+
+  it('records a paid order nothing applied yet, refunded in the dashboard: never applied', async () => {
+    const f = fixture()
+    f.submission('s1', 'draft', 'paid')
+    insertPaidOrder(f, {
+      id: 'ord_unapplied',
+      outcome: null,
+      paymentId: 'pi_x',
+      submissionId: 's1'
+    })
+    await webhook(f, paymentEvent('payment_refunded', 'pi_x'))
+    expect(
+      f.row('SELECT status, outcome, applied_at, refunded_by, refund_listing_action FROM orders')
+    ).toEqual({
+      applied_at: NOW.toISOString(),
+      outcome: 'unapplied',
+      refund_listing_action: 'none',
+      refunded_by: 'provider',
+      status: 'refunded'
+    })
+    // The buyer's return, the sweep and a late fulfilment find it refunded, and apply nothing.
+    await expect(
+      confirmReturn(f.deps, { orderId: 'ord_unapplied', userId: 'user_maya' })
+    ).resolves.toMatchObject({ status: 'refunded' })
+    await expect(runBillingSweep(f.deps, { limit: 10 })).resolves.toMatchObject({ applied: 0 })
+    await expect(fulfilOrder(f.deps, 'ord_unapplied')).resolves.toBe('unapplied')
+    expect(f.rows('SELECT id FROM listings')).toEqual([])
+    expect(f.row(`SELECT status, paid_at FROM listing_submissions WHERE id='s1'`)).toEqual({
+      paid_at: null,
+      status: 'draft'
+    })
+    expect(f.refunds).toEqual([])
+  })
+
+  it('takes the listing down when the rest of a partly refunded payment is refunded', async () => {
+    const f = fixture()
+    const order = await publishedOrder(f)
+    f.db.exec(`UPDATE listing_submissions SET status='approved' WHERE id='s1'`)
+    await webhook(
+      f,
+      paymentEvent('payment_refunded', order.payment, { id: 'evt_part', partial: true })
+    )
+    expect(liveOf(f, order.listing)).toBe(1)
+    await webhook(f, paymentEvent('payment_refunded', order.payment, { id: 'evt_rest' }))
+    expect(f.row('SELECT status, refunded_by FROM orders')).toEqual({
+      refunded_by: 'provider',
+      status: 'refunded'
+    })
+    expect(liveOf(f, order.listing)).toBe(0)
+    expect(
+      f.row(`SELECT refunded_at IS NOT NULL AS refunded FROM listing_submissions WHERE id='s1'`)
+    ).toEqual({ refunded: 1 })
+    expect(f.emails.map(email => email.eventKey)).toEqual([
+      `payment-alert:partially_refunded:${order.id}`,
+      `payment-alert:refunded:${order.id}`
+    ])
+    expect(
+      f.rows(
+        `SELECT event_id, outcome FROM billing_events WHERE event_id IN ('evt_part','evt_rest')`
+      )
+    ).toEqual(
+      expect.arrayContaining([
+        { event_id: 'evt_part', outcome: 'partially_refunded' },
+        { event_id: 'evt_rest', outcome: 'refunded_at_provider' }
+      ])
+    )
+  })
+
+  it('never applies a payment disputed while its fulfilment ran', async () => {
+    const f = fixture()
+    f.submission('s1', 'draft', 'paid')
+    insertPaidOrder(f, { id: 'ord_racing', outcome: null, paymentId: 'pi_r', submissionId: 's1' })
+    // The fulfilment read the order undisputed; the dispute is recorded before it applies.
+    f.deps.guardrails = async () => {
+      await webhook(f, paymentEvent('payment_disputed', 'pi_r'))
+      return { ok: true }
+    }
+    await expect(fulfilOrder(f.deps, 'ord_racing')).resolves.toBe('disputed')
+    expect(f.row('SELECT outcome, applied_at, dispute_status FROM orders')).toEqual({
+      applied_at: null,
+      dispute_status: 'open',
+      outcome: null
+    })
+    expect(f.rows('SELECT id FROM listings')).toEqual([])
+    expect(f.refunds).toEqual([])
+  })
+
+  it('acknowledges a payment no order took', async () => {
+    const f = fixture()
+    await expect(webhook(f, paymentEvent('payment_disputed', 'pi_unknown'))).resolves.toEqual({
+      body: { received: true },
+      status: 200
+    })
+    expect(f.row('SELECT order_id, outcome FROM billing_events')).toEqual({
+      order_id: null,
+      outcome: 'unknown_order'
+    })
+    expect(f.emails).toEqual([])
+  })
+})
+
+describe('webhook follow-ups (#481)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  for (const [outcome, sabotage] of [
+    ['unknown_order', (f: Fixture) => vi.spyOn(f.deps.operations, 'order').mockResolvedValue(null)],
+    [
+      'retry_later',
+      (f: Fixture) => {
+        const apply = f.deps.operations.apply
+        // The payment is recorded; every write of its fulfilment loses.
+        vi.spyOn(f.deps.operations, 'apply')
+          .mockImplementationOnce(plans => apply(plans))
+          .mockResolvedValue(false)
+      }
+    ]
+  ] as const) {
+    it(`logs a fulfilment that ended ${outcome} as a failure`, async () => {
+      const f = fixture()
+      f.submission('s1', 'draft', null)
+      const body = paidEvent(f, await checkout(f, 's1'))
+      const warnings = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+      const infos = vi.spyOn(console, 'info').mockImplementation(() => undefined)
+      sabotage(f)
+      await webhook(f, body)
+      const lines = (spy: typeof warnings) =>
+        spy.mock.calls.map(([line]) => JSON.parse(String(line)) as Record<string, unknown>)
+      expect(lines(warnings)).toEqual([
+        {
+          event: 'billing_webhook_fulfilment_failed',
+          order: expect.any(String),
+          outcome,
+          type: 'fake.checkout.paid'
+        }
+      ])
+      expect(lines(infos).map(line => line.event)).not.toContain('billing_webhook_fulfilled')
+    })
+  }
+
+  it('sends a recently applied payment’s emails again, from the sweep', async () => {
+    const f = fixture()
+    await publishedOrder(f, 's1')
+    f.clock.now = new Date(NOW.getTime() + 30 * 60 * 1000)
+    await runBillingSweep(f.deps, { limit: 10 })
+    expect(
+      f.emails
+        .map(({ recover, template }) => ({ recover, template }))
+        .sort((a, b) => a.template.localeCompare(b.template))
+    ).toEqual([
+      { recover: true, template: 'admin-review-ready' },
+      { recover: true, template: 'listing-live-paid' }
+    ])
+    expect(new Set(f.emails.map(email => email.eventKey))).toEqual(new Set(['submission-paid:s1']))
+    // Past the recovery window, nothing is sent again.
+    f.emails.length = 0
+    f.clock.now = new Date(NOW.getTime() + 7 * 60 * 60 * 1000)
+    await runBillingSweep(f.deps, { limit: 10 })
+    expect(f.emails).toEqual([])
+  })
+
+  it('sends a held payment’s emails again with its check’s problem', async () => {
+    const f = fixture({
+      guardrails: { code: 'fetch_timeout', ok: false, problem: 'the connection timed out' }
+    })
+    f.submission('s1', 'draft', null)
+    await webhook(f, paidEvent(f, await checkout(f, 's1')))
+    f.emails.length = 0
+    f.clock.now = new Date(NOW.getTime() + 30 * 60 * 1000)
+    await runBillingSweep(f.deps, { limit: 10 })
+    expect(f.emails).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          input: expect.objectContaining({ checkProblem: 'the connection timed out' }),
+          recover: true,
+          template: 'payment-received-in-review'
+        })
+      ])
+    )
+  })
+
+  it('sends a recent payment alert again, but never a disputed payment’s “is live” email', async () => {
+    const f = fixture()
+    const order = await publishedOrder(f, 's1')
+    await webhook(f, paymentEvent('payment_disputed', order.payment))
+    f.emails.length = 0
+    f.clock.now = new Date(NOW.getTime() + 30 * 60 * 1000)
+    await expect(runBillingSweep(f.deps, { limit: 10 })).resolves.toMatchObject({ emails: 1 })
+    expect(f.emails).toEqual([
+      expect.objectContaining({
+        eventKey: `payment-alert:disputed:${order.id}`,
+        recover: true,
+        template: 'admin-payment-alert'
+      })
     ])
   })
 })

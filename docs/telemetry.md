@@ -91,7 +91,10 @@ values to its message. So:
   Sentry, an uncaught `CodedError` arrives as `Error: [redacted]` with its stack. The lines that
   spread in `errorFields` are `request_error`, `claim_failed`,
   `submission_request_failed`, `admin_decision_failed`, `admin_refund_failed`,
-  `auth_guard_error`, `billing_webhook_failed`, the billing service's failures,
+  `auth_guard_error`, `billing_webhook_failed`, `billing_webhook_fulfilment_failed` (a
+  payment's fulfilment after the webhook answered; also logged, at warn with its `outcome`, when
+  it ended without applying: `retry_later` or `unknown_order`, #481), the billing service's
+  failures,
   `legacy_root_lookup_failed`, `scheduled_job_failed`, and the media failures
   (`submission_media_error`, `revision_media_error`, `media_settle_error`, `media_forget_failed`).
 - **Configuration failures keep their message.** `billing_unavailable`, `auth_unavailable`,

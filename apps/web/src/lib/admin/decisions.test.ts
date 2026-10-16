@@ -92,9 +92,10 @@ function fixture() {
   /**
    * A client whose next write batches each first publish something else (another admin's
    * decision on a different listing), so the decision's batch loses the race for the
-   * publication version. Read batches pass through.
+   * publication version, and run `alsoChange`; without `publishElsewhere`, only `alsoChange`
+   * runs. Read batches pass through.
    */
-  const racingClient = (races = 1, alsoChange = '') => {
+  const racingClient = (races = 1, alsoChange = '', publishElsewhere = true) => {
     const d1 = sqlite.asD1Database()
     const sqlOf = new WeakMap<object, string>()
     const prepare = d1.prepare.bind(d1)
@@ -111,9 +112,11 @@ function fixture() {
       )
       if (writes && left > 0) {
         left -= 1
-        db.exec(
-          "UPDATE publication_state SET version = version + 1, checksum = 'elsewhere-' || version"
-        )
+        if (publishElsewhere) {
+          db.exec(
+            "UPDATE publication_state SET version = version + 1, checksum = 'elsewhere-' || version"
+          )
+        }
         if (alsoChange) db.exec(alsoChange)
       }
       return batch(statements)
@@ -375,6 +378,41 @@ describe('submission decisions', () => {
       url_key: 'brieflow.ai'
     })
   })
+
+  for (const held of [true, false]) {
+    it(`refuses an approval whose payment is disputed between its read and its write (${held ? 'held' : 'live'}, #473)`, async () => {
+      const { context, db, paidLive, racingClient, row, submission } = fixture()
+      if (held) {
+        submission('sub_paid', 'paidheld.app', 'verified')
+        db.exec(`UPDATE listing_submissions SET plan='paid', paid_at='2026-10-06T08:00:00.000Z'
+          WHERE id='sub_paid'`)
+      } else {
+        paidLive('sub_paid')
+      }
+      db.exec(`INSERT INTO orders (id, number, user_id, kind, purpose, target_key, submission_id,
+          amount_cents, currency, provider, provider_payment_id, charged_cents, charged_currency,
+          status, outcome, paid_at, applied_at, created_at, updated_at)
+        VALUES ('ord_paid', 1001, 'user_maya', 'paid_listing', 'submission',
+          'submission:sub_paid', 'sub_paid', 4900, 'usd', 'fake', 'pi_paid', 4900, 'usd', 'paid',
+          '${held ? 'held' : 'published'}', '2026-10-06T08:00:00.000Z',
+          '2026-10-06T08:00:00.000Z', '2026-10-06T08:00:00.000Z', '2026-10-06T08:00:00.000Z')`)
+      const dispute = `UPDATE orders SET dispute_status='open',
+        disputed_at='2026-10-06T11:59:00.000Z' WHERE id='ord_paid'`
+      expect(
+        await approveSubmission(context({ client: racingClient(1, dispute, false) }), {
+          expectedContentVersion: 1,
+          submissionId: 'sub_paid'
+        })
+      ).toMatchObject({ error: 'conflict', status: 409 })
+      expect(row("SELECT status FROM listing_submissions WHERE id='sub_paid'")).toEqual({
+        status: held ? 'verified' : 'paid_pending_review'
+      })
+      // Read again, the reviewer sees why.
+      expect(
+        await approveSubmission(context(), { expectedContentVersion: 1, submissionId: 'sub_paid' })
+      ).toMatchObject({ error: 'payment_disputed', status: 409 })
+    })
+  }
 
   it('unpublishes a live paid submission on rejection, and refuses a refund it cannot make', async () => {
     const { context, db, paidLive, row } = fixture()

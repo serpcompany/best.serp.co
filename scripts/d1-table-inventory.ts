@@ -353,7 +353,9 @@ export const applicationColumnInventory = {
     'refunded_at',
     'failed_at',
     'created_at',
-    'updated_at'
+    'updated_at',
+    'dispute_status',
+    'disputed_at'
   ],
   billing_events: [
     'provider',

@@ -1,6 +1,7 @@
 import { urlKey } from '@/lib/url-key'
 import type { Database } from './client'
 import { listingIdsWithWebsite } from './listing-plans'
+import { paidClaimOrderSql } from './payment-kept'
 import { executePlans, isPlanConflict, queryPlan } from './plan-runner'
 import {
   assertPreviousStatementChangedOne,
@@ -10,6 +11,7 @@ import {
 } from './plan-support'
 import type {
   OrderAttention,
+  OrderDisputeStatus,
   OrderKind,
   OrderOutcome,
   OrderPurpose,
@@ -44,6 +46,9 @@ export interface OrderRecord {
   claimId: string | null
   createdAt: string
   currency: string
+  /** When the buyer's dispute of the payment was first reported (#473). */
+  disputedAt: string | null
+  disputeStatus: OrderDisputeStatus | null
   failureReason: string | null
   id: string
   kind: OrderKind
@@ -80,7 +85,8 @@ const ORDER_COLUMNS = `o.id,o.number,o.check_problem,o.refund_note,o.user_id,o.k
   o.checkout_expires_at,o.provider_payment_id,o.provider_refund_id,o.status,o.outcome,
   o.failure_reason,o.refund_reason,o.refunded_by,o.paid_at,o.applied_at,o.refunded_at,
   o.charged_cents,o.charged_currency,o.attention,o.refund_listing_action,o.refund_badge_check_id,
-  o.refund_requested_at,o.refund_attempts,o.refund_retry_at,o.created_at,o.updated_at`
+  o.refund_requested_at,o.refund_attempts,o.refund_retry_at,o.dispute_status,o.disputed_at,
+  o.created_at,o.updated_at`
 
 function optional(value: unknown): string | null {
   return value === null || value === undefined ? null : String(value)
@@ -102,6 +108,8 @@ function toOrder(row: Row): OrderRecord {
     claimId: optional(row.claim_id),
     createdAt: String(row.created_at),
     currency: String(row.currency),
+    disputedAt: optional(row.disputed_at),
+    disputeStatus: optional(row.dispute_status) as OrderDisputeStatus | null,
     failureReason: optional(row.failure_reason),
     id: String(row.id),
     kind: row.kind as OrderKind,
@@ -252,6 +260,8 @@ export function buildMarkOrderPaidPlans(input: {
 /**
  * Records what a paid order did, once (`applied_at`). Sent in the same batch as the plans that
  * applied it (the submission's payment, the upgrade, the relist), so both happen or neither.
+ * Never a disputed payment (#473): a dispute recorded after the fulfilment read the order
+ * refuses the whole batch, so the listing never goes live on it.
  */
 export function buildMarkOrderAppliedPlans(input: {
   /** The guardrail check that held the submission (`held` only). */
@@ -263,7 +273,7 @@ export function buildMarkOrderAppliedPlans(input: {
   return [
     {
       sql: `UPDATE orders SET outcome=?,check_problem=?,applied_at=?,updated_at=?
-        WHERE id=? AND status='paid' AND applied_at IS NULL`,
+        WHERE id=? AND status='paid' AND applied_at IS NULL AND dispute_status IS NULL`,
       params: [input.outcome, input.checkProblem ?? null, input.now, input.now, input.orderId]
     },
     assertPreviousStatementChangedOne('order_applied')
@@ -384,7 +394,11 @@ export function buildRecordRefundFailurePlans(input: {
   ]
 }
 
-/** `refunding` → `refunded`, once the provider confirmed the refund. */
+/**
+ * `refunding` → `refunded`, once the provider confirmed the refund (the site's, the sweep's, or
+ * one made in its dashboard). A `refund_failed` flag from an earlier failure is cleared: the money
+ * went back. A `refund.failed` reported later flags it again.
+ */
 export function buildFinishRefundPlans(input: {
   now: string
   orderId: string
@@ -392,12 +406,118 @@ export function buildFinishRefundPlans(input: {
 }): StatementPlan[] {
   return [
     {
-      sql: `UPDATE orders SET status='refunded',provider_refund_id=?,refunded_at=?,updated_at=?
+      sql: `UPDATE orders SET status='refunded',provider_refund_id=?,refunded_at=?,
+          attention=CASE WHEN attention='refund_failed' THEN NULL ELSE attention END,updated_at=?
         WHERE id=? AND status='refunding'`,
       params: [input.refundId, input.now, input.now, input.orderId]
     },
     assertPreviousStatementChangedOne('order_refunded')
   ]
+}
+
+/** `orders.refunded_by` on a refund made at the provider, outside the site (#473). */
+export const PROVIDER_ACTOR = 'provider'
+
+/**
+ * A refund made at the provider, outside the site (its dashboard, #473): a `paid` order becomes
+ * `refunded` at once, as an admin's refund by `PROVIDER_ACTOR` with the listing action the
+ * webhook took. Compared and swapped on the outcome it was decided on, so a fulfilment that
+ * applied the order meanwhile makes it decide again. An order nothing applied is recorded as
+ * `unapplied`, as the site's own refund of one is, so no fulfilment applies it later.
+ */
+export function buildRecordProviderRefundPlans(input: {
+  listingAction: OrderRefundListingAction
+  now: string
+  orderId: string
+  /** The outcome the order was read with (null: not applied). */
+  outcome: OrderOutcome | null
+}): StatementPlan[] {
+  return [
+    {
+      sql: `UPDATE orders SET status='refunded',refund_reason='admin',refunded_by=?,
+          refund_requested_at=?,refunded_at=?,refund_listing_action=?,
+          outcome=COALESCE(outcome,'unapplied'),applied_at=COALESCE(applied_at,?),updated_at=?
+        WHERE id=? AND status='paid' AND outcome IS ?`,
+      params: [
+        PROVIDER_ACTOR,
+        input.now,
+        input.now,
+        input.listingAction,
+        input.now,
+        input.now,
+        input.orderId,
+        input.outcome
+      ]
+    },
+    assertPreviousStatementChangedOne('order_refunded_at_provider')
+  ]
+}
+
+/**
+ * A provider refund that failed after it was accepted (#473): the money never went back, so the
+ * order is flagged `refund_failed` for an admin, and the sweep stops retrying a claimed one.
+ * Changes nothing on an order the site never refunded.
+ */
+export function buildFlagRefundFailedPlans(input: {
+  now: string
+  orderId: string
+}): StatementPlan[] {
+  return [
+    {
+      sql: `UPDATE orders SET attention='refund_failed',updated_at=?
+        WHERE id=? AND status IN ('refunding','refunded')`,
+      params: [input.now, input.orderId]
+    }
+  ]
+}
+
+/**
+ * A dispute the buyer opened (#473), recorded once: a dispute already recorded (this one again,
+ * or one that closed before its opening arrived) is refused, so it takes the listing down once.
+ */
+export function buildRecordDisputePlans(input: { now: string; orderId: string }): StatementPlan[] {
+  return [
+    {
+      sql: `UPDATE orders SET dispute_status='open',disputed_at=?,updated_at=?
+        WHERE id=? AND dispute_status IS NULL AND status IN ('paid','refunding','refunded')`,
+      params: [input.now, input.now, input.orderId]
+    },
+    assertPreviousStatementChangedOne('order_disputed')
+  ]
+}
+
+/** A dispute's outcome (#473). A closed one stays as it closed. */
+export function buildCloseDisputePlans(input: {
+  now: string
+  orderId: string
+  outcome: 'lost' | 'won'
+}): StatementPlan[] {
+  return [
+    {
+      sql: `UPDATE orders SET dispute_status=?,disputed_at=COALESCE(disputed_at,?),updated_at=?
+        WHERE id=? AND (dispute_status IS NULL OR dispute_status='open')
+          AND status IN ('paid','refunding','refunded')`,
+      params: [input.outcome, input.now, input.now, input.orderId]
+    }
+  ]
+}
+
+/**
+ * Whether claim order `orderId`'s payer still owns the listing through it: a current
+ * `paid_claim` owner row whose latest claim payment is this order (#473).
+ */
+export function selectPaidClaimStandsPlan(input: {
+  listingId: string
+  orderId: string
+  userId: string
+}): StatementPlan {
+  return {
+    sql: `SELECT CASE WHEN EXISTS (SELECT 1 FROM listing_owners o
+        WHERE o.listing_id=?1 AND o.user_id=?2 AND o.role='owner' AND o.revoked_at IS NULL
+          AND o.verified_via='paid_claim' AND ${paidClaimOrderSql('o.listing_id', 'o.user_id')}=?3)
+      THEN 1 ELSE 0 END AS stands`,
+    params: [input.listingId, input.userId, input.orderId]
+  }
 }
 
 export function selectOrderPlan(orderId: string): StatementPlan {
@@ -408,6 +528,15 @@ export function selectOrderByCheckoutPlan(provider: string, checkoutId: string):
   return {
     sql: `SELECT ${ORDER_COLUMNS} FROM orders o WHERE o.provider=? AND o.provider_checkout_id=?`,
     params: [provider, checkoutId]
+  }
+}
+
+/** The order a provider payment belongs to (a refund's or a dispute's charge, #473). */
+export function selectOrderByPaymentPlan(provider: string, paymentId: string): StatementPlan {
+  return {
+    sql: `SELECT ${ORDER_COLUMNS} FROM orders o WHERE o.provider=? AND o.provider_payment_id=?
+      ORDER BY o.created_at,o.id LIMIT 1`,
+    params: [provider, paymentId]
   }
 }
 
@@ -440,10 +569,12 @@ export function selectSubmissionPaymentOrderPlan(submissionId: string): Statemen
 export const RECONCILABLE_FAILURES = ['superseded_unconfirmed', 'checkout_not_recorded_unconfirmed']
 
 /**
- * Orders the hourly sweep looks at again, most urgent first: paid orders never applied (a crash
- * between recording the payment and applying it: the buyer is waiting), then claimed refunds a
- * failure left unfinished (when their backoff is over, until `refund_failed`), then pending orders whose checkout should have finished (`before`), then failed
- * orders whose checkout might still have been paid (`RECONCILABLE_FAILURES`, since
+ * Orders the hourly sweep looks at again, most urgent first: paid orders never applied (the
+ * webhook's fulfilment after its answer failed or ran out of time, or the Worker stopped between
+ * recording the payment and applying it: the buyer is waiting; never a disputed one, #473), then
+ * claimed refunds a failure left unfinished (when their backoff is over, until
+ * `refund_failed`), then pending orders whose checkout should have finished (`before`), then
+ * failed orders whose checkout might still have been paid (`RECONCILABLE_FAILURES`, since
  * `failedSince`, the provider's retry window).
  */
 export function selectOrdersToReconcilePlan(input: {
@@ -457,7 +588,7 @@ export function selectOrdersToReconcilePlan(input: {
       WHERE (o.status='refunding' AND o.refund_requested_at<?
           AND (o.refund_retry_at IS NULL OR o.refund_retry_at<=?)
           AND (o.attention IS NULL OR o.attention<>'refund_failed'))
-        OR (o.status='paid' AND o.applied_at IS NULL AND o.paid_at<?)
+        OR (o.status='paid' AND o.applied_at IS NULL AND o.paid_at<? AND o.dispute_status IS NULL)
         OR (o.status='pending' AND o.provider_checkout_id IS NOT NULL
           AND o.checkout_expires_at<?)
         OR (o.status='failed' AND o.provider_checkout_id IS NOT NULL
@@ -476,6 +607,44 @@ export function selectOrdersToReconcilePlan(input: {
       input.before,
       input.limit
     ]
+  }
+}
+
+/**
+ * Paid submissions applied in the window (`since` ≤ `applied_at` < `before`) whose emails the
+ * sweep sends again (#481): a fulfilment that ran out of time or was stopped after applying may
+ * not have sent them. Not one refunded or disputed since.
+ */
+export function selectRecentlyAppliedOrdersPlan(input: {
+  before: string
+  limit: number
+  since: string
+}): StatementPlan {
+  return {
+    sql: `SELECT ${ORDER_COLUMNS} FROM orders o
+      WHERE o.status='paid' AND o.dispute_status IS NULL AND o.outcome IN ('published','held')
+        AND o.applied_at>=? AND o.applied_at<?
+      ORDER BY o.applied_at,o.id LIMIT ?`,
+    params: [input.since, input.before, input.limit]
+  }
+}
+
+/**
+ * Webhook events processed in the window with one of `outcomes`, newest last, with their order
+ * (#473): the admin alerts the sweep sends again.
+ */
+export function selectRecentBillingEventsPlan(input: {
+  before: string
+  limit: number
+  outcomes: readonly string[]
+  since: string
+}): StatementPlan {
+  return {
+    sql: `SELECT e.order_id,e.outcome FROM billing_events e
+      WHERE e.order_id IS NOT NULL AND e.outcome IN (${input.outcomes.map(() => '?').join(',')})
+        AND e.processed_at>=? AND e.processed_at<?
+      ORDER BY e.processed_at,e.event_id LIMIT ?`,
+    params: [...input.outcomes, input.since, input.before, input.limit]
   }
 }
 
@@ -681,25 +850,32 @@ export interface AdminOrderRow extends OrderRecord {
 
 const ADMIN_ORDER_LIMIT = 500
 
+const ADMIN_ORDER_SELECT = `SELECT ${ORDER_COLUMNS},u.email AS buyer_email,
+    COALESCE(l.name,s.name) AS product_name,COALESCE(l.slug,sl.slug) AS listing_slug,
+    COALESCE(l.website,s.website) AS website,s.status AS submission_status,
+    CASE WHEN ${listingIsLiveGuard('COALESCE(o.listing_id,s.listing_id)')} THEN 1 ELSE 0 END
+      AS listing_live,s.plan AS submission_plan,s.rejection_category,
+    (SELECT m.media_key FROM listing_media m WHERE m.listing_id=COALESCE(o.listing_id,s.listing_id)
+      AND m.kind='logo' AND m.media_key IS NOT NULL ORDER BY m.sort_order LIMIT 1) AS logo_key,
+    (SELECT b.outcome FROM badge_checks b WHERE b.listing_id=COALESCE(o.listing_id,s.listing_id)
+      ORDER BY b.checked_at DESC,b.id DESC LIMIT 1) AS latest_badge_outcome
+  FROM orders o
+    LEFT JOIN users u ON u.id=o.user_id
+    LEFT JOIN listing_submissions s ON s.id=o.submission_id
+    LEFT JOIN listings l ON l.id=o.listing_id
+    LEFT JOIN listings sl ON sl.id=s.listing_id`
+
 export function selectAdminOrdersPlan(): StatementPlan {
   return {
-    sql: `SELECT ${ORDER_COLUMNS},u.email AS buyer_email,
-        COALESCE(l.name,s.name) AS product_name,COALESCE(l.slug,sl.slug) AS listing_slug,
-        COALESCE(l.website,s.website) AS website,s.status AS submission_status,
-        CASE WHEN ${listingIsLiveGuard('COALESCE(o.listing_id,s.listing_id)')} THEN 1 ELSE 0 END
-          AS listing_live,s.plan AS submission_plan,s.rejection_category,
-        (SELECT m.media_key FROM listing_media m WHERE m.listing_id=COALESCE(o.listing_id,s.listing_id)
-          AND m.kind='logo' AND m.media_key IS NOT NULL ORDER BY m.sort_order LIMIT 1) AS logo_key,
-        (SELECT b.outcome FROM badge_checks b WHERE b.listing_id=COALESCE(o.listing_id,s.listing_id)
-          ORDER BY b.checked_at DESC,b.id DESC LIMIT 1) AS latest_badge_outcome
-      FROM orders o
-        LEFT JOIN users u ON u.id=o.user_id
-        LEFT JOIN listing_submissions s ON s.id=o.submission_id
-        LEFT JOIN listings l ON l.id=o.listing_id
-        LEFT JOIN listings sl ON sl.id=s.listing_id
+    sql: `${ADMIN_ORDER_SELECT}
       ORDER BY o.created_at DESC,o.id DESC LIMIT ${ADMIN_ORDER_LIMIT}`,
     params: []
   }
+}
+
+/** One order as admin Orders shows it (its product and listing, for an admin alert, #473). */
+export function selectAdminOrderPlan(orderId: string): StatementPlan {
+  return { sql: `${ADMIN_ORDER_SELECT} WHERE o.id=?`, params: [orderId] }
 }
 
 function toAdminOrder(row: Row): AdminOrderRow {
@@ -722,6 +898,7 @@ function toAdminOrder(row: Row): AdminOrderRow {
 // Operations
 
 export interface BillingOperations {
+  adminOrder(orderId: string): Promise<AdminOrderRow | null>
   adminOrders(): Promise<AdminOrderRow[]>
   /** Sends plans as one batch; false when a compare-and-swap or constraint refused it. */
   apply(plans: StatementPlan[]): Promise<boolean>
@@ -747,9 +924,16 @@ export interface BillingOperations {
   }): Promise<void>
   /** Whether the listing is live (public) now. */
   listingLive(listingId: string | null): Promise<boolean>
+  /**
+   * Whether a claim order's payer still owns its listing through it: a current `paid_claim` owner
+   * whose latest claim payment for the listing is this order (#473). An admin's revoke or
+   * transfer, or a later claim, ends that.
+   */
+  paidClaimStands(order: Pick<OrderRecord, 'id' | 'listingId' | 'userId'>): Promise<boolean>
   openOrder(targetKey: string): Promise<OrderRecord | null>
   order(orderId: string): Promise<OrderRecord | null>
   orderByCheckout(provider: string, checkoutId: string): Promise<OrderRecord | null>
+  orderByPayment(provider: string, paymentId: string): Promise<OrderRecord | null>
   ordersToReconcile(input: {
     before: string
     failedSince: string
@@ -765,6 +949,19 @@ export interface BillingOperations {
     listingId: string
     outcome: 'fail' | 'pass'
   } | null>
+  /** `selectRecentBillingEventsPlan`: recent webhook events with these outcomes. */
+  recentBillingEvents(input: {
+    before: string
+    limit: number
+    outcomes: readonly string[]
+    since: string
+  }): Promise<Array<{ orderId: string; outcome: string }>>
+  /** `selectRecentlyAppliedOrdersPlan`: paid submissions applied in the window. */
+  recentlyAppliedOrders(input: {
+    before: string
+    limit: number
+    since: string
+  }): Promise<OrderRecord[]>
   /** Paid submissions rejected as `other` whose refund isn't recorded yet, oldest first. */
   refundPendingSubmissions(limit: number): Promise<string[]>
   /** A rejected submission's category and reason. */
@@ -795,6 +992,7 @@ export function createBillingOperations(config: { client: Database }): BillingOp
   }
 
   return {
+    adminOrder: orderId => first(selectAdminOrderPlan(orderId), toAdminOrder),
     async adminOrders() {
       return (await queryPlan<Row>(client, selectAdminOrdersPlan())).map(toAdminOrder)
     },
@@ -827,6 +1025,18 @@ export function createBillingOperations(config: { client: Database }): BillingOp
     async finishEvent(input) {
       await executePlans(client, buildFinishBillingEventPlans(input))
     },
+    async paidClaimStands(order) {
+      if (!order.listingId) return false
+      const [row] = await queryPlan<{ stands: number }>(
+        client,
+        selectPaidClaimStandsPlan({
+          listingId: order.listingId,
+          orderId: order.id,
+          userId: order.userId
+        })
+      )
+      return Number(row?.stands) === 1
+    },
     async listingLive(listingId) {
       if (!listingId) return false
       const [row] = await queryPlan<{ live: number }>(client, {
@@ -839,6 +1049,8 @@ export function createBillingOperations(config: { client: Database }): BillingOp
     order: orderId => first(selectOrderPlan(orderId), toOrder),
     orderByCheckout: (provider, checkoutId) =>
       first(selectOrderByCheckoutPlan(provider, checkoutId), toOrder),
+    orderByPayment: (provider, paymentId) =>
+      first(selectOrderByPaymentPlan(provider, paymentId), toOrder),
     async ordersToReconcile(input) {
       return (await queryPlan<Row>(client, selectOrdersToReconcilePlan(input))).map(toOrder)
     },
@@ -860,6 +1072,16 @@ export function createBillingOperations(config: { client: Database }): BillingOp
             outcome: row.outcome === 'pass' ? 'pass' : 'fail'
           }
         : null
+    },
+    async recentBillingEvents(input) {
+      const rows = await queryPlan<{ order_id: string; outcome: string }>(
+        client,
+        selectRecentBillingEventsPlan(input)
+      )
+      return rows.map(row => ({ orderId: String(row.order_id), outcome: String(row.outcome) }))
+    },
+    async recentlyAppliedOrders(input) {
+      return (await queryPlan<Row>(client, selectRecentlyAppliedOrdersPlan(input))).map(toOrder)
     },
     async refundPendingSubmissions(limit) {
       const rows = await queryPlan<{ id: string }>(

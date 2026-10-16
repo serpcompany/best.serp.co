@@ -3,6 +3,8 @@ import { createDatabase } from './client'
 import {
   createEmailDeliveryLedger,
   EMAIL_DELIVERY_MAX_ATTEMPTS,
+  EMAIL_RECOVERY_WINDOW_MS,
+  EMAIL_STALE_SENDING_MS,
   isEmailEventKey,
   pruneEmailDeliveries,
   sqliteTimestamp
@@ -27,6 +29,38 @@ const claim = { eventKey: 'fixture:event-1', provider: 'cloudflare', templateId:
 const done = { eventKey: claim.eventKey, templateId: claim.templateId }
 
 describe('email delivery ledger', () => {
+  it('re-claims a stalled send only for a recovery, once stale and inside the window (#481)', async () => {
+    const start = Date.UTC(2026, 9, 6, 12, 0, 0)
+    let now = start
+    const operations = createEmailDeliveryLedger({
+      client: createDatabase(new SqliteD1().asD1Database()),
+      clock: () => new Date(now)
+    })
+    const recover = { ...claim, recover: true }
+    expect(await operations.claim(claim)).toEqual({ attempt: 1, outcome: 'claimed' })
+    // Its Worker stopped mid-send, so the row stays `sending`.
+    now = start + EMAIL_STALE_SENDING_MS - 1000
+    expect(await operations.claim(recover)).toMatchObject({
+      outcome: 'duplicate',
+      status: 'sending'
+    })
+    now = start + EMAIL_STALE_SENDING_MS
+    expect(await operations.claim(claim)).toMatchObject({ outcome: 'duplicate', status: 'sending' })
+    expect(await operations.claim(recover)).toEqual({ attempt: 2, outcome: 'claimed' })
+    expect(await operations.claim(recover)).toMatchObject({
+      outcome: 'duplicate',
+      status: 'sending'
+    })
+    await operations.complete({ ...done, attempt: 2, providerMessageId: 'msg-2', status: 'sent' })
+    expect(await operations.claim(recover)).toMatchObject({ outcome: 'duplicate', status: 'sent' })
+    // Past the provider's idempotency window, a stalled send is left alone.
+    const late = { ...recover, eventKey: 'fixture:event-late' }
+    now = start
+    await operations.claim(late)
+    now = start + EMAIL_RECOVERY_WINDOW_MS + 1000
+    expect(await operations.claim(late)).toMatchObject({ outcome: 'duplicate', status: 'sending' })
+  })
+
   it('claims a template and event key once; a second claim is a duplicate in flight', async () => {
     const { operations, row } = ledger()
     expect(await operations.claim(claim)).toEqual({ attempt: 1, outcome: 'claimed' })

@@ -8,9 +8,12 @@ export function sourceLabel(row: Pick<AdminListingRow, 'source' | 'sourceKind'>)
   return row.sourceKind.startsWith('legacy-') ? 'Admin (import)' : 'Admin'
 }
 
-/** The plan column: how a paid or owned listing got there. */
+/**
+ * The plan column: how a paid or owned listing got there. A paid claim whose payment was refunded
+ * or disputed (and not won) reads as free (#473).
+ */
 export function planLabel(row: Pick<AdminListingRow, 'ownerVerifiedVia' | 'plan'>): string {
-  if (row.ownerVerifiedVia === 'paid_claim') return 'Paid claim'
+  if (row.ownerVerifiedVia === 'paid_claim' && row.plan === 'paid') return 'Paid claim'
   if (row.plan === 'paid') return 'Paid'
   if (row.ownerVerifiedVia === 'badge_claim') return 'Free · badge claim'
   return 'Free'

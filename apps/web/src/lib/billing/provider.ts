@@ -60,15 +60,40 @@ export interface CheckoutState {
 }
 
 /**
- * A verified webhook event. `checkout` is set for the checkout events the service acts on; any
- * other event is recorded as `ignored`.
+ * A change to a payment that can happen outside the site (#473): a refund (from the provider's
+ * dashboard, or the site's own), a refund that failed after it was accepted, or a dispute the
+ * buyer opened with their bank, and its outcome.
+ */
+export interface PaymentChange {
+  /** A closed dispute: the payment stands (`won`), or the money went back to the buyer (`lost`). */
+  disputeOutcome: 'lost' | 'won' | null
+  /** A refund of only part of the payment. */
+  partial: boolean
+  /** The provider's payment reference, as the order recorded it (`orders.provider_payment_id`). */
+  paymentId: string
+}
+
+/**
+ * A verified webhook event. `checkout` is set for the checkout events the service acts on, and
+ * `payment` for the payment events (refunds and disputes, #473); any other event is recorded as
+ * `ignored`.
  */
 export interface BillingEvent {
   checkout: CheckoutState | null
   id: string
+  payment?: PaymentChange | null
   /** The provider's own event type, recorded in `billing_events`. */
   providerType: string
-  type: 'checkout_expired' | 'checkout_failed' | 'checkout_paid' | 'checkout_processing' | 'ignored'
+  type:
+    | 'checkout_expired'
+    | 'checkout_failed'
+    | 'checkout_paid'
+    | 'checkout_processing'
+    | 'dispute_closed'
+    | 'ignored'
+    | 'payment_disputed'
+    | 'payment_refund_failed'
+    | 'payment_refunded'
 }
 
 export interface RefundRequest {

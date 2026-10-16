@@ -41,7 +41,9 @@ export type ListingLinkRel = (typeof listingLinkRels)[number]
  * Submission lifecycle (docs/submission-flow.md). `draft` is saved with no plan chosen yet
  * (or paid chosen and checkout not completed); `pending_badge` means free was chosen and the
  * badge is not verified yet. `verified` and `paid_pending_review` are the review queue;
- * `paid_pending_review` is the only queue state whose listing is already live.
+ * `paid_pending_review` is the only queue state whose listing is already live, unless a dispute
+ * or a refund made at the provider took it down (#473): its reviewer then republishes and
+ * approves it, or rejects it (docs/billing.md).
  */
 export const submissionStatuses = [
   'draft',
@@ -1690,7 +1692,11 @@ export const orderOutcomes = [
 ] as const
 export type OrderOutcome = (typeof orderOutcomes)[number]
 
-/** Why an order was refunded: an `other` rejection, an admin's refund, or an unapplied payment. */
+/**
+ * Why an order was refunded: an `other` rejection, an admin's refund, or an unapplied payment.
+ * `admin` also records a refund made at the provider, outside the site (#473): its
+ * `refunded_by` is then `provider` (`PROVIDER_ACTOR`).
+ */
 export const orderRefundReasons = ['rejected', 'admin', 'unapplied'] as const
 export type OrderRefundReason = (typeof orderRefundReasons)[number]
 
@@ -1708,10 +1714,19 @@ export type OrderRefundListingAction = (typeof orderRefundListingActions)[number
 
 /**
  * Why an order needs an admin: a charge that didn't match its order (refunded), or a refund
- * the provider kept refusing (`refund_failed`, after `REFUND_MAX_ATTEMPTS`; the sweep stops).
+ * the provider kept refusing (`refund_failed`, after `REFUND_MAX_ATTEMPTS`; the sweep stops),
+ * cleared when that refund then succeeds.
  */
 export const orderAttentions = ['amount_mismatch', 'refund_failed'] as const
 export type OrderAttention = (typeof orderAttentions)[number]
+
+/**
+ * A buyer's dispute of the payment with their bank (#473): `open` from the provider's report
+ * until it closes, then `won` (the payment stands) or `lost` (the money went back to the buyer).
+ * The webhook takes the paid listing down when one opens; nothing republishes it.
+ */
+export const orderDisputeStatuses = ['open', 'won', 'lost'] as const
+export type OrderDisputeStatus = (typeof orderDisputeStatuses)[number]
 
 export const orders = sqliteTable(
   'orders',
@@ -1757,6 +1772,9 @@ export const orders = sqliteTable(
     refundRetryAt: text('refund_retry_at'),
     /** The admin's reason for the activity log (#70 screen 13). */
     refundNote: text('refund_note'),
+    /** The payment's dispute, if the buyer opened one (#473), and when it was first reported. */
+    disputeStatus: text('dispute_status', { enum: orderDisputeStatuses }),
+    disputedAt: text('disputed_at'),
     paidAt: text('paid_at'),
     appliedAt: text('applied_at'),
     refundedAt: text('refunded_at'),
@@ -1784,6 +1802,14 @@ export const orders = sqliteTable(
     check(
       'orders_refund_reason_valid',
       sql`${table.refundReason} IS NULL OR ${table.refundReason} IN (${sqlList(orderRefundReasons)})`
+    ),
+    check(
+      'orders_dispute_status_valid',
+      sql`${table.disputeStatus} IS NULL OR ${table.disputeStatus} IN (${sqlList(orderDisputeStatuses)})`
+    ),
+    check(
+      'orders_dispute_recorded',
+      sql`(${table.disputeStatus} IS NULL) = (${table.disputedAt} IS NULL)`
     ),
     check(
       'orders_target_matches_purpose',
@@ -1829,6 +1855,10 @@ export const orders = sqliteTable(
     uniqueIndex('orders_provider_checkout_idx')
       .on(table.provider, table.providerCheckoutId)
       .where(sql`${table.providerCheckoutId} IS NOT NULL`),
+    // A refund's or a dispute's payment finds its order (#473).
+    index('orders_provider_payment_idx')
+      .on(table.provider, table.providerPaymentId)
+      .where(sql`${table.providerPaymentId} IS NOT NULL`),
     index('orders_status_created_idx').on(table.status, table.createdAt),
     index('orders_submission_idx').on(table.submissionId),
     index('orders_listing_idx').on(table.listingId),
@@ -1854,7 +1884,9 @@ export const billingEvents = sqliteTable(
   },
   table => [
     primaryKey({ columns: [table.provider, table.eventId] }),
-    index('billing_events_order_idx').on(table.orderId)
+    index('billing_events_order_idx').on(table.orderId),
+    // The sweep's recent payment alerts (#473, #481).
+    index('billing_events_processed_idx').on(table.processedAt)
   ]
 )
 

@@ -4,7 +4,7 @@ import { errorFields } from '@/lib/telemetry/error-fields'
 
 export const dynamic = 'force-dynamic'
 
-/** Larger than any checkout event the provider sends; a bigger body is refused unread. */
+/** Larger than any event the provider sends; a bigger body is refused unread. */
 const MAX_WEBHOOK_BYTES = 256 * 1024
 
 function answer(body: Record<string, unknown>, status: number): Response {
@@ -15,7 +15,8 @@ function answer(body: Record<string, unknown>, status: number): Response {
  * `POST /api/billing/webhook/` (#68): the billing provider's webhook. The raw
  * body is verified against the signature header and its timestamp before anything is read, and
  * each event id is processed once (`billing_events`). It answers before a payment's fulfilment,
- * which runs on in the request's `waitUntil` (#468). 404 while orders are off.
+ * which runs on in the request's `waitUntil` (#468); refunds and disputes made outside the site
+ * are recorded before it answers (#473). 404 while orders are off.
  */
 export async function POST(request: Request): Promise<Response> {
   let deps: Awaited<ReturnType<typeof billing>>

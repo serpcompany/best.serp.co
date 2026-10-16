@@ -47,6 +47,8 @@ export interface QueueRow {
   ownerEmail: string | null
   paid: boolean
   paidAmountCents: number | null
+  /** A paid submission's payment refunded, or disputed and not won (#473). */
+  paymentLoss: 'disputed' | 'refunded' | null
   queuedAt: string | null
   slug: string
   status: string
@@ -235,7 +237,13 @@ export function ReviewQueue({
       {
         cell: ({ row }) => (
           <span className="tabular-nums text-muted-foreground">
-            {row.original.paidAmountCents !== null ? formatUsd(row.original.paidAmountCents) : '—'}
+            {row.original.paymentLoss === 'refunded'
+              ? 'Refunded'
+              : row.original.paymentLoss === 'disputed'
+                ? 'Disputed'
+                : row.original.paidAmountCents !== null
+                  ? formatUsd(row.original.paidAmountCents)
+                  : '—'}
           </span>
         ),
         header: 'Paid',

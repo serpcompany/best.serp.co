@@ -10,7 +10,8 @@
  * 3. Render the template, with links for this environment and the `[staging]` prefix.
  * 4. Claim the template and event key in the D1 ledger (`email_deliveries`). A pair that is
  *    in flight or already sent is a duplicate and is not sent again; a failed one may be
- *    retried by enqueueing it again. If the ledger cannot be reached, nothing is sent.
+ *    retried by enqueueing it again, and a stalled one by a recovery (`recover`). If the
+ *    ledger cannot be reached, nothing is sent.
  * 5. Send once through the configured provider (no automatic retry), then record the outcome.
  *
  * Logs carry the event key and template id (only when well-formed; anything else is logged
@@ -72,6 +73,11 @@ export interface EmailRequest<Input> {
    */
   eventKey: string
   input: Input
+  /**
+   * A recovery (the billing sweep's, #481): also re-sends an earlier attempt whose Worker stopped
+   * mid-send, while the provider's idempotency key still makes a repeat harmless.
+   */
+  recover?: boolean
   /** One recipient address. */
   to: string
 }
@@ -250,7 +256,12 @@ export function createEmailService<R extends EmailTemplateRegistry>(
     const idempotencyKey = await emailIdempotencyKey(policy.environment, templateId, eventKey)
     let claim: EmailDeliveryClaim
     try {
-      claim = await ledger.claim({ eventKey, provider, templateId })
+      claim = await ledger.claim({
+        eventKey,
+        provider,
+        recover: request.recover === true,
+        templateId
+      })
     } catch (error) {
       log({
         ...recipient,

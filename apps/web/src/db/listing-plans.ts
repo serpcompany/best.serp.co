@@ -176,7 +176,10 @@ function submissionEvent(
 /**
  * Live → unpublished, with a reason code (for example `admin` or `badge_missing`). Refused while
  * the listing's own submission is still in review: the reviewer rejects it instead, so
- * `paid_pending_review` stays live.
+ * `paid_pending_review` stays live. Only a payment dispute or a refund made at the provider
+ * (`whileInReview`, #473) takes such a listing down, leaving a `paid_pending_review` (or
+ * `changes_requested`) submission whose listing isn't live: Approve is refused, and so is the
+ * owner's resubmission, until an admin republishes it (then Approve) or rejects it.
  */
 export function buildUnpublishListingPlans(input: {
   listingId: string
@@ -184,14 +187,20 @@ export function buildUnpublishListingPlans(input: {
   note?: string
   publication: CatalogPublication
   reason: string
+  whileInReview?: boolean
 }): StatementPlan[] {
   if (!input.reason.trim()) throw new Error('Unpublishing a listing needs a reason.')
   const note = input.note?.trim() || null
   return [
-    ...beginCatalogPublicationPlans(input.publication, {
-      sql: `${listingIsLiveGuard('?')} AND NOT ${listingHasQueuedSubmission('?')}`,
-      params: [input.listingId, input.listingId]
-    }),
+    ...beginCatalogPublicationPlans(
+      input.publication,
+      input.whileInReview
+        ? { sql: listingIsLiveGuard('?'), params: [input.listingId] }
+        : {
+            sql: `${listingIsLiveGuard('?')} AND NOT ${listingHasQueuedSubmission('?')}`,
+            params: [input.listingId, input.listingId]
+          }
+    ),
     {
       sql: `UPDATE listings SET is_active=0,updated_at=?
         WHERE id=? AND status='approved' AND is_active=1`,

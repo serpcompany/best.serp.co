@@ -42,7 +42,9 @@ function toRow(item: ReviewQueueItem, media: string): QueueRow {
     ownerEmail: item.ownerEmail,
     paid,
     // The amount charged is in #68's orders; the paid plan is $49 (#59).
-    paidAmountCents: item.paidAt && !item.refundedAt ? PAID_LISTING_PRICE_CENTS : null,
+    paidAmountCents:
+      item.paidAt && !item.refundedAt && !item.paymentLoss ? PAID_LISTING_PRICE_CENTS : null,
+    paymentLoss: paid ? item.paymentLoss : null,
     queuedAt: item.queuedAt,
     slug: item.slug,
     status: item.status,

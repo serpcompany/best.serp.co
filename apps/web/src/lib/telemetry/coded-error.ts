@@ -11,6 +11,7 @@ export const FAILURE_CODES = [
   'billing_mock_port_invalid',
   'billing_mock_port_not_local',
   'billing_origin_invalid',
+  'billing_payment_change_not_recorded',
   'billing_secret_key_wrong_mode',
   'billing_secrets_missing',
   'billing_tax_unsupported',

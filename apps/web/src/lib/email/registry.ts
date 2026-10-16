@@ -1,4 +1,4 @@
-import { adminNewMessageEmail, adminReviewReadyEmail } from './emails/admin'
+import { adminNewMessageEmail, adminPaymentAlertEmail, adminReviewReadyEmail } from './emails/admin'
 import { claimCodeEmail, signInCodeEmail } from './emails/codes'
 import { draftExpiredEmail, draftReminderEmail } from './emails/drafts'
 import {
@@ -26,13 +26,15 @@ import { createEmailTemplateRegistry } from './templates'
  * delivery's ledger key and provider idempotency key, so renaming one would resend.
  *
  * Callers: `enqueueEmail('<id>', { eventKey, input, to })` from `./server.ts`. Admin alerts go
- * to `EMAIL_ADMIN_RECIPIENT`. Better Auth's OTP sender (`lib/auth/sign-in-code-email.ts`,
- * #60) enqueues the sign-in code (`SIGN_IN_CODE_TEMPLATE`) for sign-in codes only, keyed
+ * to `EMAIL_ADMIN_RECIPIENT`, the billing webhook's payment alerts (#473) included. Better
+ * Auth's OTP sender (`lib/auth/sign-in-code-email.ts`, #60) enqueues the sign-in code
+ * (`SIGN_IN_CODE_TEMPLATE`) for sign-in codes only, keyed
  * `emailEventKey('sign-in-code', crypto.randomUUID())`; the code's length and lifetime are
  * defined once, in `./sign-in-code.ts`.
  */
 export const appEmailTemplates = createEmailTemplateRegistry({
   'admin-new-message': adminNewMessageEmail,
+  'admin-payment-alert': adminPaymentAlertEmail,
   'admin-review-ready': adminReviewReadyEmail,
   'badge-missing': badgeMissingEmail,
   'changes-requested': changesRequestedEmail,

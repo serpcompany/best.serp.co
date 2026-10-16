@@ -30,6 +30,7 @@ idempotency key, so renaming a template would let an event send again.
 | `draft-expired` | Day 30: the draft is removed and the URL released | submitter | `/submit/?url=<website>` |
 | `admin-review-ready` | A submission or revision is ready for review | admin | `/admin/submissions/<id>/` |
 | `admin-new-message` | A submitter sent a message (no message body) | admin | `/admin/inbox/<thread>/` |
+| `admin-payment-alert` | A payment was disputed, refunded outside the site (all or part), or a refund failed (#473) | admin | `/admin/orders/` |
 
 - `draft-reminder` has two variants. `choose_plan` shows "Choose a plan". `complete_checkout`
   shows "Complete checkout", for a draft where the paid listing was chosen but not paid. The
@@ -38,6 +39,9 @@ idempotency key, so renaming a template would let an event send again.
 - `badge-missing` names one of three findings: `nofollow`, `missing`, or `wrong_destination`.
 - `admin-review-ready` covers the free plan and both paid states: "(paid, live now)" and
   "(paid, waiting for review)".
+- `admin-payment-alert` has no #70 mockup: #473 added it with the order number, the product, and
+  whether the listing is live now. Its `kind` is `disputed`, `refunded`, `partially_refunded`, or
+  `refund_failed`, keyed `payment-alert:<kind>:<order id>`.
 - Prices (`priceCents`, `paidCents`, `refundedCents`) and times (`checkedAt`, `recheckAt`,
   `warnedAt`, `badgeVerifiedAt`) are inputs. Times render in UTC
   (`Mon, Oct 5 at 09:14 UTC`).

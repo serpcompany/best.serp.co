@@ -1,5 +1,11 @@
 import type { Database } from './client'
 import {
+  claimPaymentLossSql,
+  type PaymentLoss,
+  submissionPaymentLossSql,
+  toPaymentLoss
+} from './payment-kept'
+import {
   listingInRetiredCategory,
   MAX_STAGED_FAQS,
   MAX_STAGED_RESOURCE_LINKS,
@@ -109,6 +115,8 @@ export interface AccountSubmission {
   logoUrl: string
   name: string
   paidAt: string | null
+  /** Its payment no longer kept (`payment-kept.ts`): refunded, or disputed and not won. */
+  paymentLoss: PaymentLoss | null
   plan: SubmissionPlan | null
   refundedAt: string | null
   rejection: { category: RejectionCategory | null; reason: string } | null
@@ -184,6 +192,7 @@ export interface AccountListing {
   live: boolean
   logoUrl: string | null
   name: string
+  /** `free` too for a paid one whose payment is no longer kept (`payment-kept.ts`, #473). */
   plan: SubmissionPlan | null
   publishedAt: string | null
   /** The user's latest revision of the listing, open or decided. */
@@ -262,8 +271,8 @@ const SUBMISSION_COLUMNS = `s.id,s.slug,s.name,s.description,s.website,s.logo_ur
   l.slug AS listing_slug,
   CASE WHEN l.status='approved' AND l.is_active=1 AND l.published_at IS NOT NULL
     THEN 1 ELSE 0 END AS listing_live,
-  s.paid_at,s.refunded_at,s.reviewer_note,s.reviewed_at,s.rejection_reason,s.rejection_category,
-  s.withdrawal_reason,s.badge_verified_at,s.verification_attempts,s.last_verification_at,
+  s.paid_at,s.refunded_at,${submissionPaymentLossSql('s')} AS payment_loss,s.reviewer_note,
+  s.reviewed_at,s.rejection_reason,s.rejection_category,s.withdrawal_reason,s.badge_verified_at,s.verification_attempts,s.last_verification_at,
   s.last_verification_error,s.content_version`
 
 const SUBMISSION_FROM = `FROM listing_submissions s LEFT JOIN categories c ON c.slug=s.category_slug
@@ -287,6 +296,8 @@ const LISTING_COLUMNS = `l.id,l.slug,l.name,l.description,l.website,l.is_active,
   (SELECT o.verified_via FROM listing_owners o WHERE o.listing_id=l.id AND o.user_id=?1
     AND o.role='owner' AND o.revoked_at IS NULL LIMIT 1) AS verified_via,
   s.id AS submission_id,s.status AS submission_status,s.plan,s.paid_at,s.refunded_at,
+  CASE WHEN s.id IS NOT NULL THEN ${submissionPaymentLossSql('s')}
+    ELSE ${claimPaymentLossSql('l.id', '?1')} END AS payment_loss,
   s.verification_attempts,s.last_verification_at,s.last_verification_error,
   r.id AS revision_id,r.status AS revision_status,r.created_at AS revision_created_at,
   r.updated_at AS revision_updated_at,r.reviewer_note AS revision_note,
@@ -443,6 +454,7 @@ function toSubmission(row: Row): AccountSubmission {
     logoUrl: text(row.logo_url),
     name: text(row.name),
     paidAt: accountInstant(row.paid_at),
+    paymentLoss: toPaymentLoss(row.payment_loss),
     plan: (optional(row.plan) as SubmissionPlan | null) ?? null,
     refundedAt: accountInstant(row.refunded_at),
     rejection:
@@ -510,14 +522,18 @@ function toListing(row: Row, history: AccountBadgeCheck[], now: Date): AccountLi
     live: Number(row.live) === 1,
     logoUrl: optional(row.logo_url),
     name: text(row.name),
-    // Without a submission, a claim decides the plan (#67): paid, or free by the badge.
-    plan: submissionId
-      ? plan
-      : row.verified_via === 'paid_claim'
-        ? 'paid'
-        : row.verified_via === 'badge_claim'
-          ? 'free'
-          : null,
+    // Without a submission, a claim decides the plan (#67): paid, or free by the badge. A
+    // payment no longer kept reads as free, as /admin reads it (#473).
+    plan:
+      toPaymentLoss(row.payment_loss) !== null
+        ? 'free'
+        : submissionId
+          ? plan
+          : row.verified_via === 'paid_claim'
+            ? 'paid'
+            : row.verified_via === 'badge_claim'
+              ? 'free'
+              : null,
     publishedAt: accountInstant(row.published_at),
     revision: revisionId
       ? {

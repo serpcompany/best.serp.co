@@ -57,6 +57,8 @@ export interface SubmissionDetailView {
   content: string
   contentVersion: number
   description: string
+  /** Its payment is disputed and not won (#473). */
+  disputed: boolean
   faqs: Array<{ answer: string; question: string }>
   id: string
   listingLive: boolean
@@ -81,6 +83,7 @@ const CONTACT = '/contact/'
 function planLabel(view: SubmissionDetailView): string {
   if (view.plan === 'paid') {
     if (view.refunded) return 'Paid ($49, refunded)'
+    if (view.disputed) return 'Paid ($49, disputed)'
     if (view.rejection?.category === 'prohibited') return 'Paid ($49, not refunded)'
     return 'Paid ($49)'
   }

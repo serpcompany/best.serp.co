@@ -1,6 +1,7 @@
 import type { RevisionReview, SubmissionReview } from '@/db/admin-queries'
 import type { ListingDetail } from '@/db/contracts'
 import { resolveListingDetailMedia } from '@/db/media-keys'
+import type { PaymentLoss } from '@/db/payment-kept'
 import { renderableImage } from '../media/renderable-image'
 import { buildSubmissionReviewPreview } from '../submissions/review-preview'
 import { featuredImageView } from './featured-image'
@@ -57,7 +58,8 @@ export function submissionView(review: SubmissionReview, mediaBaseUrl: string): 
     logoUrl: review.logoUrl,
     name: review.name,
     paid,
-    paidAmountCents: paid && review.paidAt && !review.refundedAt ? PAID_LISTING_PRICE_CENTS : null,
+    paidAmountCents: paid && review.paidAt && !review.paymentLoss ? PAID_LISTING_PRICE_CENTS : null,
+    paymentLoss: paid ? review.paymentLoss : null,
     queuedAt: queuedAt(review),
     rejectionCategory: review.rejectionCategory,
     rejectionReason: review.rejectionReason,
@@ -106,6 +108,7 @@ export function revisionView(review: RevisionReview, mediaBaseUrl: string): Revi
     name: review.name,
     paid: review.plan === 'paid',
     paidAmountCents: null,
+    paymentLoss: null,
     queuedAt: review.status === 'changes_requested' ? review.reviewedAt : review.updatedAt,
     rejectionCategory: null,
     rejectionReason: review.rejectionReason,
@@ -219,7 +222,10 @@ export interface ReviewView {
   logoUrl: string
   name: string
   paid: boolean
+  /** The amount paid, or null when unpaid or its payment is no longer kept (`paymentLoss`). */
   paidAmountCents: number | null
+  /** A paid submission's payment refunded, or disputed and not won (#473): Approve refuses it. */
+  paymentLoss: PaymentLoss | null
   queuedAt: string | null
   rejectionCategory: 'other' | 'prohibited' | null
   rejectionReason: string | null

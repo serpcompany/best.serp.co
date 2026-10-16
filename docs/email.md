@@ -133,7 +133,11 @@ Each template and key sends at most once:
 4. If the ledger cannot be reached, nothing is sent.
 5. If a send's outcome is never recorded, the row stays `sending` and the email is never
    resent. That happens when useSend accepted it but D1 failed, or when the isolate stopped or
-   the request hung past the `waitUntil` budget after the claim.
+   the request hung past the `waitUntil` budget after the claim. Only a recovery
+   (`recover: true`, the billing sweep's resend of recent payment emails, #481) claims such a
+   row again: once it is 10 minutes old, and only within 23 hours of its first claim, inside
+   useSend's 24-hour idempotency window, so a send useSend did accept is answered with the
+   original message instead of a second one.
 
 The ledger holds the template id, key, provider, status, attempts, provider message id, the
 provider error code, and SQLite-format UTC timestamps; never a recipient, subject, or body.

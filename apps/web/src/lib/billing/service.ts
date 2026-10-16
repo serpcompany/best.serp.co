@@ -2,17 +2,23 @@ import {
   type BillingOperations,
   buildAttachCheckoutPlans,
   buildClaimRefundPlans,
+  buildCloseDisputePlans,
   buildFinishRefundPlans,
+  buildFlagRefundFailedPlans,
   buildMarkFailedReasonPlans,
   buildMarkOrderAppliedPlans,
   buildMarkOrderFailedPlans,
   buildMarkOrderPaidPlans,
+  buildRecordDisputePlans,
+  buildRecordProviderRefundPlans,
   buildRecordRefundFailurePlans,
   type CheckoutSubmission,
   listingCheckoutPurpose,
   type OrderRecord,
-  orderTargetKey
+  orderTargetKey,
+  PROVIDER_ACTOR
 } from '@/db/billing'
+import { buildUnpublishListingPlans } from '@/db/listing-plans'
 import {
   type CatalogPublication,
   prepareCatalogPublication,
@@ -27,18 +33,20 @@ import {
   buildRelistListingToPaidPlans,
   buildUpgradeListingToPaidPlans
 } from '@/db/submission-plans'
+import type { PaymentAlertKind } from '../email/emails/admin'
 import type { AppEmailTemplates } from '../email/registry'
 import type { EmailRequest } from '../email/service'
 import type { TemplateInput } from '../email/templates'
 import { CodedError } from '../telemetry/coded-error'
 import { errorFields } from '../telemetry/error-fields'
 import { confirmAgainPath, tooLateForCheckout } from './checkout-window'
-import type { GuardrailResult } from './guardrails'
+import { type GuardrailResult, guardrailProblem } from './guardrails'
 import {
   type BillingEvent,
   type BillingProvider,
   BillingWebhookError,
-  type CheckoutState
+  type CheckoutState,
+  type PaymentChange
 } from './provider'
 
 /**
@@ -72,6 +80,12 @@ const FAILED_RECONCILE_MS = 3 * 24 * 60 * 60 * 1000
 const SWEEP_PROVIDER_CALLS = 20
 /** How often a write that lost the catalog publication race tries again. */
 const PUBLICATION_ATTEMPTS = 3
+/**
+ * The sweep sends a payment's emails again for this long after it was applied or changed
+ * outside the site (#481), well inside the email provider's idempotency window, and from
+ * `RECONCILE_AFTER_MS` after, once the webhook's own send has had its chance.
+ */
+const EMAIL_RECOVERY_MS = 6 * 60 * 60 * 1000
 
 export type Notify = <K extends keyof AppEmailTemplates & string>(
   templateId: K,
@@ -151,6 +165,10 @@ const failure = (
 
 function log(event: string, detail: Record<string, unknown>): void {
   console.info(JSON.stringify({ event, ...detail }))
+}
+
+function logWarning(event: string, detail: Record<string, unknown>): void {
+  console.warn(JSON.stringify({ event, ...detail }))
 }
 
 /** A failure's code and name, never its message: a provider's can echo what the buyer entered. */
@@ -438,7 +456,8 @@ export interface WebhookAnswer {
 /**
  * What acting on an event did before the answer (`outcome`, recorded on the event), and the work
  * that runs after it (`after`, through the request's `waitUntil`). Each event type the webhook
- * handles adds its branch to `actOnEvent`.
+ * handles adds its branch to `actOnEvent`: the checkout events, and the payment events (refunds
+ * and disputes, #473).
  */
 interface EventAction {
   /**
@@ -449,6 +468,18 @@ interface EventAction {
   orderId: string | null
   outcome: string
 }
+
+type CheckoutEventType = Extract<BillingEvent['type'], `checkout_${string}`>
+type PaymentEventType = Exclude<BillingEvent['type'], CheckoutEventType | 'ignored'>
+
+const isCheckoutEvent = (type: BillingEvent['type']): type is CheckoutEventType =>
+  type.startsWith('checkout_')
+
+/**
+ * Fulfilment outcomes that applied nothing (#481): three lost compare-and-swaps, or an order
+ * that vanished. Logged as a failure, since the delivery itself was answered 200.
+ */
+const UNFINISHED_FULFILMENT = new Set(['retry_later', 'unknown_order'])
 
 /**
  * The order an event's checkout belongs to: the order holding that checkout id. The order id
@@ -476,6 +507,8 @@ async function orderForCheckout(
  * A fulfilment that fails or runs out of time leaves the order `paid` and unapplied (or a claimed
  * refund `refunding`), which the buyer's return and the hourly sweep finish; a later delivery of
  * the event is a replay, and every fulfilment step is a compare-and-swap, so it applies once.
+ * A refund or dispute is recorded, and its listing taken down, before the answer
+ * (`actOnPayment`, #473).
  */
 export async function handleWebhook(
   deps: BillingDependencies,
@@ -511,12 +544,14 @@ export async function handleWebhook(
     // provider retries), the payment is still applied, and the retry finds it applied.
     input.waitUntil(
       after().then(
-        result =>
-          log('billing_webhook_fulfilled', {
-            order: orderId,
-            outcome: result,
-            type: event.providerType
-          }),
+        result => {
+          const detail = { order: orderId, outcome: result, type: event.providerType }
+          if (UNFINISHED_FULFILMENT.has(result)) {
+            logWarning('billing_webhook_fulfilment_failed', detail)
+          } else {
+            log('billing_webhook_fulfilled', detail)
+          }
+        },
         error =>
           logError('billing_webhook_fulfilment_failed', error, {
             order: orderId,
@@ -531,19 +566,25 @@ export async function handleWebhook(
 }
 
 async function actOnEvent(deps: BillingDependencies, event: BillingEvent): Promise<EventAction> {
-  if (!event.checkout || event.type === 'ignored') return { orderId: null, outcome: 'ignored' }
-  const order = await orderForCheckout(deps, event.checkout)
-  if (!order) return { orderId: null, outcome: 'unknown_order' }
-  return {
-    orderId: order.id,
-    ...(await actOnCheckout(deps, order, event.type, event.checkout))
+  const type = event.type
+  if (type === 'ignored') return { orderId: null, outcome: 'ignored' }
+  if (isCheckoutEvent(type)) {
+    if (!event.checkout) return { orderId: null, outcome: 'ignored' }
+    const order = await orderForCheckout(deps, event.checkout)
+    if (!order) return { orderId: null, outcome: 'unknown_order' }
+    return { orderId: order.id, ...(await actOnCheckout(deps, order, type, event.checkout)) }
   }
+  if (!event.payment) return { orderId: null, outcome: 'ignored' }
+  const order = await deps.operations.orderByPayment(deps.provider.name, event.payment.paymentId)
+  // A payment no order took (a charge made outside the site): acknowledged and logged.
+  if (!order) return { orderId: null, outcome: 'unknown_order' }
+  return { orderId: order.id, outcome: await actOnPayment(deps, order, type, event.payment) }
 }
 
 async function actOnCheckout(
   deps: BillingDependencies,
   order: OrderRecord,
-  type: Exclude<BillingEvent['type'], 'ignored'>,
+  type: CheckoutEventType,
   checkout: CheckoutState
 ): Promise<Omit<EventAction, 'orderId'>> {
   if (type === 'checkout_paid') {
@@ -675,13 +716,15 @@ async function publicationFor(
  * Applies a paid order once and returns its outcome. Safe to call any number of times: an
  * applied (or refunded) order answers its recorded outcome. A payment the target can no longer
  * accept (withdrawn, rejected, already paid by another checkout, an admin unpublished it), or a
- * charge that didn't match the order, is refunded in full (`unapplied`).
+ * charge that didn't match the order, is refunded in full (`unapplied`). A disputed payment is
+ * never applied, nor refunded (the provider refuses): an admin decides (#473).
  */
 export async function fulfilOrder(deps: BillingDependencies, orderId: string): Promise<string> {
   for (let attempt = 0; attempt < PUBLICATION_ATTEMPTS; attempt += 1) {
     const order = await deps.operations.order(orderId)
     if (!order) return 'unknown_order'
     if (order.status !== 'paid' || order.appliedAt !== null) return order.outcome ?? order.status
+    if (order.disputeStatus !== null) return 'disputed'
     const applied =
       order.attention === 'amount_mismatch'
         ? await refundUnapplied(deps, order)
@@ -784,19 +827,25 @@ async function applySubmissionPayment(
   return 'held'
 }
 
-/** "Live after payment" or "Payment received: in review", and the admin's review alert. */
+/**
+ * "Live after payment" or "Payment received: in review", and the admin's review alert; the
+ * sweep sends them again (`recover`) for a fulfilment cut off before they went (#481).
+ */
 async function emailPaidSubmission(
   deps: BillingDependencies,
   submission: CheckoutSubmission,
   order: OrderRecord,
-  result: { live: true } | { live: false; problem: string }
+  result: { live: true } | { live: false; problem: string },
+  recover = false
 ): Promise<void> {
   const eventKey = deps.eventKey('submission-paid', submission.id)
+  const again = recover ? { recover: true } : {}
   const sends: Promise<void>[] = []
   if (submission.ownerEmail) {
     sends.push(
       result.live
         ? deps.notify('listing-live-paid', {
+            ...again,
             eventKey,
             input: {
               listingName: submission.name,
@@ -806,6 +855,7 @@ async function emailPaidSubmission(
             to: submission.ownerEmail
           })
         : deps.notify('payment-received-in-review', {
+            ...again,
             eventKey,
             input: {
               checkProblem: result.problem,
@@ -820,6 +870,7 @@ async function emailPaidSubmission(
   }
   sends.push(
     deps.notify('admin-review-ready', {
+      ...again,
       eventKey,
       input: {
         category: submission.categoryName ?? '',
@@ -905,6 +956,8 @@ async function applyClaimPayment(deps: BillingDependencies, order: OrderRecord):
   }
   const current = await deps.operations.order(order.id)
   if (current?.appliedAt) return current.outcome ?? 'claimed'
+  // Disputed meanwhile (#473): never applied, nor refunded; `fulfilOrder` answers it.
+  if (current?.disputeStatus) return 'retry'
   return refundUnapplied(deps, current ?? order)
 }
 
@@ -1076,13 +1129,28 @@ async function finishRefund(deps: BillingDependencies, orderId: string): Promise
     )
     throw error
   }
+  return recordClaimedRefund(deps, orderId, refundId, true)
+}
+
+/**
+ * Records a claimed refund the provider made, in one batch: the rejection's or the admin's
+ * recorded listing change, and `refunded`. `withRejection` false records a rejection's refund
+ * on the order alone: its own refund (`refundRejectedSubmission`, which the sweep retries) then
+ * records it on the submission and emails the owner.
+ */
+async function recordClaimedRefund(
+  deps: BillingDependencies,
+  orderId: string,
+  refundId: string | null,
+  withRejection: boolean
+): Promise<RefundListing> {
   for (let attempt = 0; attempt < PUBLICATION_ATTEMPTS; attempt += 1) {
     const order = await deps.operations.order(orderId)
     if (!order) throw new CodedError('refund_order_missing', `Order ${orderId} not found.`)
     if (order.status === 'refunded') return listingResult(order.refundListingAction)
     let plans: StatementPlan[] = []
     let result: RefundListing = 'unchanged'
-    if (order.refundReason === 'rejected' && order.submissionId) {
+    if (order.refundReason === 'rejected' && order.submissionId && withRejection) {
       const submission = await deps.operations.checkoutSubmission(order.submissionId)
       plans =
         submission?.refundedAt === null
@@ -1227,6 +1295,16 @@ export type RefundDecision =
 const REFUND_CHECK_MAX_AGE_MS = 60 * 60 * 1000
 
 /**
+ * A payment under dispute, or one whose dispute was lost, can't be refunded: the provider refuses
+ * (#473). Admin Orders offers no "Refund…" for it, and the refund routes answer 409.
+ */
+export function disputeBlocksRefund(order: Pick<OrderRecord, 'disputeStatus'>): boolean {
+  return order.disputeStatus === 'open' || order.disputeStatus === 'lost'
+}
+
+const DISPUTED = failure(409, 'disputed', 'This payment is disputed, so it can’t be refunded here.')
+
+/**
  * Decides an admin's refund of a paid order (#70 screen 13; #59 amendment 2). A live paid
  * listing (a paid submission, an upgrade, or a relist) has its badge checked once, at refund
  * (`checkBadgeAtRefund`): a pass keeps it live as a free listing, a miss or a result that can't
@@ -1323,6 +1401,7 @@ export async function previewRefund(
   if (order.status !== 'paid') {
     return failure(409, 'not_refundable', 'Only a paid order can be refunded.')
   }
+  if (disputeBlocksRefund(order)) return DISPUTED
   const decision = await decideRefund(deps, order)
   return 'kind' in decision ? { ok: true, ...decision } : decision
 }
@@ -1354,6 +1433,7 @@ export async function refundOrder(
   if (order.status !== 'paid') {
     return failure(409, 'not_refundable', 'Only a paid order can be refunded.')
   }
+  if (disputeBlocksRefund(order)) return DISPUTED
   const decision = await decideRefund(deps, order, input.badgeCheckId)
   if (!('kind' in decision)) return decision
   if (
@@ -1390,20 +1470,391 @@ export async function refundOrder(
 }
 
 // ---------------------------------------------------------------------------------------------
+// Payment changes outside the site: refunds and disputes (#473)
+
+/** The admin's alert for each payment event outcome that sends one. */
+const PAYMENT_ALERTS: Readonly<Record<string, PaymentAlertKind>> = {
+  disputed: 'disputed',
+  disputed_lost: 'disputed',
+  partially_refunded: 'partially_refunded',
+  refund_failed: 'refund_failed',
+  refunded_at_provider: 'refunded'
+}
+
+/**
+ * A refund or a dispute the provider reported, on the order that took the payment, before the
+ * answer. A dispute that opens, or a refund of the whole payment made outside the site (the
+ * provider's dashboard), takes down the listing the payment made or kept live, in the same batch
+ * as the order's record (the owner's decision on #156), and the admin is emailed. A closed
+ * dispute records its outcome only (a lost one never reported open is opened first): nothing
+ * republishes the listing, the admin decides. The site's own refund was claimed (`refunding`)
+ * before the provider was asked, so its report is answered as the order stands; one the site's
+ * refund failed to make is recorded as that refund. Returns the event's outcome.
+ */
+async function actOnPayment(
+  deps: BillingDependencies,
+  order: OrderRecord,
+  type: PaymentEventType,
+  payment: PaymentChange
+): Promise<string> {
+  switch (type) {
+    case 'payment_disputed':
+      return recordPaymentChange(deps, order, 'disputed')
+    case 'dispute_closed':
+      return payment.disputeOutcome ? closeDispute(deps, order, payment.disputeOutcome) : 'ignored'
+    case 'payment_refunded':
+      return payment.partial
+        ? alertPartialRefund(deps, order)
+        : recordPaymentChange(deps, order, 'refunded')
+    case 'payment_refund_failed':
+      return flagRefundFailed(deps, order)
+  }
+}
+
+interface Takedown {
+  listingAction: OrderRefundListingAction
+  plans: StatementPlan[]
+  submission: CheckoutSubmission | null
+}
+
+/**
+ * The plans that take down the listing an order's payment made or kept live (a paid
+ * submission's, an upgrade's, or a relist's), even while its submission is in review, or the
+ * listing whose ownership a paid claim's payment bought: a claim's comes down too (the owner's
+ * decision on #473, 2026-10-16) while its payer still owns it through that payment, and its
+ * ownership stays as it is for an admin to decide. A payment nothing
+ * applied, or one held for review, has no listing live; and a refunded order's listing no longer
+ * rides on its payment (a refund decided its listing already): those take nothing down (`none`).
+ * A dispute also takes it down while the site's own refund hasn't returned the money (still
+ * `refunding`: in flight, retrying, or flagged `refund_failed`; a dispute usually makes that refund
+ * fail), but never a `refunded` order's, whatever its flag says: that refund decided its listing,
+ * and a `refund.failed` reported after it is the admin's to decide, from its alert. A listing
+ * already down, by that refund's rejection or listing change say, stays as it is
+ * (`already_unpublished`).
+ */
+async function takedownPlans(
+  deps: BillingDependencies,
+  order: OrderRecord,
+  reason: 'disputed' | 'refunded'
+): Promise<Takedown> {
+  const none: Takedown = { listingAction: 'none', plans: [], submission: null }
+  const kept = order.status === 'paid' || (reason === 'disputed' && order.status === 'refunding')
+  if (!kept || order.appliedAt === null || order.outcome === 'unapplied') return none
+  if (order.purpose === 'claim') {
+    // The listing whose ownership this payment bought, while the payer still owns it through it:
+    // after an admin's revoke or transfer (a stolen card, say) it belongs to someone else, so
+    // the payment change is recorded and the admin emailed, and nothing comes down.
+    if (!(await deps.operations.paidClaimStands(order))) return none
+    const slug = (await deps.operations.adminOrder(order.id))?.listingSlug
+    return order.listingId && slug
+      ? unpublishTakedown(deps, { listingId: order.listingId, reason, slug, submission: null })
+      : none
+  }
+  if (!order.submissionId) return none
+  const submission = await deps.operations.checkoutSubmission(order.submissionId)
+  if (!submission?.listingId) return { ...none, submission }
+  return unpublishTakedown(deps, {
+    listingId: submission.listingId,
+    reason,
+    slug: submission.slug,
+    submission
+  })
+}
+
+/** Unpublishes a live listing, through the /admin unpublish path, even while in review. */
+async function unpublishTakedown(
+  deps: BillingDependencies,
+  input: {
+    listingId: string
+    reason: 'disputed' | 'refunded'
+    slug: string
+    submission: CheckoutSubmission | null
+  }
+): Promise<Takedown> {
+  const { listingId, reason, submission } = input
+  if (!(await deps.operations.listingLive(listingId))) {
+    return { listingAction: 'already_unpublished', plans: [], submission }
+  }
+  const now = nowIso(deps)
+  return {
+    listingAction: 'unpublish',
+    plans: buildUnpublishListingPlans({
+      listingId,
+      publication: await publicationFor(deps, {
+        action: reason === 'disputed' ? 'dispute-unpublish' : 'provider-refund-unpublish',
+        actor: BILLING_ACTOR,
+        entityId: listingId,
+        now,
+        slug: input.slug
+      }),
+      reason,
+      whileInReview: true
+    }),
+    submission
+  }
+}
+
+/**
+ * The paid submission states a refund made at the provider records refunded on (`at_provider`):
+ * approved, or held for review. One in review with its listing (`paid_pending_review`, or
+ * `changes_requested` from it) can't hold `refunded_at` (a CHECK), so its refunded order is the
+ * record the admin's plan reading checks; a rejection records it on the submission, as a
+ * rejected one's own refund does (and emails the owner).
+ */
+const REFUNDABLE_AT_PROVIDER: ReadonlySet<string> = new Set(['approved', 'verified'])
+
+/**
+ * Records a dispute that opened, or a refund of the whole payment made at the provider, with the
+ * listing's takedown in the same batch, then alerts the admin. Neither comes back as paid: the
+ * admin's plan reading checks the paying order (refunded, or disputed and not won), and a refund
+ * also records an approved or held submission as refunded. Each attempt decides on the order
+ * as it reads it now; three lost writes (the catalog publication race) throw, so the delivery
+ * answers 500 and the provider's retry runs it again. One already recorded (an earlier delivery
+ * that failed before its answer) is alerted again, which the email ledger sends once.
+ */
+async function recordPaymentChange(
+  deps: BillingDependencies,
+  order: OrderRecord,
+  change: 'disputed' | 'refunded'
+): Promise<string> {
+  const outcome = change === 'disputed' ? 'disputed' : 'refunded_at_provider'
+  for (let attempt = 0; attempt < PUBLICATION_ATTEMPTS; attempt += 1) {
+    const current = attempt === 0 ? order : await deps.operations.order(order.id)
+    if (!current) return 'unknown_order'
+    const recorded =
+      change === 'disputed'
+        ? current.disputeStatus === 'open'
+        : current.status === 'refunded' && current.refundedBy === PROVIDER_ACTOR
+    if (recorded) {
+      await alertAdmin(deps, current, change)
+      return outcome
+    }
+    // A dispute that closed before its opening arrived (a lost one recorded its opening then).
+    if (change === 'disputed' && current.disputeStatus !== null) {
+      return `dispute_${current.disputeStatus}`
+    }
+    if (
+      change === 'refunded' &&
+      current.status === 'refunding' &&
+      !siteRefundRunning(deps, current)
+    ) {
+      return finishRefundAtProvider(deps, current)
+    }
+    // The site's own refund: its finish records it.
+    if (change === 'refunded' && current.status !== 'paid') return `already_${current.status}`
+    const now = nowIso(deps)
+    const takedown = await takedownPlans(deps, current, change)
+    const submission = takedown.submission
+    const plans =
+      change === 'disputed'
+        ? buildRecordDisputePlans({ now, orderId: current.id })
+        : [
+            ...(submission &&
+            REFUNDABLE_AT_PROVIDER.has(submission.status) &&
+            submission.plan === 'paid' &&
+            submission.paidAt !== null &&
+            submission.refundedAt === null
+              ? buildRefundSubmissionPlans({
+                  actor: PROVIDER_ACTOR,
+                  mode: 'at_provider',
+                  now,
+                  submissionId: submission.id
+                })
+              : []),
+            ...buildRecordProviderRefundPlans({
+              listingAction: takedown.listingAction,
+              now,
+              orderId: current.id,
+              outcome: current.outcome
+            })
+          ]
+    if (await deps.operations.apply([...takedown.plans, ...plans])) {
+      log(change === 'disputed' ? 'billing_order_disputed' : 'billing_order_refunded_at_provider', {
+        listing: takedown.listingAction,
+        order: current.id
+      })
+      await alertAdmin(deps, current, change)
+      return outcome
+    }
+  }
+  throw new CodedError(
+    'billing_payment_change_not_recorded',
+    `The ${change} payment of order ${order.id} could not be recorded yet.`
+  )
+}
+
+/**
+ * Whether the site's own refund of a `refunding` order may still be running: claimed less than
+ * `RECONCILE_AFTER_MS` ago (the sweep takes it over after that) and never failed at the
+ * provider. Its `charge.refunded` is then its own, and its finish records it.
+ */
+function siteRefundRunning(deps: BillingDependencies, order: OrderRecord): boolean {
+  return (
+    order.refundAttempts === 0 &&
+    order.attention !== 'refund_failed' &&
+    order.refundRequestedAt !== null &&
+    Date.parse(order.refundRequestedAt) > deps.now().getTime() - RECONCILE_AFTER_MS
+  )
+}
+
+/**
+ * The whole payment refunded at the provider while the site's own refund of it had failed
+ * (`refunding`, retrying or `refund_failed`): the money is back, so the claimed refund is
+ * recorded as the site's would be (its listing change, then `refunded`), and the admin is told.
+ * The site's retry would only be refused (the charge is refunded already).
+ */
+async function finishRefundAtProvider(
+  deps: BillingDependencies,
+  order: OrderRecord
+): Promise<string> {
+  await recordClaimedRefund(deps, order.id, null, false)
+  log('billing_order_refunded_at_provider', { claimed: order.refundReason, order: order.id })
+  await alertAdmin(deps, order, 'refunded')
+  return 'refunded_at_provider'
+}
+
+/**
+ * A dispute's outcome: the listing stays down until an admin republishes it. A lost dispute
+ * whose opening was never recorded (it opened before the events were ticked, or its report is
+ * still to come) is recorded as opened first, with its takedown and the admin's alert: the money
+ * went back to the buyer. A won one is recorded only.
+ */
+async function closeDispute(
+  deps: BillingDependencies,
+  order: OrderRecord,
+  outcome: 'lost' | 'won'
+): Promise<string> {
+  const unrecorded = outcome === 'lost' && order.disputeStatus === null
+  if (unrecorded) await recordPaymentChange(deps, order, 'disputed')
+  await deps.operations.apply(
+    buildCloseDisputePlans({ now: nowIso(deps), orderId: order.id, outcome })
+  )
+  log('billing_dispute_closed', { order: order.id, outcome })
+  return unrecorded ? 'disputed_lost' : `dispute_${outcome}`
+}
+
+/**
+ * Part of a payment refunded outside the site: the order and the listing stay as they are (a
+ * partial refund isn't the refund of the listing), and the admin is told.
+ */
+async function alertPartialRefund(deps: BillingDependencies, order: OrderRecord): Promise<string> {
+  if (order.status !== 'paid') return `already_${order.status}`
+  log('billing_order_partially_refunded', { order: order.id })
+  await alertAdmin(deps, order, 'partially_refunded')
+  return 'partially_refunded'
+}
+
+/**
+ * A refund that failed after the provider accepted it: the money never went back. A refund the
+ * site made is flagged `refund_failed` (the sweep stops retrying it); the admin is told either
+ * way.
+ */
+async function flagRefundFailed(deps: BillingDependencies, order: OrderRecord): Promise<string> {
+  await deps.operations.apply(buildFlagRefundFailedPlans({ now: nowIso(deps), orderId: order.id }))
+  logWarning('billing_refund_failed_at_provider', { order: order.id })
+  await alertAdmin(deps, order, 'refund_failed')
+  return 'refund_failed'
+}
+
+/**
+ * Emails the admin about a payment change, once per order and kind (the email ledger's key):
+ * the order, its product, and whether its listing is live now. `recover`: the sweep's resend.
+ */
+async function alertAdmin(
+  deps: BillingDependencies,
+  order: OrderRecord,
+  kind: PaymentAlertKind,
+  recover = false
+): Promise<void> {
+  const row = await deps.operations.adminOrder(order.id)
+  await deps.notify('admin-payment-alert', {
+    eventKey: deps.eventKey('payment-alert', kind, order.id),
+    input: {
+      kind,
+      listingLive: row?.listingSlug ? row.listingLive : null,
+      orderNumber: order.number,
+      productName: row?.productName ?? null
+    },
+    ...(recover ? { recover: true } : {}),
+    to: deps.adminRecipient
+  })
+}
+
+/**
+ * Sends again the emails of payments applied, or changed outside the site, in the recovery
+ * window (#481): the webhook answers before its fulfilment, so an apply late in `waitUntil`'s
+ * 30 seconds, or a Worker stopped after it, may never send them. The email ledger sends each
+ * once, and re-claims an attempt cut off mid-send while the provider's idempotency key makes a
+ * repeat harmless.
+ */
+async function recoverEmails(
+  deps: BillingDependencies,
+  input: { limit: number; now: number }
+): Promise<{ emails: number; errors: number }> {
+  const counts = { emails: 0, errors: 0 }
+  const window = {
+    before: new Date(input.now - RECONCILE_AFTER_MS).toISOString(),
+    limit: input.limit,
+    since: new Date(input.now - EMAIL_RECOVERY_MS).toISOString()
+  }
+  for (const order of await deps.operations.recentlyAppliedOrders(window)) {
+    try {
+      const submission = order.submissionId
+        ? await deps.operations.checkoutSubmission(order.submissionId)
+        : null
+      if (!submission) continue
+      await emailPaidSubmission(
+        deps,
+        submission,
+        order,
+        order.outcome === 'published'
+          ? { live: true }
+          : { live: false, problem: guardrailProblem(order.checkProblem ?? '') },
+        true
+      )
+      counts.emails += 1
+    } catch (error) {
+      counts.errors += 1
+      logError('billing_sweep_email_failed', error, { order: order.id })
+    }
+  }
+  const alerts = await deps.operations.recentBillingEvents({
+    ...window,
+    outcomes: Object.keys(PAYMENT_ALERTS)
+  })
+  for (const { orderId, outcome } of alerts) {
+    const kind = PAYMENT_ALERTS[outcome]
+    try {
+      const order = await deps.operations.order(orderId)
+      if (!order || !kind) continue
+      await alertAdmin(deps, order, kind, true)
+      counts.emails += 1
+    } catch (error) {
+      counts.errors += 1
+      logError('billing_sweep_email_failed', error, { order: orderId })
+    }
+  }
+  return counts
+}
+
+// ---------------------------------------------------------------------------------------------
 // Sweep
 
 /**
  * The hourly sweep: retries refunds still owed after an `other` rejection, finishes claimed
  * refunds a failure left, asks the provider about pending orders whose checkout has closed (paid
  * → applied; otherwise failed) and about failed orders still inside the provider's retry window
- * (a superseded checkout paid late), and applies paid orders a crash left unapplied. Each item
- * is independent; a failure is logged and retried on the next run.
+ * (a superseded checkout paid late), and applies paid orders left unapplied: usually by a
+ * webhook fulfilment that failed or ran out of time after its answer (#468), or a Worker stopped
+ * before applying. It then sends again the recent emails that may not have gone
+ * (`recoverEmails`, #481). Each item is independent; a failure is logged and retried on the
+ * next run.
  */
 export async function runBillingSweep(
   deps: BillingDependencies,
   input: { limit: number; providerCalls?: number }
 ): Promise<Record<string, number>> {
-  const counts = { applied: 0, errors: 0, failed: 0, refunds: 0, skipped: 0 }
+  const counts = { applied: 0, emails: 0, errors: 0, failed: 0, refunds: 0, skipped: 0 }
   // Each item may call the provider once; the run stops calling it after this many.
   let calls = input.providerCalls ?? SWEEP_PROVIDER_CALLS
   const now = deps.now().getTime()
@@ -1482,5 +1933,8 @@ export async function runBillingSweep(
       logError('billing_sweep_refund_failed', error, { submission: submissionId })
     }
   }
+  const recovered = await recoverEmails(deps, { limit: input.limit, now })
+  counts.emails += recovered.emails
+  counts.errors += recovered.errors
   return counts
 }

@@ -134,6 +134,38 @@ describe('badge program operations', () => {
     expect((await weekly()).map(item => item.id)).toEqual(['lst_claim', 'lst_free', 'lst_paid'])
   })
 
+  it('checks a live paid listing whose payment was refunded or disputed and not won (#473)', async () => {
+    db().exec(`INSERT INTO orders (id, number, user_id, kind, purpose, target_key, submission_id,
+        amount_cents, currency, provider, provider_payment_id, charged_cents, charged_currency,
+        status, outcome, paid_at, applied_at, created_at, updated_at)
+      VALUES ('ord_paid', 1001, 'user_paid', 'paid_listing', 'submission', 'submission:sub_paid',
+        'sub_paid', 4900, 'usd', 'fake', 'pi_paid', 4900, 'usd', 'paid', 'published',
+        '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z',
+        '2026-09-01T00:00:00.000Z')`)
+    const ids = async () => (await weekly()).map(item => item.id)
+    expect(await ids()).toEqual(['lst_claim', 'lst_free'])
+    // Disputed (republished by an admin since): a free listing, so it must show the badge.
+    db().exec(`UPDATE orders SET dispute_status='open', disputed_at='2026-10-01T00:00:00.000Z'`)
+    expect(await ids()).toEqual(['lst_claim', 'lst_free', 'lst_paid'])
+    expect(await listing('lst_paid')).toMatchObject({
+      branch: 'unpublish',
+      ownerUserId: 'user_paid'
+    })
+    db().exec(`UPDATE orders SET dispute_status='lost'`)
+    expect(await ids()).toEqual(['lst_claim', 'lst_free', 'lst_paid'])
+    // Won: the payment stands, and the paid listing needs no badge.
+    db().exec(`UPDATE orders SET dispute_status='won'`)
+    expect(await ids()).toEqual(['lst_claim', 'lst_free'])
+    // Refunded at the provider: on the order, then on the submission too (plan still paid).
+    db().exec(`UPDATE orders SET status='refunded', refund_reason='admin', refunded_by='provider',
+      refund_listing_action='already_unpublished', refund_requested_at='2026-10-02T00:00:00.000Z',
+      refunded_at='2026-10-02T00:00:00.000Z'`)
+    expect(await ids()).toEqual(['lst_claim', 'lst_free', 'lst_paid'])
+    db().exec(`DELETE FROM orders;
+      UPDATE listing_submissions SET refunded_at='2026-10-02T00:00:00.000Z' WHERE id='sub_paid'`)
+    expect(await ids()).toEqual(['lst_claim', 'lst_free', 'lst_paid'])
+  })
+
   it('records one weekly check per listing and cycle, whatever the outcome', async () => {
     const free = await listing('lst_free')
     const claim = await listing('lst_claim')

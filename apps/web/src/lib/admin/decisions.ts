@@ -44,6 +44,7 @@ import {
   type ListingLogoIngestion,
   selectListingForPublicationPlan
 } from '@/db/listing-plans'
+import type { PaymentLoss } from '@/db/payment-kept'
 import { executePlans, isPlanConflict, queryPlan } from '@/db/plan-runner'
 import {
   type CatalogPublication,
@@ -300,6 +301,8 @@ interface SubmissionSnapshot {
   listing_id: string | null
   listing_live: number
   paid_at: string | null
+  /** A paid submission's payment no longer kept (`payment-kept.ts`, #473), or null. */
+  payment_loss: PaymentLoss | null
   plan: 'free' | 'paid' | null
   refunded_at: string | null
   slug: string
@@ -441,6 +444,20 @@ async function invalidTags(
 
 const EDIT_FIELDS = ['name', 'categorySlug', 'description', 'logoUrl', 'content'] as const
 
+/** Approve's answer for a paid submission whose payment is no longer kept (#473). */
+const PAYMENT_NOT_KEPT: Record<PaymentLoss, DecisionFailure> = {
+  disputed: failure(
+    409,
+    'payment_disputed',
+    'This payment is disputed, so it can’t be approved unless the dispute is won.'
+  ),
+  refunded: failure(
+    409,
+    'payment_refunded',
+    'This payment was refunded, so it can’t be approved. Reject it instead.'
+  )
+}
+
 export function approveSubmission(
   context: AdminContext,
   input: Parameters<typeof approveSubmissionOnce>[1]
@@ -473,6 +490,9 @@ async function approveSubmissionOnce(
   if (snapshot.status !== 'verified' && snapshot.status !== 'paid_pending_review') {
     return failure(409, 'not_in_review', 'Only a submission in the review queue can be approved.')
   }
+  // Held, in review, or republished after its takedown: a payment refunded, or disputed and not
+  // won, never goes live as paid (#473). The plans refuse one that changes meanwhile.
+  if (snapshot.payment_loss) return PAYMENT_NOT_KEPT[snapshot.payment_loss]
   if (snapshot.content_version !== input.expectedContentVersion) return changed
   if (hasFileExtension(snapshot.slug)) {
     return failure(422, 'invalid_slug', `${snapshot.slug} ends in a file extension.`)
