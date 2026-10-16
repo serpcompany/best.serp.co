@@ -7,7 +7,7 @@
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { selectAdminListingPlans } from '@/db/admin-queries'
+import { createAdminReadOperations, selectAdminListingPlans } from '@/db/admin-queries'
 import { createBadgeProgramOperations } from '@/db/badge-program'
 import { createBillingOperations } from '@/db/billing'
 import { createDatabase } from '@/db/client'
@@ -15,7 +15,9 @@ import { executePlans } from '@/db/plan-runner'
 import { prepareCatalogPublication } from '@/db/plan-support'
 import { buildRejectSubmissionPlans } from '@/db/submission-plans'
 import { insertPublishedListing, SqliteD1 } from '@/db/test-support'
+import { type AdminContext, approveSubmission, republishListing } from '../admin/decisions'
 import { planLabel } from '../admin/listing-labels'
+import { submissionView } from '../admin/review-view'
 import { checkBadgeAtRefund } from '../badge-program/refund'
 import { features, type SiteFeatures } from '../features'
 import { CONFIRM_AGAIN_HASH, SHORTEST_CHECKOUT_MS } from './checkout-window'
@@ -1781,6 +1783,51 @@ function planOnceApproved(f: Fixture, submissionId = 's1'): string {
   return f.db.prepare(plan.sql).get(...(plan.params as string[]))?.plan as string
 }
 
+/** /admin as the reviewer uses it, on the fixture's database and clock. */
+function adminContext(f: Fixture): AdminContext {
+  return {
+    actor: 'devin@serp.co',
+    client: f.client,
+    eventKey: (event, ...ids) => [event, ...ids].join(':'),
+    notify: (async () => undefined) as AdminContext['notify'],
+    now: () => f.clock.now
+  }
+}
+
+/** The reviewer's Approve of a submission in the review queue, as its screen sends it. */
+async function approve(f: Fixture, submissionId = 's1') {
+  const { content_version: version } = f.row<{ content_version: number }>(
+    `SELECT content_version FROM listing_submissions WHERE id='${submissionId}'`
+  )
+  return approveSubmission(adminContext(f), { expectedContentVersion: version, submissionId })
+}
+
+/** What the review queue and the review screen show of a submission's payment. */
+async function reviewPayment(f: Fixture, submissionId = 's1') {
+  const reads = createAdminReadOperations({ client: f.client })
+  const queued = (await reads.listReviewQueue('all')).find(item => item.id === submissionId)
+  const review = await reads.getSubmissionReview(submissionId)
+  if (!queued || !review) throw new Error(`${submissionId} is not in review`)
+  const view = submissionView(review, 'https://media.example')
+  return {
+    queue: { paymentLoss: queued.paymentLoss },
+    screen: { paidAmountCents: view.paidAmountCents, paymentLoss: view.paymentLoss }
+  }
+}
+
+const REFUSED_REFUNDED = {
+  error: 'payment_refunded',
+  message: 'This payment was refunded, so it can’t be approved. Reject it instead.',
+  ok: false,
+  status: 409
+}
+const REFUSED_DISPUTED = {
+  error: 'payment_disputed',
+  message: 'This payment is disputed, so it can’t be approved unless the dispute is won.',
+  ok: false,
+  status: 409
+}
+
 describe('refunds and disputes made outside the site (#473)', () => {
   it('takes a disputed paid listing down while in review, once, and alerts the admin', async () => {
     const f = fixture()
@@ -2072,6 +2119,56 @@ describe('refunds and disputes made outside the site (#473)', () => {
     expect(f.refunds).toEqual([])
   })
 
+  it('leaves up a claimed listing an admin took from its payer before a dispute, and alerts the admin', async () => {
+    const f = fixture()
+    claimedListing(f)
+    f.db.exec(`UPDATE listing_owners SET revoked_at='2026-10-06T10:00:00.000Z',
+      revoked_reason='admin' WHERE listing_id='lst_claimed'`)
+    await webhook(f, paymentEvent('payment_disputed', 'pi_claim'))
+    expect(f.row('SELECT status, dispute_status FROM orders')).toEqual({
+      dispute_status: 'open',
+      status: 'paid'
+    })
+    expect(liveOf(f, 'lst_claimed')).toBe(1)
+    expect(f.rows(`SELECT id FROM listing_events WHERE event_type='unpublished'`)).toEqual([])
+    expect(f.emails).toEqual([
+      expect.objectContaining({
+        eventKey: 'payment-alert:disputed:ord_claim',
+        input: { kind: 'disputed', listingLive: true, orderNumber: 1001, productName: 'Claimed' }
+      })
+    ])
+  })
+
+  it('leaves up a claimed listing transferred to a new owner before a refund outside the site', async () => {
+    const f = fixture()
+    claimedListing(f)
+    f.db.exec(`
+      UPDATE listing_owners SET revoked_at='2026-10-06T10:00:00.000Z', revoked_reason='transferred'
+        WHERE listing_id='lst_claimed';
+      INSERT INTO users (id, name, email, email_verified)
+        VALUES ('user_ines', 'Ines', 'ines@example.com', 1);
+      INSERT INTO listing_owners (listing_id, user_id, verified_via, verified_at)
+        VALUES ('lst_claimed', 'user_ines', 'admin', '2026-10-06T10:00:00.000Z');
+    `)
+    await webhook(f, paymentEvent('payment_refunded', 'pi_claim'))
+    expect(f.row('SELECT status, refunded_by, refund_listing_action FROM orders')).toEqual({
+      refund_listing_action: 'none',
+      refunded_by: 'provider',
+      status: 'refunded'
+    })
+    expect(liveOf(f, 'lst_claimed')).toBe(1)
+    expect(
+      f.row(
+        `SELECT user_id FROM listing_owners WHERE listing_id='lst_claimed' AND revoked_at IS NULL`
+      )
+    ).toEqual({ user_id: 'user_ines' })
+    expect(f.emails).toEqual([
+      expect.objectContaining({
+        input: { kind: 'refunded', listingLive: true, orderNumber: 1001, productName: 'Claimed' }
+      })
+    ])
+  })
+
   it('leaves the site’s own claim refund as it was: the listing stays up', async () => {
     const f = fixture()
     claimedListing(f)
@@ -2168,6 +2265,16 @@ describe('refunds and disputes made outside the site (#473)', () => {
         input: { kind: 'refunded', listingLive: null, orderNumber: 1001, productName: 'Name s1' }
       })
     ])
+    // The queue and the screen show it refunded with no amount paid, and Approve refuses it.
+    expect(await reviewPayment(f)).toEqual({
+      queue: { paymentLoss: 'refunded' },
+      screen: { paidAmountCents: null, paymentLoss: 'refunded' }
+    })
+    await expect(approve(f)).resolves.toEqual(REFUSED_REFUNDED)
+    expect(f.row(`SELECT status, listing_id FROM listing_submissions WHERE id='s1'`)).toEqual({
+      listing_id: null,
+      status: 'verified'
+    })
     expect(planOnceApproved(f)).toBe('free')
   })
 
@@ -2197,12 +2304,65 @@ describe('refunds and disputes made outside the site (#473)', () => {
     await webhook(f, paidEvent(f, await checkout(f, 's1')))
     const payment = f.row<{ id: string }>('SELECT provider_payment_id AS id FROM orders').id
     await webhook(f, paymentEvent('payment_disputed', payment))
-    // Held: nothing was live to take down. Approved while the dispute is open, it isn't paid.
+    // Held: nothing was live to take down. Approve refuses it while the dispute is open, and
+    // the queue shows it disputed with no amount paid.
     expect(f.row('SELECT dispute_status FROM orders')).toEqual({ dispute_status: 'open' })
-    expect(planOnceApproved(f)).toBe('free')
+    expect(await reviewPayment(f)).toEqual({
+      queue: { paymentLoss: 'disputed' },
+      screen: { paidAmountCents: null, paymentLoss: 'disputed' }
+    })
+    await expect(approve(f)).resolves.toEqual(REFUSED_DISPUTED)
+    // Won: the payment stands, so it is approved as a paid listing.
     await webhook(f, paymentEvent('dispute_closed', payment, { disputeOutcome: 'won' }))
+    expect(await reviewPayment(f)).toEqual({
+      queue: { paymentLoss: null },
+      screen: { paidAmountCents: 4900, paymentLoss: null }
+    })
+    await expect(approve(f)).resolves.toMatchObject({ ok: true, replayed: false })
     expect(planOnceApproved(f)).toBe('paid')
   })
+
+  it('refuses to approve a held payment whose dispute was lost', async () => {
+    const f = fixture({
+      guardrails: { code: 'fetch_timeout', ok: false, problem: 'the connection timed out' }
+    })
+    f.submission('s1', 'draft', null)
+    await webhook(f, paidEvent(f, await checkout(f, 's1')))
+    const payment = f.row<{ id: string }>('SELECT provider_payment_id AS id FROM orders').id
+    await webhook(f, paymentEvent('dispute_closed', payment, { disputeOutcome: 'lost' }))
+    expect(f.row('SELECT dispute_status FROM orders')).toEqual({ dispute_status: 'lost' })
+    await expect(approve(f)).resolves.toEqual(REFUSED_DISPUTED)
+    expect(f.row(`SELECT status FROM listing_submissions WHERE id='s1'`)).toEqual({
+      status: 'verified'
+    })
+  })
+
+  for (const change of ['refunded', 'disputed'] as const) {
+    it(`refuses to approve a listing in review republished after a ${change} takedown`, async () => {
+      const f = fixture()
+      const order = await publishedOrder(f)
+      await webhook(
+        f,
+        paymentEvent(change === 'refunded' ? 'payment_refunded' : 'payment_disputed', order.payment)
+      )
+      expect(liveOf(f, order.listing)).toBe(0)
+      // The reviewer republishes it (Approve needs it live), then approves: refused.
+      await expect(
+        republishListing(adminContext(f), { listingId: order.listing })
+      ).resolves.toMatchObject({ ok: true })
+      expect(liveOf(f, order.listing)).toBe(1)
+      expect(await reviewPayment(f)).toEqual({
+        queue: { paymentLoss: change },
+        screen: { paidAmountCents: null, paymentLoss: change }
+      })
+      await expect(approve(f)).resolves.toEqual(
+        change === 'refunded' ? REFUSED_REFUNDED : REFUSED_DISPUTED
+      )
+      expect(f.row(`SELECT status FROM listing_submissions WHERE id='s1'`)).toEqual({
+        status: 'paid_pending_review'
+      })
+    })
+  }
 
   it('records a won dispute that closed before its opening arrived, and nothing else', async () => {
     const f = fixture()

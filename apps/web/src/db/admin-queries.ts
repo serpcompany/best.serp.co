@@ -2,6 +2,12 @@ import { selectAdminAllowlistPlan } from './admin-plans'
 import type { Database } from './client'
 import { toInstant } from './instants'
 import { listingWebsiteConflicts } from './listing-plans'
+import {
+  claimPaymentLossSql,
+  type PaymentLoss,
+  submissionPaymentLossSql,
+  toPaymentLoss
+} from './payment-kept'
 import { type CategorySuggestion, parseTagSlugs, type StatementPlan } from './plan-support'
 import type {
   BadgeCheckOutcome,
@@ -45,24 +51,16 @@ const revisionStatusesByView: Record<ReviewQueueView, string> = {
 }
 
 /**
- * Whether a listing is on the paid plan: a paid claim, or a paid, unrefunded submission, whose
- * payment stands. The order that paid it (applied to it: a submission is paid once; a claim's
- * is its owner's latest claim payment) must not be refunded, which a refund made at the provider
- * records there for a submission in review, nor disputed (open, or lost; a won dispute leaves it
- * paid, #473); a paid claim's owner stays the owner until an admin decides.
+ * Whether a listing is on the paid plan: a paid claim, or a paid submission, whose payment is
+ * still kept (`payment-kept.ts`: not refunded, nor disputed and not won, #473). A claim's is its
+ * owner's latest claim payment; a paid claim's owner stays the owner until an admin decides.
  */
 const listingPaidSql = (listingIdSql: string) => `CASE WHEN EXISTS (SELECT 1 FROM listing_owners po
     WHERE po.listing_id=${listingIdSql} AND po.revoked_at IS NULL AND po.verified_via='paid_claim'
-    AND NOT EXISTS (SELECT 1 FROM orders pc WHERE pc.id=(SELECT lc.id FROM orders lc
-        WHERE lc.purpose='claim' AND lc.listing_id=po.listing_id AND lc.user_id=po.user_id
-          AND lc.outcome='claimed' ORDER BY lc.applied_at DESC,lc.id DESC LIMIT 1)
-      AND (pc.status='refunded' OR pc.dispute_status IN ('open','lost'))))
+      AND ${claimPaymentLossSql('po.listing_id', 'po.user_id')} IS NULL)
   OR EXISTS (SELECT 1 FROM listing_submissions ps WHERE ps.listing_id=${listingIdSql}
-    AND ps.plan='paid' AND ps.paid_at IS NOT NULL AND ps.refunded_at IS NULL
-    AND ps.status IN ('paid_pending_review','approved')
-    AND NOT EXISTS (SELECT 1 FROM orders pd WHERE pd.submission_id=ps.id
-      AND pd.outcome IN ('published','held','upgraded','relisted')
-      AND (pd.status='refunded' OR pd.dispute_status IN ('open','lost'))))
+    AND ps.plan='paid' AND ps.paid_at IS NOT NULL
+    AND ps.status IN ('paid_pending_review','approved') AND ${submissionPaymentLossSql('ps')} IS NULL)
   THEN 'paid' ELSE 'free' END`
 
 const latestConclusiveBadge = (listingIdSql: string) => `(SELECT outcome FROM badge_checks
@@ -104,8 +102,8 @@ export function selectReviewQueuePlan(view: ReviewQueueView): StatementPlan {
     sql: `SELECT * FROM (
         SELECT 'submission' AS kind,s.id,s.slug,s.name,s.website,s.logo_url,
           ${submissionHostedKey('s', 'logo', 's.logo_url')} AS logo_key,s.status,s.plan,
-          s.paid_at,s.refunded_at,s.listing_id,u.email AS owner_email,
-          CASE WHEN s.badge_verified_at IS NOT NULL THEN 'pass' END AS badge,
+          s.paid_at,s.refunded_at,${submissionPaymentLossSql('s')} AS payment_loss,s.listing_id,
+          u.email AS owner_email,CASE WHEN s.badge_verified_at IS NOT NULL THEN 'pass' END AS badge,
           CASE
             WHEN s.status='paid_pending_review' THEN COALESCE(s.paid_at,s.updated_at)
             WHEN s.status='verified' AND s.plan='paid' THEN COALESCE(s.paid_at,s.updated_at)
@@ -118,7 +116,7 @@ export function selectReviewQueuePlan(view: ReviewQueueView): StatementPlan {
         UNION ALL
         SELECT 'revision',r.id,l.slug,r.name,l.website,r.logo_url,
           ${revisionHostedLogoKey('r')},r.status,
-          ${listingPaidSql('r.listing_id')},NULL,NULL,r.listing_id,u.email,
+          ${listingPaidSql('r.listing_id')},NULL,NULL,NULL,r.listing_id,u.email,
           ${latestConclusiveBadge('r.listing_id')},
           CASE WHEN r.status='changes_requested' THEN COALESCE(r.reviewed_at,r.updated_at)
             ELSE r.updated_at END
@@ -172,6 +170,7 @@ export function selectSubmissionReviewPlans(submissionId: string): StatementPlan
     {
       sql: `SELECT s.id,s.slug,s.name,s.description,s.website,s.content,s.category_slug,
           c.name AS category_name,s.logo_url,s.video_url,s.status,s.plan,s.paid_at,s.refunded_at,
+          ${submissionPaymentLossSql('s')} AS payment_loss,
           ${submissionHostedKey('s', 'logo', 's.logo_url')} AS logo_key,
           ${submissionHostedKey('s', 'image')} AS image_key,
           s.verification_attempts,s.last_verification_at,s.last_verification_error,
@@ -692,6 +691,8 @@ export interface ReviewQueueItem {
   name: string
   ownerEmail: string | null
   paidAt: string | null
+  /** A paid submission's payment no longer kept (`payment-kept.ts`), or null. */
+  paymentLoss: PaymentLoss | null
   plan: SubmissionPlan | null
   queuedAt: string | null
   refundedAt: string | null
@@ -783,6 +784,8 @@ export interface SubmissionReview {
   logoUrl: string
   name: string
   paidAt: string | null
+  /** Its payment no longer kept (`payment-kept.ts`): refunded, or disputed and not won. */
+  paymentLoss: PaymentLoss | null
   plan: SubmissionPlan | null
   publishedChecksum: string | null
   refundedAt: string | null
@@ -1358,6 +1361,7 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
         logoUrl: text(row.logo_url),
         name: text(row.name),
         paidAt: toInstant(row.paid_at),
+        paymentLoss: toPaymentLoss(row.payment_loss),
         plan: optionalText(row.plan) as SubmissionPlan | null,
         publishedChecksum: optionalText(row.published_checksum),
         refundedAt: toInstant(row.refunded_at),
@@ -1496,6 +1500,7 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
         name: text(row.name),
         ownerEmail: optionalText(row.owner_email),
         paidAt: toInstant(row.paid_at),
+        paymentLoss: toPaymentLoss(row.payment_loss),
         plan: optionalText(row.plan) as SubmissionPlan | null,
         queuedAt: toInstant(row.queued_at),
         refundedAt: toInstant(row.refunded_at),

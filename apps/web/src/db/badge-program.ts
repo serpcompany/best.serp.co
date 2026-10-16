@@ -4,6 +4,7 @@ import {
   buildUnpublishListingPlans,
   selectListingForPublicationPlan
 } from './listing-plans'
+import { submissionPaymentLossSql } from './payment-kept'
 import {
   assertPreviousStatementChangedOne,
   hoursBefore,
@@ -192,9 +193,14 @@ export interface BadgeProgramOperations {
 const LATEST_CONCLUSIVE = `(SELECT c.id FROM badge_checks c WHERE c.listing_id=l.id AND c.conclusive=1
   ORDER BY c.checked_at DESC,c.id DESC LIMIT 1)`
 
-/** The listing's approved free submission (`l.source = 'submission'` only). */
+/**
+ * The listing's approved free submission (`l.source = 'submission'` only), or its paid one whose
+ * payment is no longer kept (`payment-kept.ts`: refunded at the provider, or disputed and not
+ * won, #473), which an admin's republish made live as a free listing.
+ */
 const FREE_SUBMISSION = `(SELECT s.id FROM listing_submissions s
-  WHERE s.listing_id=l.id AND s.status='approved' AND s.plan='free' ORDER BY s.id LIMIT 1)`
+  WHERE s.listing_id=l.id AND s.status='approved'
+    AND (s.plan='free' OR ${submissionPaymentLossSql('s')} IS NOT NULL) ORDER BY s.id LIMIT 1)`
 
 /**
  * The owner a free submitted listing's emails go to: its current owner, or for a listing approved

@@ -179,6 +179,65 @@ describe('account operations', () => {
     })
   })
 
+  it('reads a paid listing whose payment was refunded or disputed and not won as free (#473)', async () => {
+    seedOwnedListing('lst_paid', { paid: true })
+    sqlite.database.exec(`INSERT INTO orders (id, number, user_id, kind, purpose, target_key,
+        submission_id, amount_cents, currency, provider, provider_payment_id, charged_cents,
+        charged_currency, status, outcome, paid_at, applied_at, created_at, updated_at)
+      VALUES ('ord_paid', 1001, '${OWNER}', 'paid_listing', 'submission', 'submission:sub_lst_paid',
+        'sub_lst_paid', 4900, 'usd', 'fake', 'pi_paid', 4900, 'usd', 'paid', 'published',
+        '2026-10-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z',
+        '2026-10-01T00:00:00.000Z')`)
+    const listing = async () => (await operations().overview(OWNER)).listings[0]
+    const submission = async () => operations().submission(OWNER, 'sub_lst_paid')
+    expect(await listing()).toMatchObject({ plan: 'paid' })
+    expect(await submission()).toMatchObject({ paymentLoss: null })
+    sqlite.database.exec(
+      `UPDATE orders SET dispute_status='open', disputed_at='2026-10-02T00:00:00.000Z'`
+    )
+    expect(await listing()).toMatchObject({ badge: null, checkoutPurpose: null, plan: 'free' })
+    expect(await submission()).toMatchObject({ paymentLoss: 'disputed' })
+    sqlite.database.exec(`UPDATE orders SET dispute_status='won'`)
+    expect(await listing()).toMatchObject({ plan: 'paid' })
+    sqlite.database.exec(`UPDATE orders SET status='refunded', refund_reason='admin',
+      refunded_by='provider', refund_listing_action='already_unpublished',
+      refund_requested_at='2026-10-03T00:00:00.000Z', refunded_at='2026-10-03T00:00:00.000Z'`)
+    expect(await listing()).toMatchObject({ plan: 'free' })
+    expect(await submission()).toMatchObject({ paymentLoss: 'refunded' })
+  })
+
+  it('reads a paid claim whose payment was refunded or disputed and not won as free (#473)', async () => {
+    insertPublishedListing(sqlite.database, {
+      categoryIds: [1],
+      content: 'Live content',
+      description: 'Live description',
+      displayOrder: 0,
+      id: 'lst_claimed',
+      isFeatured: false,
+      name: 'Claimed',
+      publishedAt: '2026-09-01',
+      slug: 'claimed.example',
+      website: 'https://claimed.example/'
+    })
+    sqlite.database.exec(`
+      INSERT INTO listing_owners (listing_id,user_id,role,verified_via,verified_at)
+        VALUES ('lst_claimed','${OWNER}','owner','paid_claim','2026-10-01T00:00:00.000Z');
+      INSERT INTO orders (id, number, user_id, kind, purpose, target_key, listing_id, claim_id,
+        amount_cents, currency, provider, provider_payment_id, charged_cents, charged_currency,
+        status, outcome, paid_at, applied_at, created_at, updated_at)
+      VALUES ('ord_claim', 1001, '${OWNER}', 'paid_claim', 'claim', 'claim:claim_a',
+        'lst_claimed', 'claim_a', 4900, 'usd', 'fake', 'pi_claim', 4900, 'usd', 'paid', 'claimed',
+        '2026-10-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z', '2026-10-01T00:00:00.000Z',
+        '2026-10-01T00:00:00.000Z');
+    `)
+    const plan = async () => (await operations().overview(OWNER)).listings[0]?.plan
+    expect(await plan()).toBe('paid')
+    sqlite.database.exec(
+      `UPDATE orders SET dispute_status='lost', disputed_at='2026-10-02T00:00:00.000Z'`
+    )
+    expect(await plan()).toBe('free')
+  })
+
   it('withdraws only the owner’s unpaid submission, once', async () => {
     seedSubmission('sub_open', 'verified')
     seedSubmission('sub_paid', 'verified', { paid: true })

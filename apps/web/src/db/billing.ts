@@ -1,6 +1,7 @@
 import { urlKey } from '@/lib/url-key'
 import type { Database } from './client'
 import { listingIdsWithWebsite } from './listing-plans'
+import { paidClaimOrderSql } from './payment-kept'
 import { executePlans, isPlanConflict, queryPlan } from './plan-runner'
 import {
   assertPreviousStatementChangedOne,
@@ -496,6 +497,24 @@ export function buildCloseDisputePlans(input: {
   ]
 }
 
+/**
+ * Whether claim order `orderId`'s payer still owns the listing through it: a current
+ * `paid_claim` owner row whose latest claim payment is this order (#473).
+ */
+export function selectPaidClaimStandsPlan(input: {
+  listingId: string
+  orderId: string
+  userId: string
+}): StatementPlan {
+  return {
+    sql: `SELECT CASE WHEN EXISTS (SELECT 1 FROM listing_owners o
+        WHERE o.listing_id=?1 AND o.user_id=?2 AND o.role='owner' AND o.revoked_at IS NULL
+          AND o.verified_via='paid_claim' AND ${paidClaimOrderSql('o.listing_id', 'o.user_id')}=?3)
+      THEN 1 ELSE 0 END AS stands`,
+    params: [input.listingId, input.userId, input.orderId]
+  }
+}
+
 export function selectOrderPlan(orderId: string): StatementPlan {
   return { sql: `SELECT ${ORDER_COLUMNS} FROM orders o WHERE o.id=?`, params: [orderId] }
 }
@@ -900,6 +919,12 @@ export interface BillingOperations {
   }): Promise<void>
   /** Whether the listing is live (public) now. */
   listingLive(listingId: string | null): Promise<boolean>
+  /**
+   * Whether a claim order's payer still owns its listing through it: a current `paid_claim` owner
+   * whose latest claim payment for the listing is this order (#473). An admin's revoke or
+   * transfer, or a later claim, ends that.
+   */
+  paidClaimStands(order: Pick<OrderRecord, 'id' | 'listingId' | 'userId'>): Promise<boolean>
   openOrder(targetKey: string): Promise<OrderRecord | null>
   order(orderId: string): Promise<OrderRecord | null>
   orderByCheckout(provider: string, checkoutId: string): Promise<OrderRecord | null>
@@ -994,6 +1019,18 @@ export function createBillingOperations(config: { client: Database }): BillingOp
     },
     async finishEvent(input) {
       await executePlans(client, buildFinishBillingEventPlans(input))
+    },
+    async paidClaimStands(order) {
+      if (!order.listingId) return false
+      const [row] = await queryPlan<{ stands: number }>(
+        client,
+        selectPaidClaimStandsPlan({
+          listingId: order.listingId,
+          orderId: order.id,
+          userId: order.userId
+        })
+      )
+      return Number(row?.stands) === 1
     },
     async listingLive(listingId) {
       if (!listingId) return false

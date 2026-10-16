@@ -1416,6 +1416,7 @@ describe('protected submission statement plans', () => {
         listing_live: 0,
         owner_user_id: 'user_owner',
         paid_at: null,
+        payment_loss: null,
         plan: 'free',
         published_checksum: null,
         refunded_at: null,

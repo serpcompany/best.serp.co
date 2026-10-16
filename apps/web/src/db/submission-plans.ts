@@ -1,4 +1,5 @@
 import { draftClockCutoffs } from './draft-plans'
+import { submissionPaymentLossSql } from './payment-kept'
 import {
   adoptStagedLogoPlans,
   adoptSubmissionImagePlans,
@@ -140,7 +141,8 @@ export function selectSubmissionForDecisionPlan(submissionId: string): Statement
         s.owner_user_id,s.rejection_category,s.content_version,s.published_checksum,
         COALESCE(s.block_key,s.slug) AS block_key,
         COALESCE(s.block_covers_subdomains,0) AS block_covers_subdomains,ps.version,ps.checksum,
-        CASE WHEN ${listingIsLiveGuard('s.listing_id')} THEN 1 ELSE 0 END AS listing_live
+        CASE WHEN ${listingIsLiveGuard('s.listing_id')} THEN 1 ELSE 0 END AS listing_live,
+        ${submissionPaymentLossSql('s')} AS payment_loss
       FROM listing_submissions s JOIN publication_state ps ON ps.id=1
       WHERE s.id=?`,
     params: [submissionId]
@@ -256,7 +258,8 @@ function createListingFromSubmissionPlans(input: {
 /**
  * `verified` → `approved`: the staged submission becomes a published listing. Refused unless
  * the staged content is still the version the reviewer saw (`expectedContentVersion`). The
- * outbound link is `nofollow` (#59) unless the reviewer chose another `linkRel` (#64).
+ * outbound link is `nofollow` (#59) unless the reviewer chose another `linkRel` (#64). A paid
+ * submission whose payment is no longer kept (`payment-kept.ts`, #473) is refused too.
  */
 export function buildApproveSubmissionPlans(input: {
   afterChecksum: string
@@ -297,8 +300,9 @@ export function buildApproveSubmissionPlans(input: {
     ...beginCatalogPublicationPlans(
       publication,
       {
-        sql: `EXISTS (SELECT 1 FROM listing_submissions
-          WHERE id=? AND listing_id IS NULL AND ${current.sql})`,
+        sql: `EXISTS (SELECT 1 FROM listing_submissions s
+          WHERE s.id=? AND s.listing_id IS NULL AND ${current.sql}
+            AND ${submissionPaymentLossSql('s')} IS NULL)`,
         params: [input.submissionId, ...current.params]
       },
       'approval_snapshot_current'
@@ -529,7 +533,8 @@ export function buildRelistListingToPaidPlans(input: {
  * unless the staged content is the version the reviewer saw and the live listing is unchanged
  * since it was published from this submission (`published_checksum`), so no admin edit is lost.
  * Its tags are left as they are: payment gave it the submission's tags, and an admin's tag edit
- * during review (allowed, since tags aren't in the checksum) stands (#341, design 4.3).
+ * during review (allowed, since tags aren't in the checksum) stands (#341, design 4.3). Refused
+ * when its payment is no longer kept (`payment-kept.ts`, #473), as after a republish.
  */
 export function buildApproveLiveSubmissionPlans(input: {
   expectedContentVersion: number
@@ -549,7 +554,8 @@ export function buildApproveLiveSubmissionPlans(input: {
     ...beginCatalogPublicationPlans(input.publication, {
       sql: `EXISTS (SELECT 1 FROM listing_submissions s JOIN listings l ON l.id=s.listing_id
           WHERE s.id=? AND s.status='paid_pending_review' AND s.listing_id=?
-            AND s.content_version=? AND l.checksum=s.published_checksum)
+            AND s.content_version=? AND l.checksum=s.published_checksum
+            AND ${submissionPaymentLossSql('s')} IS NULL)
         AND ${listingIsLiveGuard('?')}`,
       params: [input.submissionId, input.listingId, reviewed, input.listingId]
     }),

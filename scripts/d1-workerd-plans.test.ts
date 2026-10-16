@@ -1493,6 +1493,12 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
       ...B.buildRecordDisputePlans({ now: NOW, orderId: 'ord-dispute' })
     ])
     expect(await listing('lst-dispute')).toMatchObject({ is_active: 0 })
+    // The shared "payment kept" rule (`payment-kept.ts`) reads the dispute, then the refund.
+    const loss = async () =>
+      (
+        await all<{ payment_loss: string | null }>(S.selectSubmissionForDecisionPlan('sub-dispute'))
+      )[0]?.payment_loss
+    expect(await loss()).toBe('disputed')
     await expect(
       run(B.buildRecordDisputePlans({ now: NOW, orderId: 'ord-dispute' }))
     ).rejects.toThrow()
@@ -1500,6 +1506,7 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
       expect.arrayContaining([expect.objectContaining({ id: 'ord-dispute' })])
     )
     await run(B.buildCloseDisputePlans({ now: NOW, orderId: 'ord-dispute', outcome: 'won' }))
+    expect(await loss()).toBeNull()
     expect(await order('ord-dispute')).toMatchObject({
       dispute_status: 'won',
       disputed_at: NOW,
@@ -1522,6 +1529,17 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
       })
     await expect(run(refund('held'))).rejects.toThrow()
     await run(refund('published'))
+    expect(await loss()).toBe('refunded')
+    // A submission's order is no claim: nobody owns a listing through it.
+    expect(
+      await all(
+        B.selectPaidClaimStandsPlan({
+          listingId: 'lst-dispute',
+          orderId: 'ord-dispute',
+          userId: 'user_owner'
+        })
+      )
+    ).toEqual([{ stands: 0 }])
     expect(await order('ord-dispute')).toMatchObject({
       refund_listing_action: 'already_unpublished',
       refund_reason: 'admin',

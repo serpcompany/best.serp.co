@@ -589,7 +589,8 @@ export function ReviewDetail({
                     ]
                   ] as Array<[string, ReactNode]>)
                 : []),
-              ['Plan', view.paid ? `Paid · ${amount}` : 'Free (badge)'],
+              // A payment refunded, or disputed and not won, shows that in place of its amount.
+              ['Plan', view.paid ? `Paid · ${view.paymentLoss ?? amount}` : 'Free (badge)'],
               ['Logo', `From ${hostOf(view.logoUrl)}`]
             ]}
           />

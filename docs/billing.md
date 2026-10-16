@@ -134,26 +134,29 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
   (`dispute_status` `open`), or a full refund made in Stripe's dashboard (`refunded`, an admin's
   refund by `provider`), takes down the listing the payment made or kept live (a paid submission's,
   an upgrade's, a relist's) in the same batch, even in review (owner decision on #156), and emails
-  the admin (`admin-payment-alert`). A paid claim's listing comes down the same way (owner decision
-  on #473, 2026-10-16: no exception for claims); its owner stays the owner until an admin decides in
-  /admin. A held payment has none live. Neither returns as paid: /admin reads a listing as free when
-  its paying order (a paid claim's: its owner's latest) is refunded, or disputed and not won, and
-  the refund also records an approved or held submission refunded (`at_provider`;
-  `paid_pending_review` can't hold `refunded_at`, a CHECK). A closed dispute records `won` or `lost`
-  only, and an admin decides; a lost one never reported open is opened first (takedown, email). A
-  partial refund changes nothing and emails the admin. `refund.failed` flags the site's refund
-  `refund_failed` and emails the admin. The site's own refund's `charge.refunded` finds the order
-  `refunded`, or `refunding` while that refund may still run (claimed under ten minutes ago, never
-  failed), and changes nothing; after it failed, the dashboard refund finishes it (its listing
-  change, none for a claim, `refunded`, the admin's email; a rejection's own refund then records the
-  submission and emails the owner). Fulfilment never applies a disputed payment (the apply refuses
-  one disputed meanwhile). Admin Orders shows "Disputed", "Dispute won", "Dispute lost" or "Refunded
-  outside the site", with no "Refund…" while a dispute is open or lost (Stripe refuses; the routes
-  answer 409). The four events stay dormant until the owner ticks them on both webhooks
-  ([Configuration](#configuration-owner)).
+  the admin (`admin-payment-alert`). A paid claim's listing comes down too (owner decision on #473,
+  2026-10-16) while its payer still owns it through that payment (after an admin's revoke or
+  transfer: the record and email only); the owner stays until an admin decides. A claim refunded in
+  /admin (the site's own refund) stays up; one refunded or disputed in Stripe comes down. A held
+  payment has none live. Neither returns as paid: by one rule (`db/payment-kept.ts`: the paying
+  order, a claim's latest, refunded or disputed and not won), /admin and the account read it free,
+  the review queue shows "Refunded" or "Disputed", Approve answers 409, and the weekly badge check
+  takes a live one in. The refund also records an approved or held submission refunded
+  (`at_provider`; `paid_pending_review` can't hold `refunded_at`, a CHECK). A closed dispute records
+  `won` or `lost` only, and an admin decides; a lost one never reported open is opened first
+  (takedown, email). A partial refund changes nothing and emails the admin. `refund.failed` flags
+  the site's refund `refund_failed` and emails the admin. The site's own refund's `charge.refunded`
+  finds the order `refunded`, or `refunding` while that refund may still run (claimed under ten
+  minutes ago, never failed), and changes nothing; after it failed, the dashboard refund finishes it
+  (its listing change, none for a claim, `refunded`, the admin's email; a rejection's own refund
+  then records the submission and emails the owner). Fulfilment never applies a disputed payment
+  (the apply refuses one disputed meanwhile). Admin Orders shows "Disputed", "Dispute won", "Dispute
+  lost" or "Refunded outside the site", with no "Refund…" while a dispute is open or lost (Stripe
+  refuses; the routes answer 409). The four events stay dormant until the owner ticks them on both
+  webhooks ([Configuration](#configuration-owner)).
 - **A listing taken down in review** (`paid_pending_review`, `changes_requested`) can't be
   approved or resubmitted until it is live: the reviewer republishes it, then approves it, or
-  rejects it.
+  rejects it. Approve refuses a payment refunded (reject it instead), or disputed and not won.
 - **Paid submission.** The guardrails run: a public address under the safe-fetch rules, the site
   answers with an HTML page, no listing has the website, and no prohibited block covers it. Pass:
   the listing is created and published (catalog version bump) and the submission is

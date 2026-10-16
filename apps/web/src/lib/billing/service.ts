@@ -1521,7 +1521,8 @@ interface Takedown {
  * The plans that take down the listing an order's payment made or kept live (a paid
  * submission's, an upgrade's, or a relist's), even while its submission is in review, or the
  * listing whose ownership a paid claim's payment bought: a claim's comes down too (the owner's
- * decision on #473, 2026-10-16), and its ownership stays as it is for an admin to decide. A payment nothing
+ * decision on #473, 2026-10-16) while its payer still owns it through that payment, and its
+ * ownership stays as it is for an admin to decide. A payment nothing
  * applied, or one held for review, has no listing live; and a refunded order's listing no longer
  * rides on its payment (a refund decided its listing already): those take nothing down (`none`).
  * A listing already down stays as it is (`already_unpublished`).
@@ -1536,6 +1537,10 @@ async function takedownPlans(
     return none
   }
   if (order.purpose === 'claim') {
+    // The listing whose ownership this payment bought, while the payer still owns it through it:
+    // after an admin's revoke or transfer (a stolen card, say) it belongs to someone else, so
+    // the payment change is recorded and the admin emailed, and nothing comes down.
+    if (!(await deps.operations.paidClaimStands(order))) return none
     const slug = (await deps.operations.adminOrder(order.id))?.listingSlug
     return order.listingId && slug
       ? unpublishTakedown(deps, { listingId: order.listingId, reason, slug, submission: null })
