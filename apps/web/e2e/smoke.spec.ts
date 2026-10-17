@@ -140,7 +140,13 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     const response = await page.goto(listing.path, { waitUntil: 'networkidle' })
     expect(response?.status()).toBe(200)
     await expect(page.getByRole('heading', { level: 1, name: listing.namePattern })).toBeVisible()
-    await expect(page).toHaveTitle(new RegExp(`${escapeRegExp(listing.name)}.*\\| SERP$`))
+    // The longest pattern that fits 60 characters with the suffix, never a cut name (#521).
+    await expect(page).toHaveTitle(
+      new RegExp(
+        `^${escapeRegExp(listing.name)}(?: Review, Rating & Alternatives| Review & Alternatives| Alternatives)? \\| SERP Best$`,
+        'u'
+      )
+    )
     await expectCanonical(page, listing.path, origin)
     // Claims are on (#67, #130): a listing without an owner offers the claim link. The seed's
     // sample listing has no owner; a deployed one may have been claimed.
@@ -510,11 +516,11 @@ test.describe('best.serp.co D1 Worker smoke', () => {
   test('renders static, commercial, and legal pages', async ({ page, request }) => {
     const origin = await originOf(request)
     const pages: Array<{ path: string; heading: RegExp }> = [
-      { path: '/about/', heading: /^about serp$/i },
+      { path: '/about/', heading: /^about serp best$/i },
       { path: '/brands/', heading: /^brands$/i },
-      { path: '/contact/', heading: /^contact serp$/i },
-      { path: '/pricing/', heading: /^serp pricing$/i },
-      { path: '/sponsor/', heading: /^sponsor serp$/i },
+      { path: '/contact/', heading: /^contact serp best$/i },
+      { path: '/pricing/', heading: /^serp best pricing$/i },
+      { path: '/sponsor/', heading: /^sponsor serp best$/i },
       { path: '/submit/', heading: /^submit a product$/i },
       { path: '/legal/privacy-policy/', heading: /^privacy policy$/i },
       { path: '/legal/terms-conditions/', heading: /^terms of service$/i }
@@ -524,7 +530,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
       const response = await page.goto(path, { waitUntil: 'domcontentloaded' })
       expect(response?.status(), path).toBe(200)
       await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible()
-      await expect(page).toHaveTitle(/\| SERP$/)
+      await expect(page).toHaveTitle(/\| SERP Best$/u)
       // Legal pages pass slashless paths to their breadcrumb; its JSON-LD must still be canonical.
       if (path.startsWith('/legal/')) await expectCanonicalStructuredData(page, origin)
     }

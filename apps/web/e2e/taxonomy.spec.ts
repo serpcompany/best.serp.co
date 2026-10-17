@@ -64,7 +64,10 @@ test.describe('taxonomy routes on the fixture seed (#346)', () => {
     const response = await page.goto(bestPath(noteTakingApp.slug))
     expect(response?.status()).toBe(200)
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(noteTakingApp.heading)
-    await expect(page).toHaveTitle(`${noteTakingApp.heading} | SERP`)
+    // `{N} Best {Keyword} in {Year}`: its 10 entries and its D1 title (#521); the H1 stays the heading.
+    await expect(page).toHaveTitle(
+      `10 ${noteTakingApp.heading} in ${new Date().getUTCFullYear()} | SERP Best`
+    )
     // 11 in its pool (12 tagged, one excluded), 10 shown: indexed from 5 entries.
     await expectRobots(page, true)
     await expectCanonical(page, bestPath(noteTakingApp.slug))

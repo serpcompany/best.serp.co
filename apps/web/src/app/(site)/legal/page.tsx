@@ -8,12 +8,11 @@ import { getRoute } from '@/lib/routing/routes'
 import { generateBaseMetadata, SITE_NAME } from '@/lib/seo/seo-config'
 import { legalPages } from '@/lib/site/legal-pages'
 
-const description =
-  'Legal policies and terms for SERP: the privacy policy and the terms and conditions that apply to using the SERP directory.'
+const description = `Legal policies and terms for ${SITE_NAME}: the privacy policy and the terms and conditions that apply to using the ${SITE_NAME} directory.`
 
 export function generateMetadata(): Metadata {
   return generateBaseMetadata({
-    title: 'SERP Legal',
+    title: `${SITE_NAME} Legal`,
     description,
     path: '/legal/'
   })

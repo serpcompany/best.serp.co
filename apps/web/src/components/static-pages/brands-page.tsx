@@ -22,10 +22,10 @@ export function generateMetadata(): Metadata {
   }
 
   return generateBaseMetadata({
-    title: `${siteCopy.brandsLabel} in the ${siteConfig.name} Network`,
-    description: `Browse sites and products in the ${siteConfig.name} network, from directories to tools and resources, with a link to visit each one.`,
+    title: `${siteCopy.brandsLabel} in the ${siteConfig.networkName} Network`,
+    description: `Browse sites and products in the ${siteConfig.networkName} network, from directories to tools and resources, with a link to visit each one.`,
     path: getRoute('brands'),
-    keywords: ['brands', 'network', siteConfig.name]
+    keywords: ['brands', 'network', siteConfig.networkName]
   })
 }
 
@@ -36,7 +36,7 @@ function BrandsJsonLd({ brands }: { brands: NetworkBrandEntry[] }) {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
     name: siteCopy.brandsLabel,
-    description: `Browse sites and products in the ${siteConfig.name} network.`,
+    description: `Browse sites and products in the ${siteConfig.networkName} network.`,
     url: brandsUrl,
     isPartOf: {
       '@type': 'WebSite',
@@ -85,7 +85,7 @@ export default function BrandsPage() {
         <PageHero
           eyebrow="Network"
           title={siteCopy.brandsLabel}
-          description={`Browse sites and products in the ${siteConfig.name} network.`}
+          description={`Browse sites and products in the ${siteConfig.networkName} network.`}
         />
       </PageSection>
       <PageSection spacing="spacious">

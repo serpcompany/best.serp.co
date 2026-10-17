@@ -15,7 +15,7 @@ import { tagChoices } from '@/lib/submissions/presentation'
 export function generateMetadata(): Metadata {
   return generateBaseMetadata({
     title: 'Edit listing',
-    description: 'Edit your listing on SERP.',
+    description: 'Edit your listing on SERP Best.',
     path: '/account/listings/',
     noindex: true
   })

@@ -8,6 +8,13 @@ import {
 } from '../../lib/directory/content-query'
 import { getRoute } from '../../lib/routing/routes'
 import {
+  categoryDescriptionLead,
+  categoryTitle,
+  currentYear,
+  tagDescriptionLead,
+  tagTitle
+} from '../../lib/seo/page-titles'
+import {
   composeMetaDescription,
   generateDynamicMetadata,
   SITE_NAME,
@@ -56,13 +63,16 @@ export async function generateCategoryRouteMetadata({
   noindex?: boolean
 }): Promise<Metadata> {
   const seoContent = getCategorySEO(category.slug, category)
-
-  const title = count > 0 ? `${count}+ ${seoContent.metaTitle}` : seoContent.metaTitle
-
-  const description =
-    count > 0
-      ? `${count}+ ${siteCopy.listingName.plural}. ${seoContent.metaDescription}`
-      : seoContent.metaDescription
+  // The live count from D1 and this request's year (#521); the description leads with every
+  // word of the longest title.
+  const parts = { count, year: currentYear() }
+  const title =
+    kind === 'tag' ? tagTitle(category.name, parts) : categoryTitle(category.name, parts)
+  const lead =
+    kind === 'tag'
+      ? tagDescriptionLead(category.name, parts)
+      : categoryDescriptionLead(category.name, parts)
+  const description = `${lead} ${seoContent.metaDescription}`
 
   return generateDynamicMetadata({
     type: kind,

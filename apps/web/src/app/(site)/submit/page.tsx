@@ -4,7 +4,7 @@ import { SubmitForm } from '@/components/submit/submit-form'
 import { getSessionUser } from '@/lib/auth/server'
 import { getActiveCategories, getActiveTags } from '@/lib/catalog/repository'
 import { getRoute } from '@/lib/routing/routes'
-import { generateBaseMetadata } from '@/lib/seo/seo-config'
+import { generateBaseMetadata, SITE_NAME } from '@/lib/seo/seo-config'
 import { toSummary } from '@/lib/submissions/http'
 import { tagChoices } from '@/lib/submissions/presentation'
 import { getOwnSubmission, insecureLogosAllowed } from '@/lib/submissions/repository'
@@ -12,8 +12,8 @@ import { getOwnSubmission, insecureLogosAllowed } from '@/lib/submissions/reposi
 // Noindex and robots-disallowed, from the route registry (#167).
 export function generateMetadata(): Metadata {
   return generateBaseMetadata({
-    title: 'Submit to SERP',
-    description: 'Submit your software, AI tool, company, resource, or SERP project to SERP.',
+    title: `Submit to ${SITE_NAME}`,
+    description: `Submit your software, AI tool, company, resource, or SERP project to ${SITE_NAME}.`,
     path: getRoute('submit')
   })
 }

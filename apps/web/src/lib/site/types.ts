@@ -116,6 +116,8 @@ export type SiteDefinition = {
      */
     legalEmailDomain?: string
     name: string
+    /** The network of sites the Brands page lists, when it is not `name` ("SERP", #521). */
+    networkName?: string
     publicUrl: string
     tagline: string
   }

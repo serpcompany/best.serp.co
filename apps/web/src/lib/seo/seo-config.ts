@@ -11,6 +11,7 @@ import {
 import { siteContent } from '../site/site-content'
 import { siteCopy } from '../site/site-copy'
 import { absoluteUrl, canonicalPathname } from './canonical-url'
+import { listingTitle } from './page-titles'
 
 export const SITE_NAME = siteConfig.name
 export const SITE_TAGLINE = siteConfig.tagline
@@ -185,15 +186,6 @@ export function generateBaseMetadata(options: {
       }
     }
   }
-}
-
-/** Search results show about 60 characters of a title; past that the type suffix is dropped. */
-const LISTING_TITLE_MAX_LENGTH = 60
-
-/** `<name> - Product`, or the bare name when the suffixed title (with ` | SITE`) runs long. */
-export function listingTitle(name: string): string {
-  const suffixed = `${name} - ${siteCopy.listingName.singularTitle}`
-  return `${suffixed} | ${SITE_NAME}`.length > LISTING_TITLE_MAX_LENGTH ? name : suffixed
 }
 
 export function generateDynamicMetadata(options: {

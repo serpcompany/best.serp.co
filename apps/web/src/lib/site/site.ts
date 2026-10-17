@@ -67,13 +67,15 @@ export const site: SiteDefinition = {
   },
   site: {
     description:
-      'SERP helps people discover software, AI tools, companies, resources, and projects from the SERP network.',
+      'SERP Best helps people discover software, AI tools, companies, resources, and projects from the SERP network.',
     domain: 'best.serp.co',
     // The legal pages have always named dmca@ and privacy@ at serp.co. best.serp.co has no
     // mail routing yet (its DNS is a GitHub Pages CNAME until cutover); switch this to
     // best.serp.co once Email Routing forwards dmca@best.serp.co (serpcompany/best.serp.co#42).
     legalEmailDomain: 'serp.co',
-    name: 'SERP',
+    // The site-wide name (#521): every title's ` | SERP Best`, Open Graph's site name, the feed.
+    name: 'SERP Best',
+    networkName: 'SERP',
     publicUrl: 'https://best.serp.co',
     tagline: 'Software, AI tools, companies, resources, and SERP projects'
   },

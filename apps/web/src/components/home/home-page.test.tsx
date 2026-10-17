@@ -27,7 +27,7 @@ describe('homepage canonical URL', () => {
 
   it('sets an absolute title, so the root layout template adds no suffix', () => {
     expect(homePageMetadata().title).toEqual({
-      absolute: 'SERP Directory of Products and Resources'
+      absolute: 'SERP Best Directory of Products and Resources'
     })
   })
 

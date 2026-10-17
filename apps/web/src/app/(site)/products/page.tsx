@@ -9,7 +9,7 @@ import { siteCopy } from '@/lib/site/site-copy'
 
 const productsPath = getRoute('listing.list')
 
-// The root layout's title template adds ` | SERP`.
+// The root layout's title template adds ` | SERP Best`.
 function productsMetadata(): Metadata {
   return generateBaseMetadata({
     title: `All ${siteCopy.listingName.pluralTitle} in the ${SITE_NAME} Directory`,

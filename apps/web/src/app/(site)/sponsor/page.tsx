@@ -5,12 +5,12 @@ import { ListCard } from '@/components/layout/list-card'
 import { PageHero } from '@/components/layout/page-hero'
 import { PageSection } from '@/components/layout/page-shell'
 import { generateBaseMetadata } from '@/lib/seo/seo-config'
+import { siteConfig } from '@/lib/site/site-config'
 
 export function generateMetadata(): Metadata {
   return generateBaseMetadata({
-    title: 'Sponsor SERP',
-    description:
-      'Sponsorship options for reaching the SERP audience: people researching software, AI tools, resources, and SERP network projects.',
+    title: `Sponsor ${siteConfig.name}`,
+    description: `Sponsorship options for reaching the ${siteConfig.name} audience: people researching software, AI tools, resources, and SERP network projects.`,
     path: '/sponsor/'
   })
 }
@@ -22,7 +22,7 @@ export default function SponsorPage() {
       <PageSection spacing="hero">
         <PageHero
           align="center"
-          title="Sponsor SERP"
+          title={`Sponsor ${siteConfig.name}`}
           description="Reach people researching software, AI tools, resources, and SERP network projects."
         />
       </PageSection>
