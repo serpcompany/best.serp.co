@@ -1100,11 +1100,17 @@ const SITE_REFUND: ReturnedRefund = { outside: false, refundId: null }
 /**
  * What the provider records of an order's payment now (#486): whether its refunds that haven't
  * failed send all of it back (`returned`), and the one that sends the money back (the site's own,
- * by the order it names, else the newest), or the provider's error when it couldn't say. The
- * error is null when retrying wouldn't help: nothing to ask about, or a key refused the read.
+ * by the order it names, else the newest), and the newest that failed or was canceled (`failed`,
+ * the refund a flag records, #503), or the provider's error when it couldn't say. The error is
+ * null when retrying wouldn't help: nothing to ask about, or a key refused the read.
  */
 type RefundsAtProvider =
-  | { checked: true; refund: ProviderRefund | null; returned: boolean }
+  | {
+      checked: true
+      failed: ProviderRefund | null
+      refund: ProviderRefund | null
+      returned: boolean
+    }
   | { checked: false; error: unknown }
 
 async function refundsAtProvider(
@@ -1130,6 +1136,8 @@ async function refundsAtProvider(
   )
   return {
     checked: true,
+    failed:
+      refunds.find(refund => refund.status === 'failed' || refund.status === 'canceled') ?? null,
     refund: sending.find(refund => refund.orderId === order.id) ?? sending[0] ?? null,
     returned: sending.reduce((sum, refund) => sum + refund.amountCents, 0) >= charged
   }
@@ -1970,10 +1978,10 @@ function siteRefundRunning(deps: BillingDependencies, order: OrderRecord): boole
  * that haven't failed don't send the payment back (the reported refund failed since: a retried
  * report, delivered after its failure, #498's review), nothing went back: the order stays
  * `refunding`, flagged `refund_failed` (the sweep stops retrying it, and never tells the owner it
- * was refunded). When the provider can't say for now (down, a timeout, a rate limit, a partial
- * list), the report alone can't show the money went back, so nothing is recorded and the error
- * answers the delivery 500: the order stays as it was, and the provider's retry decides with its
- * record (#504). A read the key is refused, or nothing to ask about (no error to retry), still
+ * was refunded). When the provider can't say for now (down, a timeout, a rate limit, a 5xx, a
+ * partial list), the report alone can't show the money went back, so nothing is recorded and the
+ * error answers the delivery 500: the order stays as it was, and the provider's retry decides with
+ * its record (#504). A read the key is refused, or nothing to ask about (no error to retry), still
  * decides by the report.
  */
 async function finishRefundAtProvider(
@@ -2002,10 +2010,13 @@ async function finishRefundAtProvider(
  * events arrive in. Its refunds that haven't failed send it all back: a flag clears (a later
  * refund, in the provider's dashboard say, sent the money back, #485) and records that refund.
  * They don't: the refund that sent it back has failed since, so the order is flagged as its
- * `refund.failed` would (a retried report landing after its failure never clears it). When the
- * provider can't say, the report decides as before: any but the site's own refund's (its
- * request key, the refund that failed, delivered late) clears the flag; the error then answers the
- * delivery 500, so the provider's retry checks again. A clear the order changed under while the
+ * `refund.failed` would, recording the same refund (a retried report landing after its failure
+ * never clears it, and the admin is emailed once for that failure, #503). When the
+ * provider can't say for now (down, a timeout, a rate limit, a 5xx, a partial list), nothing is
+ * recorded: a flag stays, and the error answers the delivery 500, so the provider's retry decides
+ * with its record (#513). When its key is refused the read (401, 403), or there is nothing to ask
+ * about, the report decides as before: any but the site's own refund's (its request key, the
+ * refund that failed, delivered late) clears the flag. A clear the order changed under while the
  * provider was asked (`clearRefundFailed`) reads both again; when that keeps losing, the flag
  * stays and the delivery answers 500.
  */
@@ -2020,14 +2031,15 @@ async function settleRefundFlag(
     const flagged = order.attention === 'refund_failed'
     const atProvider = await refundsAtProvider(deps, order)
     if (!atProvider.checked) {
-      const clears = flagged && requestKey !== `refund:${order.id}`
-      const settled = !clears || (await clearRefundFailed(deps, order, null))
       if (atProvider.error) throw atProvider.error
-      if (settled) return
+      const clears = flagged && requestKey !== `refund:${order.id}`
+      if (!clears || (await clearRefundFailed(deps, order, null))) return
     } else if (atProvider.returned && flagged) {
       if (await clearRefundFailed(deps, order, atProvider.refund?.id ?? null)) return
     } else {
-      if (!atProvider.returned && !flagged) await flagRefundFailedNow(deps, order, null)
+      if (!atProvider.returned && !flagged) {
+        await flagRefundFailedNow(deps, order, null, atProvider.failed?.id ?? null)
+      }
       return
     }
   }
@@ -2122,7 +2134,9 @@ async function alertPartialRefund(
  * refunds decides (#486), whatever order their events arrive in: when its refunds that haven't
  * failed still send all of it back (a later refund did, its report delivered first), nothing is
  * flagged, and a flag set while the provider couldn't say is cleared. Otherwise the money never
- * went back (`flagRefundFailedNow`). When the provider can't say, the report decides as before:
+ * went back (`flagRefundFailedNow`), and a `refunded` order records the newest refund the
+ * provider's record says failed, whichever report flags it (#503), so a late report of an older
+ * refund can't overwrite it. When the provider can't say, the report decides as before:
  * a failure of a refund other than the one the order records (`provider_refund_id`: an earlier
  * one, reported after a newer one succeeded, #485) flags nothing; the error then answers the
  * delivery 500, so the provider's retry checks again. A clear the order changed under while the
@@ -2147,7 +2161,12 @@ async function flagRefundFailed(
       log('billing_refund_failed_superseded', { order: current.id })
       return 'refund_failed_superseded'
     }
-    const outcome = await flagRefundFailedNow(deps, current, atProvider.checked ? null : refundId)
+    const outcome = await flagRefundFailedNow(
+      deps,
+      current,
+      atProvider.checked ? null : refundId,
+      atProvider.checked ? (atProvider.failed?.id ?? refundId) : refundId
+    )
     if (!atProvider.checked && atProvider.error) throw atProvider.error
     return outcome
   }
@@ -2165,12 +2184,16 @@ async function flagRefundFailed(
  * recorded meanwhile, so the dispute's own takedown reads the flag. `unlessSupersededBy`: when the
  * provider couldn't say (#486), a failure of a refund other than the one the order records flags
  * nothing; one with no recorded refund (blanked when a refund outside the site cleared the flag)
- * always flags. Three lost writes throw, so the provider's retry runs it again.
+ * always flags. `failedRefundId`: the refund that failed (the newest failed one in the provider's
+ * record, else the one the report names), which a `refunded` order then records as its refund, so
+ * the admin's email names that refund however its reports arrive (`alertKey`, #503). Three lost
+ * writes throw, so the provider's retry runs it again.
  */
 async function flagRefundFailedNow(
   deps: BillingDependencies,
   order: OrderRecord,
-  unlessSupersededBy: string | null
+  unlessSupersededBy: string | null,
+  failedRefundId: string | null = null
 ): Promise<string> {
   for (let attempt = 0; attempt < PUBLICATION_ATTEMPTS; attempt += 1) {
     const current = attempt === 0 ? order : await deps.operations.order(order.id)
@@ -2185,7 +2208,8 @@ async function flagRefundFailedNow(
       log('billing_refund_failed_superseded', { order: current.id })
       return 'refund_failed_superseded'
     }
-    const disputed = current.status === 'refunded' && disputeBlocksRefund(current)
+    const refunded = current.status === 'refunded'
+    const disputed = refunded && disputeBlocksRefund(current)
     const takedown = disputed ? await takedownPlans(deps, current, 'disputed', true) : null
     const flagged = await deps.operations.apply([
       ...(takedown?.plans ?? []),
@@ -2193,7 +2217,8 @@ async function flagRefundFailedNow(
         disputed,
         now: nowIso(deps),
         orderId: current.id,
-        refunded: current.status === 'refunded'
+        refunded,
+        refundId: failedRefundId
       })
     ])
     if (flagged) {
@@ -2201,7 +2226,11 @@ async function flagRefundFailedNow(
         listing: takedown?.listingAction ?? 'none',
         order: current.id
       })
-      await alertAdmin(deps, current, 'refund_failed')
+      // The order as flagged: a `refunded` one records the refund that failed, when reported.
+      const providerRefundId = refunded
+        ? (failedRefundId ?? current.providerRefundId)
+        : current.providerRefundId
+      await alertAdmin(deps, { ...current, providerRefundId }, 'refund_failed')
       return 'refund_failed'
     }
   }
@@ -2212,8 +2241,9 @@ async function flagRefundFailedNow(
 }
 
 /**
- * Emails the admin about a payment change, once per order and kind (the email ledger's key):
- * the order, its product, and whether its listing is live now. `recover`: the sweep's resend.
+ * Emails the admin about a payment change, once per order and kind, and a failed refund once per
+ * refund (`alertKey`, the email ledger's key): the order, its product, and whether its listing is
+ * live now. `recover`: the sweep's resend.
  */
 async function alertAdmin(
   deps: BillingDependencies,
@@ -2223,7 +2253,7 @@ async function alertAdmin(
 ): Promise<void> {
   const row = await deps.operations.adminOrder(order.id)
   await deps.notify('admin-payment-alert', {
-    eventKey: deps.eventKey('payment-alert', kind, order.id),
+    eventKey: await alertKey(deps, order, kind),
     input: {
       kind,
       listingLive: row?.listingSlug ? row.listingLive : null,
@@ -2233,6 +2263,29 @@ async function alertAdmin(
     ...(recover ? { recover: true } : {}),
     to: deps.adminRecipient
   })
+}
+
+/**
+ * An admin alert's event key: the order and the kind, and for a failed refund the refund the
+ * flagged order records (`provider_refund_id`, #503). That is the refund that failed: the flag
+ * records it (`flagRefundFailedNow`), and a clear records the refund that sent the money back, so
+ * that refund's own failure emails the admin again, while a retried report of the same failure
+ * doesn't. A `refunding` order records none until its refund finishes (which clears the flag), so
+ * its failure is keyed on the order alone, as before. The id is hashed: a Stripe id has capitals,
+ * which an event key can't.
+ */
+async function alertKey(
+  deps: BillingDependencies,
+  order: Pick<OrderRecord, 'id' | 'providerRefundId'>,
+  kind: PaymentAlertKind
+): Promise<string> {
+  const refundId = kind === 'refund_failed' ? order.providerRefundId : null
+  if (refundId === null) return deps.eventKey('payment-alert', kind, order.id)
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(refundId))
+  const refund = [...new Uint8Array(digest).slice(0, 16)]
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('')
+  return deps.eventKey('payment-alert', kind, order.id, refund)
 }
 
 /**
@@ -2282,6 +2335,10 @@ async function recoverEmails(
     try {
       const order = await deps.operations.order(orderId)
       if (!order || !kind) continue
+      // A failed refund's email names the refund the flagged order records (`alertKey`, #503).
+      // Once the flag cleared, a refund sent the money back: nothing is left to act on, and the
+      // refund the order records is that one, whose own failure the key must stay free for.
+      if (kind === 'refund_failed' && order.attention !== 'refund_failed') continue
       await alertAdmin(deps, order, kind, true)
       counts.emails += 1
     } catch (error) {

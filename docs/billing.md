@@ -194,10 +194,11 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
   checkout closed (paid → applied, otherwise `failed`), failed orders whose superseded checkout
   couldn't be confirmed expired (for three days; it expires an open one and drops one Stripe
   expired), then refunds still owed after an `other` rejection. Last, it sends again the emails of
-  payments applied, and the admin alerts of payment events (#473), between ten minutes and six hours
-  ago (#481): an apply late in `waitUntil`'s 30 seconds, or a Worker stopped after it, may never
-  have sent them. The email ledger sends each once, and claims again a send cut off mid-way while
-  useSend's idempotency key still answers a repeat with the original message ([Email](./email.md)).
+  payments applied, and the admin alerts of payment events (#473; a failed refund's only while its
+  order is still flagged, #503), between ten minutes and six hours ago (#481): an apply late in
+  `waitUntil`'s 30 seconds, or a Worker stopped after it, may never have sent them. The email ledger
+  sends each once, and claims again a send cut off mid-way while useSend's idempotency key still
+  answers a repeat with the original message ([Email](./email.md)).
 
 No self-withdraw after payment (#59): the withdraw plans already refuse a paid submission.
 
@@ -221,9 +222,12 @@ when Stripe can't say ([Refunds](./billing-disputes.md#refunds)) and answers 2xx
 permission never answers every refund event 500 until Stripe stops retrying. Any other failure of
 that read (unreachable, a timeout, 429, a 5xx, or more refunds than it reads, `refunds_incomplete`)
 logs the same event with `retry: true` and answers 500, so Stripe delivers it again; a
-`charge.refunded` that would finish a claimed refund records nothing first (#504). After the next
-refund on staging, look for `billing_refunds_unchecked` in its logs before promoting. Webhook
-endpoints (trailing slash included; Stripe does not follow redirects):
+`charge.refunded` neither finishes a claimed refund (#504) nor clears a `refund_failed` flag (#513)
+first (a dashboard refund of a `paid` order is still recorded, then answered 500). The sweep
+skips flagged orders, so while that read keeps failing an admin's "Refund…" settles a flagged
+`refunding` order, and a flagged `refunded` one stays flagged.
+After the next refund on staging, look for `billing_refunds_unchecked` in its logs before promoting.
+Webhook endpoints (trailing slash included; Stripe does not follow redirects):
 
 - `https://best.serp.co/api/billing/webhook/` (live mode)
 - `https://staging.best.serp.co/api/billing/webhook/` (test mode; staging's canonical host
