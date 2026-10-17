@@ -1,0 +1,295 @@
+# serpcompany/best.serp.co#539 (batch D): hand-picked alternatives for the 37 live listings whose
+# primary category is Data & Analytics and whose slug starts with a to g (avanty.app to grid.is),
+# the first part of Data & Analytics in #539's size order; a later batch takes h to z. The picks
+# lead each page's Alternatives section; the page tops it up to six from similar listings.
+# Picked on 2026-10-18 from staging's live listings (read-only), each also live on production
+# (https://best.serp.co/sitemap-products.xml, read that day), by what each listing and its
+# candidates say they do and what their sites offer that day: a pick does the same job for the same
+# kind of user, best first, and a listing gets fewer than six, or none, when nothing else fits.
+# Every listing and pick is a v1 import listing, with the same id and slug on staging and
+# production. The reason for each listing is the comment above its operation. Picks may come from
+# any category: Stripe, Paddle, Orb and Genius Sheets are filed under Business & Finance,
+# AIHelperBot (sqlai.ai), Caspio, Knack and Glide under Developer Tools, and DiagramGPT (eraser.io)
+# and GPT Workspace under Productivity.
+# Five listings have no operation, because nothing in the catalog substitutes for them: Byterat
+# (byterat.io), Cradle AI (cradle.bio), Datasette ChatGPT plugin (datasette.io), Goodlookup
+# (goodlookup.com), and Granica (granica.ai). Their pages keep the similar-listings fallback.
+# Seven listings have no operation, because their sites no longer offer what the listing describes
+# (pivoted, acquired, or unreachable), and batch D's pull request lists them for retirement:
+# Cybertiks (cybertiks.com), Dolly by Databricks (databricks.com), Findly (findly.ai), Channel
+# (fluenthq.com), ChatGPT in Google Sheets (gox.ai), Gretel (gretel.ai), and GRID 2.0 (grid.is).
+# Each listing-alternatives-set compares and swaps the listing's slug and current picks (none yet),
+# refuses a pick that isn't live with that id and slug, keeps the listing's checksum, and logs an
+# `edited` event. Row-level, so the batch is refused with nothing written if any listing changed.
+# Needs migration 0018_listing_alternatives (#534, release 9). Publish on staging first, then on
+# production after the promotion that carries it.
+version: 1
+id: 2026-10-18-alternatives-data-analytics-a-g
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  # avanty.app: AI help writing and explaining SQL queries for data analysts.
+  - action: listing-alternatives-set
+    id: lst_0b79b34c0e0ac26122b013f9
+    slug: avanty.app
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_36888ee8f5819655c4fafcf2, slug: sqlai.ai }
+      - { id: lst_d98c7c311d99f648f3086c7e, slug: blazesql.com }
+      - { id: lst_1b9a79c3283cf942e2a093c7, slug: dbpilot.io }
+      - { id: lst_143235844ef7f5f28bd2c336, slug: rawquery.com }
+      - { id: lst_59f7bfaf13d906bbced7ff55, slug: nlsql.com }
+  # baremetrics.com: subscription revenue analytics (MRR, churn); Chargebee and Recurly include it with billing.
+  - action: listing-alternatives-set
+    id: lst_299bc93bdc283c9a9a94995a
+    slug: baremetrics.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_90c721d429afa5625a0f98e3, slug: chartmogul.com }
+      - { id: lst_9077c08e86b6c36e167cb1b0, slug: chargebee.com }
+      - { id: lst_13df075e8b8ee5e41801daa2, slug: recurly.com }
+  # blazesql.com: asking a SQL database questions in plain English.
+  - action: listing-alternatives-set
+    id: lst_d98c7c311d99f648f3086c7e
+    slug: blazesql.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_36888ee8f5819655c4fafcf2, slug: sqlai.ai }
+      - { id: lst_7ad8c88ff3119740f15a6fb8, slug: defog.ai }
+      - { id: lst_901b319f2fe22af7c9ca2af3, slug: veezoo.com }
+      - { id: lst_59f7bfaf13d906bbced7ff55, slug: nlsql.com }
+      - { id: lst_143235844ef7f5f28bd2c336, slug: rawquery.com }
+      - { id: lst_8047c25091b53b2404dc5ef8, slug: vanna.ai }
+  # boloforms.com: AI formula generators for Excel and Google Sheets.
+  - action: listing-alternatives-set
+    id: lst_c6806b4adbbb65a7c7397030
+    slug: boloforms.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_7487a5e75daae5669a95c513, slug: gptexcel.uk }
+      - { id: lst_70e27b5c7b230c20452bdebf, slug: formulashq.com }
+      - { id: lst_8a842628e5e1a3177f8c87d0, slug: sheeter.ai }
+      - { id: lst_77b5c1ce176fbc57b4931095, slug: flowshot.ai }
+      - { id: lst_d7162c9cc6717150dbbec3ae, slug: numerous.ai }
+      - { id: lst_9d00ff66b17a3e581a37e780, slug: sheetai.app }
+  # chargebee.com: subscription billing for SaaS businesses.
+  - action: listing-alternatives-set
+    id: lst_9077c08e86b6c36e167cb1b0
+    slug: chargebee.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_13df075e8b8ee5e41801daa2, slug: recurly.com }
+      - { id: lst_bb7370710688ea402e9968e0, slug: zuora.com }
+      - { id: lst_cdab88dff63eda52fb445aa4, slug: stripe.com }
+      - { id: lst_bc729b21fb0407dffb944ce7, slug: paddle.com }
+      - { id: lst_c4cebfd6b9579da3a901a11d, slug: getlago.com }
+      - { id: lst_982edeef0a0b3aef9e2bf712, slug: fastspring.com }
+  # chartai.io: making charts and diagrams from a prompt or data.
+  - action: listing-alternatives-set
+    id: lst_0bfaec2f4e47c31510f9a624
+    slug: chartai.io
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_e0548da75032401636af0f71, slug: graphy.app }
+      - { id: lst_23f0d92a5076fa3114048fa0, slug: eraser.io }
+      - { id: lst_a9a868f81f9ca7185b0a42c4, slug: vizly.fyi }
+      - { id: lst_d309a5dfaf62dd5ce60dd807, slug: columns.ai }
+  # chartmogul.com: subscription revenue analytics (MRR, churn); Chargebee and Recurly include it with billing.
+  - action: listing-alternatives-set
+    id: lst_90c721d429afa5625a0f98e3
+    slug: chartmogul.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_299bc93bdc283c9a9a94995a, slug: baremetrics.com }
+      - { id: lst_9077c08e86b6c36e167cb1b0, slug: chargebee.com }
+      - { id: lst_13df075e8b8ee5e41801daa2, slug: recurly.com }
+  # chatcsv.co: asking questions of a CSV or spreadsheet in plain English.
+  - action: listing-alternatives-set
+    id: lst_df1787b07cdd6dae9bcfca3b
+    slug: chatcsv.co
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_a9a868f81f9ca7185b0a42c4, slug: vizly.fyi }
+      - { id: lst_7487a5e75daae5669a95c513, slug: gptexcel.uk }
+      - { id: lst_14463cf060bcc3080c31bcf6, slug: tomat.ai }
+      - { id: lst_367184ac70d03d1fa0acd414, slug: kanaries.net }
+  # coactive.ai: AI that understands, searches and tags video and image libraries.
+  - action: listing-alternatives-set
+    id: lst_67fdca1f9700f0c54bc65de1
+    slug: coactive.ai
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_134ce01fe1ba05cf1941252f, slug: mixpeek.com }
+      - { id: lst_16fc9bff7e648d36b0775477, slug: thehive.ai }
+  # coefficient.io: pulling live business data into spreadsheets.
+  - action: listing-alternatives-set
+    id: lst_a411a7f297a2ccd93ee3a884
+    slug: coefficient.io
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_fdc8e05f3c9b7234ea414a11, slug: equals.com }
+      - { id: lst_c3d51b5b9dd29958a29fa5ad, slug: geniussheets.us }
+  # columns.ai: turning data into charts and visual stories.
+  - action: listing-alternatives-set
+    id: lst_d309a5dfaf62dd5ce60dd807
+    slug: columns.ai
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_e0548da75032401636af0f71, slug: graphy.app }
+      - { id: lst_a9a868f81f9ca7185b0a42c4, slug: vizly.fyi }
+      - { id: lst_367184ac70d03d1fa0acd414, slug: kanaries.net }
+      - { id: lst_0bfaec2f4e47c31510f9a624, slug: chartai.io }
+  # dbeaver.io: database clients for browsing and querying databases.
+  - action: listing-alternatives-set
+    id: lst_009e7bda6d338cb383f5719b
+    slug: dbeaver.io
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_1b9a79c3283cf942e2a093c7, slug: dbpilot.io }
+  # dbfront.com: no-code business apps and data-entry screens on top of business data.
+  - action: listing-alternatives-set
+    id: lst_7a06366cc687a83c1d91855d
+    slug: dbfront.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_7f80dc6529813e9dface903f, slug: caspio.com }
+      - { id: lst_6df197b2d48f05ec618168d9, slug: knack.com }
+      - { id: lst_3b7150ae97d28f358b3b591b, slug: glideapps.com }
+  # dbpilot.io: database clients with AI query help.
+  - action: listing-alternatives-set
+    id: lst_1b9a79c3283cf942e2a093c7
+    slug: dbpilot.io
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_009e7bda6d338cb383f5719b, slug: dbeaver.io }
+      - { id: lst_36888ee8f5819655c4fafcf2, slug: sqlai.ai }
+  # deepnote.com: collaborative data notebooks for Python and SQL.
+  - action: listing-alternatives-set
+    id: lst_bb6446d5879a2e746b224b6c
+    slug: deepnote.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_6bb3c650690fab4f0481bc8d, slug: hex.tech }
+  # defog.ai: natural-language questions over company databases.
+  - action: listing-alternatives-set
+    id: lst_7ad8c88ff3119740f15a6fb8
+    slug: defog.ai
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_8047c25091b53b2404dc5ef8, slug: vanna.ai }
+      - { id: lst_59f7bfaf13d906bbced7ff55, slug: nlsql.com }
+      - { id: lst_d98c7c311d99f648f3086c7e, slug: blazesql.com }
+      - { id: lst_901b319f2fe22af7c9ca2af3, slug: veezoo.com }
+      - { id: lst_143235844ef7f5f28bd2c336, slug: rawquery.com }
+      - { id: lst_36888ee8f5819655c4fafcf2, slug: sqlai.ai }
+  # drawsql.app: database schema diagrams.
+  - action: listing-alternatives-set
+    id: lst_45e291e544773814213761b0
+    slug: drawsql.app
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_58d3b68c3f4284e09f63bc19, slug: soft-builder.com }
+      - { id: lst_23f0d92a5076fa3114048fa0, slug: eraser.io }
+  # equals.com: spreadsheet-style analytics connected to live data, with AI.
+  - action: listing-alternatives-set
+    id: lst_fdc8e05f3c9b7234ea414a11
+    slug: equals.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_a411a7f297a2ccd93ee3a884, slug: coefficient.io }
+  # eversql.com: AI SQL query optimization.
+  - action: listing-alternatives-set
+    id: lst_1e85477d7b4bbdab5df9e403
+    slug: eversql.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_36888ee8f5819655c4fafcf2, slug: sqlai.ai }
+  # fastspring.com: merchant-of-record payments, subscriptions and sales tax for software companies.
+  - action: listing-alternatives-set
+    id: lst_982edeef0a0b3aef9e2bf712
+    slug: fastspring.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_bc729b21fb0407dffb944ce7, slug: paddle.com }
+  # flowshot.ai: AI add-ons for Google Sheets.
+  - action: listing-alternatives-set
+    id: lst_77b5c1ce176fbc57b4931095
+    slug: flowshot.ai
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_d7162c9cc6717150dbbec3ae, slug: numerous.ai }
+      - { id: lst_9d00ff66b17a3e581a37e780, slug: sheetai.app }
+      - { id: lst_f3cc65e5649cc677edae7036, slug: gpt.space }
+      - { id: lst_7487a5e75daae5669a95c513, slug: gptexcel.uk }
+      - { id: lst_70e27b5c7b230c20452bdebf, slug: formulashq.com }
+  # formulashq.com: AI formula, script and macro generators for spreadsheets.
+  - action: listing-alternatives-set
+    id: lst_70e27b5c7b230c20452bdebf
+    slug: formulashq.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_7487a5e75daae5669a95c513, slug: gptexcel.uk }
+      - { id: lst_8a842628e5e1a3177f8c87d0, slug: sheeter.ai }
+      - { id: lst_c6806b4adbbb65a7c7397030, slug: boloforms.com }
+      - { id: lst_77b5c1ce176fbc57b4931095, slug: flowshot.ai }
+      - { id: lst_d7162c9cc6717150dbbec3ae, slug: numerous.ai }
+  # getlago.com: usage-based and subscription billing for software companies.
+  - action: listing-alternatives-set
+    id: lst_c4cebfd6b9579da3a901a11d
+    slug: getlago.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_c284c0a1b8460c8abb24af5a, slug: withorb.com }
+      - { id: lst_5e4b2b4d5e822fd4cf24d2f8, slug: metronome.com }
+      - { id: lst_d12c544696133d00f8631089, slug: m3ter.com }
+      - { id: lst_9077c08e86b6c36e167cb1b0, slug: chargebee.com }
+      - { id: lst_b90eb4eb86330f2335c341fd, slug: logisense.com }
+      - { id: lst_bb7370710688ea402e9968e0, slug: zuora.com }
+  # gptexcel.uk: AI spreadsheet assistants for formulas, scripts and analysis.
+  - action: listing-alternatives-set
+    id: lst_7487a5e75daae5669a95c513
+    slug: gptexcel.uk
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_70e27b5c7b230c20452bdebf, slug: formulashq.com }
+      - { id: lst_8a842628e5e1a3177f8c87d0, slug: sheeter.ai }
+      - { id: lst_c6806b4adbbb65a7c7397030, slug: boloforms.com }
+      - { id: lst_d7162c9cc6717150dbbec3ae, slug: numerous.ai }
+      - { id: lst_77b5c1ce176fbc57b4931095, slug: flowshot.ai }
+      - { id: lst_9d00ff66b17a3e581a37e780, slug: sheetai.app }
+  # graphy.app: making charts and graphs online with AI.
+  - action: listing-alternatives-set
+    id: lst_e0548da75032401636af0f71
+    slug: graphy.app
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_0bfaec2f4e47c31510f9a624, slug: chartai.io }
+      - { id: lst_d309a5dfaf62dd5ce60dd807, slug: columns.ai }
+      - { id: lst_a9a868f81f9ca7185b0a42c4, slug: vizly.fyi }

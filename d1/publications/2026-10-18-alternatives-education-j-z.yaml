@@ -1,0 +1,601 @@
+# serpcompany/best.serp.co#539 (batch D): hand-picked alternatives for the live listings whose
+# primary category is Education and whose slug starts with j to z (jungleai.com to youlearn.ai), the
+# second part of Education in #539's size order after batch C's a to i. 62 of the range's 63
+# listings are here: staging's Zenbu Japanese (zenbujapanese.com) is not a v1 import listing and has
+# another id on production, where #542 picks for it. The picks lead each page's Alternatives
+# section; the page tops it up to six from similar listings.
+# Picked on 2026-10-18 from staging's live listings (read-only), each also live on production
+# (https://best.serp.co/sitemap-products.xml, read that day), by what each listing and its
+# candidates say they do and what their sites offer that day: a pick does the same job for the same
+# kind of user, best first, and a listing gets fewer than six, or none, when nothing else fits.
+# Every listing and pick is a v1 import listing, with the same id and slug on staging and
+# production. The reason for each listing is the comment above its operation. Picks may come from
+# any category: the chat-with-documents tools Petal picks (ChatPDF, PDF.AI, Docalysis, Docanalyzer,
+# Sharly AI) are filed under Productivity and Charley.ai under Writing. Khan Academy has two
+# listings (khanacademy.org, khanmigo.ai); picks name khanmigo.ai only, and neither picks the other.
+# Seven listings have no operation, because nothing in the catalog substitutes for them: KodeKloud
+# (kodekloud.com), Lablab.ai (lablab.ai), Locus (locusextension.com), Moonbeam Exchange
+# (moonbeamexchange.com), Course: Building No-Code Apps with AI (nocode.mba), SynthaceGPT
+# (synthace.com), and Tarteel (tarteel.ai). Their pages keep the similar-listings fallback.
+# Eight listings have no operation, because their sites no longer offer what the listing describes
+# (pivoted, down, or only a waitlist), and batch D's pull request lists them for retirement: AI
+# Tutor (myapps.ai), Whiteboard (mywhiteboard.ai), Vocabulary Lesson Generator (polyglotmedia.com),
+# Prepsup (prepsup.com), ProfBot (profbot.ai), Talkberry - mock interview (talkberry.ai), Teacherbot
+# (teacherbot.io), and Typpo (typpo.app).
+# Each listing-alternatives-set compares and swaps the listing's slug and current picks (none yet),
+# refuses a pick that isn't live with that id and slug, keeps the listing's checksum, and logs an
+# `edited` event. Row-level, so the batch is refused with nothing written if any listing changed.
+# Needs migration 0018_listing_alternatives (#534, release 9). Publish on staging first, then on
+# production after the promotion that carries it.
+version: 1
+id: 2026-10-18-alternatives-education-j-z
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  # jungleai.com: AI flashcards and quizzes from your course material.
+  - action: listing-alternatives-set
+    id: lst_f20f53559319919cf42e2170
+    slug: jungleai.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_6ce183d469f28614a5a78d1e, slug: quizlet.com }
+      - { id: lst_b93020b09d3f285b7440e2aa, slug: studywand.com }
+      - { id: lst_9ea83ae68e7776e9bbb825b7, slug: mindgrasp.ai }
+      - { id: lst_4fad3a5c7605b41003706dcb, slug: quizgecko.com }
+      - { id: lst_9fddd61a13482352d61c2cec, slug: litgrades.com }
+      - { id: lst_a4b6ffa8ebd33ff7a646db8d, slug: youlearn.ai }
+  # khanacademy.org: AI tutors for school students (Khanmigo itself is not picked: same product).
+  - action: listing-alternatives-set
+    id: lst_41cfb5d938cb3d71ef93b848
+    slug: khanacademy.org
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_74dbf0da04127de33157cbdb, slug: squirrelai.com }
+      - { id: lst_e957d8fb0df0546301f0b112, slug: synthesis.com }
+      - { id: lst_32b279aa648471d268e5c283, slug: getsuperteacher.com }
+      - { id: lst_6eb19308616cd0581c5a429c, slug: deaplearning.com }
+      - { id: lst_a4b6ffa8ebd33ff7a646db8d, slug: youlearn.ai }
+  # khanmigo.ai: AI tutors for school students.
+  - action: listing-alternatives-set
+    id: lst_211664782b6147f406839e91
+    slug: khanmigo.ai
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_74dbf0da04127de33157cbdb, slug: squirrelai.com }
+      - { id: lst_e957d8fb0df0546301f0b112, slug: synthesis.com }
+      - { id: lst_32b279aa648471d268e5c283, slug: getsuperteacher.com }
+      - { id: lst_6eb19308616cd0581c5a429c, slug: deaplearning.com }
+      - { id: lst_a4b6ffa8ebd33ff7a646db8d, slug: youlearn.ai }
+  # langchats.com: AI conversation practice for language learners.
+  - action: listing-alternatives-set
+    id: lst_348c2a856020ff1f58d7ce56
+    slug: langchats.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_6d1a8853a12ec9a03fcc5cf1, slug: talkpal.ai }
+      - { id: lst_c93008caa82d38c2e470f80f, slug: praktika.ai }
+      - { id: lst_0a59f0c79c3bb736e8fbe5eb, slug: speak.com }
+      - { id: lst_ea2d5133fc2f47dd60d63b83, slug: langotalk.org }
+      - { id: lst_3c3b6e41758e60eb6c3d10e4, slug: talkio.ai }
+      - { id: lst_3f36b9035da3423302cd9480, slug: duolingo.com }
+  # langotalk.org: AI conversation practice for language learners.
+  - action: listing-alternatives-set
+    id: lst_ea2d5133fc2f47dd60d63b83
+    slug: langotalk.org
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_6d1a8853a12ec9a03fcc5cf1, slug: talkpal.ai }
+      - { id: lst_c93008caa82d38c2e470f80f, slug: praktika.ai }
+      - { id: lst_0a59f0c79c3bb736e8fbe5eb, slug: speak.com }
+      - { id: lst_3c3b6e41758e60eb6c3d10e4, slug: talkio.ai }
+      - { id: lst_3f36b9035da3423302cd9480, slug: duolingo.com }
+      - { id: lst_348c2a856020ff1f58d7ce56, slug: langchats.com }
+  # languagemate.io: AI spoken-language practice and assessment for schools and employers.
+  - action: listing-alternatives-set
+    id: lst_af0a48751f848b610c1d830a
+    slug: languagemate.io
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_add46c821e81be7faa1d7590, slug: speakable.io }
+      - { id: lst_e1da9cb3ca80a5fe7e8319a9, slug: hallo.ai }
+      - { id: lst_4a631adc88e83fbc6eb0e373, slug: elsaspeak.com }
+  # lessonplans.ai: AI lesson plan generators for teachers.
+  - action: listing-alternatives-set
+    id: lst_5e07a75e1ba6765b586b7d27
+    slug: lessonplans.ai
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_1dc6c0fce235ddf2e5e34d8f, slug: educatorlab.org }
+      - { id: lst_70c6c51767ec5c4ea7539db6, slug: to-teach.ai }
+      - { id: lst_30a55339ed378891dff3de60, slug: briskteaching.com }
+      - { id: lst_890beb9ed0bf9737a1ae2e97, slug: teachermatic.com }
+      - { id: lst_839ba3c4bd971342505362aa, slug: twee.com }
+  # lingually.ai: language practice in writing, with AI corrections.
+  - action: listing-alternatives-set
+    id: lst_9c40a74ec962a415e580a814
+    slug: lingually.ai
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_348c2a856020ff1f58d7ce56, slug: langchats.com }
+      - { id: lst_28ecd91990328f79a353549e, slug: polyglotchatbot.com }
+      - { id: lst_3f36b9035da3423302cd9480, slug: duolingo.com }
+  # litgrades.com: AI flashcards, notes and quizzes for studying.
+  - action: listing-alternatives-set
+    id: lst_9fddd61a13482352d61c2cec
+    slug: litgrades.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_9ea83ae68e7776e9bbb825b7, slug: mindgrasp.ai }
+      - { id: lst_6ce183d469f28614a5a78d1e, slug: quizlet.com }
+      - { id: lst_4fad3a5c7605b41003706dcb, slug: quizgecko.com }
+      - { id: lst_b93020b09d3f285b7440e2aa, slug: studywand.com }
+      - { id: lst_f20f53559319919cf42e2170, slug: jungleai.com }
+      - { id: lst_a4b6ffa8ebd33ff7a646db8d, slug: youlearn.ai }
+  # mindgrasp.ai: turning lectures and readings into notes, flashcards and quizzes.
+  - action: listing-alternatives-set
+    id: lst_9ea83ae68e7776e9bbb825b7
+    slug: mindgrasp.ai
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_a4b6ffa8ebd33ff7a646db8d, slug: youlearn.ai }
+      - { id: lst_4fad3a5c7605b41003706dcb, slug: quizgecko.com }
+      - { id: lst_6ce183d469f28614a5a78d1e, slug: quizlet.com }
+      - { id: lst_b93020b09d3f285b7440e2aa, slug: studywand.com }
+      - { id: lst_f20f53559319919cf42e2170, slug: jungleai.com }
+      - { id: lst_9fddd61a13482352d61c2cec, slug: litgrades.com }
+  # mindsmith.ai: AI e-learning course authoring.
+  - action: listing-alternatives-set
+    id: lst_af2ff4fb14fb6b989ea8b678
+    slug: mindsmith.ai
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_532c3fd3ffac83b78407f2a4, slug: courseau.co }
+      - { id: lst_18d73d5e9e1a0480f46284ed, slug: coursebox.ai }
+      - { id: lst_1b2ee6e6321e1fc3756f2c91, slug: minicoursegenerator.com }
+  # minicoursegenerator.com: AI course creation from documents and prompts.
+  - action: listing-alternatives-set
+    id: lst_1b2ee6e6321e1fc3756f2c91
+    slug: minicoursegenerator.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_18d73d5e9e1a0480f46284ed, slug: coursebox.ai }
+      - { id: lst_af2ff4fb14fb6b989ea8b678, slug: mindsmith.ai }
+      - { id: lst_532c3fd3ffac83b78407f2a4, slug: courseau.co }
+      - { id: lst_0a940423e91553bbde0f3041, slug: steppit.com }
+  # openread.academy: AI search and reading of research papers.
+  - action: listing-alternatives-set
+    id: lst_1e560f6bbe052d35a1add9fc
+    slug: openread.academy
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_9519fb856be1eaa8bc6b0ed1, slug: consensus.app }
+      - { id: lst_9b0c0b03b64a8f9d34d10391, slug: elicit.com }
+      - { id: lst_1d53a69d01674b19de393080, slug: typeset.io }
+      - { id: lst_fab760b2f65e50ea2c0d0c64, slug: scite.ai }
+      - { id: lst_6626e6a8f22aca3abe2f46f2, slug: semanticscholar.org }
+      - { id: lst_38645f5343e2f80c8f478a79, slug: researchrabbit.ai }
+  # opexams.com: creating quizzes and exams from text, and running them.
+  - action: listing-alternatives-set
+    id: lst_ce7bf56d63ff82aeeaf302fa
+    slug: opexams.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_5591723eb864ff51839b4aca, slug: quizbot.ai }
+      - { id: lst_7ff2d19ecb44ec060a679ade, slug: questgen.ai }
+      - { id: lst_3a9c9c72d958a425029c41b2, slug: quilgo.com }
+      - { id: lst_bf54657e4eef9d9bba1e7fff, slug: getquizwizard.com }
+  # petal.org: chatting with and analysing your documents.
+  - action: listing-alternatives-set
+    id: lst_4977a717fb105d5f491126c2
+    slug: petal.org
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_70aa7bc593cdae4d6a15ad5b, slug: sharly.ai }
+      - { id: lst_3f23c17a0ff9bf886e5638d0, slug: unriddle.ai }
+      - { id: lst_a5ff2c141a13014166f87234, slug: chatpdf.com }
+      - { id: lst_1d8354603dcb780e93fa5885, slug: docanalyzer.ai }
+      - { id: lst_478f9886562c132a50f1df62, slug: pdf.ai }
+      - { id: lst_b124dfe52f3e7567e99e8158, slug: docalysis.com }
+  # polyglotchatbot.com: chatting with an AI partner to practise a language.
+  - action: listing-alternatives-set
+    id: lst_28ecd91990328f79a353549e
+    slug: polyglotchatbot.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_348c2a856020ff1f58d7ce56, slug: langchats.com }
+      - { id: lst_6d1a8853a12ec9a03fcc5cf1, slug: talkpal.ai }
+      - { id: lst_c93008caa82d38c2e470f80f, slug: praktika.ai }
+      - { id: lst_0a59f0c79c3bb736e8fbe5eb, slug: speak.com }
+      - { id: lst_ea2d5133fc2f47dd60d63b83, slug: langotalk.org }
+      - { id: lst_3c3b6e41758e60eb6c3d10e4, slug: talkio.ai }
+  # practicetalking.net: AI conversations with famous people and historical figures.
+  - action: listing-alternatives-set
+    id: lst_5b005d1779b5c1d460459b61
+    slug: practicetalking.net
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_d1b30b9d098c0bae69e3613c, slug: hellohistory.ai }
+  # praktika.ai: AI conversation practice for language learners.
+  - action: listing-alternatives-set
+    id: lst_c93008caa82d38c2e470f80f
+    slug: praktika.ai
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_6d1a8853a12ec9a03fcc5cf1, slug: talkpal.ai }
+      - { id: lst_0a59f0c79c3bb736e8fbe5eb, slug: speak.com }
+      - { id: lst_ea2d5133fc2f47dd60d63b83, slug: langotalk.org }
+      - { id: lst_3c3b6e41758e60eb6c3d10e4, slug: talkio.ai }
+      - { id: lst_3f36b9035da3423302cd9480, slug: duolingo.com }
+      - { id: lst_348c2a856020ff1f58d7ce56, slug: langchats.com }
+  # questgen.ai: AI quiz generators from text and documents.
+  - action: listing-alternatives-set
+    id: lst_7ff2d19ecb44ec060a679ade
+    slug: questgen.ai
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_5591723eb864ff51839b4aca, slug: quizbot.ai }
+      - { id: lst_4fad3a5c7605b41003706dcb, slug: quizgecko.com }
+      - { id: lst_bf54657e4eef9d9bba1e7fff, slug: getquizwizard.com }
+      - { id: lst_86e096542477b9473889178a, slug: quizmakito.com }
+      - { id: lst_ce7bf56d63ff82aeeaf302fa, slug: opexams.com }
+  # quilgo.com: running and grading online tests.
+  - action: listing-alternatives-set
+    id: lst_3a9c9c72d958a425029c41b2
+    slug: quilgo.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_ce7bf56d63ff82aeeaf302fa, slug: opexams.com }
+  # quizbot.ai: AI quiz generators from text and documents.
+  - action: listing-alternatives-set
+    id: lst_5591723eb864ff51839b4aca
+    slug: quizbot.ai
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_7ff2d19ecb44ec060a679ade, slug: questgen.ai }
+      - { id: lst_4fad3a5c7605b41003706dcb, slug: quizgecko.com }
+      - { id: lst_bf54657e4eef9d9bba1e7fff, slug: getquizwizard.com }
+      - { id: lst_86e096542477b9473889178a, slug: quizmakito.com }
+      - { id: lst_ce7bf56d63ff82aeeaf302fa, slug: opexams.com }
+  # quizgecko.com: AI practice quizzes and flashcards from your study material.
+  - action: listing-alternatives-set
+    id: lst_4fad3a5c7605b41003706dcb
+    slug: quizgecko.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_6ce183d469f28614a5a78d1e, slug: quizlet.com }
+      - { id: lst_b93020b09d3f285b7440e2aa, slug: studywand.com }
+      - { id: lst_9ea83ae68e7776e9bbb825b7, slug: mindgrasp.ai }
+      - { id: lst_f20f53559319919cf42e2170, slug: jungleai.com }
+      - { id: lst_9fddd61a13482352d61c2cec, slug: litgrades.com }
+      - { id: lst_7ff2d19ecb44ec060a679ade, slug: questgen.ai }
+  # quizlet.com: flashcards and AI study tools.
+  - action: listing-alternatives-set
+    id: lst_6ce183d469f28614a5a78d1e
+    slug: quizlet.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_f20f53559319919cf42e2170, slug: jungleai.com }
+      - { id: lst_4fad3a5c7605b41003706dcb, slug: quizgecko.com }
+      - { id: lst_b93020b09d3f285b7440e2aa, slug: studywand.com }
+      - { id: lst_9ea83ae68e7776e9bbb825b7, slug: mindgrasp.ai }
+      - { id: lst_9fddd61a13482352d61c2cec, slug: litgrades.com }
+      - { id: lst_a4b6ffa8ebd33ff7a646db8d, slug: youlearn.ai }
+  # quizmakito.com: AI quiz generators from web pages and text.
+  - action: listing-alternatives-set
+    id: lst_86e096542477b9473889178a
+    slug: quizmakito.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_7ff2d19ecb44ec060a679ade, slug: questgen.ai }
+      - { id: lst_5591723eb864ff51839b4aca, slug: quizbot.ai }
+      - { id: lst_4fad3a5c7605b41003706dcb, slug: quizgecko.com }
+      - { id: lst_bf54657e4eef9d9bba1e7fff, slug: getquizwizard.com }
+  # redacta.me: AI assistants and content tools for teachers.
+  - action: listing-alternatives-set
+    id: lst_8c868c66e411222819db83db
+    slug: redacta.me
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_890beb9ed0bf9737a1ae2e97, slug: teachermatic.com }
+      - { id: lst_30a55339ed378891dff3de60, slug: briskteaching.com }
+      - { id: lst_70c6c51767ec5c4ea7539db6, slug: to-teach.ai }
+      - { id: lst_839ba3c4bd971342505362aa, slug: twee.com }
+      - { id: lst_1dc6c0fce235ddf2e5e34d8f, slug: educatorlab.org }
+      - { id: lst_5e07a75e1ba6765b586b7d27, slug: lessonplans.ai }
+  # researchrabbit.ai: finding related research papers.
+  - action: listing-alternatives-set
+    id: lst_38645f5343e2f80c8f478a79
+    slug: researchrabbit.ai
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_6626e6a8f22aca3abe2f46f2, slug: semanticscholar.org }
+      - { id: lst_fab760b2f65e50ea2c0d0c64, slug: scite.ai }
+      - { id: lst_9b0c0b03b64a8f9d34d10391, slug: elicit.com }
+      - { id: lst_9519fb856be1eaa8bc6b0ed1, slug: consensus.app }
+      - { id: lst_1d53a69d01674b19de393080, slug: typeset.io }
+      - { id: lst_1e560f6bbe052d35a1add9fc, slug: openread.academy }
+  # roshi.ai: AI lesson materials for teachers.
+  - action: listing-alternatives-set
+    id: lst_46422b3a2b981a22f9bfd817
+    slug: roshi.ai
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_839ba3c4bd971342505362aa, slug: twee.com }
+      - { id: lst_70c6c51767ec5c4ea7539db6, slug: to-teach.ai }
+      - { id: lst_30a55339ed378891dff3de60, slug: briskteaching.com }
+      - { id: lst_890beb9ed0bf9737a1ae2e97, slug: teachermatic.com }
+      - { id: lst_1dc6c0fce235ddf2e5e34d8f, slug: educatorlab.org }
+      - { id: lst_5e07a75e1ba6765b586b7d27, slug: lessonplans.ai }
+  # scite.ai: AI research search with citations.
+  - action: listing-alternatives-set
+    id: lst_fab760b2f65e50ea2c0d0c64
+    slug: scite.ai
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_9519fb856be1eaa8bc6b0ed1, slug: consensus.app }
+      - { id: lst_9b0c0b03b64a8f9d34d10391, slug: elicit.com }
+      - { id: lst_1d53a69d01674b19de393080, slug: typeset.io }
+      - { id: lst_6626e6a8f22aca3abe2f46f2, slug: semanticscholar.org }
+      - { id: lst_38645f5343e2f80c8f478a79, slug: researchrabbit.ai }
+      - { id: lst_46d1b407ee9cb3bea504d9d6, slug: sourcely.net }
+  # semanticscholar.org: AI search for research papers.
+  - action: listing-alternatives-set
+    id: lst_6626e6a8f22aca3abe2f46f2
+    slug: semanticscholar.org
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_9519fb856be1eaa8bc6b0ed1, slug: consensus.app }
+      - { id: lst_9b0c0b03b64a8f9d34d10391, slug: elicit.com }
+      - { id: lst_38645f5343e2f80c8f478a79, slug: researchrabbit.ai }
+      - { id: lst_fab760b2f65e50ea2c0d0c64, slug: scite.ai }
+      - { id: lst_1d53a69d01674b19de393080, slug: typeset.io }
+      - { id: lst_1e560f6bbe052d35a1add9fc, slug: openread.academy }
+  # sourcely.net: finding academic sources for a piece of writing.
+  - action: listing-alternatives-set
+    id: lst_46d1b407ee9cb3bea504d9d6
+    slug: sourcely.net
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_9519fb856be1eaa8bc6b0ed1, slug: consensus.app }
+      - { id: lst_fab760b2f65e50ea2c0d0c64, slug: scite.ai }
+      - { id: lst_6626e6a8f22aca3abe2f46f2, slug: semanticscholar.org }
+      - { id: lst_1d53a69d01674b19de393080, slug: typeset.io }
+      - { id: lst_9b0c0b03b64a8f9d34d10391, slug: elicit.com }
+  # speak.com: AI conversation practice for language learners.
+  - action: listing-alternatives-set
+    id: lst_0a59f0c79c3bb736e8fbe5eb
+    slug: speak.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_6d1a8853a12ec9a03fcc5cf1, slug: talkpal.ai }
+      - { id: lst_c93008caa82d38c2e470f80f, slug: praktika.ai }
+      - { id: lst_ea2d5133fc2f47dd60d63b83, slug: langotalk.org }
+      - { id: lst_3c3b6e41758e60eb6c3d10e4, slug: talkio.ai }
+      - { id: lst_3f36b9035da3423302cd9480, slug: duolingo.com }
+      - { id: lst_348c2a856020ff1f58d7ce56, slug: langchats.com }
+  # speakable.io: AI language-proficiency practice and assessment for schools.
+  - action: listing-alternatives-set
+    id: lst_add46c821e81be7faa1d7590
+    slug: speakable.io
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_af0a48751f848b610c1d830a, slug: languagemate.io }
+      - { id: lst_e1da9cb3ca80a5fe7e8319a9, slug: hallo.ai }
+  # speakenglishwithai.com: AI English speaking practice.
+  - action: listing-alternatives-set
+    id: lst_8749c15eed672f18048d47a8
+    slug: speakenglishwithai.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_c93008caa82d38c2e470f80f, slug: praktika.ai }
+      - { id: lst_0a59f0c79c3bb736e8fbe5eb, slug: speak.com }
+      - { id: lst_4a631adc88e83fbc6eb0e373, slug: elsaspeak.com }
+      - { id: lst_6d1a8853a12ec9a03fcc5cf1, slug: talkpal.ai }
+      - { id: lst_3c3b6e41758e60eb6c3d10e4, slug: talkio.ai }
+      - { id: lst_ea2d5133fc2f47dd60d63b83, slug: langotalk.org }
+  # squirrelai.com: AI tutors for school students.
+  - action: listing-alternatives-set
+    id: lst_74dbf0da04127de33157cbdb
+    slug: squirrelai.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_211664782b6147f406839e91, slug: khanmigo.ai }
+      - { id: lst_e957d8fb0df0546301f0b112, slug: synthesis.com }
+      - { id: lst_32b279aa648471d268e5c283, slug: getsuperteacher.com }
+      - { id: lst_6eb19308616cd0581c5a429c, slug: deaplearning.com }
+  # steppit.com: creating and selling online courses with AI.
+  - action: listing-alternatives-set
+    id: lst_0a940423e91553bbde0f3041
+    slug: steppit.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_18d73d5e9e1a0480f46284ed, slug: coursebox.ai }
+      - { id: lst_1b2ee6e6321e1fc3756f2c91, slug: minicoursegenerator.com }
+  # studywand.com: AI flashcards and quizzes from your notes and PDFs.
+  - action: listing-alternatives-set
+    id: lst_b93020b09d3f285b7440e2aa
+    slug: studywand.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_f20f53559319919cf42e2170, slug: jungleai.com }
+      - { id: lst_6ce183d469f28614a5a78d1e, slug: quizlet.com }
+      - { id: lst_4fad3a5c7605b41003706dcb, slug: quizgecko.com }
+      - { id: lst_9ea83ae68e7776e9bbb825b7, slug: mindgrasp.ai }
+      - { id: lst_9fddd61a13482352d61c2cec, slug: litgrades.com }
+      - { id: lst_a4b6ffa8ebd33ff7a646db8d, slug: youlearn.ai }
+  # synthesis.com: AI tutors for children.
+  - action: listing-alternatives-set
+    id: lst_e957d8fb0df0546301f0b112
+    slug: synthesis.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_74dbf0da04127de33157cbdb, slug: squirrelai.com }
+      - { id: lst_32b279aa648471d268e5c283, slug: getsuperteacher.com }
+      - { id: lst_211664782b6147f406839e91, slug: khanmigo.ai }
+  # talkio.ai: AI conversation practice for language learners.
+  - action: listing-alternatives-set
+    id: lst_3c3b6e41758e60eb6c3d10e4
+    slug: talkio.ai
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_6d1a8853a12ec9a03fcc5cf1, slug: talkpal.ai }
+      - { id: lst_c93008caa82d38c2e470f80f, slug: praktika.ai }
+      - { id: lst_0a59f0c79c3bb736e8fbe5eb, slug: speak.com }
+      - { id: lst_ea2d5133fc2f47dd60d63b83, slug: langotalk.org }
+      - { id: lst_3f36b9035da3423302cd9480, slug: duolingo.com }
+      - { id: lst_348c2a856020ff1f58d7ce56, slug: langchats.com }
+  # talkpal.ai: AI conversation practice for language learners.
+  - action: listing-alternatives-set
+    id: lst_6d1a8853a12ec9a03fcc5cf1
+    slug: talkpal.ai
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_c93008caa82d38c2e470f80f, slug: praktika.ai }
+      - { id: lst_0a59f0c79c3bb736e8fbe5eb, slug: speak.com }
+      - { id: lst_ea2d5133fc2f47dd60d63b83, slug: langotalk.org }
+      - { id: lst_3c3b6e41758e60eb6c3d10e4, slug: talkio.ai }
+      - { id: lst_3f36b9035da3423302cd9480, slug: duolingo.com }
+      - { id: lst_348c2a856020ff1f58d7ce56, slug: langchats.com }
+  # tandem-gpt.com: role-playing real-life conversations with AI to practise a language.
+  - action: listing-alternatives-set
+    id: lst_fb0f1f704d1928458f991f6c
+    slug: tandem-gpt.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_6d1a8853a12ec9a03fcc5cf1, slug: talkpal.ai }
+      - { id: lst_c93008caa82d38c2e470f80f, slug: praktika.ai }
+      - { id: lst_0a59f0c79c3bb736e8fbe5eb, slug: speak.com }
+      - { id: lst_ea2d5133fc2f47dd60d63b83, slug: langotalk.org }
+      - { id: lst_3c3b6e41758e60eb6c3d10e4, slug: talkio.ai }
+      - { id: lst_3f36b9035da3423302cd9480, slug: duolingo.com }
+  # teachermatic.com: AI tools for teachers.
+  - action: listing-alternatives-set
+    id: lst_890beb9ed0bf9737a1ae2e97
+    slug: teachermatic.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_30a55339ed378891dff3de60, slug: briskteaching.com }
+      - { id: lst_70c6c51767ec5c4ea7539db6, slug: to-teach.ai }
+      - { id: lst_839ba3c4bd971342505362aa, slug: twee.com }
+      - { id: lst_1dc6c0fce235ddf2e5e34d8f, slug: educatorlab.org }
+      - { id: lst_5e07a75e1ba6765b586b7d27, slug: lessonplans.ai }
+      - { id: lst_8c868c66e411222819db83db, slug: redacta.me }
+  # to-teach.ai: AI lesson and worksheet makers for teachers.
+  - action: listing-alternatives-set
+    id: lst_70c6c51767ec5c4ea7539db6
+    slug: to-teach.ai
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_839ba3c4bd971342505362aa, slug: twee.com }
+      - { id: lst_30a55339ed378891dff3de60, slug: briskteaching.com }
+      - { id: lst_890beb9ed0bf9737a1ae2e97, slug: teachermatic.com }
+      - { id: lst_1dc6c0fce235ddf2e5e34d8f, slug: educatorlab.org }
+      - { id: lst_5e07a75e1ba6765b586b7d27, slug: lessonplans.ai }
+      - { id: lst_8c868c66e411222819db83db, slug: redacta.me }
+  # tutorly.ai: AI homework helpers.
+  - action: listing-alternatives-set
+    id: lst_7b2f65f4841094fa2accdd7c
+    slug: tutorly.ai
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_34a6254128744203a5387fca, slug: collegetools.io }
+      - { id: lst_d0e07f651a1b15bb9d7fa800, slug: charley.ai }
+      - { id: lst_72ccaeb572ac28f40c6991fc, slug: geleza.app }
+      - { id: lst_a4b6ffa8ebd33ff7a646db8d, slug: youlearn.ai }
+  # twee.com: AI lesson materials for teachers.
+  - action: listing-alternatives-set
+    id: lst_839ba3c4bd971342505362aa
+    slug: twee.com
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_70c6c51767ec5c4ea7539db6, slug: to-teach.ai }
+      - { id: lst_46422b3a2b981a22f9bfd817, slug: roshi.ai }
+      - { id: lst_30a55339ed378891dff3de60, slug: briskteaching.com }
+      - { id: lst_890beb9ed0bf9737a1ae2e97, slug: teachermatic.com }
+      - { id: lst_1dc6c0fce235ddf2e5e34d8f, slug: educatorlab.org }
+      - { id: lst_5e07a75e1ba6765b586b7d27, slug: lessonplans.ai }
+  # typeset.io: AI research assistants for finding and reading papers.
+  - action: listing-alternatives-set
+    id: lst_1d53a69d01674b19de393080
+    slug: typeset.io
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_9519fb856be1eaa8bc6b0ed1, slug: consensus.app }
+      - { id: lst_9b0c0b03b64a8f9d34d10391, slug: elicit.com }
+      - { id: lst_fab760b2f65e50ea2c0d0c64, slug: scite.ai }
+      - { id: lst_3f23c17a0ff9bf886e5638d0, slug: unriddle.ai }
+      - { id: lst_6626e6a8f22aca3abe2f46f2, slug: semanticscholar.org }
+      - { id: lst_1e560f6bbe052d35a1add9fc, slug: openread.academy }
+  # unriddle.ai: AI research workspaces with cited answers.
+  - action: listing-alternatives-set
+    id: lst_3f23c17a0ff9bf886e5638d0
+    slug: unriddle.ai
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_1d53a69d01674b19de393080, slug: typeset.io }
+      - { id: lst_9b0c0b03b64a8f9d34d10391, slug: elicit.com }
+      - { id: lst_70aa7bc593cdae4d6a15ad5b, slug: sharly.ai }
+      - { id: lst_4977a717fb105d5f491126c2, slug: petal.org }
+      - { id: lst_fab760b2f65e50ea2c0d0c64, slug: scite.ai }
+      - { id: lst_9519fb856be1eaa8bc6b0ed1, slug: consensus.app }
+  # youlearn.ai: an AI tutor for your PDFs, videos and lectures.
+  - action: listing-alternatives-set
+    id: lst_a4b6ffa8ebd33ff7a646db8d
+    slug: youlearn.ai
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_9ea83ae68e7776e9bbb825b7, slug: mindgrasp.ai }
+      - { id: lst_4fad3a5c7605b41003706dcb, slug: quizgecko.com }
+      - { id: lst_9fddd61a13482352d61c2cec, slug: litgrades.com }
+      - { id: lst_b93020b09d3f285b7440e2aa, slug: studywand.com }
+      - { id: lst_f20f53559319919cf42e2170, slug: jungleai.com }
+      - { id: lst_6ce183d469f28614a5a78d1e, slug: quizlet.com }
