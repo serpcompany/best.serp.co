@@ -144,22 +144,25 @@ export function WebsiteDetailAside({ claim, website }: WebsiteDetailAsideProps) 
 
   return (
     <Item variant="outline" render={<aside aria-labelledby={BADGE_EMBED_HEADING_ID} />}>
-      <ItemContent className="gap-3">
-        <FeaturedOnBadgeEmbedPanel
-          badgePreviewUrls={{
-            dark: getFeaturedOnBadgePreviewPathFromKey(badgeKeys.dark),
-            light: getFeaturedOnBadgePreviewPathFromKey(badgeKeys.light)
-          }}
-          badgeUrls={{
-            dark: getFeaturedOnBadgePublicUrlFromKey(badgeKeys.dark, siteConfig.publicUrl),
-            light: getFeaturedOnBadgePublicUrlFromKey(badgeKeys.light, siteConfig.publicUrl)
-          }}
-          headingId={BADGE_EMBED_HEADING_ID}
-          listingUrl={listingUrl}
-          siteId={siteConfig.id}
-          siteName={badgeKeys.displayName}
-        />
-        {claim && !website.verifiedOwner ? claim : null}
+      <ItemContent>
+        {/* An ordinary wrapper spaces the badge from the claim; ItemContent keeps its stock gap. */}
+        <div className="flex flex-col gap-3">
+          <FeaturedOnBadgeEmbedPanel
+            badgePreviewUrls={{
+              dark: getFeaturedOnBadgePreviewPathFromKey(badgeKeys.dark),
+              light: getFeaturedOnBadgePreviewPathFromKey(badgeKeys.light)
+            }}
+            badgeUrls={{
+              dark: getFeaturedOnBadgePublicUrlFromKey(badgeKeys.dark, siteConfig.publicUrl),
+              light: getFeaturedOnBadgePublicUrlFromKey(badgeKeys.light, siteConfig.publicUrl)
+            }}
+            headingId={BADGE_EMBED_HEADING_ID}
+            listingUrl={listingUrl}
+            siteId={siteConfig.id}
+            siteName={badgeKeys.displayName}
+          />
+          {claim && !website.verifiedOwner ? claim : null}
+        </div>
       </ItemContent>
     </Item>
   )
