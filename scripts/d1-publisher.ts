@@ -275,10 +275,21 @@ const listing = z
 /** The admin panel's limits for a listing's name and short description (`lib/admin/decisions.ts`). */
 const LISTING_NAME_MAX = 80
 const LISTING_DESCRIPTION_MAX = 160
+/**
+ * A new listing (#506 review): its name, short description, and website are trimmed and capped
+ * as `listing-details-set` takes them, the admin edit's rules, so the admin edit can save the
+ * listing unchanged and the exact website match finds it. The website's public-URL rule is in
+ * `manifestSchema`. `listing-update` keeps the shared `listing`, so stored rows still match it.
+ */
+const createdListing = listing.extend({
+  name: z.string().trim().min(1).max(LISTING_NAME_MAX),
+  description: z.string().trim().min(1).max(LISTING_DESCRIPTION_MAX),
+  website: z.string().trim().url()
+})
 /** The listing fields `listing-details-set` compares and replaces, in the order it logs them. */
 const listingDetailFields = ['name', 'description', 'website'] as const
 const operation = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('listing-create'), listing }).strict(),
+  z.object({ action: z.literal('listing-create'), listing: createdListing }).strict(),
   z
     .object({ action: z.literal('listing-update'), listing, previousCategories: categories })
     .strict(),
@@ -816,10 +827,12 @@ export const manifestConcurrency = ['publication', 'rows'] as const
  * redirect (#338: an unpublished source, a live target, no redirect for the slug, no chain or
  * loop, all still true at the end of the batch), a listing's name, short description, and website
  * (#340: `expected`), a listing's resource links (#376: `expected`, every link in order), its
- * feature-of-a-larger-site flag (#409: `expected`), and every taxonomy operation (#344: each
- * compares the tag, best page, listing, or redirect it changes).
+ * feature-of-a-larger-site flag (#409: `expected`), a new listing (#506: its id and slug unused,
+ * and its website no other listing's, no submission's in flight, and not blocked), and every
+ * taxonomy operation (#344: each compares the tag, best page, listing, or redirect it changes).
  */
 const rowLevelActions = new Set<string>([
+  'listing-create',
   'listing-media-update',
   'listing-categories-add',
   'listing-categories-remove',
@@ -864,7 +877,7 @@ export const manifestSchema = z
           context.addIssue({
             code: z.ZodIssueCode.custom,
             message:
-              'A row-level manifest holds only listing-media-update, listing-categories-add/-remove/-set, listing-details-set, listing-resources-set, listing-feature-listing-set, listing-content-remove-suffix, listing-unpublish, listing-claim-hold-add/-clear, listing-slug-redirect, category-create/-unpublish, and taxonomy (tag-*, listing-tags-set, best-page-*, taxonomy-redirect-set) operations.',
+              'A row-level manifest holds only listing-create, listing-media-update, listing-categories-add/-remove/-set, listing-details-set, listing-resources-set, listing-feature-listing-set, listing-content-remove-suffix, listing-unpublish, listing-claim-hold-add/-clear, listing-slug-redirect, category-create/-unpublish, and taxonomy (tag-*, listing-tags-set, best-page-*, taxonomy-redirect-set) operations.',
             path: ['operations', index, 'action']
           })
         }
@@ -947,6 +960,13 @@ export const manifestSchema = z
           path: ['operations', index, 'categories']
         })
       }
+      // The submission intake's and the admin edit's URL rule, as for `listing-details-set`.
+      if (op.action === 'listing-create' && !validatePublicHttpUrl(op.listing.website).ok)
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'A listing website must be a public HTTP(S) URL.',
+          path: ['operations', index, 'listing', 'website']
+        })
       if (op.action === 'listing-details-set') {
         const changed = listingDetailFields.filter(
           field => op.details[field] !== undefined && op.details[field] !== op.expected[field]
@@ -1177,10 +1197,13 @@ function listingStatements(
   now: string
 ): PlannedStatement[] {
   const out: PlannedStatement[] = []
+  // Flags bind as 1 or 0: D1's REST API takes bindings as JSON, so a boolean would arrive as
+  // true or false (#339 review).
   if (mode === 'create')
     out.push(
+      // A new listing's outbound link is followed (#506), whatever the column's default.
       statement(
-        "INSERT INTO listings (id,slug,name,description,website,content,entity_type,priority,is_unofficial,is_featured,is_active,status,published_at,display_order,source_kind,source_identity,source_updated_at,checksum,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,1,'draft',?,(SELECT COALESCE(MAX(display_order),-1)+1 FROM listings),'yaml-manifest-v1',?,?,?,?,?)",
+        "INSERT INTO listings (id,slug,name,description,website,content,entity_type,priority,is_unofficial,is_featured,link_rel,is_active,status,published_at,display_order,source_kind,source_identity,source_updated_at,checksum,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,'follow',1,'draft',?,(SELECT COALESCE(MAX(display_order),-1)+1 FROM listings),'yaml-manifest-v1',?,?,?,?,?)",
         value.id,
         value.slug,
         value.name,
@@ -1189,8 +1212,8 @@ function listingStatements(
         value.content ?? null,
         value.entityType ?? null,
         value.priority ?? null,
-        value.isUnofficial,
-        value.featured,
+        value.isUnofficial ? 1 : 0,
+        value.featured ? 1 : 0,
         value.publishedAt,
         manifestId,
         now,
@@ -1221,8 +1244,8 @@ function listingStatements(
         value.content ?? null,
         value.entityType ?? null,
         value.priority ?? null,
-        value.isUnofficial,
-        value.featured,
+        value.isUnofficial ? 1 : 0,
+        value.featured ? 1 : 0,
         value.publishedAt,
         manifestId,
         now,
@@ -1237,7 +1260,7 @@ function listingStatements(
         'INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary) SELECT ?,id,?,? FROM categories WHERE slug=? AND is_active=1',
         value.id,
         order,
-        order === 0,
+        order === 0 ? 1 : 0,
         cat
       )
     )
@@ -1458,6 +1481,27 @@ export function buildPublicationPlan(
       if (op.action === 'listing-update') {
         statements.push(membershipGuard(op.listing.id, op.previousCategories))
         addCategories(op.previousCategories)
+      } else {
+        // Row-level (#506): the new listing's own row guards it, not a base version. Its id and
+        // slug must be unused, and its website must not be another listing's, a submission's in
+        // flight, or blocked, as for `listing-details-set`. `manifestSchema` has already refused
+        // a non-public website.
+        const { id, slug, website } = op.listing
+        const label = `listing-create ${slug}`
+        const conflicts = Object.values(listingWebsiteConflicts({ listingId: id, website }))
+        statements.push(
+          statement(
+            `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? OR slug=?) THEN ${REASONED_GUARD_FAILURE} ELSE 1 END`,
+            id,
+            slug,
+            `${label}: a listing already has this id or slug`
+          ),
+          statement(
+            `SELECT CASE WHEN ${conflicts.map(conflict => conflict.sql).join(' OR ')} THEN ${REASONED_GUARD_FAILURE} ELSE 1 END`,
+            ...conflicts.flatMap(conflict => conflict.params),
+            `${label}: the website belongs to another listing or a submission in flight, or is blocked`
+          )
+        )
       }
       statements.push(
         ...listingStatements(

@@ -430,6 +430,84 @@ describe('row-level media manifests (#97 review B3)', () => {
     expect(calls(wrong)).toHaveLength(1)
   })
 
+  it('holds a new listing’s logo and images to the same rule (#506 review)', async () => {
+    const imageKey = `best.serp.co/listings/testing/image/${pngSha.slice(0, 16)}.png`
+    const hosted = (key: string) => ({
+      bytes: png.byteLength,
+      contentType: 'image/png',
+      height: 4,
+      key,
+      sha256: pngSha,
+      source: 'https://testing.example/icon.png',
+      width: 4
+    })
+    // JSON is YAML too.
+    const manifest = parseManifest(
+      JSON.stringify({
+        version: 1,
+        id: 'remote-publisher-create-media-test',
+        concurrency: 'rows',
+        provenance: { actor: 'publisher@example.com', workflow: 'github/publish-d1' },
+        operations: [
+          {
+            action: 'listing-create',
+            listing: {
+              id: 'lst_remote_create_test',
+              slug: 'testing',
+              name: 'Testing',
+              description: 'What Testing does.',
+              website: 'https://testing.example',
+              publishedAt: '2026-10-17T00:00:00.000Z',
+              categories: ['testing'],
+              media: { logo: hosted(mediaKey), images: [hosted(imageKey)] }
+            }
+          }
+        ]
+      })
+    )
+    // Only the logo is in a reviewed plan; the image is read back and verified like an upload.
+    const planned = new Map([
+      [
+        mediaKey,
+        {
+          bytes: png.byteLength,
+          contentType: 'image/png',
+          height: 4,
+          key: mediaKey,
+          md5: createHash('md5').update(png).digest('hex'),
+          sha256: pngSha,
+          source: 'https://testing.example/icon.png',
+          width: 4
+        }
+      ]
+    ])
+    const held = (bucket: string, body: Uint8Array = png) => ({
+      [`${bucket}/${mediaKey}`]: body,
+      [`${bucket}/${imageKey}`]: body
+    })
+    await expect(
+      assertHostedMediaServed(manifest, 'production', production, cloudflare().fetcher, planned)
+    ).rejects.toThrow(
+      `2 hosted media objects are not in the cdn bucket as reviewed (first: ${imageKey} (missing))`
+    )
+    const onStaging = cloudflare({ objects: held('cdn-staging') })
+    await expect(
+      assertHostedMediaServed(manifest, 'production', production, onStaging.fetcher, planned)
+    ).rejects.toThrow('not in the cdn bucket')
+    const good = cloudflare({ objects: held('cdn') })
+    await expect(
+      assertHostedMediaServed(manifest, 'production', production, good.fetcher, planned)
+    ).resolves.toBeUndefined()
+    const tampered = new Uint8Array(png)
+    tampered[tampered.length - 5] = 0
+    const wrong = cloudflare({ objects: held('cdn', tampered) })
+    await expect(
+      assertHostedMediaServed(manifest, 'production', production, wrong.fetcher, planned)
+    ).rejects.toThrow(
+      `2 hosted media objects are not in the cdn bucket as reviewed (first: ${imageKey} (sha256_mismatch))`
+    )
+  })
+
   it('is idempotent by its input, whatever version each environment published it at', async () => {
     const inputChecksum = createHash('sha256').update(mediaSource).digest('hex')
     const { fetcher } = cloudflare({
