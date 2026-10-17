@@ -1,0 +1,774 @@
+# serpcompany/best.serp.co#539 (batch B): hand-picked alternatives for the 72 live listings whose
+# primary category is Careers & Hiring, the next category in #539's size order after the ones
+# batches 1 and A claimed. The picks lead each page's Alternatives section; the page tops it up to
+# six from similar listings.
+# Picked on 2026-10-18 from staging's live listings (read-only), each also live on production
+# (https://best.serp.co/sitemap-products.xml, read that day), by what each listing and its
+# candidates say they do: a pick does the same job for the same kind of user, best first, and a
+# listing gets fewer than six, or none, when nothing else fits. Job-seeker tools (resumes, cover
+# letters, interview practice, auto-apply) pick job-seeker tools, and hiring and HR tools pick
+# hiring and HR tools. Picks may come from any category: Talkberry (Education) practises job
+# interviews, Traq.ai (Business & Finance) analyses recruiting calls, and Stunning (Developer Tools)
+# builds portfolios. Every listing and pick is a v1 import listing, with the same id and slug on
+# staging and production. The reason for each listing is the comment above its operation.
+# Eight listings have no operation, because nothing in the catalog substitutes for them: Checkr
+# (background checks), GoodListen (self-improvement podcasts), HRM Wage (an all-in-one HR suite with
+# time and attendance), Kardow (job board software), Proposal Genie (Upwork proposals for
+# freelancers), Resign (resignation letters), AI Rental Cover Letter (rental applications in
+# Australia), and Vahan (delivery jobs for workers in India). Their pages keep the similar-listings
+# fallback.
+# Each listing-alternatives-set compares and swaps the listing's slug and current picks (none yet),
+# refuses a pick that isn't live with that id and slug, keeps the listing's checksum, and logs an
+# `edited` event. Row-level, so the batch is refused with nothing written if any listing changed.
+# Needs migration 0018_listing_alternatives (#534, release 9). Publish on staging first, then on
+# production after the promotion that carries it.
+version: 1
+id: 2026-10-18-alternatives-careers
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  # benchtalentcloud.com: enterprise talent platforms that match internal and external talent to roles.
+  - action: listing-alternatives-set
+    id: lst_c16d7f8eec19008ddf7f8d86
+    slug: benchtalentcloud.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_7e73c4a9453eca83f1edec92, slug: eightfold.ai }
+      - { id: lst_52fd183ef9d30348fbb130e1, slug: hireez.com }
+  # bestresume.ai: AI resume optimization for applicant tracking systems.
+  - action: listing-alternatives-set
+    id: lst_569c473f71fd6db6372b2b65
+    slug: bestresume.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_9f4d85f195070e5938cd7356, slug: rezi.ai }
+      - { id: lst_9e9c58fabc510e077e31c1c9, slug: jobscan.co }
+      - { id: lst_863c0b359cb0b9f6716404a2, slug: tealhq.com }
+      - { id: lst_b4f9a00faf980f4ad77fb623, slug: kickresume.com }
+      - { id: lst_98f71c3bf8811f3afdf6d1c1, slug: resumeworded.com }
+      - { id: lst_ab5774acd38555bd34bfe5ce, slug: resumy.app }
+  # careered.ai: tailoring a resume and cover letter to each job posting.
+  - action: listing-alternatives-set
+    id: lst_6a3ae957f1e3b6c8f93854c8
+    slug: careered.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_9e9c58fabc510e077e31c1c9, slug: jobscan.co }
+      - { id: lst_863c0b359cb0b9f6716404a2, slug: tealhq.com }
+      - { id: lst_9f4d85f195070e5938cd7356, slug: rezi.ai }
+      - { id: lst_648ced838c50089cefbb588e, slug: careerflow.ai }
+      - { id: lst_b4f9a00faf980f4ad77fb623, slug: kickresume.com }
+      - { id: lst_37c2f520f0754cceb9690817, slug: majorgen.com }
+  # careerflow.ai: job-search suites with an AI resume builder and an application tracker.
+  - action: listing-alternatives-set
+    id: lst_648ced838c50089cefbb588e
+    slug: careerflow.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_863c0b359cb0b9f6716404a2, slug: tealhq.com }
+      - { id: lst_2cbd99936d97f2de22a5988e, slug: eztrackr.app }
+      - { id: lst_9e9c58fabc510e077e31c1c9, slug: jobscan.co }
+      - { id: lst_b4f9a00faf980f4ad77fb623, slug: kickresume.com }
+      - { id: lst_9f4d85f195070e5938cd7356, slug: rezi.ai }
+      - { id: lst_98f71c3bf8811f3afdf6d1c1, slug: resumeworded.com }
+  # coverdoc.ai: AI cover letter writers for job applications.
+  - action: listing-alternatives-set
+    id: lst_a525bf2e6126da3678b2ab9e
+    slug: coverdoc.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_d8ab16caae70433556395be9, slug: coverletter-ai.com }
+      - { id: lst_5d3d5145f4de1f6729315ba7, slug: coverler.com }
+      - { id: lst_48a3ffbda57702daad265829, slug: yourcoverletter.com }
+      - { id: lst_8fb86648d698418493ec3a7f, slug: wonsulting.ai }
+      - { id: lst_b4f9a00faf980f4ad77fb623, slug: kickresume.com }
+      - { id: lst_37c2f520f0754cceb9690817, slug: majorgen.com }
+  # coverler.com: AI cover letter writers for job applications.
+  - action: listing-alternatives-set
+    id: lst_5d3d5145f4de1f6729315ba7
+    slug: coverler.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_d8ab16caae70433556395be9, slug: coverletter-ai.com }
+      - { id: lst_a525bf2e6126da3678b2ab9e, slug: coverdoc.ai }
+      - { id: lst_48a3ffbda57702daad265829, slug: yourcoverletter.com }
+      - { id: lst_8fb86648d698418493ec3a7f, slug: wonsulting.ai }
+      - { id: lst_b4f9a00faf980f4ad77fb623, slug: kickresume.com }
+      - { id: lst_37c2f520f0754cceb9690817, slug: majorgen.com }
+  # coverletter-ai.com: AI cover letter writers for job applications.
+  - action: listing-alternatives-set
+    id: lst_d8ab16caae70433556395be9
+    slug: coverletter-ai.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_5d3d5145f4de1f6729315ba7, slug: coverler.com }
+      - { id: lst_a525bf2e6126da3678b2ab9e, slug: coverdoc.ai }
+      - { id: lst_48a3ffbda57702daad265829, slug: yourcoverletter.com }
+      - { id: lst_8fb86648d698418493ec3a7f, slug: wonsulting.ai }
+      - { id: lst_b4f9a00faf980f4ad77fb623, slug: kickresume.com }
+      - { id: lst_37c2f520f0754cceb9690817, slug: majorgen.com }
+  # effy.ai: performance review software for managers and HR.
+  - action: listing-alternatives-set
+    id: lst_6bb623a294fb095b708b5ec2
+    slug: effy.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_8212d373667a0ab59bc64035, slug: managebetter.com }
+      - { id: lst_b0166ab81e0016ab632593f6, slug: geniusreview.xyz }
+      - { id: lst_95d000a50a2ef413bae99335, slug: onloop.com }
+      - { id: lst_bb2da81f890780789e1c1e31, slug: predictiveindex.com }
+  # eightfold.ai: AI talent platforms for sourcing and matching candidates.
+  - action: listing-alternatives-set
+    id: lst_7e73c4a9453eca83f1edec92
+    slug: eightfold.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_52fd183ef9d30348fbb130e1, slug: hireez.com }
+      - { id: lst_78ac23afc9baad3f0aed19b8, slug: turbohire.co }
+      - { id: lst_f034a3a472139f1743d759d1, slug: zap-hire.com }
+      - { id: lst_c16d7f8eec19008ddf7f8d86, slug: benchtalentcloud.com }
+  # eztrackr.app: job application trackers for job seekers.
+  - action: listing-alternatives-set
+    id: lst_2cbd99936d97f2de22a5988e
+    slug: eztrackr.app
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_648ced838c50089cefbb588e, slug: careerflow.ai }
+      - { id: lst_863c0b359cb0b9f6716404a2, slug: tealhq.com }
+  # geniusreview.xyz: AI performance review software for managers.
+  - action: listing-alternatives-set
+    id: lst_b0166ab81e0016ab632593f6
+    slug: geniusreview.xyz
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_6bb623a294fb095b708b5ec2, slug: effy.ai }
+      - { id: lst_8212d373667a0ab59bc64035, slug: managebetter.com }
+      - { id: lst_95d000a50a2ef413bae99335, slug: onloop.com }
+      - { id: lst_bb2da81f890780789e1c1e31, slug: predictiveindex.com }
+  # getmarlee.com: AI coaching for personal and professional goals.
+  - action: listing-alternatives-set
+    id: lst_c0e308199f9eaf5749eabf00
+    slug: getmarlee.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_d525f6865a1159ba0b6e7876, slug: summit.im }
+      - { id: lst_f70f9db8e746ed4bda12c99f, slug: waiheke.ai }
+  # hireez.com: AI candidate sourcing for recruiters.
+  - action: listing-alternatives-set
+    id: lst_52fd183ef9d30348fbb130e1
+    slug: hireez.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_f034a3a472139f1743d759d1, slug: zap-hire.com }
+      - { id: lst_0ceae057e4a49cae91e039a0, slug: hollyhires.ai }
+      - { id: lst_38a5049a77e42e6b17c92499, slug: hirequotient.com }
+      - { id: lst_7e73c4a9453eca83f1edec92, slug: eightfold.ai }
+      - { id: lst_78ac23afc9baad3f0aed19b8, slug: turbohire.co }
+      - { id: lst_7d1f915cabbc65138e4f20cb, slug: vanillahr.com }
+  # hirehoc.com: AI recruiting platforms that screen and interview candidates.
+  - action: listing-alternatives-set
+    id: lst_2161ed6af327622aafe8734d
+    slug: hirehoc.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_78ac23afc9baad3f0aed19b8, slug: turbohire.co }
+      - { id: lst_12a085dd5a79482d6e25ee04, slug: recruitgenius.ai }
+      - { id: lst_7d1f915cabbc65138e4f20cb, slug: vanillahr.com }
+      - { id: lst_f034a3a472139f1743d759d1, slug: zap-hire.com }
+      - { id: lst_47e0992afe739e11155043a5, slug: micro1.ai }
+  # hirelake.ai: AI resume screening and ranking for hiring teams.
+  - action: listing-alternatives-set
+    id: lst_eb864fd1b9bcbd1cafe26a3d
+    slug: hirelake.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_12a085dd5a79482d6e25ee04, slug: recruitgenius.ai }
+      - { id: lst_f041fdf8d34f4cafb90872be, slug: jobs-scout.com }
+      - { id: lst_78ac23afc9baad3f0aed19b8, slug: turbohire.co }
+      - { id: lst_f034a3a472139f1743d759d1, slug: zap-hire.com }
+  # hirequotient.com: AI job description writing and candidate sourcing for recruiters.
+  - action: listing-alternatives-set
+    id: lst_38a5049a77e42e6b17c92499
+    slug: hirequotient.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_390aa46b642285eeb04e7a05, slug: seeqle.com }
+      - { id: lst_52fd183ef9d30348fbb130e1, slug: hireez.com }
+      - { id: lst_78ac23afc9baad3f0aed19b8, slug: turbohire.co }
+      - { id: lst_f034a3a472139f1743d759d1, slug: zap-hire.com }
+      - { id: lst_47e0992afe739e11155043a5, slug: micro1.ai }
+      - { id: lst_7d1f915cabbc65138e4f20cb, slug: vanillahr.com }
+  # hollyhires.ai: AI candidate sourcing and outreach for hiring teams.
+  - action: listing-alternatives-set
+    id: lst_0ceae057e4a49cae91e039a0
+    slug: hollyhires.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_52fd183ef9d30348fbb130e1, slug: hireez.com }
+      - { id: lst_f034a3a472139f1743d759d1, slug: zap-hire.com }
+      - { id: lst_38a5049a77e42e6b17c92499, slug: hirequotient.com }
+      - { id: lst_78ac23afc9baad3f0aed19b8, slug: turbohire.co }
+  # infeedo.ai: AI employee feedback and sentiment check-ins.
+  - action: listing-alternatives-set
+    id: lst_f8040c666ffa639cd0a5dd91
+    slug: infeedo.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_f6b1e81b69146520d507fadd, slug: soon.works }
+  # interviewai.io: AI interview practice with feedback.
+  - action: listing-alternatives-set
+    id: lst_6d9a4d856cb64aeb9c134b07
+    slug: interviewai.io
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_b606ddfc5f5d9b6a64f36e59, slug: interviewsby.ai }
+      - { id: lst_e444ad44da26c91689edb486, slug: interviewprep-ai.com }
+      - { id: lst_5d78de99f6d470a767d61369, slug: interviewai.me }
+      - { id: lst_b7a2c8150fa4d10c057a7d95, slug: rightjoin.co }
+      - { id: lst_8fad365f12d8dbc25fd94552, slug: jobinterview.coach }
+      - { id: lst_97d1003e062d381aefb28f6f, slug: talkberry.ai }
+  # interviewai.me: AI interview practice, behavioral and technical.
+  - action: listing-alternatives-set
+    id: lst_5d78de99f6d470a767d61369
+    slug: interviewai.me
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_b606ddfc5f5d9b6a64f36e59, slug: interviewsby.ai }
+      - { id: lst_e444ad44da26c91689edb486, slug: interviewprep-ai.com }
+      - { id: lst_6d9a4d856cb64aeb9c134b07, slug: interviewai.io }
+      - { id: lst_fb11ef14b1fa308489d99fe3, slug: interviewigniter.com }
+      - { id: lst_b7a2c8150fa4d10c057a7d95, slug: rightjoin.co }
+      - { id: lst_8fad365f12d8dbc25fd94552, slug: jobinterview.coach }
+  # interviewigniter.com: AI practice for technical interviews.
+  - action: listing-alternatives-set
+    id: lst_fb11ef14b1fa308489d99fe3
+    slug: interviewigniter.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_5d78de99f6d470a767d61369, slug: interviewai.me }
+      - { id: lst_a64f7b35e20c10014436a325, slug: sqlpad.io }
+      - { id: lst_b606ddfc5f5d9b6a64f36e59, slug: interviewsby.ai }
+      - { id: lst_e444ad44da26c91689edb486, slug: interviewprep-ai.com }
+      - { id: lst_b7a2c8150fa4d10c057a7d95, slug: rightjoin.co }
+      - { id: lst_6d9a4d856cb64aeb9c134b07, slug: interviewai.io }
+  # interviewprep-ai.com: AI interview practice with feedback.
+  - action: listing-alternatives-set
+    id: lst_e444ad44da26c91689edb486
+    slug: interviewprep-ai.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_b606ddfc5f5d9b6a64f36e59, slug: interviewsby.ai }
+      - { id: lst_6d9a4d856cb64aeb9c134b07, slug: interviewai.io }
+      - { id: lst_5d78de99f6d470a767d61369, slug: interviewai.me }
+      - { id: lst_b7a2c8150fa4d10c057a7d95, slug: rightjoin.co }
+      - { id: lst_8fad365f12d8dbc25fd94552, slug: jobinterview.coach }
+      - { id: lst_97d1003e062d381aefb28f6f, slug: talkberry.ai }
+  # interviewsby.ai: AI interview practice from a job description.
+  - action: listing-alternatives-set
+    id: lst_b606ddfc5f5d9b6a64f36e59
+    slug: interviewsby.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_e444ad44da26c91689edb486, slug: interviewprep-ai.com }
+      - { id: lst_6d9a4d856cb64aeb9c134b07, slug: interviewai.io }
+      - { id: lst_5d78de99f6d470a767d61369, slug: interviewai.me }
+      - { id: lst_b7a2c8150fa4d10c057a7d95, slug: rightjoin.co }
+      - { id: lst_8fad365f12d8dbc25fd94552, slug: jobinterview.coach }
+      - { id: lst_97d1003e062d381aefb28f6f, slug: talkberry.ai }
+  # jobcopilot.com: tools that apply to jobs for you.
+  - action: listing-alternatives-set
+    id: lst_da4c21dba46014c9eb7effe1
+    slug: jobcopilot.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_96ad1f853ebaa20d5bb3b518, slug: lazyapply.com }
+      - { id: lst_e5366f462cb852ed2be7ab35, slug: loopcv.pro }
+      - { id: lst_ac7d629671f07134ba9b6aae, slug: wesendcv.com }
+  # jobhuntmode.com: AI career planning and job-search toolkits.
+  - action: listing-alternatives-set
+    id: lst_a6fd78fc8a5f80942351f3bb
+    slug: jobhuntmode.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_f70f9db8e746ed4bda12c99f, slug: waiheke.ai }
+      - { id: lst_648ced838c50089cefbb588e, slug: careerflow.ai }
+      - { id: lst_cb3ddeb489426957820620c0, slug: wonsulting.com }
+  # jobinterview.coach: AI interview coaching and practice.
+  - action: listing-alternatives-set
+    id: lst_8fad365f12d8dbc25fd94552
+    slug: jobinterview.coach
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_b606ddfc5f5d9b6a64f36e59, slug: interviewsby.ai }
+      - { id: lst_e444ad44da26c91689edb486, slug: interviewprep-ai.com }
+      - { id: lst_6d9a4d856cb64aeb9c134b07, slug: interviewai.io }
+      - { id: lst_5d78de99f6d470a767d61369, slug: interviewai.me }
+      - { id: lst_b7a2c8150fa4d10c057a7d95, slug: rightjoin.co }
+      - { id: lst_97d1003e062d381aefb28f6f, slug: talkberry.ai }
+  # jobs-scout.com: AI candidate evaluation and ranking for hiring managers.
+  - action: listing-alternatives-set
+    id: lst_f041fdf8d34f4cafb90872be
+    slug: jobs-scout.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_eb864fd1b9bcbd1cafe26a3d, slug: hirelake.ai }
+      - { id: lst_12a085dd5a79482d6e25ee04, slug: recruitgenius.ai }
+      - { id: lst_78ac23afc9baad3f0aed19b8, slug: turbohire.co }
+      - { id: lst_7d1f915cabbc65138e4f20cb, slug: vanillahr.com }
+      - { id: lst_f034a3a472139f1743d759d1, slug: zap-hire.com }
+  # jobscan.co: resume checks against applicant tracking systems and job descriptions.
+  - action: listing-alternatives-set
+    id: lst_9e9c58fabc510e077e31c1c9
+    slug: jobscan.co
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_98f71c3bf8811f3afdf6d1c1, slug: resumeworded.com }
+      - { id: lst_863c0b359cb0b9f6716404a2, slug: tealhq.com }
+      - { id: lst_9f4d85f195070e5938cd7356, slug: rezi.ai }
+      - { id: lst_bc84ac3368eb42e81a3b318d, slug: resumechecker.ai }
+      - { id: lst_45edc89238d5cdae5b98e60f, slug: resumecheck.net }
+      - { id: lst_569c473f71fd6db6372b2b65, slug: bestresume.ai }
+  # kickresume.com: AI resume and cover letter builders.
+  - action: listing-alternatives-set
+    id: lst_b4f9a00faf980f4ad77fb623
+    slug: kickresume.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_863c0b359cb0b9f6716404a2, slug: tealhq.com }
+      - { id: lst_9f4d85f195070e5938cd7356, slug: rezi.ai }
+      - { id: lst_c4ac3c831c8a8cd6b5797767, slug: resumaker.ai }
+      - { id: lst_37c2f520f0754cceb9690817, slug: majorgen.com }
+      - { id: lst_6f6bd7dc92a25ba0dae75e8d, slug: resumemaker.online }
+      - { id: lst_ab5774acd38555bd34bfe5ce, slug: resumy.app }
+  # lazyapply.com: tools that apply to jobs for you.
+  - action: listing-alternatives-set
+    id: lst_96ad1f853ebaa20d5bb3b518
+    slug: lazyapply.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_da4c21dba46014c9eb7effe1, slug: jobcopilot.com }
+      - { id: lst_e5366f462cb852ed2be7ab35, slug: loopcv.pro }
+      - { id: lst_ac7d629671f07134ba9b6aae, slug: wesendcv.com }
+  # loopcv.pro: tools that apply to jobs for you.
+  - action: listing-alternatives-set
+    id: lst_e5366f462cb852ed2be7ab35
+    slug: loopcv.pro
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_96ad1f853ebaa20d5bb3b518, slug: lazyapply.com }
+      - { id: lst_da4c21dba46014c9eb7effe1, slug: jobcopilot.com }
+      - { id: lst_ac7d629671f07134ba9b6aae, slug: wesendcv.com }
+  # majorgen.com: AI resume and cover letter builders.
+  - action: listing-alternatives-set
+    id: lst_37c2f520f0754cceb9690817
+    slug: majorgen.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_b4f9a00faf980f4ad77fb623, slug: kickresume.com }
+      - { id: lst_9f4d85f195070e5938cd7356, slug: rezi.ai }
+      - { id: lst_863c0b359cb0b9f6716404a2, slug: tealhq.com }
+      - { id: lst_c4ac3c831c8a8cd6b5797767, slug: resumaker.ai }
+      - { id: lst_6f6bd7dc92a25ba0dae75e8d, slug: resumemaker.online }
+      - { id: lst_ab5774acd38555bd34bfe5ce, slug: resumy.app }
+  # managebetter.com: performance management software for managers.
+  - action: listing-alternatives-set
+    id: lst_8212d373667a0ab59bc64035
+    slug: managebetter.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_6bb623a294fb095b708b5ec2, slug: effy.ai }
+      - { id: lst_b0166ab81e0016ab632593f6, slug: geniusreview.xyz }
+      - { id: lst_95d000a50a2ef413bae99335, slug: onloop.com }
+      - { id: lst_bb2da81f890780789e1c1e31, slug: predictiveindex.com }
+  # metaview.ai: AI notes and analytics for recruiting conversations.
+  - action: listing-alternatives-set
+    id: lst_4b030ad174fa5a07e30ab0ab
+    slug: metaview.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_9a0fbd5ef5ff853afce4f195, slug: traq.ai }
+  # micro1.ai: AI interviews that screen and vet candidates.
+  - action: listing-alternatives-set
+    id: lst_47e0992afe739e11155043a5
+    slug: micro1.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_38a5049a77e42e6b17c92499, slug: hirequotient.com }
+      - { id: lst_12a085dd5a79482d6e25ee04, slug: recruitgenius.ai }
+      - { id: lst_2161ed6af327622aafe8734d, slug: hirehoc.com }
+      - { id: lst_78ac23afc9baad3f0aed19b8, slug: turbohire.co }
+      - { id: lst_f034a3a472139f1743d759d1, slug: zap-hire.com }
+  # onloop.com: continuous feedback and team development for managers.
+  - action: listing-alternatives-set
+    id: lst_95d000a50a2ef413bae99335
+    slug: onloop.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_8212d373667a0ab59bc64035, slug: managebetter.com }
+      - { id: lst_6bb623a294fb095b708b5ec2, slug: effy.ai }
+      - { id: lst_bb2da81f890780789e1c1e31, slug: predictiveindex.com }
+      - { id: lst_b0166ab81e0016ab632593f6, slug: geniusreview.xyz }
+      - { id: lst_3d1772799aa8e1dafee79a5c, slug: sereda.ai }
+  # predictiveindex.com: the listing is Charma: feedback and performance tools for managers.
+  - action: listing-alternatives-set
+    id: lst_bb2da81f890780789e1c1e31
+    slug: predictiveindex.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_95d000a50a2ef413bae99335, slug: onloop.com }
+      - { id: lst_8212d373667a0ab59bc64035, slug: managebetter.com }
+      - { id: lst_6bb623a294fb095b708b5ec2, slug: effy.ai }
+      - { id: lst_b0166ab81e0016ab632593f6, slug: geniusreview.xyz }
+  # razoroo.com: technical recruiting services that find and vet engineers for companies.
+  - action: listing-alternatives-set
+    id: lst_8d44c44d2b5493780bdad91f
+    slug: razoroo.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_47e0992afe739e11155043a5, slug: micro1.ai }
+      - { id: lst_0ceae057e4a49cae91e039a0, slug: hollyhires.ai }
+  # recruitgenius.ai: AI candidate screening and recruiting automation.
+  - action: listing-alternatives-set
+    id: lst_12a085dd5a79482d6e25ee04
+    slug: recruitgenius.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_78ac23afc9baad3f0aed19b8, slug: turbohire.co }
+      - { id: lst_7d1f915cabbc65138e4f20cb, slug: vanillahr.com }
+      - { id: lst_47e0992afe739e11155043a5, slug: micro1.ai }
+      - { id: lst_f034a3a472139f1743d759d1, slug: zap-hire.com }
+      - { id: lst_2161ed6af327622aafe8734d, slug: hirehoc.com }
+      - { id: lst_eb864fd1b9bcbd1cafe26a3d, slug: hirelake.ai }
+  # resumaker.ai: AI resume builders with templates.
+  - action: listing-alternatives-set
+    id: lst_c4ac3c831c8a8cd6b5797767
+    slug: resumaker.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_863c0b359cb0b9f6716404a2, slug: tealhq.com }
+      - { id: lst_b4f9a00faf980f4ad77fb623, slug: kickresume.com }
+      - { id: lst_9f4d85f195070e5938cd7356, slug: rezi.ai }
+      - { id: lst_6f6bd7dc92a25ba0dae75e8d, slug: resumemaker.online }
+      - { id: lst_ab5774acd38555bd34bfe5ce, slug: resumy.app }
+      - { id: lst_37c2f520f0754cceb9690817, slug: majorgen.com }
+  # resumecheck.net: AI resume checkers.
+  - action: listing-alternatives-set
+    id: lst_45edc89238d5cdae5b98e60f
+    slug: resumecheck.net
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_bc84ac3368eb42e81a3b318d, slug: resumechecker.ai }
+      - { id: lst_98f71c3bf8811f3afdf6d1c1, slug: resumeworded.com }
+      - { id: lst_9e9c58fabc510e077e31c1c9, slug: jobscan.co }
+      - { id: lst_9f4d85f195070e5938cd7356, slug: rezi.ai }
+      - { id: lst_569c473f71fd6db6372b2b65, slug: bestresume.ai }
+  # resumechecker.ai: AI resume checkers.
+  - action: listing-alternatives-set
+    id: lst_bc84ac3368eb42e81a3b318d
+    slug: resumechecker.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_98f71c3bf8811f3afdf6d1c1, slug: resumeworded.com }
+      - { id: lst_9e9c58fabc510e077e31c1c9, slug: jobscan.co }
+      - { id: lst_45edc89238d5cdae5b98e60f, slug: resumecheck.net }
+      - { id: lst_9f4d85f195070e5938cd7356, slug: rezi.ai }
+      - { id: lst_569c473f71fd6db6372b2b65, slug: bestresume.ai }
+  # resumemaker.online: AI resume builders with templates.
+  - action: listing-alternatives-set
+    id: lst_6f6bd7dc92a25ba0dae75e8d
+    slug: resumemaker.online
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_c4ac3c831c8a8cd6b5797767, slug: resumaker.ai }
+      - { id: lst_b4f9a00faf980f4ad77fb623, slug: kickresume.com }
+      - { id: lst_9f4d85f195070e5938cd7356, slug: rezi.ai }
+      - { id: lst_863c0b359cb0b9f6716404a2, slug: tealhq.com }
+      - { id: lst_ab5774acd38555bd34bfe5ce, slug: resumy.app }
+      - { id: lst_37c2f520f0754cceb9690817, slug: majorgen.com }
+  # resumeworded.com: resume feedback and ATS-friendly resume tools.
+  - action: listing-alternatives-set
+    id: lst_98f71c3bf8811f3afdf6d1c1
+    slug: resumeworded.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_9e9c58fabc510e077e31c1c9, slug: jobscan.co }
+      - { id: lst_9f4d85f195070e5938cd7356, slug: rezi.ai }
+      - { id: lst_863c0b359cb0b9f6716404a2, slug: tealhq.com }
+      - { id: lst_b4f9a00faf980f4ad77fb623, slug: kickresume.com }
+      - { id: lst_bc84ac3368eb42e81a3b318d, slug: resumechecker.ai }
+      - { id: lst_45edc89238d5cdae5b98e60f, slug: resumecheck.net }
+  # resumy.app: AI resume builders.
+  - action: listing-alternatives-set
+    id: lst_ab5774acd38555bd34bfe5ce
+    slug: resumy.app
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_9f4d85f195070e5938cd7356, slug: rezi.ai }
+      - { id: lst_b4f9a00faf980f4ad77fb623, slug: kickresume.com }
+      - { id: lst_863c0b359cb0b9f6716404a2, slug: tealhq.com }
+      - { id: lst_c4ac3c831c8a8cd6b5797767, slug: resumaker.ai }
+      - { id: lst_6f6bd7dc92a25ba0dae75e8d, slug: resumemaker.online }
+      - { id: lst_569c473f71fd6db6372b2b65, slug: bestresume.ai }
+  # rezi.ai: AI resume builders for applicant tracking systems.
+  - action: listing-alternatives-set
+    id: lst_9f4d85f195070e5938cd7356
+    slug: rezi.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_863c0b359cb0b9f6716404a2, slug: tealhq.com }
+      - { id: lst_b4f9a00faf980f4ad77fb623, slug: kickresume.com }
+      - { id: lst_98f71c3bf8811f3afdf6d1c1, slug: resumeworded.com }
+      - { id: lst_9e9c58fabc510e077e31c1c9, slug: jobscan.co }
+      - { id: lst_c4ac3c831c8a8cd6b5797767, slug: resumaker.ai }
+      - { id: lst_6f6bd7dc92a25ba0dae75e8d, slug: resumemaker.online }
+  # rightjoin.co: AI interview practice tailored to the user.
+  - action: listing-alternatives-set
+    id: lst_b7a2c8150fa4d10c057a7d95
+    slug: rightjoin.co
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_b606ddfc5f5d9b6a64f36e59, slug: interviewsby.ai }
+      - { id: lst_e444ad44da26c91689edb486, slug: interviewprep-ai.com }
+      - { id: lst_6d9a4d856cb64aeb9c134b07, slug: interviewai.io }
+      - { id: lst_5d78de99f6d470a767d61369, slug: interviewai.me }
+      - { id: lst_8fad365f12d8dbc25fd94552, slug: jobinterview.coach }
+      - { id: lst_97d1003e062d381aefb28f6f, slug: talkberry.ai }
+  # seeqle.com: AI job description and job posting writers.
+  - action: listing-alternatives-set
+    id: lst_390aa46b642285eeb04e7a05
+    slug: seeqle.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_38a5049a77e42e6b17c92499, slug: hirequotient.com }
+  # sereda.ai: team development and performance tools for HR.
+  - action: listing-alternatives-set
+    id: lst_3d1772799aa8e1dafee79a5c
+    slug: sereda.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_95d000a50a2ef413bae99335, slug: onloop.com }
+      - { id: lst_6bb623a294fb095b708b5ec2, slug: effy.ai }
+      - { id: lst_8212d373667a0ab59bc64035, slug: managebetter.com }
+  # showspace.so: online portfolio builders for showing professional work.
+  - action: listing-alternatives-set
+    id: lst_577f211aae6a0eff5aa53c4c
+    slug: showspace.so
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_ac2c42f32d89e844ffde4b43, slug: stunning.so }
+  # soon.works: AI employee feedback check-ins for managers.
+  - action: listing-alternatives-set
+    id: lst_f6b1e81b69146520d507fadd
+    slug: soon.works
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_f8040c666ffa639cd0a5dd91, slug: infeedo.ai }
+      - { id: lst_95d000a50a2ef413bae99335, slug: onloop.com }
+  # sqlpad.io: AI mock interviews, technical practice first.
+  - action: listing-alternatives-set
+    id: lst_a64f7b35e20c10014436a325
+    slug: sqlpad.io
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_fb11ef14b1fa308489d99fe3, slug: interviewigniter.com }
+      - { id: lst_5d78de99f6d470a767d61369, slug: interviewai.me }
+      - { id: lst_b606ddfc5f5d9b6a64f36e59, slug: interviewsby.ai }
+      - { id: lst_e444ad44da26c91689edb486, slug: interviewprep-ai.com }
+      - { id: lst_6d9a4d856cb64aeb9c134b07, slug: interviewai.io }
+      - { id: lst_b7a2c8150fa4d10c057a7d95, slug: rightjoin.co }
+  # summit.im: AI coaching for personal and professional goals.
+  - action: listing-alternatives-set
+    id: lst_d525f6865a1159ba0b6e7876
+    slug: summit.im
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_c0e308199f9eaf5749eabf00, slug: getmarlee.com }
+  # tealhq.com: AI resume builders with job-search tools.
+  - action: listing-alternatives-set
+    id: lst_863c0b359cb0b9f6716404a2
+    slug: tealhq.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_9f4d85f195070e5938cd7356, slug: rezi.ai }
+      - { id: lst_b4f9a00faf980f4ad77fb623, slug: kickresume.com }
+      - { id: lst_648ced838c50089cefbb588e, slug: careerflow.ai }
+      - { id: lst_9e9c58fabc510e077e31c1c9, slug: jobscan.co }
+      - { id: lst_98f71c3bf8811f3afdf6d1c1, slug: resumeworded.com }
+      - { id: lst_c4ac3c831c8a8cd6b5797767, slug: resumaker.ai }
+  # theladders.com: the listing is Leet Resumes: ATS resume optimization.
+  - action: listing-alternatives-set
+    id: lst_a8387992e05d0be31968db35
+    slug: theladders.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_9f4d85f195070e5938cd7356, slug: rezi.ai }
+      - { id: lst_9e9c58fabc510e077e31c1c9, slug: jobscan.co }
+      - { id: lst_98f71c3bf8811f3afdf6d1c1, slug: resumeworded.com }
+      - { id: lst_b4f9a00faf980f4ad77fb623, slug: kickresume.com }
+      - { id: lst_863c0b359cb0b9f6716404a2, slug: tealhq.com }
+      - { id: lst_569c473f71fd6db6372b2b65, slug: bestresume.ai }
+  # thisresumedoesnotexist.com: AI resume writing and tailoring.
+  - action: listing-alternatives-set
+    id: lst_5365a1bc4556bc3d637e2806
+    slug: thisresumedoesnotexist.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_ab5774acd38555bd34bfe5ce, slug: resumy.app }
+      - { id: lst_9f4d85f195070e5938cd7356, slug: rezi.ai }
+      - { id: lst_b4f9a00faf980f4ad77fb623, slug: kickresume.com }
+      - { id: lst_863c0b359cb0b9f6716404a2, slug: tealhq.com }
+      - { id: lst_c4ac3c831c8a8cd6b5797767, slug: resumaker.ai }
+      - { id: lst_6a3ae957f1e3b6c8f93854c8, slug: careered.ai }
+  # turbohire.co: AI recruiting automation platforms.
+  - action: listing-alternatives-set
+    id: lst_78ac23afc9baad3f0aed19b8
+    slug: turbohire.co
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_7d1f915cabbc65138e4f20cb, slug: vanillahr.com }
+      - { id: lst_12a085dd5a79482d6e25ee04, slug: recruitgenius.ai }
+      - { id: lst_f034a3a472139f1743d759d1, slug: zap-hire.com }
+      - { id: lst_52fd183ef9d30348fbb130e1, slug: hireez.com }
+      - { id: lst_38a5049a77e42e6b17c92499, slug: hirequotient.com }
+      - { id: lst_7e73c4a9453eca83f1edec92, slug: eightfold.ai }
+  # vanillahr.com: AI recruiting platforms that post jobs, source and manage candidates.
+  - action: listing-alternatives-set
+    id: lst_7d1f915cabbc65138e4f20cb
+    slug: vanillahr.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_78ac23afc9baad3f0aed19b8, slug: turbohire.co }
+      - { id: lst_12a085dd5a79482d6e25ee04, slug: recruitgenius.ai }
+      - { id: lst_f034a3a472139f1743d759d1, slug: zap-hire.com }
+      - { id: lst_52fd183ef9d30348fbb130e1, slug: hireez.com }
+      - { id: lst_2161ed6af327622aafe8734d, slug: hirehoc.com }
+      - { id: lst_f041fdf8d34f4cafb90872be, slug: jobs-scout.com }
+  # waiheke.ai: AI career coaching and career planning.
+  - action: listing-alternatives-set
+    id: lst_f70f9db8e746ed4bda12c99f
+    slug: waiheke.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_a6fd78fc8a5f80942351f3bb, slug: jobhuntmode.com }
+      - { id: lst_c0e308199f9eaf5749eabf00, slug: getmarlee.com }
+  # wesendcv.com: services that send applications for you.
+  - action: listing-alternatives-set
+    id: lst_ac7d629671f07134ba9b6aae
+    slug: wesendcv.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_e5366f462cb852ed2be7ab35, slug: loopcv.pro }
+      - { id: lst_da4c21dba46014c9eb7effe1, slug: jobcopilot.com }
+      - { id: lst_96ad1f853ebaa20d5bb3b518, slug: lazyapply.com }
+  # wonsulting.ai: the listing is CoverletterAI: AI cover letter writers.
+  - action: listing-alternatives-set
+    id: lst_8fb86648d698418493ec3a7f
+    slug: wonsulting.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_d8ab16caae70433556395be9, slug: coverletter-ai.com }
+      - { id: lst_5d3d5145f4de1f6729315ba7, slug: coverler.com }
+      - { id: lst_a525bf2e6126da3678b2ab9e, slug: coverdoc.ai }
+      - { id: lst_48a3ffbda57702daad265829, slug: yourcoverletter.com }
+      - { id: lst_b4f9a00faf980f4ad77fb623, slug: kickresume.com }
+      - { id: lst_37c2f520f0754cceb9690817, slug: majorgen.com }
+  # wonsulting.com: the listing is NetworkAI: AI job-search suites for resumes and LinkedIn.
+  - action: listing-alternatives-set
+    id: lst_cb3ddeb489426957820620c0
+    slug: wonsulting.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_648ced838c50089cefbb588e, slug: careerflow.ai }
+      - { id: lst_863c0b359cb0b9f6716404a2, slug: tealhq.com }
+      - { id: lst_9e9c58fabc510e077e31c1c9, slug: jobscan.co }
+      - { id: lst_98f71c3bf8811f3afdf6d1c1, slug: resumeworded.com }
+  # yourcoverletter.com: AI cover letter writers for job applications.
+  - action: listing-alternatives-set
+    id: lst_48a3ffbda57702daad265829
+    slug: yourcoverletter.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_d8ab16caae70433556395be9, slug: coverletter-ai.com }
+      - { id: lst_5d3d5145f4de1f6729315ba7, slug: coverler.com }
+      - { id: lst_a525bf2e6126da3678b2ab9e, slug: coverdoc.ai }
+      - { id: lst_8fb86648d698418493ec3a7f, slug: wonsulting.ai }
+      - { id: lst_b4f9a00faf980f4ad77fb623, slug: kickresume.com }
+      - { id: lst_37c2f520f0754cceb9690817, slug: majorgen.com }
+  # zap-hire.com: AI candidate sourcing and evaluation.
+  - action: listing-alternatives-set
+    id: lst_f034a3a472139f1743d759d1
+    slug: zap-hire.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_52fd183ef9d30348fbb130e1, slug: hireez.com }
+      - { id: lst_78ac23afc9baad3f0aed19b8, slug: turbohire.co }
+      - { id: lst_38a5049a77e42e6b17c92499, slug: hirequotient.com }
+      - { id: lst_7d1f915cabbc65138e4f20cb, slug: vanillahr.com }
+      - { id: lst_0ceae057e4a49cae91e039a0, slug: hollyhires.ai }
+      - { id: lst_7e73c4a9453eca83f1edec92, slug: eightfold.ai }
