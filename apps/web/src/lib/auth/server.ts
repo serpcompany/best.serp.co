@@ -172,6 +172,18 @@ export async function getSessionUser(): Promise<SessionUser | null> {
 }
 
 /**
+ * The session user of the current request if they are an admin now, or null (never throws), for
+ * pages that only add admin links. Only a session whose role is `admin` (set from the allowlist
+ * at sign-in) is checked against the allowlist, so other users cost no extra read.
+ */
+export async function getSessionAdmin(): Promise<SessionUser | null> {
+  const user = await getSessionUser()
+  if (user?.role !== 'admin') return null
+  const result = await authorizeCurrentAdmin()
+  return result.ok ? result.user : null
+}
+
+/**
  * Next.js's 401 or 403, or, when the guard could not decide (the session or the allowlist could
  * not be read, `auth_guard_error` says why), an error that fails the page closed. Its code names
  * that cause in the page's `request_error` line, not a misconfiguration (#389).

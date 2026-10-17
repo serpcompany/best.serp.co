@@ -5,6 +5,7 @@ import {
   CirclePlus,
   ExternalLink,
   FileText,
+  Inbox,
   LayoutDashboard,
   MessageSquare,
   Settings
@@ -29,6 +30,7 @@ import { cn } from '@/lib/utils'
  * reuses them with sidebar-07's options), whose rows, footer and top bar follow serplists'
  * console (#261). The layout renders it once; each page names its breadcrumb with
  * `AccountCrumbs`. Messages (#73) and Settings are not built yet, so they show a "Soon" badge.
+ * Admins also get the admin panel's "Review queue" entry with its waiting count (#489).
  */
 
 export type AccountUser = DashboardUser
@@ -85,10 +87,16 @@ const SECONDARY = [
 
 export function AccountShell({
   children,
+  reviewQueueCount,
   submissionsNeedingAction = 0,
   user
 }: {
   children: ReactNode
+  /**
+   * Admins only: the admin review queue's waiting count, which adds its "Review queue" entry.
+   * Omitted for everyone else, so they see no entry.
+   */
+  reviewQueueCount?: number
   /** The Submissions entry's count: the user's submissions that need their action. */
   submissionsNeedingAction?: number
   user: AccountUser
@@ -108,7 +116,17 @@ export function AccountShell({
     },
     { href: '/account/listings/', icon: Box, title: 'Listings' },
     { icon: MessageSquare, title: 'Messages' },
-    { icon: Settings, title: 'Settings' }
+    { icon: Settings, title: 'Settings' },
+    ...(reviewQueueCount === undefined
+      ? []
+      : [
+          {
+            badge: reviewQueueCount > 0 ? reviewQueueCount : undefined,
+            href: '/admin/submissions/',
+            icon: Inbox,
+            title: 'Review queue'
+          }
+        ])
   ]
 
   async function onSignOut() {

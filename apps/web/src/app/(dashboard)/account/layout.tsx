@@ -3,7 +3,8 @@ import type { ReactNode } from 'react'
 import { AccountShell } from '@/components/account/account-shell'
 import { getAccountOverview } from '@/lib/account/overview'
 import { accountRows, type BadgeTarget } from '@/lib/account/view'
-import { getSessionUser } from '@/lib/auth/server'
+import { getAdminReads } from '@/lib/admin/runtime'
+import { getSessionAdmin, getSessionUser } from '@/lib/auth/server'
 import { ordersEnabled } from '@/lib/billing/runtime'
 import { requireRouteFeature } from '@/lib/route-feature-gates'
 
@@ -11,7 +12,8 @@ import { requireRouteFeature } from '@/lib/route-feature-gates'
  * The account area (#60, #65): the dashboard-01 shell from the #70 mockups around every
  * `/account` page. Pages are never indexed, never cached at the edge (the Worker bypasses
  * `/account`), and each one calls `requireAccountUser()` itself, which sends signed-out
- * visitors to `/login` and back; the shell renders only for a signed-in user.
+ * visitors to `/login` and back; the shell renders only for a signed-in user. Admins also get
+ * the admin review queue's waiting count (#489), read only after the admin check.
  */
 export const dynamic = 'force-dynamic'
 
@@ -31,8 +33,12 @@ export default async function AccountLayout({ children }: { children: ReactNode 
     now: new Date(),
     showPaid: await ordersEnabled()
   })
+  const reviewQueueCount = (await getSessionAdmin())
+    ? (await (await getAdminReads()).reviewQueueCounts()).waiting
+    : undefined
   return (
     <AccountShell
+      reviewQueueCount={reviewQueueCount}
       submissionsNeedingAction={
         rows.filter(row => row.kind === 'submission' && row.tab === 'action').length
       }
