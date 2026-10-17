@@ -42,7 +42,7 @@ operations:
       - { id: lst_fdf3ce3e8182c946ffe8f4e5, slug: ecwid.com }
       - { id: lst_c15f52c9dcf33b02da879cbf, slug: squarespace.com }
   # boostcommerce.net: AI product search, filtering and merchandising for online stores
-  # (Searchspring is left out: it and Klevu are one company now).
+  # (Searchspring is left out, as it and Klevu are one company now).
   - action: listing-alternatives-set
     id: lst_311304b2dfab23090c6cf3e8
     slug: boostcommerce.net
@@ -268,8 +268,8 @@ operations:
       - { id: lst_fbfbfa56c591c33210b0bcd6, slug: fishbowlinventory.com }
       - { id: lst_66ac6d5550027a4a919958c4, slug: orderhive.com }
       - { id: lst_27a5800283b1032187f7e06e, slug: inflowinventory.com }
-  # klevu.com: AI site search and product recommendations for online stores (Searchspring is left
-  # out: it and Klevu are one company now).
+  # klevu.com: AI site search and product recommendations for online stores (not Searchspring, as
+  # the two are one company now).
   - action: listing-alternatives-set
     id: lst_41b1190f2301849601ed43f5
     slug: klevu.com
@@ -343,7 +343,7 @@ operations:
       - { id: lst_1b52b01ff3069870ea494f7d, slug: cs-cart.com }
       - { id: lst_465658a2f4ec18411d5a8ca9, slug: yo-kart.com }
   # nosto.com: AI product recommendations and personalization for online stores (Searchspring is
-  # left out: it and Klevu are one company now).
+  # left out, as it and Klevu are one company now).
   - action: listing-alternatives-set
     id: lst_4acf2320d09ad7d8aa7b2369
     slug: nosto.com
@@ -451,8 +451,8 @@ operations:
       - { id: lst_83d0d31b119563cac7ba706b, slug: inriver.com }
       - { id: lst_a0b3d0c30af155da371be91c, slug: saleslayer.com }
       - { id: lst_23cace55d3fcbe8d928afef4, slug: plytix.com }
-  # searchspring.com: AI site search, merchandising and personalization for online stores (Klevu
-  # is left out: it and Searchspring are one company now).
+  # searchspring.com: AI site search, merchandising and personalization for online stores (not
+  # Klevu, as the two are one company now).
   - action: listing-alternatives-set
     id: lst_66b61375ad57b219b13b3b86
     slug: searchspring.com
@@ -553,7 +553,7 @@ operations:
       - { id: lst_83d0d31b119563cac7ba706b, slug: inriver.com }
       - { id: lst_a0b3d0c30af155da371be91c, slug: saleslayer.com }
       - { id: lst_23cace55d3fcbe8d928afef4, slug: plytix.com }
-  # tagalys.com: merchandising and product search for Shopify stores (Klevu is left out: it and
+  # tagalys.com: merchandising and product search for Shopify stores (Klevu is left out, as it and
   # Searchspring are one company now).
   - action: listing-alternatives-set
     id: lst_ebb3c646d7640f4d990a477f

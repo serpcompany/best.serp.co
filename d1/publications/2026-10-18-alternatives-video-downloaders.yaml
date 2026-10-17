@@ -23,8 +23,7 @@
 # - Thumbnail Downloader saves a YouTube thumbnail on its own.
 # - The Facebook, Hulu, Instagram, Internet Archive, LinkedIn, Netflix, Nicovideo, OnlyFans,
 #   Patreon, Pexels, Reddit, Skillshare, Snapchat, Soundgasm, Terabox, TikTok, Twitter X, Udemy and
-#   YouTube downloaders: SERP Video Downloader was their only pick, and no other listing is built
-#   for those sites.
+#   YouTube downloaders: SERP Video Downloader was their only pick.
 # - M3U8 Stream Downloader saves HLS streams from any site; SERP Video Downloader was its only pick.
 # - OnlyFans Bulk Downloader: its link opens OnlyFans Downloader and its own product page is gone,
 #   so it is up for retirement (#546).
