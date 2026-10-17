@@ -271,7 +271,10 @@ test.describe('admin gate', () => {
     const home = await request.get('/admin/', { maxRedirects: 0 })
     expect(home.status()).toBe(307)
     expect(home.headers().location).toMatch(/\/admin\/submissions\/$/u)
-    expect((await request.get('/admin/submissions/')).status()).toBe(200)
+    const queue = await request.get('/admin/submissions/')
+    expect(queue.status()).toBe(200)
+    // The dashboard's own pages keep the admin layout's one robots tag.
+    expect(robotsMetas(await queue.text())).toEqual(['noindex, nofollow, nocache'])
     expect((await request.get('/api/admin/listings')).status()).toBe(404)
     // The dashboard's 404 carries one robots tag: the admin layout's own is cleared (#53).
     const missingPage = await request.get('/admin/not-a-page/')

@@ -57,7 +57,7 @@ export function GoneListing({
         <PageContainer className="flex flex-col items-center gap-3 pt-14 pb-12 text-center">
           <h1
             id="gone-listing-title"
-            className="text-3xl font-semibold tracking-tight text-balance wrap-break-word sm:text-4xl"
+            className="text-3xl font-semibold tracking-tight text-balance wrap-anywhere sm:text-4xl"
           >
             {listing.name} is no longer listed
           </h1>

@@ -682,7 +682,7 @@ test('shows and acts on the user’s own records only, never cached or indexed',
   }
   expect(submissionRow(id)?.status).toBe('pending_badge')
 
-  // Every account page bypasses the edge cache and is noindex.
+  // Every account page bypasses the edge cache and carries one robots tag, its page's noindex.
   for (const path of [
     '/account/',
     '/account/submissions/',
@@ -692,7 +692,7 @@ test('shows and acts on the user’s own records only, never cached or indexed',
     const response = await owner.context.request.get(path)
     expect(response.status(), path).toBe(200)
     expect(response.headers()['x-edge-cache'], path).toBe('BYPASS')
-    expect(await response.text(), path).toMatch(/<meta name="robots" content="noindex/u)
+    expect(robotsMetas(await response.text()), path).toEqual(['noindex, follow'])
   }
   await owner.context.close()
   await other.context.close()
