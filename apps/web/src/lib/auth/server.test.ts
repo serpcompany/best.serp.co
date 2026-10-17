@@ -13,7 +13,7 @@ import { errorFields } from '@/lib/telemetry/error-fields'
 import { ADMIN_PAGE_PATH_HEADER } from './admin-gate'
 import { hasSessionCookie } from './cookies'
 import { clearDevOtpOutbox } from './otp-sender'
-import { authorizeAdminRequest, handleAuthRequest, requireAdmin } from './server'
+import { authorizeAdminRequest, getSessionAdmin, handleAuthRequest, requireAdmin } from './server'
 
 const { getCloudflareContext, requestHeaders } = vi.hoisted(() => ({
   getCloudflareContext: vi.fn(),
@@ -96,6 +96,12 @@ function adminApiRequest(cookie: string): Request {
   return new Request(`${ORIGIN}/api/admin/listings`, { headers: { cookie, host: HOST } })
 }
 
+/** `getSessionAdmin()`'s email for this session, or null. */
+async function sessionAdmin(cookie: string): Promise<string | null> {
+  requestHeaders.current = new Headers({ cookie, host: HOST })
+  return (await getSessionAdmin())?.email ?? null
+}
+
 async function adminPage(cookie: string, headers: Record<string, string> = {}): Promise<string> {
   requestHeaders.current = new Headers({ ...headers, cookie, host: HOST })
   try {
@@ -157,6 +163,20 @@ describe('admin adapters re-check the allowlist on every request', () => {
     expect(await adminPage(owner, page)).toBe('devin@serp.co')
     // Without the Worker's path (`next dev`), the 401 stays.
     expect(await adminPage('better-auth.session_token=stale.value')).toBe('NEXT_UNAUTHORIZED')
+  })
+
+  it('names the session admin for admin links, without throwing for anyone else (#489)', async () => {
+    const sqlite = localWorker()
+    const owner = await signIn('devin@serp.co', '192.0.2.14')
+    const visitor = await signIn('visitor@example.com', '192.0.2.15')
+
+    expect(await sessionAdmin(owner)).toBe('devin@serp.co')
+    expect(await sessionAdmin(visitor)).toBeNull()
+    expect(await sessionAdmin('')).toBeNull()
+
+    sqlite.database.prepare("DELETE FROM admin_allowlist WHERE email = 'devin@serp.co'").run()
+    // The stored `admin` role is unchanged; the live allowlist check decides.
+    expect(await sessionAdmin(owner)).toBeNull()
   })
 
   it('fails a page closed with a code that names the guard, when D1 cannot answer (#389)', async () => {
