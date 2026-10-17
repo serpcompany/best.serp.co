@@ -216,13 +216,14 @@ key needs write access to Checkout Sessions and Refunds, and read access to Prod
 The webhook also lists a payment's refunds (`GET /v1/refunds?payment_intent=`, #486), a read that
 Stripe's Refunds write should include; nothing has run that against live Stripe yet. If Stripe
 refuses it (401 or 403, a key without the access), the webhook logs `billing_refunds_unchecked` at
-error level with `retry: false`, decides the `refund.failed` or `charge.refunded` by the rules from
-before #486 ([Refunds](./billing-disputes.md#refunds)) and answers 2xx, so a missing permission
-never answers every refund event 500 until Stripe stops retrying. Any other failure of that read
-(unreachable, a timeout, 429, a 5xx, or more refunds than it reads, `refunds_incomplete`) logs the
-same event with `retry: true` and answers 500, so Stripe delivers it again. After the next refund
-on staging, look for `billing_refunds_unchecked` in its logs before promoting. Webhook endpoints
-(trailing slash included; Stripe does not follow redirects):
+error level with `retry: false`, decides the `refund.failed` or `charge.refunded` by the rules for
+when Stripe can't say ([Refunds](./billing-disputes.md#refunds)) and answers 2xx, so a missing
+permission never answers every refund event 500 until Stripe stops retrying. Any other failure of
+that read (unreachable, a timeout, 429, a 5xx, or more refunds than it reads, `refunds_incomplete`)
+logs the same event with `retry: true` and answers 500, so Stripe delivers it again; a
+`charge.refunded` that would finish a claimed refund records nothing first (#504). After the next
+refund on staging, look for `billing_refunds_unchecked` in its logs before promoting. Webhook
+endpoints (trailing slash included; Stripe does not follow redirects):
 
 - `https://best.serp.co/api/billing/webhook/` (live mode)
 - `https://staging.best.serp.co/api/billing/webhook/` (test mode; staging's canonical host

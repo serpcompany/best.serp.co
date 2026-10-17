@@ -106,10 +106,14 @@ refund failed, the dashboard refund finishes it the same way (its listing change
 submission and emails the owner), unless Stripe's record shows its refunds that haven't failed
 don't send the payment back (the reported refund failed since, its report retried after its
 failure): then nothing went back, so the order stays `refunding`, flagged `refund_failed`, and the
-owner is never told the rejection was refunded (#498's review). One Stripe's record shows naming the order (or, when Stripe can't
-say, whose event carries the site's `refund:<order>` idempotency key: a call that timed out after
-Stripe refunded) finishes it as the site's refund, with no "refunded outside the site" email
-(#484). An admin's "Refund…" on an order refunded outside the site, before it, while it was
-claimed, or while it ran, answers 409 and is never reported as the admin's refund.
+owner is never told the rejection was refunded (#498's review). While Stripe can't be read for
+now (unreachable, rate-limited, or more refunds than the site reads), the report alone can't show
+the money went back, so nothing is recorded: the delivery answers 500, the order stays as it was,
+and Stripe's retry finishes it by its record (#504). One Stripe's record shows naming the order
+(or, when Stripe refuses the read, whose event carries the site's `refund:<order>` idempotency key:
+a call that timed out after Stripe refunded) finishes it as the site's refund, with no "refunded
+outside the site" email (#484). An admin's "Refund…" on an order refunded outside the site,
+before it, while it was claimed, or while it ran, answers 409 and is never reported as the admin's
+refund.
 
 Admin Orders shows "Disputed", "Dispute won", "Dispute lost" or "Refunded outside the site".
