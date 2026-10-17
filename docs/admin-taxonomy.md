@@ -68,7 +68,7 @@ it lacks: `category-edit` (compared and swapped), `category-retire`, `taxonomy-r
   live listing of its pool (its tag's listings, in its category when it names one too), never one
   it excludes or a listing that names a feature of a larger site: `listings.is_feature_listing`
   (#409), which the picker leaves out and `setBestPagePins` refuses (422 `feature_listing`). Only
-  a reviewed manifest sets it ([Feature listings](./catalog-publication.md#feature-listings)); until
+  a reviewed manifest sets it ([Feature listings](./listing-operations.md#feature-listings)); until
   an environment publishes `2026-10-12-feature-listings`, no listing there has it. A pin the page
   keeps keeps its blurb; its exclusions stay as manifests set them. Pins join a page's pool, so its tag
   changes only while every pin is in the new pool; otherwise the admin unpins those first. Both

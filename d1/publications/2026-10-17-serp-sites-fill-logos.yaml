@@ -1,0 +1,90 @@
+# serpcompany/best.serp.co#523 (part 1 of 2): logos for today's five listings (#506), whose pages
+# showed the grey placeholder. Each image is in the upload plan
+# d1/media/2026-10-17-serp-sites-fill-logos.json, sources checked on 2026-10-17
+# (`pnpm media:upload:dry-run`: 5 of 5 verified):
+# - Keybumps App and Zenbu Japanese: each site's own 180 px apple-touch-icon.
+# - SERP Games: the site's own favicon, a 64 px PNG served as favicon.ico.
+# - SERP Tools and SERP Lists: SERP's mark, from serp.co's 180 px apple-touch-icon (#520: "from
+#   SERP's brand files"). SERP Tools' own favicon is the framework's default icon, and SERP Lists'
+#   is the same SERP mark as a 410 KB multi-size ICO.
+# PRODUCTION ONLY, like 2026-10-17-serp-sites-fill (#506); on staging every operation is refused,
+# leaving the catalog unchanged. The plan still goes to the staging bucket first: Upload Listing
+# Media (staging), then, after the promotion, Upload Listing Media, which copies staging's verified
+# objects. The publisher refuses this manifest until production's bucket holds all five.
+# Each listing-media-update expects no logo or image rows (listing-create wrote none) and refuses
+# a listing with a queued upload it would drop. Row-level, so the batch is refused with nothing
+# written if any of the five changed since.
+# Publish on production after the production upload, in any order with
+# 2026-10-17-serp-sites-fill and 2026-10-17-serp-sites-fill-details.
+version: 1
+id: 2026-10-17-serp-sites-fill-logos
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  - action: listing-media-update
+    id: lst_e7dc82255f70c7bb508c6d12
+    slug: tools.serp.co
+    expected: []
+    media:
+      logo:
+        bytes: 2970
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/tools.serp.co/logo/cd7dedb0f824e261.png
+        sha256: cd7dedb0f824e26169a7921fcc8e5054f7a29c1d4ed0881236d8d3fc1f2a5182
+        source: https://serp.co/apple-touch-icon.png
+        width: 180
+  - action: listing-media-update
+    id: lst_94f4216c04d33a9a8bc2adf3
+    slug: games.serp.co
+    expected: []
+    media:
+      logo:
+        bytes: 583
+        contentType: image/png
+        height: 64
+        key: best.serp.co/listings/games.serp.co/logo/fa3a55defb159e6c.png
+        sha256: fa3a55defb159e6c756b4470f1806f0e62e02e19b94fc301a1eff1629623644c
+        source: https://games.serp.co/favicon.ico
+        width: 64
+  - action: listing-media-update
+    id: lst_760ff525d9033ca34a8beb36
+    slug: serplists.com
+    expected: []
+    media:
+      logo:
+        bytes: 2970
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/serplists.com/logo/cd7dedb0f824e261.png
+        sha256: cd7dedb0f824e26169a7921fcc8e5054f7a29c1d4ed0881236d8d3fc1f2a5182
+        source: https://serp.co/apple-touch-icon.png
+        width: 180
+  - action: listing-media-update
+    id: lst_1df3a39aa72def5a12c1b7f1
+    slug: keybumps.app
+    expected: []
+    media:
+      logo:
+        bytes: 24723
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/keybumps.app/logo/a150b677e57c3c8b.png
+        sha256: a150b677e57c3c8bc89e871c3d57b6935134a9863316241eb68aaca5b8159091
+        source: https://keybumps.app/apple-icon.png
+        width: 180
+  - action: listing-media-update
+    id: lst_a79e1333afdecf3e9ebc4f49
+    slug: zenbujapanese.com
+    expected: []
+    media:
+      logo:
+        bytes: 24638
+        contentType: image/png
+        height: 180
+        key: best.serp.co/listings/zenbujapanese.com/logo/b698103f8cd74ad8.png
+        sha256: b698103f8cd74ad81e0ffa1a949c3a71a71d0485baf0a506f462c69fda4c25b2
+        source: https://zenbujapanese.com/apple-touch-icon.png
+        width: 180

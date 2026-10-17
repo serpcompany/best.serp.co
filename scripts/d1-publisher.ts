@@ -496,6 +496,23 @@ const operation = z.discriminatedUnion('action', [
     })
     .strict(),
   /**
+   * Replaces a listing's long description, the Markdown its page renders (#523: listings created
+   * without one, whose pages were thin), compared and swapped on its slug and current description
+   * (`expected.content`, null for none), so it is row-level like `listing-details-set`. As the
+   * admin panel's edits do (#64), it refuses a listing that isn't approved or whose own submission
+   * is in review or was rejected.
+   */
+  z
+    .object({
+      action: z.literal('listing-content-set'),
+      id: listingId,
+      slug: existingSlug,
+      reason: z.string().trim().min(1).max(200),
+      expected: z.object({ content: z.string().nullable() }).strict(),
+      content: pageText
+    })
+    .strict(),
+  /**
    * Marks a listing as naming one feature, add-on, model, or sub-tool of a larger site, or clears
    * the mark (#409: #349's `featureListings`, which a best page never pins), compared and swapped
    * on its slug and current flag (`expected`), so it is row-level. The flag changes no public page
@@ -826,10 +843,10 @@ export const manifestConcurrency = ['publication', 'rows'] as const
  * category (#333: its insert refuses the batch when the slug exists, retired or not), a slug
  * redirect (#338: an unpublished source, a live target, no redirect for the slug, no chain or
  * loop, all still true at the end of the batch), a listing's name, short description, and website
- * (#340: `expected`), a listing's resource links (#376: `expected`, every link in order), its
- * feature-of-a-larger-site flag (#409: `expected`), a new listing (#506: its id and slug unused,
- * and its website no other listing's, no submission's in flight, and not blocked), and every
- * taxonomy operation (#344: each compares the tag, best page, listing, or redirect it changes).
+ * (#340: `expected`), a listing's resource links (#376: `expected`, every link in order), its long
+ * description (#523: `expected.content`), its feature-of-a-larger-site flag (#409: `expected`), a
+ * new listing (#506: its id and slug unused, and its website no other listing's, no submission's
+ * in flight, and not blocked), and every taxonomy operation (#344: each compares the tag, best page, listing, or redirect it changes).
  */
 const rowLevelActions = new Set<string>([
   'listing-create',
@@ -839,6 +856,7 @@ const rowLevelActions = new Set<string>([
   'listing-categories-set',
   'listing-details-set',
   'listing-resources-set',
+  'listing-content-set',
   'listing-feature-listing-set',
   'listing-content-remove-suffix',
   'listing-unpublish',
@@ -877,7 +895,7 @@ export const manifestSchema = z
           context.addIssue({
             code: z.ZodIssueCode.custom,
             message:
-              'A row-level manifest holds only listing-create, listing-media-update, listing-categories-add/-remove/-set, listing-details-set, listing-resources-set, listing-feature-listing-set, listing-content-remove-suffix, listing-unpublish, listing-claim-hold-add/-clear, listing-slug-redirect, category-create/-unpublish, and taxonomy (tag-*, listing-tags-set, best-page-*, taxonomy-redirect-set) operations.',
+              'A row-level manifest holds only listing-create, listing-media-update, listing-categories-add/-remove/-set, listing-details-set, listing-resources-set, listing-content-set, listing-feature-listing-set, listing-content-remove-suffix, listing-unpublish, listing-claim-hold-add/-clear, listing-slug-redirect, category-create/-unpublish, and taxonomy (tag-*, listing-tags-set, best-page-*, taxonomy-redirect-set) operations.',
             path: ['operations', index, 'action']
           })
         }
@@ -1013,6 +1031,12 @@ export const manifestSchema = z
             })
         })
       }
+      if (op.action === 'listing-content-set' && op.content === op.expected.content)
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'The listing already has this description.',
+          path: ['operations', index, 'content']
+        })
       if (op.action === 'listing-feature-listing-set' && op.featureListing === op.expected)
         context.addIssue({
           code: z.ZodIssueCode.custom,
@@ -1846,6 +1870,48 @@ export function buildPublicationPlan(
           "INSERT INTO listing_events (listing_id,event_type,detail,actor) VALUES (?,'edited',?,?)",
           op.id,
           JSON.stringify({ fields: ['links'], manifest: manifest.id, reason: op.reason }),
+          manifest.provenance.actor
+        )
+      )
+      routes.add(listingRoute(op.slug))
+    }
+    if (op.action === 'listing-content-set') {
+      const label = `listing-content-set ${op.slug}`
+      statements.push(
+        // As in the admin panel (#64): never while the listing's own submission is in review, whose
+        // approval needs the checksum the listing was paid at; the new checksum below changes it.
+        statement(
+          `SELECT CASE WHEN ${listingHasQueuedSubmission('?')} THEN ${REASONED_GUARD_FAILURE} ELSE 1 END`,
+          op.id,
+          `${label}: its own submission is in review`
+        ),
+        // As in the admin panel: a listing whose own submission stands rejected stays read-only.
+        statement(
+          `SELECT CASE WHEN ${listingSubmissionRejected('?')} THEN ${REASONED_GUARD_FAILURE} ELSE 1 END`,
+          op.id,
+          `${label}: its own submission was rejected`
+        ),
+        // Compared and swapped on the slug and the description (`IS`, so a listing with none
+        // matches a null `expected.content`). The page changed, so `updated_at` (sitemap lastmod,
+        // #218) moves, and a new checksum refuses an owner revision or admin edit read before it:
+        // a revision's approval replaces the description with its own.
+        statement(
+          "UPDATE listings SET content=?,checksum=?,updated_at=? WHERE id=? AND slug=? AND status='approved' AND content IS ?",
+          op.content,
+          hash(`${manifest.id}\0${op.id}\0content`),
+          now,
+          op.id,
+          op.slug,
+          op.expected.content
+        ),
+        changedOne(
+          `${label}: the listing is not approved, or its slug or description changed since the manifest`
+        ),
+        // The admin panel's activity record for an edit (#64): "Details edited: content".
+        statement(
+          "INSERT INTO listing_events (listing_id,event_type,detail,actor) VALUES (?,'edited',?,?)",
+          op.id,
+          JSON.stringify({ fields: ['content'], manifest: manifest.id, reason: op.reason }),
           manifest.provenance.actor
         )
       )

@@ -1,0 +1,201 @@
+# serpcompany/best.serp.co#523 (part 1 of 2): long descriptions for today's five listings, which
+# #506 created without one, so their pages were thin (#520). PRODUCTION ONLY, like
+# 2026-10-17-serp-sites-zenbu-production: the owner put all five on production only (#506), so
+# staging has none of the four SERP sites, and its Zenbu Japanese is another listing with another
+# id. On staging every operation here is refused, leaving the catalog unchanged.
+# Each description uses only what the listing's own website said when read on 2026-10-17 (its home,
+# about, pricing, feature, and sample tool or game pages): no ratings, reviews, or outside claims.
+# SERP Tools also lists downloaders for adult sites; its description leaves them out (#260: no
+# adult content on best.serp.co).
+# No tags: every active tag is for AI tools, and none of the five sites describes itself that way.
+# Categories stay as #506 filed them.
+# Each listing-content-set compares and swaps the listing's slug and current description (none:
+# listing-create wrote no content), refuses a listing that isn't approved or whose own submission
+# is in review or was rejected, and logs an `edited` event. Row-level, so the batch is refused with
+# nothing written if any of the five changed since.
+# Companions: 2026-10-17-serp-sites-fill-details (two short descriptions) and
+# 2026-10-17-serp-sites-fill-logos (logos, after its upload plan). A manifest names a listing once,
+# so the three can't be one; they run in any order.
+# Publish on production after the promotion that carries it.
+version: 1
+id: 2026-10-17-serp-sites-fill
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  - action: listing-content-set
+    id: lst_e7dc82255f70c7bb508c6d12
+    slug: tools.serp.co
+    reason: '#523: the listing had no description'
+    expected:
+      content: null
+    content: |-
+      SERP Tools is a free collection of browser-based file tools from SERP. It converts, compresses, views, and edits images, audio, video, PDFs, and data files. Its converter pages say files are processed locally, so they stay on your device, and there is no software to install.
+
+      ## SERP Tools Overview
+
+      The site groups its tools into categories such as Convert, Compress, Combine, Bulk Operations, Edit, and PDF, and you can browse them by category or filter one long list. Each converter has its own page with a drop zone for your files, a short comparison of the source and target formats, step-by-step instructions, related tools, common questions, and a changelog.
+
+      The converter pages describe the same approach throughout: the tool runs in the browser with no uploads required, keeps your original file untouched, and works on modern desktop and mobile browsers.
+
+      ## File Conversion
+
+      Convert is by far the largest category, with about 2,200 tools. They cover:
+
+      - **Images:** PNG to JPG, AVIF to WebP, BMP to ICO, camera RAW files such as Sony ARW and Canon CR2 to JPG, and less common formats like TGA, DDS, PCX, and XBM.
+      - **Audio:** conversions between AAC, FLAC, MP3, WAV, OGG, Opus, and other formats, plus CD audio tracks to FLAC, MP3, or WAV.
+      - **Video:** 3GP, AVI, MOV, MKV, and other formats to MP4, WebM, and more, and audio extraction from video, such as MP4 to MP3, AAC, FLAC, M4A, OGG, Opus, or WAV.
+
+      A few converters solve specific problems. One recovers a picture saved as a `.bin` file, such as an Outlook `ATT00001.bin` attachment, as a JPG or PNG. GIF to JPG extracts a GIF's first frame as a JPG, and GIF to PNG extracts its frames as PNG images.
+
+      ## Compression
+
+      The Compress category has 22 tools: compressors for images (AVIF, BMP, GIF, JPEG, SVG, TIFF, WebP), audio (AAC, FLAC, M4A, MP3, OGG, WAV), video (AVI, FLV, MKV, MOV, MP4, WebM), and PDF files, and a Batch PNG Compressor that compresses several PNG files at once and downloads them as a ZIP. A separate PNG Optimizer is also available.
+
+      ## Editors, PDF Tools, and Utilities
+
+      SERP Tools includes an Audio Editor, an Image Editor, and a Video Editor that work in the browser. Its PDF tools are a PDF Editor, a PDF Reader, and a PDF Viewer, with versions of their pages for Mac and Windows users.
+
+      Smaller utilities round out the collection: a Character Counter for characters, words, and lines; a CSV Combiner that merges several CSV files into one; Audio to Text and Audio to Transcript tools that transcribe audio and video files; and a YouTube Transcript Generator.
+  - action: listing-content-set
+    id: lst_94f4216c04d33a9a8bc2adf3
+    slug: games.serp.co
+    reason: '#523: the listing had no description'
+    expected:
+      content: null
+    content: |-
+      SERP Games is a free online games site in SERP's network of sites. Its library has more than 2,500 games that you play directly in your web browser, from classics such as 2048, Minesweeper, Sudoku, and Wordle Unlimited to arcade, driving, sports, and puzzle games.
+
+      ## SERP Games Overview
+
+      The home page opens on the whole library, with quick filters for game types such as Arcade, Maze, Logic, Brain Teaser, Skill, Jumping, Obstacle Course, Puzzle, Simulation, Driving, Exploration, and Vehicles. Games can also be browsed by category and by tag, and a Brands page links to the other sites in the SERP network.
+
+      The site is available in six languages: English, German, Spanish, French, Portuguese, and Japanese.
+
+      ## Categories
+
+      The categories page lists 93 categories, each with its number of games. The largest are Arcade (about 900 games), Skill (about 520), Puzzle (about 370), Brain (about 340), Strategy, Platformer, Classic, Shooter, Sports, and Driving. Smaller categories cover narrower interests, such as Educational, Typing, Chess, Cooking, Basketball, Soccer, Fishing, and Parkour games.
+
+      ## Game Pages
+
+      Each game has its own page where you play it in the browser. Next to the game, the page explains how to get started, lists the controls (for 2048, the arrow keys or a swipe to move tiles), and answers common questions, such as what kind of game it is and whether it is free to play. It also gives tips and strategy, links to the game's categories and tags, and suggests about 40 similar games to try next.
+
+      ## Who It Is For
+
+      SERP Games is for anyone who wants a quick game without installing anything: a short puzzle break, a driving or running game, or an old favorite like Flappy Bird, Doodle Jump, or Cookie Clicker. Every game is free, and nothing needs to be downloaded before you play.
+  - action: listing-content-set
+    id: lst_760ff525d9033ca34a8beb36
+    slug: serplists.com
+    reason: '#523: the listing had no description'
+    expected:
+      content: null
+    content: |-
+      SERP Lists is a checklist app for repeatable work. You build a checklist once as a template, run it as many times as you need with each run's progress tracked on its own, and share the result or publish the template for others to reuse. It is made for teams and solo operators who need the same process done cleanly more than once, so they stop rebuilding the same checklist in documents and spreadsheets.
+
+      ## SERP Lists Overview
+
+      SERP Lists works in three steps:
+
+      1. **Make a template.** Capture a repeatable process once, with sections, tasks, rich instructions, and ownership context.
+      2. **Run the workflow.** Start a fresh run from the template, move through it task by task, and keep the run's progress separate from the source template.
+      3. **Share the result.** Share a run's link so anyone can tick tasks, add notes, and complete it, or publish the template so others can reuse the work.
+
+      ## Template Builder
+
+      Templates are reusable standard operating procedures built from sections and tasks. They can carry instructions, media, and structured sub-items, and one source template serves every repeat of the process. The site's sample Full Website Launch QA Checklist, for example, uses Markdown instructions, subtasks, video review, image proof, file references, and external QA embeds.
+
+      ## Checklist Runs
+
+      A new run can be launched from any saved template. Every run gets its own progress, task focus, completion states, and a link to pick it up again, while the template itself stays unchanged for the next run.
+
+      ## Template Library and Sharing
+
+      The Template Library holds checklist templates published by the community, organized by category and covering SOPs, audits, launches, onboarding flows, and field checklists. Starter templates include a Complete Wedding Planning Checklist, the Full Website Launch QA Checklist, and an Ultimate Camping Checklist, and any of them can be adapted to your own process.
+
+      You can publish your own templates to a public profile and share their links, which keep a stable structure. Sharing a run is separate from publishing a template, and public share pages show what was done without exposing private dashboard controls.
+
+      ## Import and Export
+
+      Templates can be exported as portable JSON packs and imported back into the app, which makes it possible to back them up, move them between accounts, or keep SOP content under version control in a repository. Import and export are part of the Pro plan.
+
+      ## Pricing
+
+      SERP Lists has a free plan and a Pro plan. The free plan covers creating templates with sections and items, running checklists and tracking progress, and browsing public checklists. Pro costs $9 a month, can be cancelled anytime, and adds template import and export, saving public templates to your account, and billing management in account settings. Payments and subscriptions are handled by Stripe.
+  - action: listing-content-set
+    id: lst_1df3a39aa72def5a12c1b7f1
+    slug: keybumps.app
+    reason: '#523: the listing had no description'
+    expected:
+      content: null
+    content: |-
+      Keybumps is a native macOS app from SERP that brings quick search, clipboard history, screenshots, dictation, window management, and other Mac utilities into one keyboard-first app. Instead of installing a launcher, a clipboard manager, a text expander, a dictation app, a window manager, a screenshot editor, a menu bar timer, an emoji picker, and a translator one by one, you turn on the Keybumps plugins you want and reach all of them from one Command Palette. It runs on your Mac with no account.
+
+      ## Keybumps Overview
+
+      Everything starts from the Command Palette. Press ⌘ Space in any app to open it on Quick Search, its first tab, then jump to another tab with ⌘1 to ⌘8: Clipboard, Screenshots, Dictation, Snippets, and Timers, plus Emoji and Translate once their plugins are on. Type, then press Return to open the app or file, copy the item you found, or press ⌘P to paste it into the app you were using.
+
+      Each plugin does one job. A plugin you turn off stops its shortcuts and background work, and every shortcut can be changed in Settings, where some start unassigned until you pick one.
+
+      ## Plugins
+
+      - **Quick Search** opens apps, files, and folders from the keyboard.
+      - **Clipboard History** keeps your 50 most recent copies, text and images, searchable from one shortcut (⇧⌘ Space). It shows the app each copy came from and the website's domain when the browser provides it, gives you the image itself when you copy an image file in Finder, and collects the screenshots you take.
+      - **Dictation** turns speech into text in any app. Press ⌥ Space, speak, and press it again, and your words appear where your cursor was. Speech is transcribed on the Mac, every recording is kept in Dictation History to search, replay, and copy, and on macOS 15 or later you can translate what you said and hear it read aloud. Recordings stop after 5 minutes by default, and the limit can be raised or removed.
+      - **Window Manager** sends a window to a half, a third, a sixth, a fourth, or a corner, maximizes, centers, resizes, or restores it, and moves it to the next or previous display, with 30 window commands in all. You can also drag a window to the top, a side, or a corner to snap it.
+      - **Screenshot Tools** captures an area or every screen and lets you blur, redact, draw, and add arrows and text. Screenshot Screen and Edit copies only when you save, so nothing unredacted reaches the clipboard, and your screenshots appear in their own tab as large thumbnails.
+      - **Snippets** saves text you reuse so you can paste it from the Command Palette, or, with keyword expansion on, type a short keyword such as `;ship` in any app. Sensitive snippets stay hidden and out of search, and an Alfred snippets export can be imported.
+      - **Shortcut Coach** shows you the keyboard shortcut when you do something by hand.
+      - **Timer** counts down from a duration and tells you when it ends, with options to turn off the ringing, the menu bar countdown, or the menu list.
+      - **Emoji Picker** finds any emoji by name and pastes it where you are typing, with one skin tone setting for every emoji that has one.
+      - **Translation** translates what you type, then copies it or pastes it where you are typing.
+
+      ## How People Use It
+
+      The site shows the same app set up for different kinds of work. For writing and editing, you keep the quotes and links you collect in Clipboard History, save sign-offs as snippets, and dictate a first draft. For software development, you paste a command you copied an hour ago, put the editor and browser side by side, and capture a bug with the secrets blurred. For customer support, you answer common questions with saved snippets and send marked-up screenshots. For studying and research, you dictate notes, keep what you copied from your sources searchable, and time focused sessions with a menu bar countdown.
+
+      ## Pricing and Requirements
+
+      Keybumps is a one-time purchase of $49 for one Mac, with no subscription. The license includes every plugin and all future updates, needs no account, has no cloud sync, and comes with a 30-day money-back guarantee. Payments are processed by Polar, the merchant of record, and the license key arrives by email; to move Keybumps to a new Mac, you deactivate it on the old one and activate it on the new one.
+
+      Keybumps needs an Apple silicon Mac running macOS 14.2 or later. The Translation plugin and translating dictations need macOS 15.
+  - action: listing-content-set
+    id: lst_a79e1333afdecf3e9ebc4f49
+    slug: zenbujapanese.com
+    reason: '#523: the listing had no description'
+    expected:
+      content: null
+    content: |-
+      Zenbu Japanese is an offline-first Japanese dictionary, image-text reader, and translator for iPhone. It helps learners understand the Japanese they meet, whether it is typed, photographed, handwritten, or heard in a video. Its dictionary is also free on the web, alongside free kana, kanji, and vocabulary tools that run in the browser.
+
+      ## Zenbu Japanese Overview
+
+      The iPhone app has five areas with one dictionary behind all of them: the Dictionary, Image Search, Translate, Player, and Lists. You can look up a word offline, point the camera at a menu or a sign, draw a kanji you can't type, talk through a conversation in Japanese and English, and watch YouTube with Japanese captions you can tap.
+
+      ## Dictionary
+
+      The dictionary has more than 200,000 words and works with no connection. You can search in Japanese, kana, romaji, or English, and conjugated forms are found too. Kanji you can't type can be drawn in any stroke order or found by their radicals. Each entry shows furigana and pitch accent, every conjugation and what it means, and real example sentences, and each kanji has its readings and stroke order.
+
+      Among equally good search matches, the most common words come first. The frequency lists you choose set that order: JLPT levels and YouTube are built in, and Japanese Wikipedia, TV and movies, anime, manga, novels, visual novels, and video games are optional downloads.
+
+      ## Image Search
+
+      Take a photo, or choose one from your library or files, and Zenbu reads the Japanese in it, across or down the page, even with English around it. Tap any word to open it in the dictionary with the photo still in view, or switch to Translate for the whole passage.
+
+      ## Translate
+
+      Translate lets two people share one iPhone and speak Japanese or English in any order. Speech appears as it is spoken, and the translation is read aloud after a pause. A listening mode follows a TV, a guide, or announcements. Translate downloads Apple's Japanese and English speech recognition and translation once, then runs on the iPhone without a connection.
+
+      ## Player
+
+      Player plays YouTube videos with their Japanese captions under the video. Paste a link or search YouTube from the app, then tap any word in the captions to pause and look it up. You can repeat a line, step through line by line, or slow playback to 0.5×. Player needs a connection.
+
+      ## Lists and Known Words
+
+      Save words and kanji to your own lists, and mark the words you know: their furigana is then hidden in example sentences and captions. Tapping a kanji shows which part of a word's reading belongs to it.
+
+      ## Free on the Web
+
+      The web dictionary has the same entries as the app's search, free in your browser with no download. Every word has its own page with readings, pitch accent, conjugations, kanji, and example sentences, and you can browse words by hiragana, katakana, kanji school grade, JLPT level from N5 to N1, frequency list, and part of speech. Image Search, handwriting, Translate, and Player are only in the app.
+
+      The site also offers free tools built on the same dictionary: hiragana and katakana charts, kanji lists by school grade, JLPT level, and jinmeiyō, frequency lists, and converters for hiragana to katakana, romaji to kana, and kanji to furigana. Printable reference guides include a kana chart, a verb conjugation sheet, and the JLPT N5 kanji, and short video courses teach phrases from real clips, with every word linked to the dictionary. A browser extension for looking up Japanese on any web page is listed as coming soon.

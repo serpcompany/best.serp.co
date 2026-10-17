@@ -273,7 +273,7 @@ that batch. Publish it where it was refused; where the original applied, there i
 - `-removals` unpublishes 127: 40 dead, hijacked, or not products (3 more are held), and 87 real
   products with the wrong copy (`unowned`, as [duplicates](#duplicate-listings-332) are).
 - `-renames` gives 8 renamed products a new name, a description from the live site, and their own
-  URL where the serp.ly link no longer reaches them ([`listing-details-set`](./catalog-publication.md#listing-details)),
+  URL where the serp.ly link no longer reaches them ([`listing-details-set`](./listing-operations.md#listing-details)),
   and fixes faceapp.com's description; `-categories` moves the 4 with a live category.
 - `-claim-holds-clear` clears the [claim holds](./claims.md#holds) of the 5 renames whose new
   website replaces the link that caused the hold; before `-renames`, it is refused.

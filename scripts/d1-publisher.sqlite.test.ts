@@ -2561,6 +2561,224 @@ describe('listing-resources-set in a row-level manifest (#376: dead resource lin
   })
 })
 
+describe('listing-content-set in a row-level manifest (#523: thin listings)', () => {
+  const live = { checksum: beforeChecksum, version: 4 }
+  const rows = (operations: Record<string, unknown>[]) =>
+    manifestSchema.parse({
+      version: 1,
+      id: 'content',
+      concurrency: 'rows',
+      provenance: { actor: 'test@example.com', workflow: 'test/sqlite' },
+      operations
+    })
+  const written = 'Example builds checklists.\n\n## Example Overview\n\nRun them every time.'
+  const set = (content: string, extra: Record<string, unknown> = {}) => ({
+    action: 'listing-content-set',
+    id: 'lst_sqlite_test',
+    slug: 'old-slug',
+    reason: 'The listing had no description',
+    expected: { content: null },
+    content,
+    ...extra
+  })
+  const changedSince =
+    'the listing is not approved, or its slug or description changed since the manifest'
+  const state = (db: DatabaseSync) =>
+    db
+      .prepare(
+        "SELECT slug,status,is_active,content,checksum,updated_at FROM listings WHERE id='lst_sqlite_test'"
+      )
+      .get()
+  const publish = (db: DatabaseSync, operations: Record<string, unknown>[]) =>
+    executeInTestTransaction(db, buildPublicationPlan(rows(operations), 'content', now, live))
+  /** Asserts the batch was refused whole: the listing, the version, and the log. */
+  const expectRefused = (db: DatabaseSync, before: ReturnType<typeof state>) => {
+    expect(state(db)).toEqual(before)
+    expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
+      version: 4
+    })
+    expect(db.prepare('SELECT COUNT(*) AS count FROM listing_events').get()).toEqual({ count: 0 })
+  }
+
+  it('writes a description where there was none, at any version, and logs the edit', () => {
+    const db = database()
+    const before = state(db) as Record<string, unknown>
+    expect(before.content).toBeNull()
+    db.prepare('UPDATE publication_state SET version=9').run()
+    const publication = buildPublicationPlan(rows([set(written)]), 'content', now, {
+      ...live,
+      version: 9
+    })
+    expect(
+      publication.statements.flatMap(item => item.bindings).filter(b => typeof b === 'boolean')
+    ).toEqual([])
+    expect(publication.statements.flatMap(item => d1CompatViolations(item.query))).toEqual([])
+    executeInTestTransaction(db, publication)
+    // Published as before, with the description, a new checksum (a stale revision is refused),
+    // and a new lastmod.
+    const after = state(db) as Record<string, unknown>
+    expect(after).toMatchObject({
+      slug: 'old-slug',
+      status: 'approved',
+      is_active: 1,
+      content: written,
+      updated_at: now
+    })
+    expect(after.checksum).not.toBe(before.checksum)
+    expect(
+      db.prepare('SELECT listing_id,event_type,detail,actor FROM listing_events').all()
+    ).toEqual([
+      {
+        listing_id: 'lst_sqlite_test',
+        event_type: 'edited',
+        detail: JSON.stringify({
+          fields: ['content'],
+          manifest: 'content',
+          reason: 'The listing had no description'
+        }),
+        actor: 'test@example.com'
+      }
+    ])
+    expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
+      version: 10
+    })
+    expect(publication.affectedRoutes.split('\n')).toContain('/products/old-slug/')
+    // Applied once: the listing no longer has no description, so it is refused.
+    const applied = state(db)
+    expect(() =>
+      executeInTestTransaction(
+        db,
+        buildPublicationPlan(rows([set(written)]), 'again', now, {
+          checksum: publication.afterChecksum,
+          version: 10
+        })
+      )
+    ).toThrow(`listing-content-set old-slug: ${changedSince}`)
+    expect(state(db)).toEqual(applied)
+    // A follow-up names the description it replaces.
+    const published = db.prepare('SELECT version,checksum FROM publication_state WHERE id=1').get()
+    executeInTestTransaction(
+      db,
+      buildPublicationPlan(
+        rows([set('Rewritten.', { expected: { content: written } })]),
+        'rewritten',
+        now,
+        published as { checksum: string; version: number }
+      )
+    )
+    expect(state(db)).toMatchObject({ content: 'Rewritten.' })
+  })
+
+  it('refuses the whole batch when the description or slug changed since generation', () => {
+    const second = 'lst_sqlite_second'
+    for (const changed of [
+      { expected: { content: '' } },
+      { expected: { content: 'Something else' } },
+      { slug: 'new-slug' },
+      { id: 'lst_sqlite_missing' }
+    ]) {
+      const db = database()
+      // A second listing's change in the same batch rolls back with it.
+      db.exec(`INSERT INTO listings (id,slug,name,description,website,status,published_at,source_kind,source_identity,checksum)
+        VALUES ('${second}','second','Second','d','https://second.example','draft','${now}','test','fixture','${'d'.repeat(64)}');
+        INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary) VALUES ('${second}',1,0,1);
+        UPDATE listings SET status='approved' WHERE id='${second}';`)
+      const before = state(db)
+      expect(
+        () => publish(db, [set(written, { id: second, slug: 'second' }), set(written, changed)]),
+        JSON.stringify(changed)
+      ).toThrow(
+        `listing-content-set ${'slug' in changed ? changed.slug : 'old-slug'}: ${changedSince}`
+      )
+      expectRefused(db, before)
+      expect(db.prepare(`SELECT content FROM listings WHERE id='${second}'`).get()).toEqual({
+        content: null
+      })
+    }
+    // A listing that has a description refuses an `expected` of none.
+    const described = database()
+    described.exec(`UPDATE listings SET content='Existing' WHERE id='lst_sqlite_test'`)
+    const before = state(described)
+    expect(() => publish(described, [set(written)])).toThrow(
+      `listing-content-set old-slug: ${changedSince}`
+    )
+    expectRefused(described, before)
+  })
+
+  it.each(['paid_pending_review', 'changes_requested'])(
+    'refuses a listing whose own submission is %s',
+    status => {
+      const db = database()
+      db.exec(`INSERT INTO listing_submissions (id,slug,name,description,website,content,
+        category_slug,logo_url,status,plan,paid_at,listing_id,published_checksum)
+      VALUES ('sub','example.com','Old','d','https://example.com/','c','seo','l',
+        '${status}','paid','${now}','lst_sqlite_test',
+        (SELECT checksum FROM listings WHERE id='lst_sqlite_test'))`)
+      const before = state(db)
+      expect(() => publish(db, [set(written)])).toThrow(
+        'listing-content-set old-slug: its own submission is in review'
+      )
+      expectRefused(db, before)
+    }
+  )
+
+  it('refuses a listing whose own submission was rejected, which stays down and read-only', () => {
+    const db = database()
+    db.exec(`UPDATE listings SET is_active=0 WHERE id='lst_sqlite_test';
+      INSERT INTO listing_submissions (id,slug,name,description,website,content,category_slug,
+        logo_url,status,plan,paid_at,listing_id,rejection_reason,rejection_category)
+      VALUES ('sub','example.com','Old','d','https://example.com/','c','seo','l','rejected',
+        'paid','${now}','lst_sqlite_test','No','prohibited')`)
+    const before = state(db)
+    expect(() => publish(db, [set(written)])).toThrow(
+      'listing-content-set old-slug: its own submission was rejected'
+    )
+    expectRefused(db, before)
+  })
+
+  it.each(['draft', 'review', 'rejected'])('refuses a listing in %s', status => {
+    const db = database()
+    db.exec(`UPDATE listings SET status='${status}' WHERE id='lst_sqlite_test'`)
+    const before = state(db)
+    expect(() => publish(db, [set(written)])).toThrow(
+      `listing-content-set old-slug: ${changedSince}`
+    )
+    expectRefused(db, before)
+  })
+
+  it('writes an unpublished listing’s description and leaves it unpublished', () => {
+    const db = database()
+    db.exec("UPDATE listings SET is_active=0 WHERE id='lst_sqlite_test'")
+    publish(db, [set(written)])
+    expect(state(db)).toMatchObject({ status: 'approved', is_active: 0, content: written })
+  })
+
+  it('refuses no change, a blank description, and a second operation on the listing', () => {
+    expect(() => rows([set(written, { expected: { content: written } })])).toThrow(
+      /already has this description/u
+    )
+    for (const content of ['', '  \n '])
+      expect(() => rows([set(content)]), JSON.stringify(content)).toThrow(/Must not be blank/u)
+    expect(() => rows([set(written, { reason: undefined })])).toThrow()
+    expect(() => rows([set(written, { expected: {} })])).toThrow()
+    expect(() => rows([set(written, { description: 'Short' })])).toThrow()
+    // A listing is named once per manifest.
+    expect(() =>
+      rows([
+        set(written),
+        {
+          action: 'listing-details-set',
+          id: 'lst_sqlite_test',
+          slug: 'old-slug',
+          reason: 'Renamed',
+          expected: { name: 'Old', description: 'Description', website: 'https://example.com' },
+          details: { name: 'New' }
+        }
+      ])
+    ).toThrow(/Duplicate listing/u)
+  })
+})
+
 describe('listing-feature-listing-set in a row-level manifest (#409: features of larger sites)', () => {
   const live = { checksum: beforeChecksum, version: 4 }
   const rows = (operations: Record<string, unknown>[], id = 'features') =>

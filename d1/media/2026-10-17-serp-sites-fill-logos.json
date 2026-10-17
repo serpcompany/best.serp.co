@@ -1,0 +1,57 @@
+{
+ "id": "2026-10-17-serp-sites-fill-logos",
+ "objects": [
+  {
+   "bytes": 2970,
+   "contentType": "image/png",
+   "height": 180,
+   "key": "best.serp.co/listings/tools.serp.co/logo/cd7dedb0f824e261.png",
+   "md5": "51eb1310003cbaf4d8658769e0b09221",
+   "sha256": "cd7dedb0f824e26169a7921fcc8e5054f7a29c1d4ed0881236d8d3fc1f2a5182",
+   "source": "https://serp.co/apple-touch-icon.png",
+   "width": 180
+  },
+  {
+   "bytes": 583,
+   "contentType": "image/png",
+   "height": 64,
+   "key": "best.serp.co/listings/games.serp.co/logo/fa3a55defb159e6c.png",
+   "md5": "e4d58ac683947802186b7386e9c0dd29",
+   "sha256": "fa3a55defb159e6c756b4470f1806f0e62e02e19b94fc301a1eff1629623644c",
+   "source": "https://games.serp.co/favicon.ico",
+   "width": 64
+  },
+  {
+   "bytes": 2970,
+   "contentType": "image/png",
+   "height": 180,
+   "key": "best.serp.co/listings/serplists.com/logo/cd7dedb0f824e261.png",
+   "md5": "51eb1310003cbaf4d8658769e0b09221",
+   "sha256": "cd7dedb0f824e26169a7921fcc8e5054f7a29c1d4ed0881236d8d3fc1f2a5182",
+   "source": "https://serp.co/apple-touch-icon.png",
+   "width": 180
+  },
+  {
+   "bytes": 24723,
+   "contentType": "image/png",
+   "height": 180,
+   "key": "best.serp.co/listings/keybumps.app/logo/a150b677e57c3c8b.png",
+   "md5": "267d65fb5675180c0f9514a24c129d14",
+   "sha256": "a150b677e57c3c8bc89e871c3d57b6935134a9863316241eb68aaca5b8159091",
+   "source": "https://keybumps.app/apple-icon.png",
+   "width": 180
+  },
+  {
+   "bytes": 24638,
+   "contentType": "image/png",
+   "height": 180,
+   "key": "best.serp.co/listings/zenbujapanese.com/logo/b698103f8cd74ad8.png",
+   "md5": "79b6f3e3287651971a799272d5e62457",
+   "sha256": "b698103f8cd74ad81e0ffa1a949c3a71a71d0485baf0a506f462c69fda4c25b2",
+   "source": "https://zenbujapanese.com/apple-touch-icon.png",
+   "width": 180
+  }
+ ],
+ "site": "best.serp.co",
+ "version": 1
+}
