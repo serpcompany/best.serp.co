@@ -13,7 +13,7 @@ import { type AdminOrderRow, createBillingOperations } from '@/db/billing'
 import { createDatabase, type Database } from '@/db/client'
 import { billing } from '../billing/runtime'
 import { previewRefund, refundOrder, refundRejectedSubmission } from '../billing/service'
-import { emailEventKey, enqueueEmail } from '../email/server'
+import { deliverEmail, emailEventKey } from '../email/server'
 import { createMediaHost } from '../media/worker-media'
 import { CodedError } from '../telemetry/coded-error'
 import type { AdminContext } from './decisions'
@@ -63,7 +63,8 @@ async function adminBilling() {
 
 /**
  * The decision context for an authorized admin. Refunds (a rejection tagged `other`, and the
- * Orders screen) are available while orders are on and billing is configured (#68).
+ * Orders screen) are available while orders are on and billing is configured (#68). A decision
+ * waits for its email's delivery, so it can answer what the email did (#490).
  */
 export async function adminDecisionContext(actor: string): Promise<AdminContext> {
   const { ctx, env } = await getCloudflareContext({ async: true })
@@ -75,14 +76,25 @@ export async function adminDecisionContext(actor: string): Promise<AdminContext>
     // A changed logo is hosted in the environment's media bucket; an approval's queued copies
     // are hosted after the response (#95).
     media: createMediaHost(env as CloudflareEnv, task => ctx.waitUntil(task)),
-    notify: enqueueEmail,
+    notify: deliverEmail,
     ...(deps
       ? {
           billing: {
             previewRefund: input => previewRefund(deps, input),
             refundOrder: input => refundOrder(deps, input)
           },
-          refunds: { refundRejectedSubmission: input => refundRejectedSubmission(deps, input) }
+          refunds: {
+            refundRejectedSubmission: ({ notify, ...input }) =>
+              refundRejectedSubmission(
+                {
+                  ...deps,
+                  notify: async (templateId, request) => {
+                    await notify(templateId, request)
+                  }
+                },
+                input
+              )
+          }
         }
       : {})
   }

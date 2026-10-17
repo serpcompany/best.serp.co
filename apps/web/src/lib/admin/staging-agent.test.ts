@@ -14,8 +14,8 @@ import { POST as tagsPost } from '@/app/api/admin/tags/route'
 import { SqliteD1 } from '@/db/test-support'
 import { STAGING_ADMIN_KEY_HEADER } from '@/lib/auth/staging-admin-key'
 
-const { enqueueEmail, getCloudflareContext } = vi.hoisted(() => ({
-  enqueueEmail: vi.fn(async () => {}),
+const { deliverEmail, getCloudflareContext } = vi.hoisted(() => ({
+  deliverEmail: vi.fn(async () => 'sent' as const),
   getCloudflareContext: vi.fn()
 }))
 
@@ -24,7 +24,7 @@ vi.mock('@opennextjs/cloudflare', () => ({ getCloudflareContext }))
 vi.mock('next/headers', () => ({ headers: async () => new Headers() }))
 vi.mock('@/lib/email/server', async importOriginal => ({
   ...(await importOriginal<typeof import('@/lib/email/server')>()),
-  enqueueEmail
+  deliverEmail
 }))
 
 /** A test value only; the real key is a staging Worker secret and is never in the repository. */
@@ -106,7 +106,7 @@ const logged: unknown[][] = []
 
 beforeEach(() => {
   logged.length = 0
-  enqueueEmail.mockClear()
+  deliverEmail.mockClear()
   for (const method of ['debug', 'error', 'info', 'log', 'warn'] as const) {
     vi.spyOn(console, method).mockImplementation((...args: unknown[]) => {
       logged.push(args)
@@ -125,7 +125,12 @@ describe('the staging admin key through the admin API', () => {
     const sqlite = worker('staging')
     const response = await approve('sub_zen', 1)
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ listingSlug: 'zen.example', ok: true, replayed: false })
+    expect(await response.json()).toEqual({
+      email: { outcome: 'sent', to: 'maya@example.com' },
+      listingSlug: 'zen.example',
+      ok: true,
+      replayed: false
+    })
     expect(response.headers.get('set-cookie')).toBeNull()
     expect(response.headers.get('cache-control')).toBe('private, no-store')
     expect(
@@ -139,7 +144,7 @@ describe('the staging admin key through the admin API', () => {
       submissionEvents: ['staging-agent']
     })
     // The approval email still goes to the Creator.
-    expect(enqueueEmail).toHaveBeenCalledWith(
+    expect(deliverEmail).toHaveBeenCalledWith(
       'listing-approved',
       expect.objectContaining({ to: 'maya@example.com' })
     )

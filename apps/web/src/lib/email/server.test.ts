@@ -84,6 +84,28 @@ describe('enqueueEmail', () => {
     ])
   })
 
+  it('resolves a delivery with its outcome, on waitUntil, and never rejects (#490)', async () => {
+    const { deliverEmail } = await import('./server')
+    const waitUntil = vi.fn<(promise: Promise<unknown>) => void>()
+    getCloudflareContext.mockResolvedValue({
+      ctx: { waitUntil },
+      env: { D1_RUNTIME_ENV: 'local', DB: new SqliteD1().asD1Database(), SITE_ENVIRONMENT: 'local' }
+    })
+    vi.spyOn(console, 'info').mockImplementation(() => undefined)
+    const request = {
+      eventKey: 'submission-approved:sub_quill',
+      input: { listingName: 'Quillmate', listingSlug: 'quillmate.app', website: 'https://q.app/' },
+      to: 'owner@serp.co'
+    }
+    await expect(deliverEmail('listing-approved', request)).resolves.toBe('sent')
+    expect(waitUntil).toHaveBeenCalledTimes(1)
+    getCloudflareContext.mockRejectedValueOnce(new Error('no context'))
+    await expect(deliverEmail('listing-approved', request)).resolves.toBe('not_sent')
+    expect(loggedLines(errors)).toEqual([
+      expect.objectContaining({ event: 'email_context_unavailable' })
+    ])
+  })
+
   it("reports whether this request's Worker can deliver, false on any doubt", async () => {
     const { emailDeliveryConfigured } = await import('./server')
     const DB = new SqliteD1().asD1Database()

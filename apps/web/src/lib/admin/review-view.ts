@@ -1,12 +1,13 @@
-import type { RevisionReview, SubmissionReview } from '@/db/admin-queries'
+import type { DecisionEmailRecord, RevisionReview, SubmissionReview } from '@/db/admin-queries'
 import type { ListingDetail } from '@/db/contracts'
 import { resolveListingDetailMedia } from '@/db/media-keys'
 import type { PaymentLoss } from '@/db/payment-kept'
 import { renderableImage } from '../media/renderable-image'
 import { buildSubmissionReviewPreview } from '../submissions/review-preview'
+import type { DecisionEmail } from './decisions'
 import { featuredImageView } from './featured-image'
-import { PAID_LISTING_PRICE_CENTS } from './format'
-import type { LinkRel } from './listing-view'
+import { formatDateTime, PAID_LISTING_PRICE_CENTS } from './format'
+import type { LinkRel, TimelineItem } from './listing-view'
 
 /**
  * Maps the admin reads to what the review screen renders (#64 screen 11), and builds the
@@ -22,6 +23,67 @@ function queuedAt(review: SubmissionReview): string | null {
   }
   if (review.status === 'verified') return review.badgeVerifiedAt ?? review.updatedAt
   return review.reviewedAt ?? review.updatedAt
+}
+
+/** Each decision email's name, as the approve dialog's Email row names "Approved". */
+const DECISION_EMAIL_NAMES: Record<DecisionEmailRecord['kind'], string> = {
+  approved: '“Approved”',
+  changes_requested: '“Changes requested”',
+  rejected: '“Rejected”',
+  rejected_prohibited: '“Rejected as prohibited”',
+  rejected_refunded: '“Rejected and refunded”'
+}
+
+const DELIVERY_STATUS: Record<
+  DecisionEmailRecord['status'],
+  { label: string; tone: TimelineItem['tone'] }
+> = {
+  failed: { label: 'Failed', tone: 'err' },
+  sending: { label: 'Pending', tone: 'warn' },
+  sent: { label: 'Sent', tone: 'ok' }
+}
+
+/**
+ * A submission's decision emails as timeline rows (#490): the email, its recipient, and its
+ * delivery status and time. The ledger keeps no recipient, so it is the submitter's address,
+ * the one decision emails go to.
+ */
+function decisionEmailItems(review: SubmissionReview): TimelineItem[] {
+  return review.emails.map(email => {
+    const name = DECISION_EMAIL_NAMES[email.kind]
+    const status = DELIVERY_STATUS[email.status]
+    return {
+      detail: `${formatDateTime(email.updatedAt)} · ${status.label}`,
+      key: `${email.kind}-${email.eventKey}`,
+      title: review.submitter ? `${name} to ${review.submitter.email}` : name,
+      tone: status.tone
+    }
+  })
+}
+
+/**
+ * The line a decision's toast adds about the submitter's email (#490), from what the decision
+ * answered: `warn` when it didn't go out. Null when the decision answered none.
+ */
+export function decisionEmailNote(
+  email: DecisionEmail | null | undefined
+): { text: string; warn: boolean } | null {
+  switch (email?.outcome) {
+    case 'sent':
+      return { text: `Email sent to ${email.to}`, warn: false }
+    case 'pending':
+      return { text: `Email to ${email.to} is still pending`, warn: true }
+    case 'failed':
+      return { text: `Email to ${email.to} failed to send`, warn: true }
+    case 'not_sent':
+      return { text: `Email to ${email.to} wasn’t sent`, warn: true }
+    case 'no_account':
+      return { text: 'No email: no account on file', warn: false }
+    case 'paid':
+      return { text: 'No email for paid listings yet', warn: false }
+    default:
+      return null
+  }
 }
 
 export function submissionView(review: SubmissionReview, mediaBaseUrl: string): ReviewView {
@@ -41,6 +103,7 @@ export function submissionView(review: SubmissionReview, mediaBaseUrl: string): 
     contentVersion: review.contentVersion,
     description: review.description,
     duplicates: review.duplicateListings + review.duplicateSubmissions,
+    emails: decisionEmailItems(review),
     id: review.id,
     kind: 'submission',
     linkRel: review.listing?.linkRel ?? 'nofollow',
@@ -97,6 +160,7 @@ export function revisionView(review: RevisionReview, mediaBaseUrl: string): Revi
     contentVersion: review.contentVersion,
     description: review.description,
     duplicates: 0,
+    emails: [],
     id: review.id,
     kind: 'revision',
     linkRel: review.listing.linkRel,
@@ -204,6 +268,8 @@ export interface ReviewView {
   contentVersion: number
   description: string
   duplicates: number
+  /** A submission's decision emails and their delivery (#490); none for a revision. */
+  emails: TimelineItem[]
   id: string
   kind: 'revision' | 'submission'
   linkRel: LinkRel

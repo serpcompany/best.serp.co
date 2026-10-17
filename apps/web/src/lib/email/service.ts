@@ -82,6 +82,14 @@ export interface EmailRequest<Input> {
   to: string
 }
 
+/**
+ * What one delivery did: `sent` (the provider accepted it, now or before), `failed` (the
+ * provider refused it or the request failed; enqueueing it again retries), `pending` (an
+ * earlier attempt's outcome was never recorded), or `not_sent` (never attempted: an invalid
+ * request, the staging allowlist, a render or ledger failure, or email disabled).
+ */
+export type EmailDeliveryOutcome = 'failed' | 'not_sent' | 'pending' | 'sent'
+
 export interface EmailService<R extends EmailTemplateRegistry> {
   /**
    * Schedules an email for delivery after the response (`waitUntil`). Returns immediately,
@@ -91,6 +99,14 @@ export interface EmailService<R extends EmailTemplateRegistry> {
     templateId: K,
     request: EmailRequest<TemplateInput<R[K]>>
   ): void
+  /**
+   * `enqueue`, resolving with the outcome once delivery finishes, for a caller that reports it
+   * (an admin decision, #490). Still registered with `waitUntil`; never rejects.
+   */
+  deliver<K extends keyof R & string>(
+    templateId: K,
+    request: EmailRequest<TemplateInput<R[K]>>
+  ): Promise<EmailDeliveryOutcome>
 }
 
 export interface EmailServiceOptions<R extends EmailTemplateRegistry> {
@@ -209,11 +225,11 @@ export function createEmailService<R extends EmailTemplateRegistry>(
     templateId: string,
     request: Partial<EmailRequest<unknown>>,
     context: Record<string, unknown>
-  ): Promise<void> {
+  ): Promise<EmailDeliveryOutcome> {
     const eventKey = request.eventKey
     if (!isEmailEventKey(eventKey)) {
       log({ ...context, event: 'email_rejected', level: 'error', reason: 'invalid_event_key' })
-      return
+      return 'not_sent'
     }
     // Templates declare `render` as a method, so any registered template accepts `unknown`
     // here; the caller's input type was already checked by `enqueue`'s signature.
@@ -223,17 +239,17 @@ export function createEmailService<R extends EmailTemplateRegistry>(
         : undefined
     if (!template) {
       log({ ...context, event: 'email_rejected', level: 'error', reason: 'unknown_template' })
-      return
+      return 'not_sent'
     }
     const to = normalizeEmailAddress(request.to)
     if (!to) {
       log({ ...context, event: 'email_rejected', level: 'error', reason: 'invalid_recipient' })
-      return
+      return 'not_sent'
     }
     const recipient = { ...context, recipientDomain: recipientDomain(to) }
     if (!recipientAllowed(policy, to)) {
       log({ ...recipient, event: 'email_skipped', level: 'warn', reason: 'recipient_not_allowed' })
-      return
+      return 'not_sent'
     }
 
     let rendered: RenderedEmail
@@ -250,7 +266,7 @@ export function createEmailService<R extends EmailTemplateRegistry>(
         event: 'email_render_failed',
         level: 'error'
       })
-      return
+      return 'not_sent'
     }
 
     const idempotencyKey = await emailIdempotencyKey(policy.environment, templateId, eventKey)
@@ -270,7 +286,7 @@ export function createEmailService<R extends EmailTemplateRegistry>(
         level: 'error',
         stage: 'claim'
       })
-      return
+      return 'not_sent'
     }
     if (claim.outcome === 'duplicate') {
       log(
@@ -289,7 +305,7 @@ export function createEmailService<R extends EmailTemplateRegistry>(
               status: claim.status
             }
       )
-      return
+      return claim.status === 'sending' ? 'pending' : claim.status
     }
 
     const message: OutgoingEmail = {
@@ -340,33 +356,46 @@ export function createEmailService<R extends EmailTemplateRegistry>(
         stage: 'complete'
       })
     }
+    return outcome.status
   }
 
-  return {
-    enqueue(templateId, request) {
-      const context = emailLogContext(templateId, request, {
-        environment: policy.environment,
-        provider
-      })
-      try {
-        // `deliver` is async, so even a malformed request becomes a rejection logged here.
-        const delivery = deliver(templateId, request ?? {}, context).catch(error => {
-          log({
-            ...context,
-            error: redactedErrorMessage(error),
-            event: 'email_delivery_failed',
-            level: 'error'
-          })
-        })
-        options.waitUntil(delivery)
-      } catch (error) {
+  function schedule(
+    templateId: string,
+    request: Partial<EmailRequest<unknown>> | null | undefined
+  ): Promise<EmailDeliveryOutcome> {
+    const context = emailLogContext(templateId, request, {
+      environment: policy.environment,
+      provider
+    })
+    // `deliver` is async, so even a malformed request becomes a rejection logged here.
+    const delivery = deliver(templateId, request ?? {}, context).catch(
+      (error): EmailDeliveryOutcome => {
         log({
           ...context,
           error: redactedErrorMessage(error),
-          event: 'email_wait_until_failed',
+          event: 'email_delivery_failed',
           level: 'error'
         })
+        return 'not_sent'
       }
+    )
+    try {
+      options.waitUntil(delivery)
+    } catch (error) {
+      log({
+        ...context,
+        error: redactedErrorMessage(error),
+        event: 'email_wait_until_failed',
+        level: 'error'
+      })
+    }
+    return delivery
+  }
+
+  return {
+    deliver: schedule,
+    enqueue(templateId, request) {
+      void schedule(templateId, request)
     }
   }
 }
@@ -379,13 +408,17 @@ export function createDisabledEmailService<R extends EmailTemplateRegistry>(
   reason: string,
   log: EmailLogger = consoleEmailLogger
 ): EmailService<R> {
+  const disabled = (templateId: string, request: unknown) =>
+    log({
+      ...emailLogContext(templateId, request, { reason: redactedErrorMessage(reason) }),
+      event: 'email_disabled',
+      level: 'error'
+    })
   return {
-    enqueue(templateId, request) {
-      log({
-        ...emailLogContext(templateId, request, { reason: redactedErrorMessage(reason) }),
-        event: 'email_disabled',
-        level: 'error'
-      })
-    }
+    async deliver(templateId, request) {
+      disabled(templateId, request)
+      return 'not_sent'
+    },
+    enqueue: disabled
   }
 }
