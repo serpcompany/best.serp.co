@@ -95,7 +95,11 @@ export function FeaturedOnBadgeEmbedPanel({
             </Button>
           )
         })}
-        <p className="text-xs text-muted-foreground" aria-live="polite">
+        {/* Its own reserved line on a phone, where it would wrap and push the claim down. */}
+        <p
+          className="min-h-4 basis-full text-xs text-muted-foreground sm:basis-auto"
+          aria-live="polite"
+        >
           {copiedTheme ? `Copied ${copiedTheme} badge` : null}
         </p>
       </div>
