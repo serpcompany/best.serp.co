@@ -1309,7 +1309,7 @@ export const listingSubmissionUrlBlocks = sqliteTable(
 /**
  * Who owns a listing. One current `owner` per listing (a partial unique index); revoking keeps
  * the row with `revoked_at`, so the table is also the ownership history. Further roles can be
- * added for teams. The public "Verified owner" badge is derived from a current owner row, so a
+ * added for teams. The public "Claimed" badge is derived from a current owner row, so a
  * change here advances the catalog epoch in the same batch (see data-model.md).
  */
 export const listingOwners = sqliteTable(

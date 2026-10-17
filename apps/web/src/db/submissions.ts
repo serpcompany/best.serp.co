@@ -399,7 +399,8 @@ export function buildSubmissionReviewPreview(
     modifiedAt: toInstant(createdAt) ?? `${publishedAt}T00:00:00.000Z`,
     name: requiredTrimmedText(row.name, 'name'),
     publishedAt,
-    relatedWebsites: [],
+    alternatives: [],
+    related: [],
     resourceLinks,
     slug: requiredTrimmedText(row.slug, 'slug'),
     website: absoluteUrl(row.website, 'website URL')

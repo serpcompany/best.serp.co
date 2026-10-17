@@ -194,7 +194,7 @@ export function revisionView(review: RevisionReview, mediaBaseUrl: string): Revi
 }
 
 /**
- * Whether the preview shows "Verified owner", as the live page will: a listing that exists
+ * Whether the preview shows "Claimed", as the live page will: a listing that exists
  * already (a revision's, or a submission's published at payment) shows it while it has a current
  * owner; a submission not yet published gets an owner at approval when its submitter is signed in.
  */

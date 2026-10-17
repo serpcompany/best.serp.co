@@ -335,14 +335,14 @@ describe('representative D1 query benchmark', () => {
     }
     console.info(`DATA_OPS_BENCHMARK ${JSON.stringify(report)}`)
 
-    expect(single?.relatedWebsites.map(related => related.slug)).toEqual(expectedSingleRelated)
+    expect(single?.alternatives.map(related => related.slug)).toEqual(expectedSingleRelated)
     expect(optimizedAlternativesEvidence.flatMap(evidence => evidence.plan).join('\n')).toContain(
       'listings_related_name_idx'
     )
     expect(singleCategoryEvidence.flatMap(evidence => evidence.plan).join('\n')).toContain(
       'listings_related_name_idx'
     )
-    expect(tagged?.relatedWebsites.map(related => related.slug)).toEqual([
+    expect(tagged?.alternatives.map(related => related.slug)).toEqual([
       'bench-251',
       'bench-252',
       'bench-253',
@@ -350,7 +350,7 @@ describe('representative D1 query benchmark', () => {
       'bench-255',
       'bench-256'
     ])
-    expect(wrapped?.relatedWebsites.map(related => related.slug)).toEqual([
+    expect(wrapped?.alternatives.map(related => related.slug)).toEqual([
       'bench-314',
       'bench-200',
       'bench-201',
@@ -361,7 +361,7 @@ describe('representative D1 query benchmark', () => {
     expect(taggedEvidence.flatMap(evidence => evidence.plan).join('\n')).toContain(
       'listing_tags_tag_idx'
     )
-    expect(solo?.relatedWebsites.map(related => related.slug)).toEqual([
+    expect(solo?.alternatives.map(related => related.slug)).toEqual([
       'bench-121',
       'bench-122',
       'bench-123',
@@ -399,10 +399,11 @@ describe('representative D1 query benchmark', () => {
         oneColdPlus99WarmAverage
       ]).toEqual(Array(6).fill(null))
     }
-    // Epoch probe, detail row (with its hand picks), the rest of its alternatives.
-    expect(detailStatements.length).toBeLessThanOrEqual(3)
-    expect(taggedStatements.length).toBeLessThanOrEqual(3)
-    expect(soloStatements.length).toBeLessThanOrEqual(3)
+    // Epoch probe, detail row (with its hand picks), the rest of its alternatives, its related
+    // listings (#535).
+    expect(detailStatements.length).toBeLessThanOrEqual(4)
+    expect(taggedStatements.length).toBeLessThanOrEqual(4)
+    expect(soloStatements.length).toBeLessThanOrEqual(4)
     expect(events.every(event => event.success)).toBe(true)
   })
 })

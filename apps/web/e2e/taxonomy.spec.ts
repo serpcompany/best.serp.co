@@ -491,6 +491,37 @@ test.describe('the taxonomy on listing, hub and home pages (#347)', () => {
     expect(await alternativeSlugs(page, writer(5))).toEqual([6, 7, 8, 9, 10, 11].map(writer))
   })
 
+  test("Related shows more of a listing's hub, never the listing or an alternative (#535)", async ({
+    page
+  }) => {
+    const related = page.getByRole('region', { name: 'Related' })
+    for (const slug of [writer(5), writer(20), writer(47)]) {
+      const alternatives = await alternativeSlugs(page, slug)
+      const shown = await related
+        .locator('[data-website-slug]')
+        .evaluateAll(links => links.map(link => link.getAttribute('data-website-slug') ?? ''))
+      expect(shown, slug).toHaveLength(6)
+      expect(new Set(shown).size, slug).toBe(6)
+      expect(
+        shown.filter(other => other === slug || alternatives.includes(other)),
+        slug
+      ).toEqual([])
+    }
+    // Under the article, three across on desktop.
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await expect
+      .poll(() =>
+        related
+          .locator('[data-slot="card-grid"]')
+          .evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length)
+      )
+      .toBe(3)
+    // A small hub its Alternatives already show: no Related section.
+    await page.goto(listingPath(seedAlternatives.listing.slug))
+    await expect(page.getByRole('region', { name: 'Alternatives' })).toBeVisible()
+    await expect(related).toHaveCount(0)
+  })
+
   test('a hub page: its tags of 3 or more as chips, most listings first, and its best pages', async ({
     page
   }) => {

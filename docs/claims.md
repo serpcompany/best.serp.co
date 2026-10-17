@@ -10,8 +10,8 @@ payment (#68), and become its owner. The flow lives in `apps/web/src/lib/claims/
 
 Claims run only while `features.claims` (`apps/web/src/lib/features.ts`) is on. **It is on** since
 #130 (the owner's launch decision, 2026-10-07): every listing page without a current owner shows
-"Work at …? Claim this listing" beside the listing's badge, under its content (#70 screen 9a,
-#491), which opens the claim dialog (`apps/web/src/components/claims/claim-listing.tsx`, #70
+"Claim this listing" in the listing's badge card, after Visit Site and Alternatives (#70 screen 9a,
+#491, #535), which opens the claim dialog (`apps/web/src/components/claims/claim-listing.tsx`, #70
 screen 8; a drawer on a phone). A visitor signs in first and comes back to `#claim`. Held listings and listings whose
 slug and landing disagree still show the link, and the dialog answers "This URL can’t be claimed." with
 "Message us" (the contact path, `/contact/` while #73 is off). The dialog's badge card and
@@ -73,7 +73,7 @@ proving the address.
    fetching, unless an admin changed the listing's website since (then a domain that no longer
    matches, or can't be resolved, is `409 changed`). A pass, within 24 hours of the confirmation, makes the
    claimer the owner (`verified_via = badge_claim`), cancels other open claims, and advances the
-   catalog version (the public "Verified owner" badge). The weekly
+   catalog version (the public "Claimed" badge, #535). The weekly
    [badge program](./badge-program.md) then checks the claimer's product page, and removes the
    owner (the listing stays up, curated) if the badge is confirmed missing; a later replay of the
    claim then answers `409 not_owner`.

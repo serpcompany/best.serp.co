@@ -56,7 +56,7 @@ export const seedListings = {
   /** Its instant claim is held for review (`listing_claim_holds`). */
   held: { name: 'Fixture Quaybin', slug: 'fixture-quaybin' },
   /**
-   * A Verified owner (`seedUsers.owner`, badge claim) in a badge warning, with a revision in
+   * A Claimed listing (`seedUsers.owner`, badge claim) in a badge warning, with a revision in
    * every closed status and one awaiting changes.
    */
   owned: { name: 'Fixture Ledger', slug: 'fixture-ledger' },

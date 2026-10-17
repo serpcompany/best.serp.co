@@ -21,7 +21,7 @@ export interface WebsiteMetadata {
   website: string
   /** Detail pages from D1 always carry it; imported and admin listings are `follow`. */
   linkRel?: WebsiteLinkRel
-  /** True when the listing has a current owner: the public "Verified owner" badge (#62, #70 9b). */
+  /** True when the listing has a current owner: the public "Claimed" badge (#62, #535). */
   verifiedOwner?: true
   category: string
   categories?: string[]
@@ -158,8 +158,10 @@ export interface WebsiteDetailMetadata extends WebsiteMetadata {
    * (`lib/markdown/listing-content.ts`, #334); absent without a body.
    */
   contentTree?: ListingContentTree
-  /** Its Alternatives section (#519): its hand picks first, then similar listings, up to six. */
-  relatedWebsites: WebsiteRelatedCardMetadata[]
+  /** Its Alternatives list (#519, #535): its hand picks first, then similar listings, up to six. */
+  alternatives: WebsiteRelatedCardMetadata[]
+  /** Its Related section (#535): up to six more listings in its hub, none of its alternatives. */
+  related: WebsiteRelatedCardMetadata[]
 }
 
 export interface WebsiteLookupIndex {
@@ -265,7 +267,7 @@ export function resolveWebsiteBySlugFromIndex(
   }
 
   const websiteCategorySlugs = new Set(getListingCategories(website))
-  const relatedWebsites = websites
+  const alternatives = websites
     .map(site => ({
       sharedCategoryCount: getListingCategories(site).filter(category =>
         websiteCategorySlugs.has(category)
@@ -286,7 +288,8 @@ export function resolveWebsiteBySlugFromIndex(
   return {
     ...website,
     content: website.content || website._meta?.content || '',
-    relatedWebsites
+    alternatives,
+    related: []
   }
 }
 

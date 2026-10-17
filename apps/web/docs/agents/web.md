@@ -55,14 +55,15 @@ Every color and the radius are CSS variables in `globals.css`: light values in `
 | `muted`, `muted-foreground` | Panels and tiles behind content, and secondary text |
 | `destructive` | Deleting, refusing and errors (`buttonVariants({ variant: 'destructive' })`) |
 | `success`, `warning`, `info` (each with `-foreground`) | Status (#184): live or verified, needs attention or unofficial, in review or informational. The dashboards show a record's status with `StatusChip` (`components/status/status-chip.tsx`) |
+| `cta`, `cta-foreground` | The listing page's blue Visit Site (#535) |
 | `border`, `input`, `ring` | Borders, form-control borders, focus rings |
 | `chart-1` to `chart-5` | Charts (none yet) |
 | `sidebar-*` | The dashboards' sidebar |
 | `radius` | shadcn's stock radius (`0.625rem`); the `--radius-*` steps derive from it |
 
-The status tones are best.serp.co's only addition to the stock tokens. Their text reads at WCAG
-AA on `background` and `muted` in both themes. Add a token, in both themes, when a design needs a
-new color.
+The status tones and `cta` are best.serp.co's additions to the stock tokens. The status tones'
+text reads at WCAG AA on `background` and `muted` in both themes, and `cta-foreground` on `cta`.
+Add a token, in both themes, when a design needs a new color.
 
 ## Building UI
 
@@ -82,7 +83,9 @@ These are the rules the other SERP sites follow (zenbujapanese.com's UI componen
   chip, the data table's toolbar, serp.co's docs badges), which stay as copied; and status tones,
   since shadcn ships no success, warning or info variants: they go on `Badge` and `Alert` as
   token classes (`text-warning`, `border-warning/40`), as the product page's Unofficial badge and
-  the dashboards' notices do.
+  the dashboards' notices do. The one deliberate exception is the listing page's Visit Site,
+  which recolours `buttonVariants({ size: 'lg' })` with `bg-cta text-cta-foreground`
+  (`website-detail-header.tsx:50`, #535), since shadcn ships no blue variant.
 - **Colors come only from the tokens.** No hex or rgb values and no Tailwind palette classes
   (`white`, `gray-500`) in components.
 - **Copy the reference blocks.** A new page or section starts from the layout blocks below, or
@@ -123,7 +126,7 @@ search is `components/directory/empty-state.tsx`: the stock `Empty`, as serplist
 | Home, and `/products/` page by page | `/`, `/products/?page=N` | `components/home/home-page.tsx`: `PageHero` with the listing count and Submit, Featured and Recently added in `LLMGrid`, the hubs as `CategoryCards` (once they hold tags, #347), then the browse list with its filter and the page links |
 | Categories | `/products/categories/` | `PageHero`, then a `ListCard` per category in `CardGrid` (`CategoryCards`) |
 | Category | `/products/categories/<category>/` | `components/category-routes/category-page.tsx`: breadcrumb, `PageHero` with the hub's tag chips, "Best {hub} lists" (`BestPagesSection`), the sortable listings, the page links |
-| Product | `/products/<slug>/` | `components/website-routes/detail-page.tsx` on `DetailPageLayout`: the breadcrumb through its hub, the logo, name, description, badges, hub and tag chips, Visit Site and favorite in the header (the header holds only the product), then the content, links, FAQs, the featured-on badge and claim link in one outline `Item` (`WebsiteDetailAside`, #491), "Featured in" best pages, and the Alternatives section (#519) |
+| Product | `/products/<slug>/` | `components/website-routes/detail-page.tsx` on `DetailPageLayout`: the breadcrumb through its hub, then #535's Design 2 header, a full-width panel with the logo, name, Claimed badge, description, hub and tag chips on the left and the visitor's actions (the favorite) on the right. Beside the content (links, FAQs) a column: Visit Site first, then Alternatives (#519), then the badge card with the claim block in its footer. Visit Site is sticky on every screen: atop the desktop column, and pinned under the site header on phones. "Featured in" best pages and Related run under the article |
 | Search | `/search/` | `components/search/index-page.tsx`: `PageHero` with the page's search field, then the results |
 | About | `/about/` | `components/static-pages/about-page.tsx`: `PageHero`, then `SectionHeader`s over `ListCard`s in `CardGrid` |
 | Brands | `/brands/` | `components/static-pages/brands-page.tsx`: `PageHero` over `ListCard`s in `CardGrid` |

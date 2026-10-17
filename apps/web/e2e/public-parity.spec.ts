@@ -189,62 +189,107 @@ test.describe('public parity interactions', () => {
     }
   })
 
-  test("the product page is serplists' detail page (#273)", async ({ baseURL, page, request }) => {
+  test('the product page: the wide header, then Visit Site, Alternatives and the badge (#273, #535)', async ({
+    baseURL,
+    page,
+    request
+  }) => {
     const { listing } = await catalogSample(request, baseURL)
     await page.setViewportSize({ width: 1440, height: 900 })
     await gotoPublicPage(page, listing.path)
     const breadcrumb = page.getByRole('navigation', { name: 'breadcrumb' })
     await expectInternalLink(breadcrumb.getByRole('link', { name: 'Home' }), /^\/$/u)
     await expectInternalLink(breadcrumb.getByRole('link', { name: 'Products' }), /^\/products\/$/u)
+    // The header panel holds the product and the save button, nothing for its makers.
     const header = page.locator('[data-slot="detail-page-header"]')
     await expect(header.getByRole('heading', { level: 1, name: listing.namePattern })).toBeVisible()
-    const visit = header.getByRole('link', { name: 'Visit Site' })
-    await expect(visit).toHaveAttribute('target', '_blank')
-    await expect(visit).toHaveAttribute('rel', /\bnoopener\b/u)
-    // The header holds only the product; the badge embed and the claim sit under the content
-    // in a small block named by its heading (#491).
+    await expect(header.getByRole('button', { name: /favorites$/u })).toBeVisible()
     await expect(header.getByRole('button', { name: /badge embed code$/u })).toHaveCount(0)
     await expect(header.getByRole('button', { name: 'Claim this listing' })).toHaveCount(0)
-    const badgeBlock = page.getByRole('complementary', { name: /^Add a badge to your website\b/u })
-    for (const theme of ['light', 'dark']) {
-      await expect(
-        badgeBlock.getByRole('button', { name: `Copy ${theme} badge embed code` })
-      ).toBeVisible()
-    }
-    // A click still copies that badge's embed code, linking to the listing.
+    await expect(header.getByRole('link', { name: 'Visit Site' })).toHaveCount(0)
+    // One Visit Site on the screen, leaving in a new tab.
+    const visit = page.getByRole('link', { name: 'Visit Site' })
+    await expect(visit).toHaveCount(1)
+    await expect(visit).toHaveAttribute('target', '_blank')
+    await expect(visit).toHaveAttribute('rel', /\bnoopener\b/u)
+    // The column in the owner's order, under the header: Visit Site, Alternatives, the badge card.
+    const badgeBlock = page.getByRole('complementary', { name: 'Click a badge to copy its code.' })
+    const alternatives = page.getByRole('region', { name: 'Alternatives' })
+    const top = (locator: typeof visit) =>
+      locator.evaluate(element => element.getBoundingClientRect().top)
+    const headerBottom = await header.evaluate(element => element.getBoundingClientRect().bottom)
+    const column = [visit, ...((await alternatives.count()) > 0 ? [alternatives] : []), badgeBlock]
+    const tops = await Promise.all(column.map(top))
+    expect(tops[0]).toBeGreaterThan(headerBottom)
+    expect([...tops].sort((left, right) => left - right)).toEqual(tops)
+    // One badge, the light theme's; a click copies its embed code, linking to the listing.
+    await expect(
+      badgeBlock.getByRole('button', { name: 'Copy light badge embed code' })
+    ).toBeVisible()
+    await expect(
+      badgeBlock.getByRole('button', { name: 'Copy dark badge embed code' })
+    ).toHaveCount(0)
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
     await badgeBlock.getByRole('button', { name: 'Copy light badge embed code' }).click()
     await expect(badgeBlock.getByText('Copied light badge')).toBeVisible()
     expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(listing.path)
-    const headerBottom = await header.evaluate(element => element.getBoundingClientRect().bottom)
-    const content = page.locator('[data-slot="detail-page"] > [data-slot="separator"]')
-    const contentTop = await content.evaluate(element => element.getBoundingClientRect().top)
-    expect(contentTop).toBeGreaterThan(headerBottom)
-    expect(
-      await badgeBlock.evaluate(element => element.getBoundingClientRect().top)
-    ).toBeGreaterThan(contentTop)
+    // Visit Site sticks under the site header as the article scrolls.
+    await page.evaluate(() => window.scrollTo(0, 300))
+    await expect.poll(() => top(visit)).toBeLessThan(tops[0] as number)
+    expect(await top(visit)).toBeGreaterThanOrEqual(57)
 
-    // The Alternatives section ends the page in the listing grid's columns (#519), with no
-    // "Browse more" (previous and next), and nothing scrolls sideways on phones.
+    // No "Browse more" (previous and next). Related, when the hub has more to show, runs under the
+    // article in the listing grid's columns, never repeating an alternative or the listing.
     await expect(page.getByRole('heading', { name: 'Browse more' })).toHaveCount(0)
-    const alternatives = page.getByRole('region', { name: 'Alternatives' })
-    const cards = alternatives.locator('[data-slot="card-grid"] > li')
-    expect(await cards.count()).toBeGreaterThan(0)
-    expect(await cards.count()).toBeLessThanOrEqual(6)
-    for (const [width, expected] of [
-      [1440, 3],
-      [390, 1]
-    ] as const) {
-      await page.setViewportSize({ width, height: 900 })
-      await expect
-        .poll(() =>
-          alternatives
-            .locator('[data-slot="card-grid"]')
-            .evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length)
-        )
-        .toBe(expected)
+    const related = page.getByRole('region', { name: 'Related' })
+    if ((await related.count()) > 0) {
+      const slugs = (region: typeof related) =>
+        region
+          .locator('[data-website-slug]')
+          .evaluateAll(links => links.map(link => link.getAttribute('data-website-slug') ?? ''))
+      const shown = await slugs(related)
+      expect(shown.length).toBeGreaterThan(0)
+      expect(shown.length).toBeLessThanOrEqual(6)
+      const picked = await slugs(alternatives)
+      expect(
+        shown.filter(slug => picked.includes(slug) || listing.path.includes(`/${slug}/`))
+      ).toEqual([])
+      for (const [width, expected] of [
+        [1440, 3],
+        [390, 1]
+      ] as const) {
+        await page.setViewportSize({ width, height: 900 })
+        await expect
+          .poll(() =>
+            related
+              .locator('[data-slot="card-grid"]')
+              .evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length)
+          )
+          .toBe(expected)
+      }
     }
+
+    // On a phone Visit Site comes first under the header, pinned there from the top of the page,
+    // and nothing scrolls sideways.
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.evaluate(() => window.scrollTo(0, 0))
+    const phoneVisit = page.getByRole('link', { name: 'Visit Site' })
+    await expect(phoneVisit).toHaveCount(1)
+    await expect(phoneVisit).toBeInViewport()
+    expect(await top(phoneVisit)).toBeGreaterThan(
+      await header.evaluate(element => element.getBoundingClientRect().bottom)
+    )
+    await page.evaluate(() => window.scrollTo(0, 1200))
+    await expect(phoneVisit).toBeInViewport()
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+
+    // Nor at 360px, even when the name is one long word: it wraps instead.
+    await page.setViewportSize({ width: 360, height: 780 })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360)
+    await header.getByRole('heading', { level: 1 }).evaluate(heading => {
+      heading.textContent = 'SupercalifragilisticExpialidociousPlagiarismChecker.net'
+    })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360)
   })
 
   test('the home search sends its query to /search/, by Enter or its button', async ({

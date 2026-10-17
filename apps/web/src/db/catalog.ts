@@ -43,7 +43,9 @@ import { latestInstant } from './instants'
 import { LISTING_ALTERNATIVES_SHOWN, listingSlugRedirects, listings } from './schema'
 
 /**
- * v10: listing details carry no `previousWebsite` or `nextWebsite`, and `relatedWebsites` are the
+ * v11: listing details carry `related`, the Related section's (#535), and name the Alternatives
+ * section's listings `alternatives`; v10: listing details carry no `previousWebsite` or
+ * `nextWebsite`, and `alternatives` are the
  * Alternatives section's: hand picks, then similar listings, up to six (#519); v9: listing details
  * carry `bestPageMarks`, and an untagged listing in one category takes its
  * related listings onward from its own name (#347, #331); v8: listing details carry `tags`, name
@@ -53,7 +55,7 @@ import { LISTING_ALTERNATIVES_SHOWN, listingSlugRedirects, listings } from './sc
  * carry `faqs` (#105); v5: a hosted logo or image is its media key (#95), which the web adapter
  * turns into a URL on the environment's media host; v4 added `linkRel` and `verifiedOwner` (#62).
  */
-const CACHE_SCHEMA = 'v10'
+const CACHE_SCHEMA = 'v11'
 /**
  * Keys include the catalog epoch (publication version plus the latest public
  * `published_at`), so an entry can never outlive the content it was built from; the TTL
@@ -113,6 +115,13 @@ const RELATED_SCORED_TAGS = 3
  */
 const ALTERNATIVE_TAG_POINTS = 3
 const ALTERNATIVE_BEST_PAGE_POINTS = 2
+/** How many listings a listing page's Related section shows (#535). */
+const LISTING_RELATED_SHOWN = 6
+/**
+ * How many hub members the related statement reads: enough to show `LISTING_RELATED_SHOWN` after
+ * leaving out the at most `LISTING_ALTERNATIVES_SHOWN` alternatives.
+ */
+const RELATED_CANDIDATES = LISTING_RELATED_SHOWN + LISTING_ALTERNATIVES_SHOWN
 /**
  * How many of a best-page entry's active tags it carries for its chips (#341, design 5.1): the
  * most central, so hydrating an entry reads at most this many tags however many it has.
@@ -207,20 +216,24 @@ interface UnpublishedRow {
   slug: string
 }
 
-/**
- * A row of `alternativesStatement`: the ranking and the fill's plan, then an alternative, whose
- * columns are null on the one row of a listing with none.
- */
-interface AlternativeRow {
+/** A linked listing's row (`relatedStatement`), or the listing part of an alternative's. */
+interface LinkedListingRow {
   description: string | null
-  fill_plan: string | null
   id: string | null
   is_unofficial: number | null
-  kind: string
   logo: string | null
   name: string | null
   slug: string | null
   website: string | null
+}
+
+/**
+ * A row of `alternativesStatement`: the ranking and the fill's plan, then an alternative, whose
+ * columns are null on the one row of a listing with none.
+ */
+interface AlternativeRow extends LinkedListingRow {
+  fill_plan: string | null
+  kind: string
 }
 
 interface NameOrderRow {
@@ -412,7 +425,7 @@ function mapBestPageMarks(value: string): ListingBestPageMark[] {
   })
 }
 
-function mapDetail(row: DetailRow): Omit<ListingDetail, 'relatedWebsites'> {
+function mapDetail(row: DetailRow): Omit<ListingDetail, 'alternatives' | 'related'> {
   const summary = mapSummary(row)
   const imageValues = parseJsonArray(row.images, 'listing images')
   const resourceValues = parseJsonArray(row.resource_links, 'listing resource links')
@@ -590,8 +603,10 @@ function isListingDetail(value: unknown): value is ListingDetail {
             typeof faq.answer === 'string' &&
             faq.answer.length > 0
         ))) &&
-    Array.isArray(candidate.relatedWebsites) &&
-    candidate.relatedWebsites.every(isRelatedListing) &&
+    Array.isArray(candidate.alternatives) &&
+    candidate.alternatives.every(isRelatedListing) &&
+    Array.isArray(candidate.related) &&
+    candidate.related.every(isRelatedListing) &&
     (candidate.resourceLinks === undefined ||
       (Array.isArray(candidate.resourceLinks) &&
         candidate.resourceLinks.every(
@@ -1134,6 +1149,62 @@ ORDER BY alternative.score DESC, alternative.wrap ASC, alternative.name ASC, alt
 }
 
 /**
+ * A listing's Related section (#535): more public listings in its hub (its primary category),
+ * read by a statement of its own in the detail batch, since the alternatives statement already
+ * combines the five SELECTs a compound SELECT may have. Like that statement, it finds the listing
+ * by its slug. It reads the hub's memberships in their index order
+ * (`listing_categories_category_idx`: the category, then the listing's id) onward from the
+ * listing's own id, wrapping round to the start for only as many as that lacked: an index range
+ * that stops after `RELATED_CANDIDATES` public members, with no sort and no hub-size probe, so it
+ * reads at most the hub's memberships however the listing is tagged. Starting at the listing's own
+ * id spreads the links across the hub, as the alternatives' name keyset does (#331). It never
+ * returns the listing itself; `withoutAlternatives` leaves out its alternatives.
+ */
+function relatedStatement(slug: string, asOf: string): CompiledQuery {
+  const step = (
+    name: 'onward' | 'wrapped',
+    comparison: '<' | '>',
+    wrapValue: 0 | 1,
+    limit: string
+  ) => `${name} AS (
+    SELECT l.id, l.slug, l.name, l.description, l.website, l.is_unofficial, ${wrapValue} AS wrap
+    FROM listing_categories member INDEXED BY listing_categories_category_idx
+    CROSS JOIN listings l ON l.id = member.listing_id
+    WHERE member.category_id = (SELECT id FROM hub)
+      AND member.listing_id ${comparison} (SELECT id FROM current_listing)
+      AND ${eligibleAt()}
+    ORDER BY member.listing_id ASC
+    LIMIT ${limit}
+  )`
+  return numberedQuery(
+    `WITH ${CURRENT_LISTING},
+  hub AS MATERIALIZED (
+    SELECT lc.category_id AS id
+    FROM listing_categories lc
+    WHERE lc.listing_id = (SELECT id FROM current_listing) AND lc.is_primary = 1
+    LIMIT 1
+  ),
+  ${step('onward', '>', 0, String(RELATED_CANDIDATES))},
+  ${step('wrapped', '<', 1, `${RELATED_CANDIDATES} - (SELECT COUNT(*) FROM onward)`)}
+SELECT
+  related.id,
+  related.slug,
+  related.name,
+  related.description,
+  related.website,
+  related.is_unofficial,
+  (
+    SELECT COALESCE(m.media_key, m.url) FROM listing_media m
+    WHERE m.listing_id = related.id AND m.kind = 'logo'
+    ORDER BY m.sort_order ASC LIMIT 1
+  ) AS logo
+FROM (SELECT * FROM onward UNION ALL SELECT * FROM wrapped) related
+ORDER BY related.wrap ASC, related.id ASC`,
+    [asOf, slug]
+  )
+}
+
+/**
  * The query shape an alternatives statement ran as, named by its first row
  * (`alternativesStatement`), or null when the rows name none (a public listing without a primary
  * category, which the baseline triggers prevent). A listing with tags reads them whatever its
@@ -1176,23 +1247,39 @@ function mapAlternativePicks(value: string): RelatedListing[] {
   })
 }
 
-function mapAlternatives(rows: AlternativeRow[]): RelatedListing[] {
-  return rows.flatMap(alternative =>
-    alternative.id === null
+/** Linked listings' rows, leaving out the placeholder row (null id) of a listing with none. */
+function mapLinkedListings(
+  rows: LinkedListingRow[],
+  label: 'alternative' | 'related listing'
+): RelatedListing[] {
+  return rows.flatMap(linked =>
+    linked.id === null
       ? []
       : [
           {
-            description: requireString(alternative.description, 'alternative description'),
-            isUnofficial: alternative.is_unofficial === 1 || undefined,
-            media: alternative.logo
-              ? { logo: requireString(alternative.logo, 'alternative logo') }
-              : undefined,
-            name: requireString(alternative.name, 'alternative name'),
-            slug: requireString(alternative.slug, 'alternative slug'),
-            website: requireString(alternative.website, 'alternative website')
+            description: requireString(linked.description, `${label} description`),
+            isUnofficial: linked.is_unofficial === 1 || undefined,
+            media: linked.logo ? { logo: requireString(linked.logo, `${label} logo`) } : undefined,
+            name: requireString(linked.name, `${label} name`),
+            slug: requireString(linked.slug, `${label} slug`),
+            website: requireString(linked.website, `${label} website`)
           }
         ]
   )
+}
+
+/**
+ * The Related section's listings (#535): the related statement's, in its order, leaving out the
+ * listing and its alternatives, so no listing shows in both sections; at most
+ * `LISTING_RELATED_SHOWN`.
+ */
+function withoutAlternatives(
+  related: readonly RelatedListing[],
+  slug: string,
+  alternatives: readonly RelatedListing[]
+): RelatedListing[] {
+  const shown = new Set([slug, ...alternatives.map(alternative => alternative.slug)])
+  return related.filter(listing => !shown.has(listing.slug)).slice(0, LISTING_RELATED_SHOWN)
 }
 
 export function createCatalogOperations(config: CatalogOperationsConfig): CatalogOperations {
@@ -1424,13 +1511,14 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
   }
 
   /**
-   * A listing's detail and its alternatives, as one D1 batch of two statements that each find the
-   * listing by its slug: an uncached listing page waits on one round trip to D1 after the epoch,
-   * where it waited on two or three before (#378). (#519 dropped the batch's previous and next
-   * listings with the page's "Browse more".) Each statement reports its own rows and D1 time
-   * under its own query shape, both with the batch's wall time. A slug that names no public
-   * listing reports one `listing-detail` event with the batch's totals: the alternatives statement
-   * found no listing and read only its slug seek.
+   * A listing's detail, its alternatives and its related listings, as one D1 batch of three
+   * statements that each find the listing by its slug: an uncached listing page waits on one round
+   * trip to D1 after the epoch, where it waited on two or three before (#378). (#519 dropped the
+   * batch's previous and next listings with the page's "Browse more"; #535 added the related
+   * listings.) Each statement reports its own rows and D1 time under its own query shape, all
+   * with the batch's wall time. A slug that names no public listing reports one `listing-detail`
+   * event with the batch's totals: the other statements found no listing and read only its slug
+   * seek.
    */
   async function queryListingBySlug(slug: string): Promise<ListingDetail | null> {
     const asOf = operationTime()
@@ -1439,7 +1527,8 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
     try {
       results = await runBatch(client, [
         detailStatement(slug, asOf),
-        alternativesStatement(slug, asOf)
+        alternativesStatement(slug, asOf),
+        relatedStatement(slug, asOf)
       ])
     } catch (error) {
       observe({
@@ -1457,9 +1546,10 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
       throw error
     }
     const wallDurationMs = performance.now() - startedAt
-    const [detailResult, alternativesResult] = results as [
+    const [detailResult, alternativesResult, relatedResult] = results as [
       D1Result<DetailRow>,
-      D1Result<AlternativeRow>
+      D1Result<AlternativeRow>,
+      D1Result<LinkedListingRow>
     ]
     const row = detailResult.results[0]
     if (!row) {
@@ -1485,18 +1575,25 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
         resultRows: alternativesResult.results.filter(alternative => alternative.id !== null).length
       })
     }
+    observe(queryEvent('listing-detail', 'related-hub-members', relatedResult, wallDurationMs))
     if (!results.every(result => result.success)) throw new Error('D1 catalog query failed.')
 
     // A listing without its primary category fails here, as it did before the batch.
     const detail = mapDetail(row)
     if (!alternativesShape) throw new Error('Invalid D1 alternatives plan.')
+    // The hand picks first, then the statement that leaves them out (#519).
+    const alternatives = [
+      ...mapAlternativePicks(row.alternative_picks),
+      ...mapLinkedListings(alternativesResult.results, 'alternative')
+    ]
     return {
       ...detail,
-      // The hand picks first, then the statement that leaves them out (#519).
-      relatedWebsites: [
-        ...mapAlternativePicks(row.alternative_picks),
-        ...mapAlternatives(alternativesResult.results)
-      ]
+      alternatives,
+      related: withoutAlternatives(
+        mapLinkedListings(relatedResult.results, 'related listing'),
+        detail.slug,
+        alternatives
+      )
     }
   }
 
@@ -1992,10 +2089,10 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
   /**
    * A best page's entries (#341, design 1.3 and 3.1), in one statement: rank the pool's ids
    * (its tag's members, else its category's, plus the pins outside them), then hydrate only the
-   * top `listSize`, as related listings do. SQLite evaluates select-list subqueries before it
-   * sorts, so hydrating the whole pool would read categories and logos for all of it. Order: pins
-   * by position, then tag centrality (`listing_tags.sort_order`), hosted logos first, then name
-   * and slug; nothing a Creator pays for. Cached per epoch and page.
+   * top `listSize`, as a listing's alternatives do. SQLite evaluates select-list subqueries before
+   * it sorts, so hydrating the whole pool would read categories and logos for all of it. Order:
+   * pins by position, then tag centrality (`listing_tags.sort_order`), hosted logos first, then
+   * name and slug; nothing a Creator pays for. Cached per epoch and page.
    */
   async function getBestPageItems(slug: string): Promise<BestPageItem[]> {
     // Only a public best page with entries reaches D1 (and the cache): never a slug from a URL.

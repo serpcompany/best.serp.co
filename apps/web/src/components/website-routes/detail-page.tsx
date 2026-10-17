@@ -14,19 +14,22 @@ import { generateWebsiteDetailSchema } from '../../lib/seo/schema'
 import { composeMetaDescription, generateDynamicMetadata } from '../../lib/seo/seo-config'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
+import { FavoriteButton } from '../favorites/favorite-button'
 import { DetailPageLayout } from '../layout/detail-page-layout'
 import { SectionHeader } from '../layout/section-header'
 import { ListingImage } from '../listing/listing-image'
 import { JsonLd } from '../seo/json-ld'
 import { BestPageCards } from '../taxonomy/best-page'
+import { ClaimedBadge } from '../website/claimed-badge'
+import { WebsiteAlternatives } from '../website/website-alternatives'
 import { WebsiteContentSection } from '../website/website-content-section'
 import {
-  WebsiteDetailActions,
   WebsiteDetailAside,
+  WebsiteVisitLink,
   websiteDetailMeta
 } from '../website/website-detail-header'
 import { faqsToShow, WebsiteFaqsSection } from '../website/website-faqs-section'
-import { WebsiteRelatedProjects } from '../website/website-related-projects'
+import { WebsiteRelated } from '../website/website-related'
 import { WebsiteResourcesSection } from '../website/website-resources-section'
 
 type WebsiteResourcesSectionWebsite = Pick<WebsiteDetailMetadata, 'resourceLinks'>
@@ -126,12 +129,18 @@ export function WebsiteDetailRoutePage({
     ...(project.resourceLinks ? { resourceLinks: project.resourceLinks } : {})
   }
   const verifiedOwner = project.verifiedOwner ? { verifiedOwner: true as const } : {}
+  const visitWebsite = {
+    // D1 details always carry the setting; a missing one fails safe to nofollow.
+    linkRel: project.linkRel ?? 'nofollow',
+    website: project.website
+  }
 
   return (
     <div data-entity-type={project.entityType || 'listing'} data-listing-template={detailTemplate}>
       <JsonLd data={generateWebsiteDetailSchema(project, hub)} />
 
-      {/* serplists' detail page (#273); the JSON-LD graph above carries the breadcrumb. */}
+      {/* The listing page (#273), with #535's wide header; the JSON-LD graph above carries the
+          breadcrumb. */}
       <DetailPageLayout
         breadcrumbs={[
           { href: getCanonicalListingListRoute(), label: siteCopy.listingName.pluralTitle },
@@ -144,56 +153,53 @@ export function WebsiteDetailRoutePage({
           <ListingImage
             name={project.name}
             src={project.media?.logo}
-            size={56}
+            size={48}
             className="rounded-xl"
           />
         }
         title={project.name}
+        badge={project.verifiedOwner ? <ClaimedBadge /> : null}
         description={project.description}
         meta={websiteDetailMeta({
           categories,
           ...(project.isUnofficial ? { isUnofficial: true } : {}),
-          ...(project.tags?.length ? { tags: project.tags } : {}),
-          ...verifiedOwner
+          ...(project.tags?.length ? { tags: project.tags } : {})
         })}
-        actions={
-          <WebsiteDetailActions
-            website={{
-              // D1 details always carry the setting; a missing one fails safe to nofollow.
-              linkRel: project.linkRel ?? 'nofollow',
-              slug: project.slug,
-              website: project.website
-            }}
-          />
+        actions={<FavoriteButton slug={project.slug} size="lg" />}
+        cta={<WebsiteVisitLink className="w-full" website={visitWebsite} />}
+        sidebar={
+          project.alternatives.length > 0 ? (
+            <WebsiteAlternatives websites={project.alternatives} />
+          ) : null
+        }
+        lower={
+          featuredIn.length > 0 || project.related.length > 0 ? (
+            <>
+              {featuredIn.length > 0 ? (
+                <section aria-labelledby="featured-in-heading">
+                  <SectionHeader id="featured-in-heading" title="Featured in" />
+                  <BestPageCards pages={featuredIn} />
+                </section>
+              ) : null}
+              <WebsiteRelated websites={project.related} />
+            </>
+          ) : null
+        }
+        end={
+          <WebsiteDetailAside claim={claim} website={{ slug: project.slug, ...verifiedOwner }} />
         }
       >
-        <div className="flex flex-col gap-12">
-          {/* The listing's own text, links and FAQs read in one column. */}
-          <div className="flex max-w-3xl flex-col gap-12">
-            <WebsiteContentSection
-              categories={categories}
-              contentTree={project.contentTree}
-              website={project}
-            />
+        {/* The listing's own text, links and FAQs read in one column. */}
+        <div className="flex max-w-3xl flex-col gap-12">
+          <WebsiteContentSection
+            categories={categories}
+            contentTree={project.contentTree}
+            website={project}
+          />
 
-            <WebsiteResourcesSection website={resourcesWebsite} />
+          <WebsiteResourcesSection website={resourcesWebsite} />
 
-            <WebsiteFaqsSection website={{ faqs: faqsToShow(project.faqs, project.content) }} />
-
-            {/* The badge and the claim, for the listing's makers, below its content (#491). */}
-            <WebsiteDetailAside claim={claim} website={{ slug: project.slug, ...verifiedOwner }} />
-          </div>
-
-          {featuredIn.length > 0 ? (
-            <section aria-labelledby="featured-in-heading">
-              <SectionHeader id="featured-in-heading" title="Featured in" />
-              <BestPageCards pages={featuredIn} />
-            </section>
-          ) : null}
-
-          {project.relatedWebsites?.length > 0 && (
-            <WebsiteRelatedProjects websites={project.relatedWebsites} />
-          )}
+          <WebsiteFaqsSection website={{ faqs: faqsToShow(project.faqs, project.content) }} />
         </div>
       </DetailPageLayout>
     </div>

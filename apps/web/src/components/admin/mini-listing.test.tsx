@@ -16,7 +16,7 @@ const listing: ListingDetail = {
   modifiedAt: '2026-10-09T00:00:00.000Z',
   name: 'Staged Tool',
   publishedAt: '2026-10-09',
-  relatedWebsites: [],
+  alternatives: [],
   faqs: [{ answer: 'Yes, every plan includes it.', question: 'Is there a free plan?' }],
   resourceLinks: [{ label: 'Docs', url: 'https://docs.staged.example/' }],
   slug: 'staged.example',
@@ -70,8 +70,8 @@ describe('admin review preview (#292)', () => {
     expect(html).toContain('Is there a free plan?')
   })
 
-  it('shows Verified owner only when asked to (#296)', () => {
-    expect(header(markup(true))).toContain('Verified owner')
-    expect(markup()).not.toContain('Verified owner')
+  it('shows the Claimed badge only when asked to (#296, #535)', () => {
+    expect(header(markup(true))).toContain('Claimed')
+    expect(markup()).not.toContain('Claimed')
   })
 })

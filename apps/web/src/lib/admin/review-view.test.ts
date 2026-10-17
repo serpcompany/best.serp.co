@@ -31,7 +31,7 @@ describe('the admin review preview (#296)', () => {
     expect('listing' in without && without.listing.faqs).toBeFalsy()
   })
 
-  it('shows Verified owner as the live page will', () => {
+  it('shows Claimed as the live page will', () => {
     const submitter = { email: 'maya@example.com' }
     // A listing that exists already follows its current owner, whoever submitted it.
     expect(previewVerifiedOwner({ listing: { verifiedOwner: true }, submitter: null })).toBe(true)

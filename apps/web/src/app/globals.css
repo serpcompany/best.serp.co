@@ -35,6 +35,9 @@
   --color-warning-foreground: var(--warning-foreground);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
+  /* The listing page's Visit Site (#535): blue, its text at WCAG AA in both themes. */
+  --color-cta: var(--cta);
+  --color-cta-foreground: var(--cta-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -80,6 +83,8 @@
   --warning-foreground: oklch(0.985 0 0);
   --info: oklch(0.5 0.118 242.209);
   --info-foreground: oklch(0.985 0 0);
+  --cta: oklch(0.52 0.2 260);
+  --cta-foreground: oklch(1 0 0);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -121,6 +126,8 @@
   --warning-foreground: oklch(0.205 0 0);
   --info: oklch(0.758 0.137 231.601);
   --info-foreground: oklch(0.205 0 0);
+  --cta: oklch(0.72 0.13 252);
+  --cta-foreground: oklch(0.205 0 0);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
@@ -148,6 +155,18 @@
   }
   html {
     @apply font-sans;
+    /* The site header's height (its h-14 row and bottom border), which sticky parts sit under. */
+    --site-header-height: 57px;
+  }
+}
+
+/* Below `lg` the listing page pins Visit Site under the site header (#535), on a band of the lg
+   Button (h-9) and py-2. Scrolling to a focused element or a fragment stops below both, so
+   neither covers it (WCAG 2.2, 2.4.11). */
+@media (width < 64rem) {
+  html:has([data-slot="detail-page"]) {
+    --pinned-cta-height: 3.25rem;
+    scroll-padding-top: calc(var(--site-header-height) + var(--pinned-cta-height));
   }
 }
 
