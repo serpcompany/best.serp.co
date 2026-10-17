@@ -93,9 +93,10 @@ describe('the 404 page (#279, #53)', () => {
     expect(markup).not.toContain('border-t pt-11')
   })
 
-  it('sets no robots directive, leaving Next.js’s one noindex tag', () => {
+  it('clears the robots directive, a layout’s included, leaving Next.js’s one noindex tag', () => {
     const metadata = notFoundMetadata()
-    expect(metadata).not.toHaveProperty('robots')
+    // `null`, not left out: left out, `/admin`'s and `/account`'s layouts add a second tag.
+    expect(metadata).toHaveProperty('robots', null)
     expect(metadata.title).toBe('Page Not Found')
   })
 })

@@ -2,6 +2,7 @@ import 'server-only'
 
 import type { PublishedBestPage, PublishedCategory } from '@/db/contracts'
 import { linkedCategories, listedBestPages } from '@/lib/seo/taxonomy-indexing'
+import { errorFields } from '@/lib/telemetry/error-fields'
 import {
   getActiveCategories,
   getBestPages,
@@ -46,20 +47,35 @@ export interface NotFoundLinkTargets {
 }
 
 /**
+ * A failed 404 read's fallback (#53 review): it logs one JSON line to the Worker's logs, the way
+ * public pages report errors (#401), with the error's code and name but never its message
+ * (`errorFields`, #211), then answers `fallback`, so a broken data cache or D1 stays visible while
+ * the 404 still renders.
+ */
+function fallBackTo<T>(read: string, fallback: T): (error: unknown) => T {
+  return error => {
+    console.error(
+      JSON.stringify({ event: 'not_found_links_read_failed', read, ...errorFields(error) })
+    )
+    return fallback
+  }
+}
+
+/**
  * The 404 page's targets (#53). The categories and best pages come from the cached shell stats and
  * best index the header reads too, the newest from the publication order's cached head, and the
  * listing total from the directory's first page (the homepage's cached read), which counts the
- * same public listings the HTML sitemap pages. A failed read leaves its links out instead of
- * failing the 404.
+ * same public listings the HTML sitemap pages. A failed read is logged and leaves its links out
+ * instead of failing the 404.
  */
 export async function notFoundLinkTargets(): Promise<NotFoundLinkTargets> {
   const [categories, bestPages, newest, listingTotal] = await Promise.all([
-    getActiveCategories().catch(() => []),
-    getBestPages().catch(() => []),
-    getLatestListings(NOT_FOUND_NEWEST_LISTINGS).catch(() => []),
+    getActiveCategories().catch(fallBackTo('categories', [])),
+    getBestPages().catch(fallBackTo('best_pages', [])),
+    getLatestListings(NOT_FOUND_NEWEST_LISTINGS).catch(fallBackTo('newest', [])),
     getListingNamePage({ page: 1 })
       .then(page => page.total)
-      .catch(() => 0)
+      .catch(fallBackTo('listing_total', 0))
   ])
   return {
     bestPages: listedBestPages(bestPages),

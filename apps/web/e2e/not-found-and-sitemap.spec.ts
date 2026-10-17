@@ -1,5 +1,6 @@
 import { expect } from '@playwright/test'
 import { seedCategories, seedFacts, seedListings } from './seed-facts'
+import { robotsMetas } from './site-fixture'
 import { test } from './test'
 
 /**
@@ -9,12 +10,6 @@ import { test } from './test'
  */
 
 const noRedirects = { maxRedirects: 0 }
-
-function robotsMetas(html: string): string[] {
-  return [...html.matchAll(/<meta\s+name="robots"\s+content="([^"]*)"/gu)].map(
-    match => match[1] ?? ''
-  )
-}
 
 /** The page's `<main>`: its own links, without the header's and footer's. */
 function mainOf(html: string): string {

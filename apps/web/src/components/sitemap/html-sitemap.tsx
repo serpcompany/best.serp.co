@@ -139,7 +139,7 @@ export function HtmlSitemapListings({ result }: { result: HtmlSitemapPage<HtmlSi
       <LinkSections>
         <ul className="columns-2 gap-x-6 sm:columns-3 lg:columns-4">
           {items.map(item => (
-            <li key={item.slug} className="break-inside-avoid py-1.25">
+            <li key={item.slug} className="break-inside-avoid py-1.25 wrap-break-word">
               <Link
                 href={getRoute('listing.detail', { slug: item.slug })}
                 className={sectionLinkClassName}

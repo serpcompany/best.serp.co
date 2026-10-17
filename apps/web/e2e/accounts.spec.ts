@@ -1,4 +1,5 @@
 import { type APIRequestContext, expect, request as playwrightRequest } from '@playwright/test'
+import { robotsMetas } from './site-fixture'
 import { test } from './test'
 
 /**
@@ -272,7 +273,10 @@ test.describe('admin gate', () => {
     expect(home.headers().location).toMatch(/\/admin\/submissions\/$/u)
     expect((await request.get('/admin/submissions/')).status()).toBe(200)
     expect((await request.get('/api/admin/listings')).status()).toBe(404)
-    expect((await request.get('/admin/not-a-page/')).status()).toBe(404)
+    // The dashboard's 404 carries one robots tag: the admin layout's own is cleared (#53).
+    const missingPage = await request.get('/admin/not-a-page/')
+    expect(missingPage.status()).toBe(404)
+    expect(robotsMetas(await missingPage.text())).toEqual(['noindex'])
 
     // Admin writes need this site's Origin, not just a same-site cookie.
     const foreign = await request.post('/api/admin/listings', {

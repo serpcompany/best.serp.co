@@ -100,16 +100,32 @@ describe('what the 404 page links (#53)', () => {
     expect(targets.listingTotal).toBe(2498)
   })
 
-  it('leaves out what a failed read would have linked, instead of failing the 404', async () => {
+  it('leaves out what a failed read would have linked, instead of failing the 404, and logs it', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     getActiveCategories.mockRejectedValue(new Error('D1 unavailable'))
     getBestPages.mockRejectedValue(new Error('D1 unavailable'))
     getLatestListings.mockRejectedValue(new Error('D1 unavailable'))
     getListingNamePage.mockRejectedValue(new Error('D1 unavailable'))
-    expect(await notFoundLinkTargets()).toEqual({
-      bestPages: [],
-      categories: [],
-      listingTotal: 0,
-      newest: []
-    })
+    try {
+      expect(await notFoundLinkTargets()).toEqual({
+        bestPages: [],
+        categories: [],
+        listingTotal: 0,
+        newest: []
+      })
+      // One JSON line per failed read: its code and name, never its message (#211).
+      const lines = logged.mock.calls.map(([line]) => JSON.parse(String(line)))
+      expect(lines).toEqual(
+        ['categories', 'best_pages', 'newest', 'listing_total'].map(read => ({
+          code: 'UNKNOWN',
+          event: 'not_found_links_read_failed',
+          name: 'Error',
+          read
+        }))
+      )
+      expect(JSON.stringify(lines)).not.toContain('D1 unavailable')
+    } finally {
+      logged.mockRestore()
+    }
   })
 })

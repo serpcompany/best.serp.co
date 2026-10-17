@@ -25,7 +25,7 @@ import {
   unique
 } from './admin-fixture'
 import { insert, listingStatements, type SeedStatement } from './fixture-seed'
-import { escapeRegExp } from './site-fixture'
+import { escapeRegExp, robotsMetas } from './site-fixture'
 import { type FixtureSite, startFixtureSite } from './submit-fixture'
 import { expectedResponse, test } from './test'
 
@@ -601,14 +601,17 @@ test('shows and acts on the user’s own records only, never cached or indexed',
   await owner.page.goto(`/account/listings/${listingSlug}/edit/`)
   await expect(owner.page.getByRole('heading', { name: 'Edit Owned listing' })).toBeVisible()
 
-  // Another account: the pages are 404s and every action is refused as not found.
+  // Another account: the pages are 404s and every action is refused as not found. Each 404
+  // carries one robots tag: the account layout's own is cleared (#53).
   const other = await signedIn(browser, 'other')
   for (const path of [
     `/account/submissions/${id}/`,
     `/account/listings/${listingSlug}/edit/`,
     `/account/listings/${listingSlug}/`
   ]) {
-    expect((await other.context.request.get(path)).status(), path).toBe(404)
+    const response = await other.context.request.get(path)
+    expect(response.status(), path).toBe(404)
+    expect(robotsMetas(await response.text()), path).toEqual(['noindex'])
   }
   await other.page.goto('/account/')
   await expect(other.page.getByText(name)).toHaveCount(0)

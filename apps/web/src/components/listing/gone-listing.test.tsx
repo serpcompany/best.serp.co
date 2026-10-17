@@ -97,6 +97,7 @@ describe('the 410 page’s sections (#53)', () => {
     )
     expect(hrefs(markup)).toEqual(expect.arrayContaining(['/products/quill', '/products/inkpot']))
     expect(hrefs(markup)).not.toContain('/sitemap')
+    expect(markup).not.toContain('<form')
     expect(headings(markup)).toEqual(['Writing Tools'])
   })
 
@@ -122,9 +123,12 @@ describe('the 410 page’s sections (#53)', () => {
     ])
   })
 
-  it('shows the 404 page’s links when there is no alternative', () => {
+  it('shows the 404 page’s actions and links when there is no alternative', () => {
     const markup = page('audio-tools')
     expect(markup).not.toContain('gone-listing-alternatives')
+    expect(markup).toMatch(/<a [^>]*href="\/"[^>]*>Go to the homepage<\/a>/u)
+    expect(markup).toMatch(/<form [^>]*action="\/search\/?"[^>]*method="get"/u)
+    expect(markup).toMatch(/<input [^>]*name="q"/u)
     expect(headings(markup)).toEqual(['Categories', 'Newest', 'Listings'])
     expect(hrefs(markup)).toEqual(
       expect.arrayContaining([

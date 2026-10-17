@@ -215,9 +215,10 @@ names its paths (`htmlSitemapPaths`), and every page's footer links `/sitemap/` 
 
 Per serp's `docs/engineering/standards/web-stack/404-pages.md` (#53):
 
-- **A URL with no page answers 404** with the 404 page, never a redirect. The page carries one
-  robots tag, the `noindex` Next.js writes on a not-found response: `notFoundMetadata` sets no
-  robots directive of its own.
+- **A URL with no page answers 404** with the 404 page, never a redirect. Every 404, the
+  dashboards' included, carries one robots tag, the `noindex` Next.js writes on a not-found
+  response: `notFoundMetadata` sets `robots: null`, which also clears the `/admin` and `/account`
+  layouts' own directive (left out, it would keep theirs as a second tag).
 - **What it links.** Its message, "Go to the homepage" beside the site's search (a GET form to
   `/search/`), every index page (the Products menu's Categories, Best while the best index lists a
   page, and Brands) and the HTML sitemap, then a section for each kind of link (`NotFoundLinks`,
@@ -227,12 +228,15 @@ Per serp's `docs/engineering/standards/web-stack/404-pages.md` (#53):
   "recently added" order: D1 stores no view counts), and the HTML sitemap's numbered listing pages.
   Each comes from a cached read the site already makes (`notFoundLinkTargets`: the shell stats,
   the best index, the publication order's head, and the directory's first page for the listing
-  count); a failed read leaves its section out rather than fail the 404. The tag index stays
+  count); a failed read logs one `not_found_links_read_failed` line (its code and name) and leaves
+  its section out rather than fail the 404. The tag index stays
   unlinked (#425). The dashboards' 404 shows the same without the site chrome.
 - **A removed listing** answers 410 as before ([Taxonomy pages](#taxonomy-pages)). Its hub's first
   100 listings in directory order (`getCategoryListings`, one cached page) fill its sections: the
   first 6 as cards under the hub's name, the hub's best pages, then the rest as links under "More
-  in {hub}". With no alternative, it shows the 404 page's index links and sections instead.
+  in {hub}". A hub with more than 100 listings, the usual case, shows only those first 94 as
+  links; its link leads to the rest. With no alternative, it shows the 404
+  page's actions (the homepage button, the search and the index links) and sections instead.
 
 ## What pages publish for search engines
 

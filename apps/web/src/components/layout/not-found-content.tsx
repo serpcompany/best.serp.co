@@ -22,17 +22,21 @@ import { productLinks, type SiteLink } from './site-links'
 
 /**
  * The 404 page's metadata, built per request (its URLs carry this environment's origin, #359).
- * It sets no robots directive: Next.js already writes `noindex` on a not-found response, and a
- * second, different tag left crawlers to pick one (#53; serp web-stack/404-pages.md).
+ * Its robots directive is `null`: Next.js already writes `noindex` on a not-found response, and a
+ * second, different tag leaves crawlers to pick one (#53; serp web-stack/404-pages.md). Leaving
+ * the key out would keep a layout's own directive, which `/admin` and `/account` set; `null`
+ * clears it, so every 404 carries Next.js's one tag.
  */
 export function notFoundMetadata(): Metadata {
-  const { robots: _robots, ...metadata } = generateBaseMetadata({
-    title: 'Page Not Found',
-    description: `The page you are looking for does not exist. Browse ${siteConfig.name} to explore the directory.`,
-    path: '/404',
-    noindex: true
-  })
-  return metadata
+  return {
+    ...generateBaseMetadata({
+      title: 'Page Not Found',
+      description: `The page you are looking for does not exist. Browse ${siteConfig.name} to explore the directory.`,
+      path: '/404',
+      noindex: true
+    }),
+    robots: null
+  }
 }
 
 /**
@@ -46,18 +50,42 @@ function indexPageLinks(bestIndexListed: boolean): SiteLink[] {
   ]
 }
 
-/** The index pages in one centered row, under the 404 page's message. */
-export function NotFoundIndexLinks({ bestPages }: Pick<NotFoundLinkTargets, 'bestPages'>) {
+/**
+ * What the 404 page offers under its message: "Go to the homepage" beside the site's search, then
+ * the index pages in one centered row. The 410 page shows it too when its listing's category has
+ * no other live listing.
+ */
+export function NotFoundActions({ bestPages }: Pick<NotFoundLinkTargets, 'bestPages'>) {
   return (
-    <ul className="mt-2 flex flex-wrap justify-center gap-x-6 gap-y-2">
-      {indexPageLinks(bestPages.length > 0).map(link => (
-        <li key={link.href}>
-          <Link href={link.href} className={sectionLinkClassName}>
-            {link.label}
-          </Link>
-        </li>
-      ))}
-    </ul>
+    <>
+      <div className="mt-5 flex w-full max-w-2xl flex-col gap-3 sm:flex-row sm:items-center">
+        <Link href={getRoute('home')} className={buttonVariants({ size: 'lg' })}>
+          Go to the homepage
+        </Link>
+        {/* The search page's GET form (`search-page-form.tsx`), without its current query. */}
+        <search className="w-full sm:flex-1">
+          <form action={getRoute('search')} method="get">
+            <SearchField
+              name="q"
+              autoComplete="off"
+              aria-label="Search"
+              groupClassName="h-9"
+              submitLabel="Search"
+              placeholder={siteCopy.listingSearchPlaceholder}
+            />
+          </form>
+        </search>
+      </div>
+      <ul className="mt-2 flex flex-wrap justify-center gap-x-6 gap-y-2">
+        {indexPageLinks(bestPages.length > 0).map(link => (
+          <li key={link.href}>
+            <Link href={link.href} className={sectionLinkClassName}>
+              {link.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </>
   )
 }
 
@@ -111,8 +139,8 @@ export function NotFoundLinks({
 
 /**
  * The 404 page's content (serp.co's `not-found.tsx`, #279; #53, "Option A, Sections"): a small
- * "404" over the heading and its sentence, the homepage button beside the site's search, the index
- * pages, then the 404 page's sections. `app/not-found.tsx` and `app/(dashboard)/not-found.tsx`
+ * "404" over the heading and its sentence, its actions (the homepage button beside the site's
+ * search, then the index pages), then the 404 page's sections. `app/not-found.tsx` and `app/(dashboard)/not-found.tsx`
  * place it.
  */
 export function NotFoundContent(targets: NotFoundLinkTargets) {
@@ -130,25 +158,7 @@ export function NotFoundContent(targets: NotFoundLinkTargets) {
           <p className="max-w-xl text-lg text-pretty text-foreground/80">
             There is no page at this address. It may have moved, or the link may be mistyped.
           </p>
-          <div className="mt-5 flex w-full max-w-2xl flex-col gap-3 sm:flex-row sm:items-center">
-            <Link href={getRoute('home')} className={buttonVariants({ size: 'lg' })}>
-              Go to the homepage
-            </Link>
-            {/* The search page's GET form (`search-page-form.tsx`), without its current query. */}
-            <search className="w-full sm:flex-1">
-              <form action={getRoute('search')} method="get">
-                <SearchField
-                  name="q"
-                  autoComplete="off"
-                  aria-label="Search"
-                  groupClassName="h-9"
-                  submitLabel="Search"
-                  placeholder={siteCopy.listingSearchPlaceholder}
-                />
-              </form>
-            </search>
-          </div>
-          <NotFoundIndexLinks bestPages={targets.bestPages} />
+          <NotFoundActions bestPages={targets.bestPages} />
         </PageContainer>
       </section>
       <NotFoundLinks {...targets} />

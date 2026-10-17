@@ -11,7 +11,8 @@ import type { SiteLink } from './site-links'
  * The link pages' layout (#53, the owner's "Option A, Sections"): the 404 page, the removed-listing
  * page and the HTML sitemap list each kind of link under its own heading, in the same grid of up to
  * four columns. Stock shadcn/ui has no link list, so these are plain lists, styled like the
- * footer's links.
+ * footer's links. A name longer than its column (`CheckForPlagiarism.net` on a 360 px phone) breaks
+ * inside the word instead of running past the viewport.
  */
 
 export const sectionLinkClassName =
@@ -57,7 +58,7 @@ export function LinkGrid({ links }: { links: readonly SiteLink[] }) {
   return (
     <ul className="grid grid-cols-2 gap-x-6 gap-y-2.5 sm:grid-cols-3 lg:grid-cols-4">
       {links.map(link => (
-        <li key={link.href} className="min-w-0">
+        <li key={link.href} className="min-w-0 wrap-break-word">
           <Link href={link.href} className={sectionLinkClassName}>
             {link.label}
           </Link>
@@ -73,10 +74,10 @@ export function LinkGroups({ groups }: { groups: readonly LinkGroup[] }) {
     <div className="-mb-6 columns-2 gap-x-6 sm:columns-3 lg:columns-4">
       {groups.map(group => (
         <div key={group.key} className="flex break-inside-avoid flex-col gap-2.5 pb-6">
-          <h3 className="text-sm font-medium">{group.title}</h3>
+          <h3 className="text-sm font-medium wrap-break-word">{group.title}</h3>
           <ul className="flex flex-col gap-2.5">
             {group.links.map(link => (
-              <li key={link.href}>
+              <li key={link.href} className="wrap-break-word">
                 <Link href={link.href} className={sectionLinkClassName}>
                   {link.label}
                 </Link>

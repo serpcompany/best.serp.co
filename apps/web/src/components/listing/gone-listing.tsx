@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { LinkGrid, LinkSection, LinkSections } from '@/components/layout/link-sections'
-import { NotFoundIndexLinks, NotFoundLinks } from '@/components/layout/not-found-content'
+import { NotFoundActions, NotFoundLinks } from '@/components/layout/not-found-content'
 import { PageContainer } from '@/components/layout/page-shell'
 import { LLMGrid } from '@/components/llm/llm-grid'
 import { buttonVariants } from '@/components/ui/button'
@@ -26,8 +26,9 @@ export const GONE_LISTING_CATEGORY_LISTINGS = 100
  * `GONE_LISTING_ALTERNATIVES` of its live listings as cards under its name, its best pages, and its
  * other live listings as links. `hub` is the listing's category only while that category's page
  * renders (`renderingCategory`, #347); without it the page links the directory, never a category
- * page that answers 404. With no alternative to show, it shows the 404 page's links instead (serp
- * web-stack/404-pages.md).
+ * page that answers 404. With no alternative to show, it shows the 404 page's actions and links
+ * instead (serp web-stack/404-pages.md): the homepage button, the search, the index pages and the
+ * 404 page's sections.
  */
 export function GoneListing({
   alternatives,
@@ -56,7 +57,7 @@ export function GoneListing({
         <PageContainer className="flex flex-col items-center gap-3 pt-14 pb-12 text-center">
           <h1
             id="gone-listing-title"
-            className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl"
+            className="text-3xl font-semibold tracking-tight text-balance wrap-break-word sm:text-4xl"
           >
             {listing.name} is no longer listed
           </h1>
@@ -77,7 +78,7 @@ export function GoneListing({
               Relist it
             </Link>
           </p>
-          {links ? <NotFoundIndexLinks bestPages={links.bestPages} /> : null}
+          {links ? <NotFoundActions bestPages={links.bestPages} /> : null}
         </PageContainer>
       </section>
       {hub && alternatives.length > 0 ? (
