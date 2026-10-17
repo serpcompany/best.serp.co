@@ -175,22 +175,45 @@ const SUBMISSION_DECISION_EMAILS = {
 } as const satisfies Record<string, DecisionEmailKind>
 const SUBMISSION_DECISION_EMAIL_TEMPLATES = Object.keys(SUBMISSION_DECISION_EMAILS)
 
-/** A submission's decision emails in the email ledger (#490), most recently updated first. */
+const DECISION_EMAILS_SHOWN = 20
+
+/**
+ * A submission's decision emails in the email ledger (#490). Both halves seek the ledger's
+ * primary key `(template_id, event_key)`: the fixed keys by equality, and the numbered
+ * changes-requested keys as the range their prefix covers (key parts never contain `;`, the code
+ * point after the `:` separator). The rows are few (two fixed keys, and one key per request for
+ * changes), so `newestDecisionEmails` orders them rather than a temporary B-tree.
+ */
 function selectSubmissionDecisionEmailsPlan(submissionId: string): StatementPlan {
-  const changesRequested = `submission-changes-requested:${submissionId}:`
+  const templates = SUBMISSION_DECISION_EMAIL_TEMPLATES.map(() => '?').join(',')
+  const changesRequested = `submission-changes-requested:${submissionId}`
   return {
     sql: `SELECT template_id,event_key,status,updated_at FROM email_deliveries
-      WHERE template_id IN (${SUBMISSION_DECISION_EMAIL_TEMPLATES.map(() => '?').join(',')})
-        AND (event_key IN (?,?) OR substr(event_key,1,?)=?)
-      ORDER BY updated_at DESC,event_key DESC LIMIT 20`,
+        WHERE template_id IN (${templates}) AND event_key IN (?,?)
+      UNION ALL
+      SELECT template_id,event_key,status,updated_at FROM email_deliveries
+        WHERE template_id IN (${templates}) AND event_key>=? AND event_key<?`,
     params: [
       ...SUBMISSION_DECISION_EMAIL_TEMPLATES,
       `submission-approved:${submissionId}`,
       `submission-rejected:${submissionId}`,
-      changesRequested.length,
-      changesRequested
+      ...SUBMISSION_DECISION_EMAIL_TEMPLATES,
+      `${changesRequested}:`,
+      `${changesRequested};`
     ]
   }
+}
+
+/** The 20 newest decision emails first: by update time, then event key, both descending. */
+function newestDecisionEmails(rows: Row[]): Row[] {
+  const descending = (a: string, b: string) => (a < b ? 1 : a > b ? -1 : 0)
+  return [...rows]
+    .sort(
+      (a, b) =>
+        descending(text(a.updated_at), text(b.updated_at)) ||
+        descending(text(a.event_key), text(b.event_key))
+    )
+    .slice(0, DECISION_EMAILS_SHOWN)
 }
 
 /**
@@ -1395,7 +1418,7 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
         description: text(row.description),
         duplicateListings: Number(row.duplicate_listings ?? 0),
         duplicateSubmissions: Number(row.duplicate_submissions ?? 0),
-        emails: (emails ?? []).map(email => ({
+        emails: newestDecisionEmails(emails ?? []).map(email => ({
           eventKey: text(email.event_key),
           kind: SUBMISSION_DECISION_EMAILS[
             text(email.template_id) as keyof typeof SUBMISSION_DECISION_EMAILS
