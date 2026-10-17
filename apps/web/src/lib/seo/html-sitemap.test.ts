@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   HTML_SITEMAP_PAGE_SIZE,
+  htmlSitemapListingPageLinks,
   htmlSitemapListingsPath,
   htmlSitemapPage,
   htmlSitemapPageCount,
+  htmlSitemapRange,
+  htmlSitemapRangeOf,
   parseHtmlSitemapPageSegment
 } from './html-sitemap'
 
@@ -50,5 +53,18 @@ describe('the HTML sitemap’s numbered pages (#53)', () => {
   it('writes page 1 as the bare listings URL and later pages by number', () => {
     expect(htmlSitemapListingsPath(1)).toBe('/sitemap/listings/')
     expect(htmlSitemapListingsPath(2)).toBe('/sitemap/listings/2/')
+  })
+
+  it('labels each page by the range of items on it', () => {
+    expect(htmlSitemapRange(1, 2498)).toBe('1–200')
+    expect(htmlSitemapRange(13, 2498)).toBe('2,401–2,498')
+    expect(htmlSitemapRange(2, 201)).toBe('201')
+    expect(htmlSitemapRangeOf(2, 2498)).toBe('201–400 of 2,498')
+    expect(htmlSitemapListingPageLinks(401)).toEqual([
+      { href: '/sitemap/listings/', label: '1–200' },
+      { href: '/sitemap/listings/2/', label: '201–400' },
+      { href: '/sitemap/listings/3/', label: '401' }
+    ])
+    expect(htmlSitemapListingPageLinks(0)).toEqual([])
   })
 })

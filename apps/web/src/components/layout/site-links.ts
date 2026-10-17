@@ -157,15 +157,20 @@ export function footerGroups(): FooterGroup[] {
 
 /**
  * The HTML sitemap's "Pages" (#53): the indexable static pages the pages sitemap lists, named as
- * the header and footer name them, in their order. The sitemap's own pages are left out, and the
- * best index is in only while it lists a best page, as in the pages sitemap.
+ * the header and footer name them (the homepage as "Home", as #53's design names it), in the
+ * header's order, then the footer's. The sitemap's own pages are left out, and the best index is
+ * in only while it lists a best page, as in the pages sitemap.
  */
 export function sitemapPageLinks(options: SiteLinkOptions): SiteLink[] {
   const listed = new Set<string>(sitemapRoutePaths('pages'))
   for (const path of [htmlSitemapPaths.index, htmlSitemapPaths.listings]) listed.delete(path)
+  const headerLinks = headerItems(options).flatMap(item =>
+    item.kind === 'menu' ? item.links : [item.link]
+  )
   const links = new Map<string, SiteLink>()
   for (const link of [
-    ...productLinks(options),
+    { href: getRoute('home'), label: 'Home' },
+    ...headerLinks,
     ...directoryLinks(),
     ...resourceLinks(),
     ...legalLinks()

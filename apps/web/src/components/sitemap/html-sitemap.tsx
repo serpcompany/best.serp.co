@@ -1,52 +1,44 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { Separator } from '@/components/ui/separator'
 import type { PublishedBestPage, PublishedCategory } from '@/db/contracts'
 import { getRoute } from '@/lib/routing/routes'
 import {
   type HtmlSitemapLink,
   type HtmlSitemapPage,
-  htmlSitemapListingsPath
+  htmlSitemapListingPageLinks,
+  htmlSitemapListingsPath,
+  htmlSitemapRangeOf
 } from '@/lib/seo/html-sitemap'
 import { generateBaseMetadata, SITE_NAME, siteOrigin } from '@/lib/seo/seo-config'
 import { isBestPageIndexable, linkedCategories } from '@/lib/seo/taxonomy-indexing'
 import { siteCopy } from '@/lib/site/site-copy'
 import { ListingPagination } from '../directory/listing-pagination'
+import {
+  bestPageGroups,
+  categoryLinks,
+  LinkGrid,
+  type LinkGroup,
+  LinkGroups,
+  LinkSection,
+  LinkSections,
+  sectionLinkClassName
+} from '../layout/link-sections'
 import { PageHero } from '../layout/page-hero'
 import { PageSection } from '../layout/page-shell'
 import { type BreadcrumbItemData, SiteBreadcrumb } from '../layout/site-breadcrumb'
 import type { SiteLink } from '../layout/site-links'
 
 /**
- * The HTML sitemap (#53; serp web-stack/html-sitemap.md, after serp.co's `/sitemap/`): links under
- * plain headings, every one to an indexable page. `/sitemap/` lists the hub pages and the numbered
- * listing pages; each numbered page lists up to 200 listings, oldest first.
+ * The HTML sitemap (#53; serp web-stack/html-sitemap.md, after serp.co's `/sitemap/`), in the
+ * owner's "Option A, Sections": each kind of link under its own heading, every one to an indexable
+ * page. `/sitemap/` lists the hub pages and the numbered listing pages; each numbered page lists up
+ * to 200 listings, oldest first.
  */
 
-type SitemapGroup = { id: string; links: SiteLink[]; title: string }
-
-const linkClassName = 'text-sm text-muted-foreground transition-colors hover:text-foreground'
-
-/** Links in columns, each group under its heading. */
-function SitemapLinkGroup({ group }: { group: SitemapGroup }) {
-  return (
-    <section aria-labelledby={group.id}>
-      <Separator />
-      <h2 id={group.id} className="pt-6 text-sm font-medium">
-        {group.title}
-      </h2>
-      <ul className="mt-4 columns-1 gap-x-10 sm:columns-2 lg:columns-4">
-        {group.links.map(link => (
-          <li key={link.href} className="break-inside-avoid py-1.5">
-            <Link href={link.href} className={linkClassName}>
-              {link.label}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </section>
-  )
-}
+export type SitemapSection = { id: string; title: string } & (
+  | { groups: LinkGroup[] }
+  | { links: SiteLink[] }
+)
 
 export function htmlSitemapMetadata(): Metadata {
   return generateBaseMetadata({
@@ -57,106 +49,100 @@ export function htmlSitemapMetadata(): Metadata {
 }
 
 /**
- * `/sitemap/`'s groups: the indexable static pages, every category whose page renders, every
- * indexable best page, then the numbered listing pages. A group with no link is left out.
+ * `/sitemap/`'s sections: the indexable static pages, every category whose page renders, every
+ * indexable best page under its hub, then the numbered listing pages, labelled by range. A section
+ * with no link is left out.
  */
-export function htmlSitemapGroups({
+export function htmlSitemapSections({
   bestPages,
   categories,
-  listingPageCount,
+  listingTotal,
   pages
 }: {
   bestPages: readonly PublishedBestPage[]
   categories: readonly PublishedCategory[]
-  listingPageCount: number
+  /** How many listings the numbered pages list. */
+  listingTotal: number
   /** `sitemapPageLinks` */
   pages: SiteLink[]
-}): SitemapGroup[] {
-  const groups: SitemapGroup[] = [
+}): SitemapSection[] {
+  const sections: SitemapSection[] = [
     { id: 'sitemap-pages', links: pages, title: 'Pages' },
     {
       id: 'sitemap-categories',
-      links: linkedCategories(categories).map(category => ({
-        href: getRoute('category.page', { category: category.slug }),
-        label: category.name
-      })),
+      links: categoryLinks(linkedCategories(categories)),
       title: 'Categories'
     },
     {
+      groups: bestPageGroups(bestPages.filter(isBestPageIndexable), categories),
       id: 'sitemap-best',
-      links: bestPages
-        .filter(isBestPageIndexable)
-        .sort((left, right) => left.heading.localeCompare(right.heading))
-        .map(page => ({
-          href: getRoute('best.page', { keyword: page.slug }),
-          label: page.heading
-        })),
-      title: 'Best'
+      title: 'Best of'
     },
-    {
-      id: 'sitemap-listings',
-      links: Array.from({ length: listingPageCount }, (_, index) => ({
-        href: htmlSitemapListingsPath(index + 1),
-        label: `Page ${index + 1}`
-      })),
-      title: siteCopy.listingName.pluralTitle
-    }
+    { id: 'sitemap-listings', links: htmlSitemapListingPageLinks(listingTotal), title: 'Listings' }
   ]
-  return groups.filter(group => group.links.length > 0)
+  return sections.filter(section =>
+    'groups' in section ? section.groups.length > 0 : section.links.length > 0
+  )
 }
 
-export function HtmlSitemapIndex({ groups }: { groups: SitemapGroup[] }) {
+export function HtmlSitemapIndex({ sections }: { sections: SitemapSection[] }) {
   return (
     <>
-      <PageSection spacing="hero" className="border-b">
+      <PageSection spacing="hero">
         <SiteBreadcrumb
           items={[{ name: 'Sitemap', href: getRoute('sitemap.index') }]}
           baseUrl={siteOrigin()}
         />
         <PageHero title="Sitemap" />
       </PageSection>
-      <PageSection spacing="spacious" containerClassName="flex flex-col gap-12">
-        {groups.map(group => (
-          <SitemapLinkGroup key={group.id} group={group} />
+      <LinkSections>
+        {sections.map(section => (
+          <LinkSection key={section.id} id={section.id} title={section.title}>
+            {'groups' in section ? (
+              <LinkGroups groups={section.groups} />
+            ) : (
+              <LinkGrid links={section.links} />
+            )}
+          </LinkSection>
         ))}
-      </PageSection>
+      </LinkSections>
     </>
   )
 }
 
 /** A numbered page's metadata: indexable and canonical to itself, with its own title. */
 export function htmlSitemapListingsMetadata(page: number): Metadata {
-  const { pluralTitle, singular } = siteCopy.listingName
   const suffix = page > 1 ? ` - Page ${page}` : ''
   return generateBaseMetadata({
-    title: `Sitemap: ${pluralTitle}${suffix}`,
-    description: `Links to every ${singular} on ${SITE_NAME}, page ${page}.`,
+    title: `Sitemap: Listings${suffix}`,
+    description: `Links to every ${siteCopy.listingName.singular} on ${SITE_NAME}, page ${page}.`,
     path: htmlSitemapListingsPath(page)
   })
 }
 
-/** A numbered page: its listings' links in columns, then the page links. */
+/** A numbered page: its range of the whole, its listings' links in columns, then the page links. */
 export function HtmlSitemapListings({ result }: { result: HtmlSitemapPage<HtmlSitemapLink> }) {
-  const { pluralTitle } = siteCopy.listingName
-  const { items, page, pageCount } = result
+  const { items, page, pageCount, total } = result
   const breadcrumb: BreadcrumbItemData[] = [
     { name: 'Sitemap', href: getRoute('sitemap.index') },
-    { name: pluralTitle, href: htmlSitemapListingsPath(1) },
-    ...(page > 1 ? [{ name: `Page ${page}`, href: htmlSitemapListingsPath(page) }] : [])
+    { name: 'Listings', href: htmlSitemapListingsPath(page) }
   ]
   return (
     <>
-      <PageSection spacing="hero" className="border-b">
+      <PageSection spacing="hero">
         <SiteBreadcrumb items={breadcrumb} baseUrl={siteOrigin()} />
-        <PageHero title={pluralTitle} description={`Page ${page} of ${pageCount}`} />
+        <PageHero
+          title="Listings"
+          description={total > 0 ? htmlSitemapRangeOf(page, total) : undefined}
+        />
       </PageSection>
-      <PageSection spacing="spacious">
-        <ul className="columns-1 gap-x-10 sm:columns-2 lg:columns-4">
+      <LinkSections>
+        <ul className="columns-2 gap-x-6 sm:columns-3 lg:columns-4">
           {items.map(item => (
-            <li key={item.slug} className="break-inside-avoid py-1.5">
+            <li key={item.slug} className="break-inside-avoid py-1.25">
               <Link
                 href={getRoute('listing.detail', { slug: item.slug })}
-                className={linkClassName}
+                className={sectionLinkClassName}
               >
                 {item.name}
               </Link>
@@ -170,7 +156,7 @@ export function HtmlSitemapListings({ result }: { result: HtmlSitemapPage<HtmlSi
           pageCount={pageCount}
           pageHref={htmlSitemapListingsPath}
         />
-      </PageSection>
+      </LinkSections>
     </>
   )
 }

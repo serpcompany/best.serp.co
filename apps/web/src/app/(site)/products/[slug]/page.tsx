@@ -2,7 +2,11 @@ import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import { notFound, permanentRedirect } from 'next/navigation'
 import { ClaimListing } from '@/components/claims/claim-listing'
-import { GONE_LISTING_ALTERNATIVES, GoneListing } from '@/components/listing/gone-listing'
+import {
+  GONE_LISTING_ALTERNATIVES,
+  GONE_LISTING_CATEGORY_LISTINGS,
+  GoneListing
+} from '@/components/listing/gone-listing'
 import {
   generateWebsiteDetailRouteMetadata,
   WebsiteDetailRoutePage
@@ -13,7 +17,7 @@ import {
   getCategoryListings,
   getUnpublishedListing
 } from '@/lib/catalog/repository'
-import { notFoundLinkTargetsFrom } from '@/lib/catalog/site-nav'
+import { notFoundLinkTargets } from '@/lib/catalog/site-nav'
 import { currentClaimCopy, currentClaimFlags } from '@/lib/claims/current'
 import { getWebsiteBySlug, getWebsiteCanonicalRedirect } from '@/lib/content-loader'
 import { categoryNamesBySlug } from '@/lib/directory/categories'
@@ -86,22 +90,25 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     if (canonicalSlug) permanentRedirect(getRoute('listing.detail', { slug: canonicalSlug }))
     const gone = await goneListing(slug)
     // Its hub only while the hub's page renders, else the directory (#347); the hub's first
-    // listings as alternatives and its best pages (#53).
+    // listings as cards, its best pages and its other listings as links, or the 404 page's links
+    // when it has none (#53).
     if (gone) {
       const [categories, bestPages] = await shell
       const hub = renderingCategory(categories, gone.category)
-      const alternatives = hub
-        ? (await getCategoryListings(hub.slug, GONE_LISTING_ALTERNATIVES)).map(
-            toWebsiteBrowseCardMetadata
-          )
+      const listings = hub
+        ? await getCategoryListings(hub.slug, GONE_LISTING_CATEGORY_LISTINGS)
         : []
+      const alternatives = listings
+        .slice(0, GONE_LISTING_ALTERNATIVES)
+        .map(toWebsiteBrowseCardMetadata)
       return (
         <GoneListing
           alternatives={alternatives}
           bestPages={hub ? categoryBestPages(bestPages, hub.slug) : []}
           hub={hub}
-          links={notFoundLinkTargetsFrom(categories, bestPages)}
+          links={alternatives.length > 0 ? null : await notFoundLinkTargets()}
           listing={gone}
+          more={listings.slice(GONE_LISTING_ALTERNATIVES).map(({ name, slug }) => ({ name, slug }))}
         />
       )
     }

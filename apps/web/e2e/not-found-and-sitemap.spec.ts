@@ -62,12 +62,20 @@ test.describe('the 404 page (#53)', () => {
     )
     // Only categories with a public listing.
     expect(links).not.toContain(`/products/categories/${seedCategories.empty.slug}/`)
+    // The newest listings and the HTML sitemap's listing pages, each under its heading.
+    for (const heading of ['Categories', 'Best of', 'Newest', 'Listings']) {
+      expect(mainOf(html)).toMatch(new RegExp(`<h2[^>]*>${heading}</h2>`, 'u'))
+    }
+    expect(links.filter(listingPath).length).toBe(12)
+    expect(links).toContain('/sitemap/listings/')
     expect(mainOf(html)).toMatch(/<form[^>]*action="\/search\/"[^>]*>[\s\S]*name="q"/u)
   })
 })
 
 test.describe('a removed listing (#53)', () => {
-  test('answers 410 with up to six live listings from its category', async ({ request }) => {
+  test('answers 410 with six live listings from its category, then the rest of it as links', async ({
+    request
+  }) => {
     const response = await request.get(`/products/${seedListings.unlisted.slug}/`, noRedirects)
     expect(response.status()).toBe(410)
     const main = mainOf(await response.text())
@@ -75,18 +83,29 @@ test.describe('a removed listing (#53)', () => {
     expect(main.replaceAll('<!-- -->', '')).toContain(
       `${seedListings.unlisted.name} is no longer listed`
     )
-    const alternativesAt = main.indexOf('id="gone-listing-alternatives"')
+    const sectionAt = (id: string) => main.indexOf(`id="${id}"`)
+    const alternativesAt = sectionAt('gone-listing-alternatives')
+    const moreAt = sectionAt('gone-listing-more')
     expect(alternativesAt, 'the page shows alternatives').toBeGreaterThan(-1)
-    const alternatives = [...new Set(hrefs(main.slice(alternativesAt)).filter(listingPath))]
-    expect(alternatives.length).toBeGreaterThan(0)
-    expect(alternatives.length).toBeLessThanOrEqual(6)
-    expect(alternatives).not.toContain(`/products/${seedListings.unlisted.slug}/`)
+    expect(moreAt, 'and the rest of the category').toBeGreaterThan(alternativesAt)
+    const alternatives = [...new Set(hrefs(main.slice(alternativesAt, moreAt)).filter(listingPath))]
+    const more = hrefs(main.slice(moreAt)).filter(listingPath)
+    expect(alternatives.length).toBe(6)
+    for (const href of [...alternatives, ...more]) {
+      expect(href).not.toBe(`/products/${seedListings.unlisted.slug}/`)
+    }
 
-    // Each one is a live listing of the removed listing's category (Writing Tools).
-    const category = await request.get(`/products/categories/${seedCategories.writing.slug}/`)
-    const inCategory = new Set(hrefs(mainOf(await category.text())).filter(listingPath))
-    for (const href of alternatives) expect(inCategory.has(href), href).toBe(true)
-    expect(hrefs(main)).toContain(`/products/categories/${seedCategories.writing.slug}/`)
+    // Together they are every live listing of the removed listing's category (Writing Tools,
+    // two pages of the category), each once.
+    const categoryPath = `/products/categories/${seedCategories.writing.slug}/`
+    const inCategory = new Set<string>()
+    for (const path of [categoryPath, `${categoryPath}?page=2`]) {
+      const page = await request.get(path)
+      for (const href of hrefs(mainOf(await page.text())).filter(listingPath)) inCategory.add(href)
+    }
+    expect(inCategory.size).toBe(seedFacts.paginatedCategory.listingCount)
+    expect([...alternatives, ...more].sort()).toEqual([...inCategory].sort())
+    expect(hrefs(main)).toContain(categoryPath)
   })
 })
 

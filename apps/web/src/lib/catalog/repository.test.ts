@@ -9,7 +9,7 @@ const { getCloudflareContext } = vi.hoisted(() => ({ getCloudflareContext: vi.fn
 vi.mock('server-only', () => ({}))
 vi.mock('@opennextjs/cloudflare', () => ({ getCloudflareContext }))
 
-const { getCategoryListings, getListingBySlug, getSitemapListingPage, getSitemapListingPageCount } =
+const { getCategoryListings, getListingBySlug, getSitemapListingPage, getSitemapListingTotal } =
   await import('./repository')
 
 /** A Workers Cache API stand-in: entries by request URL, kept as the JSON the data cache writes. */
@@ -199,7 +199,7 @@ describe('the catalog adapter’s HTML sitemap and alternatives reads (#53)', ()
       pageCount: 1,
       total: 5
     })
-    expect(await getSitemapListingPageCount()).toBe(1)
+    expect(await getSitemapListingTotal()).toBe(5)
     expect(cacheStates('published-summaries')).toEqual(['miss', 'written', 'hit'])
   })
 

@@ -66,7 +66,14 @@ describe('the HTML sitemap’s links (#53)', () => {
     const listed = sitemapRoutePaths('pages').filter(path => !own.has(path))
     const links = sitemapPageLinks({ bestIndexListed: true })
     expect(links.map(link => link.href).sort()).toEqual([...listed].sort())
-    expect(links[0]).toEqual({ href: '/', label: 'All products' })
+    expect(links.slice(0, 6).map(link => link.label)).toEqual([
+      'Home',
+      'Categories',
+      'Best',
+      'Brands',
+      'Pricing',
+      'About'
+    ])
     expect(links.every(link => link.label.length > 0)).toBe(true)
   })
 

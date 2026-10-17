@@ -2,14 +2,10 @@ import type { Metadata } from 'next'
 import { sitemapPageLinks } from '@/components/layout/site-links'
 import {
   HtmlSitemapIndex,
-  htmlSitemapGroups,
-  htmlSitemapMetadata
+  htmlSitemapMetadata,
+  htmlSitemapSections
 } from '@/components/sitemap/html-sitemap'
-import {
-  getActiveCategories,
-  getBestPages,
-  getSitemapListingPageCount
-} from '@/lib/catalog/repository'
+import { getActiveCategories, getBestPages, getSitemapListingTotal } from '@/lib/catalog/repository'
 import { listedBestPages } from '@/lib/seo/taxonomy-indexing'
 
 export function generateMetadata(): Metadata {
@@ -18,15 +14,15 @@ export function generateMetadata(): Metadata {
 
 /** The HTML sitemap (#53): every indexable hub page, then the numbered listing pages. */
 export default async function HtmlSitemapPage() {
-  const [categories, bestPages, listingPageCount] = await Promise.all([
+  const [categories, bestPages, listingTotal] = await Promise.all([
     getActiveCategories(),
     getBestPages(),
-    getSitemapListingPageCount()
+    getSitemapListingTotal()
   ])
   const pages = sitemapPageLinks({ bestIndexListed: listedBestPages(bestPages).length > 0 })
   return (
     <HtmlSitemapIndex
-      groups={htmlSitemapGroups({ bestPages, categories, listingPageCount, pages })}
+      sections={htmlSitemapSections({ bestPages, categories, listingTotal, pages })}
     />
   )
 }

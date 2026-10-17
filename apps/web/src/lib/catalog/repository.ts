@@ -30,12 +30,7 @@ import {
   LISTING_CONTENT_FORMAT,
   type ListingContentTree
 } from '@/lib/markdown/listing-content'
-import {
-  type HtmlSitemapLink,
-  type HtmlSitemapPage,
-  htmlSitemapPage,
-  htmlSitemapPageCount
-} from '@/lib/seo/html-sitemap'
+import { type HtmlSitemapLink, type HtmlSitemapPage, htmlSitemapPage } from '@/lib/seo/html-sitemap'
 import { CodedError } from '@/lib/telemetry/coded-error'
 
 export type {
@@ -324,7 +319,7 @@ export async function getSitemapListingPage(
   return htmlSitemapPage(await readSitemapListingLinks(), page)
 }
 
-/** How many numbered pages the HTML sitemap's listings fill. */
-export async function getSitemapListingPageCount(): Promise<number> {
-  return htmlSitemapPageCount((await readSitemapListingLinks()).length)
+/** How many listings the HTML sitemap's numbered pages list. */
+export async function getSitemapListingTotal(): Promise<number> {
+  return (await readSitemapListingLinks()).length
 }
