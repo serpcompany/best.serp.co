@@ -1970,7 +1970,11 @@ function siteRefundRunning(deps: BillingDependencies, order: OrderRecord): boole
  * that haven't failed don't send the payment back (the reported refund failed since: a retried
  * report, delivered after its failure, #498's review), nothing went back: the order stays
  * `refunding`, flagged `refund_failed` (the sweep stops retrying it, and never tells the owner it
- * was refunded).
+ * was refunded). When the provider can't say for now (down, a timeout, a rate limit, a partial
+ * list), the report alone can't show the money went back, so nothing is recorded and the error
+ * answers the delivery 500: the order stays as it was, and the provider's retry decides with its
+ * record (#504). A read the key is refused, or nothing to ask about (no error to retry), still
+ * decides by the report.
  */
 async function finishRefundAtProvider(
   deps: BillingDependencies,
@@ -1978,6 +1982,7 @@ async function finishRefundAtProvider(
   siteRefund: boolean
 ): Promise<string> {
   const atProvider = await refundsAtProvider(deps, order)
+  if (!atProvider.checked && atProvider.error) throw atProvider.error
   if (atProvider.checked && !atProvider.returned) {
     logWarning('billing_refund_not_returned', { order: order.id })
     if (order.attention === 'refund_failed') return 'refund_failed'
