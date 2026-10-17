@@ -1,0 +1,731 @@
+# serpcompany/best.serp.co#539 (batch G): hand-picked alternatives for the 110 live listings whose
+# primary category is Health & Lifestyle and whose slug starts with d to z (dishgen.com to
+# yougotcooking.com), the rest of Health & Lifestyle after batch F's a to c. The picks lead each
+# page's Alternatives section; the page tops it up to six from similar listings.
+# Picked on 2026-10-18 from staging's live listings (read-only), each also live on production
+# (https://best.serp.co/sitemap-products.xml, read that day), by what each listing and its
+# candidates say they do: a pick does the same job for the same kind of user, best first, and a
+# listing gets fewer than six, or none, when nothing else fits. That day each listing's site and
+# each pick's site was fetched to check it still offers the product its listing describes, but the
+# first pass missed ScrappyChef's notice that it is offline and picked it. Review then read every
+# homepage (in a browser where a script got only a title, a bot check or an empty page), so
+# ScrappyChef is now a retirement candidate and every pick left is confirmed; Eleven Labs and
+# Gatherly, added in review, were read too. When picking, nine were read in a browser (Dream
+# Interpreter, DreamStory, Layla, Skoot, Gatherly, Noom, ixigo, FaceApp's hairstyle filters and
+# Velo.ai's product page).
+# Picks may come from any category: Consensus is filed under Education, Eleven Labs under Audio &
+# Music, FaceApp and Meshy under Image & Design, and Nabla and Suki under Productivity. Every
+# listing and pick is a v1 import listing, with the same id and slug on staging and production. The
+# reason for each listing is the comment above its operation.
+# Forty-five listings have no operation. Thirty-seven because nothing in the catalog substitutes for
+# them on 2026-10-18: Pod AI by Eightsleep (a smart bed cover that cools and heats each side of the
+# bed), ElfMessages (personalised audio messages from a Christmas elf), Endurance (structured group
+# workouts for running, cycling and swimming teams), Flora incognita (identifying plants from a
+# photo), Face Shape AI (detecting your face shape from a photo), Getactyv (AI-guided physiotherapy
+# at home), HeardThat (a phone app that makes speech clearer in noisy places for people with hearing
+# aids), Jeffrey Célavie (an AI astrologer chat), Rhubarb (smart backyard gardens with growing
+# coaching), Josh.ai (AI voice control for the smart home), Keeper (matchmaking for people who want
+# to marry, with human matchmakers), Lion Browser (safer browsing and parental-control apps for
+# families), LitRPG Adventures (AI generators of tabletop RPG content), Medgic (checking skin
+# problems from a photo), MeowTalk (translating cat meows), Mighty Travels (a membership that emails
+# airfare and hotel deals and error fares), Moveme (movie picks by the mood you want), OnePanel
+# (reading manga one panel at a time), Onoco AI (a parenting app that tracks and shares a baby's
+# care and milestones), Ask Poppy (a baby registry), PMcardio (AI ECG interpretation for heart
+# care), proudP (measuring urine flow and prostate symptoms at home), RPS AI (playing rock paper
+# scissors against an AI), Safewaters (shark-risk and surf forecasts), Sens.ai (neurofeedback brain
+# training at home), Siwalu (identifying animals and breeds from a photo), Soharhealth (insurance
+# checks and patient intake for healthcare providers), AI Sports Prediction (AI football predictions
+# for betting), StarByFace (finding which celebrity you look like), Stitch Fix (personal styling
+# with clothes shipped to your door), Write A Thank You (writing thank-you notes), This Word Does
+# Not Exist (inventing new English words with AI), TTcare (AI health checks for pets from photos),
+# Unlearn (digital twins of patients for clinical trials), Unpromptedgame (a game of guessing the
+# words behind AI images), Velo.ai (a bike radar camera that warns of cars from behind) and
+# Video2Recipe (turning cooking videos into written recipes). Eight because their sites don't offer
+# the listed product on 2026-10-18, so they are retirement candidates and no listing picks them: The
+# Simulation (fablesimulation.com, a 2023 placeholder pointing to Showrunner), FashionAdvisorAI
+# (fashionadvisorai.com, now a gambling site), JourneyPlan (journeyplan.co, answers 410 Gone),
+# Kinetix (kinetix.tech, now a motion-AI research lab), Nutrition AI (nutrition.ai, only a "stay
+# tuned" mailing list), ScrappyChef (scrappychef.ai, a "Sunset" notice says it is now offline),
+# Skoot (skoothere.com, redirects to ad links) and Woebot Health (woebothealth.com, the app was
+# retired on 2025-06-30). Their pages keep the similar-listings fallback.
+# Each listing-alternatives-set compares and swaps the listing's slug and current picks (none yet),
+# refuses a pick that isn't live with that id and slug, keeps the listing's checksum, and logs an
+# `edited` event. Row-level, so the batch is refused with nothing written if any listing changed.
+# Needs migration 0018_listing_alternatives (#534, release 9). Publish on staging first, then on
+# production after the promotion that carries it.
+version: 1
+id: 2026-10-18-alternatives-lifestyle-d-z
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  # dishgen.com: AI recipe generators that write a recipe from an idea or the ingredients you have,
+  # with meal plans.
+  - action: listing-alternatives-set
+    id: lst_02764b81a4579c713ec42dd8
+    slug: dishgen.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_fa92720f8ceb06bd69ce6eac, slug: chefgpt.xyz }
+      - { id: lst_0c67097a483a157faf374524, slug: mealsai.com }
+      - { id: lst_ddab070eba92ebf32b67edbd, slug: cookaifood.com }
+      - { id: lst_c5d360500e966d245acfdebd, slug: what-the-chef.com }
+      - { id: lst_f0f93b3746a8a0d24a036d12, slug: yougotcooking.com }
+  # docus.ai: AI health assistants and symptom checkers for consumers.
+  - action: listing-alternatives-set
+    id: lst_dca56319fbf41dad0cbbcdf8
+    slug: docus.ai
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_9eb69c91201a22a7239de775, slug: ubiehealth.com }
+      - { id: lst_5d9964eee033c567494379df, slug: buoyhealth.com }
+      - { id: lst_03f90b7d527851ade6880f2a, slug: symptomchecker.io }
+      - { id: lst_7e9942ec5b64653e225b9f4b, slug: medisearch.io }
+  # doximity.com: clinical AI and note-taking for US clinicians (Doximity's Ask and Scribe); nothing
+  # else in the catalog is a clinician network or dialer.
+  - action: listing-alternatives-set
+    id: lst_bc863a19753deb5fb81481ff
+    slug: doximity.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_ff033fe6adba15c676edcd28, slug: glass.health }
+      - { id: lst_5a1b622f42236a0ba8af92a8, slug: leny.ai }
+      - { id: lst_458fc079274781fb3e415bc8, slug: suki.ai }
+      - { id: lst_32ece2577a0a35c4a2d8c7a4, slug: nabla.com }
+  # dr-muscle.com: AI personal trainers that build and adapt strength workouts.
+  - action: listing-alternatives-set
+    id: lst_26cc57d84f3784e8cf17286b
+    slug: dr-muscle.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_14bb8a79bbaca662bc7364f8, slug: fitbod.me }
+      - { id: lst_4828ec505b5cfa8230cc028c, slug: gravl.ai }
+      - { id: lst_54bb53ed43490319ad545a05, slug: gymbuddy.ai }
+      - { id: lst_7e98432eaf369bbe2e07c163, slug: burnbacon.com }
+      - { id: lst_45cd9f6e2d4e9be94a628c5f, slug: strongrfastr.com }
+  # dream.page: community and events management for curated communities; Gatherly hosts
+  # communities' networking events and member sessions online, and nothing in the catalog runs the
+  # community side.
+  - action: listing-alternatives-set
+    id: lst_0a5948b6d70bf5a28eb23751
+    slug: dream.page
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_03c5c245805a41c5e6ad28a4, slug: gatherly.io }
+  # dreamdecoder.me: AI dream interpreters and dream journals.
+  - action: listing-alternatives-set
+    id: lst_11d69feb99f1c38017be1b4b
+    slug: dreamdecoder.me
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_b262c9bb9ec59cd655965ae7, slug: dreamstory.me }
+      - { id: lst_4bde66e5b034586391b43af7, slug: somniai.com }
+      - { id: lst_63448a1a0037c4801f92dbb8, slug: dreaminterpreter.ai }
+  # dreaminterpreter.ai: AI dream interpreters and dream journals.
+  - action: listing-alternatives-set
+    id: lst_63448a1a0037c4801f92dbb8
+    slug: dreaminterpreter.ai
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_b262c9bb9ec59cd655965ae7, slug: dreamstory.me }
+      - { id: lst_11d69feb99f1c38017be1b4b, slug: dreamdecoder.me }
+      - { id: lst_4bde66e5b034586391b43af7, slug: somniai.com }
+  # dreamstory.me: AI dream interpreters and dream journals.
+  - action: listing-alternatives-set
+    id: lst_b262c9bb9ec59cd655965ae7
+    slug: dreamstory.me
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_11d69feb99f1c38017be1b4b, slug: dreamdecoder.me }
+      - { id: lst_4bde66e5b034586391b43af7, slug: somniai.com }
+      - { id: lst_63448a1a0037c4801f92dbb8, slug: dreaminterpreter.ai }
+  # dressrious.com: apps that plan outfits from the clothes you own.
+  - action: listing-alternatives-set
+    id: lst_4e48c6e7253a3beb4c178492
+    slug: dressrious.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_2ce3994ce22355d9d8c66b91, slug: cladwell.com }
+  # earkick.com: AI mental-health companions and journals for tracking and improving how you feel.
+  - action: listing-alternatives-set
+    id: lst_9316f6b869b41626d406186d
+    slug: earkick.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_2abbc573c1d68462a3b73290, slug: wysa.com }
+      - { id: lst_57f5fb75588cdb10c64842a6, slug: mindsera.com }
+      - { id: lst_0c2d05a1b976ecd305685028, slug: reflectr.ai }
+  # endlessvn.io: AI interactive story games.
+  - action: listing-alternatives-set
+    id: lst_9fd31e78d33a95f9aef26834
+    slug: endlessvn.io
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_4072705010abdfa40d90635f, slug: hiddendoor.co }
+  # fitbod.me: AI personal trainers that build and adapt strength workouts.
+  - action: listing-alternatives-set
+    id: lst_14bb8a79bbaca662bc7364f8
+    slug: fitbod.me
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_4828ec505b5cfa8230cc028c, slug: gravl.ai }
+      - { id: lst_26cc57d84f3784e8cf17286b, slug: dr-muscle.com }
+      - { id: lst_54bb53ed43490319ad545a05, slug: gymbuddy.ai }
+      - { id: lst_7e98432eaf369bbe2e07c163, slug: burnbacon.com }
+      - { id: lst_45cd9f6e2d4e9be94a628c5f, slug: strongrfastr.com }
+  # foodzilla.com: nutrition software for dietitians and nutritionists.
+  - action: listing-alternatives-set
+    id: lst_0e44439d5114b7736d469dda
+    slug: foodzilla.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_a8739b53568298c9f55fa577, slug: logmeal.com }
+  # gatherly.io: event platforms for hosting networking events and conferences.
+  - action: listing-alternatives-set
+    id: lst_03c5c245805a41c5e6ad28a4
+    slug: gatherly.io
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_6007f742b59eb8e8b8b2a66f, slug: bizzabo.com }
+  # getmindset.com: daily self-care and mood check-in apps.
+  - action: listing-alternatives-set
+    id: lst_a91216574fefae191eed0012
+    slug: getmindset.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_9316f6b869b41626d406186d, slug: earkick.com }
+      - { id: lst_2abbc573c1d68462a3b73290, slug: wysa.com }
+  # glass.health: clinical AI that answers clinicians' questions from medical evidence.
+  - action: listing-alternatives-set
+    id: lst_ff033fe6adba15c676edcd28
+    slug: glass.health
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_5a1b622f42236a0ba8af92a8, slug: leny.ai }
+      - { id: lst_bc863a19753deb5fb81481ff, slug: doximity.com }
+      - { id: lst_7e9942ec5b64653e225b9f4b, slug: medisearch.io }
+  # gptgame.app: AI that turns a game idea into a playable game.
+  - action: listing-alternatives-set
+    id: lst_1ef05b9d94020ddfff6f8480
+    slug: gptgame.app
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_1fde716ad15a5420fad1e284, slug: upit.com }
+  # gravl.ai: AI personal trainers that build and adapt strength workouts.
+  - action: listing-alternatives-set
+    id: lst_4828ec505b5cfa8230cc028c
+    slug: gravl.ai
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_14bb8a79bbaca662bc7364f8, slug: fitbod.me }
+      - { id: lst_26cc57d84f3784e8cf17286b, slug: dr-muscle.com }
+      - { id: lst_54bb53ed43490319ad545a05, slug: gymbuddy.ai }
+      - { id: lst_7e98432eaf369bbe2e07c163, slug: burnbacon.com }
+      - { id: lst_45cd9f6e2d4e9be94a628c5f, slug: strongrfastr.com }
+  # gymbuddy.ai: AI personal trainers that build and adapt strength workouts.
+  - action: listing-alternatives-set
+    id: lst_54bb53ed43490319ad545a05
+    slug: gymbuddy.ai
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_14bb8a79bbaca662bc7364f8, slug: fitbod.me }
+      - { id: lst_4828ec505b5cfa8230cc028c, slug: gravl.ai }
+      - { id: lst_26cc57d84f3784e8cf17286b, slug: dr-muscle.com }
+      - { id: lst_7e98432eaf369bbe2e07c163, slug: burnbacon.com }
+      - { id: lst_45cd9f6e2d4e9be94a628c5f, slug: strongrfastr.com }
+  # hairstyleai.com: trying new hairstyles on your own photo; FaceApp has hairstyle filters.
+  - action: listing-alternatives-set
+    id: lst_d41f8f52b256eb9cdffeda01
+    slug: hairstyleai.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_e0a376d8610948dc75b595bc, slug: faceapp.com }
+  # hiddendoor.co: AI interactive story and roleplay games.
+  - action: listing-alternatives-set
+    id: lst_4072705010abdfa40d90635f
+    slug: hiddendoor.co
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_9fd31e78d33a95f9aef26834, slug: endlessvn.io }
+  # hippocraticai.com: AI agents that take routine work off health-system staff.
+  - action: listing-alternatives-set
+    id: lst_12901702b8bc0f9facb50d6a
+    slug: hippocraticai.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_6422d979e3793b44dfb339a1, slug: qventus.com }
+  # inworld.ai: realtime voice models (text to speech, speech to text) for consumer apps, with games
+  # one use; Eleven Labs sells the same voice models, Convai conversational characters for games.
+  - action: listing-alternatives-set
+    id: lst_f4f8d704eb1b2220cd20bc03
+    slug: inworld.ai
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_23509d85df29e3b7df8551a8, slug: elevenlabs.io }
+      - { id: lst_b8c35630648444f297255106, slug: convai.com }
+  # ixigo.com: booking travel and planning trips with AI.
+  - action: listing-alternatives-set
+    id: lst_4a6bbf5d1d5f49f20e05fe15
+    slug: ixigo.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_4a72ed466564dd8584638c4c, slug: kayak.com }
+      - { id: lst_e48c7df481c37405e7f05554, slug: mindtrip.ai }
+      - { id: lst_7a4b25f8935ab2b6acd7036a, slug: tripplanner.ai }
+      - { id: lst_146e9c03725e7d0989d9ecff, slug: roamaround.io }
+  # kayak.com: travel search and booking with an AI trip planner.
+  - action: listing-alternatives-set
+    id: lst_4a72ed466564dd8584638c4c
+    slug: kayak.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_e48c7df481c37405e7f05554, slug: mindtrip.ai }
+      - { id: lst_4a6bbf5d1d5f49f20e05fe15, slug: ixigo.com }
+      - { id: lst_146e9c03725e7d0989d9ecff, slug: roamaround.io }
+      - { id: lst_7a4b25f8935ab2b6acd7036a, slug: tripplanner.ai }
+  # kokocares.org: free mental-health support apps; Wysa also has a version for children and young
+  # people.
+  - action: listing-alternatives-set
+    id: lst_2d8ef80f310cc98eef09b553
+    slug: kokocares.org
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_2abbc573c1d68462a3b73290, slug: wysa.com }
+      - { id: lst_9316f6b869b41626d406186d, slug: earkick.com }
+  # leny.ai: clinical AI that answers medical questions with citations.
+  - action: listing-alternatives-set
+    id: lst_5a1b622f42236a0ba8af92a8
+    slug: leny.ai
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_ff033fe6adba15c676edcd28, slug: glass.health }
+      - { id: lst_bc863a19753deb5fb81481ff, slug: doximity.com }
+      - { id: lst_7e9942ec5b64653e225b9f4b, slug: medisearch.io }
+  # lifesum.com: apps that track what you eat and guide your diet.
+  - action: listing-alternatives-set
+    id: lst_632d27a715cc6607caaf10a3
+    slug: lifesum.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_d836059a52c3010671356eb3, slug: welling.ai }
+      - { id: lst_e530b8e6aa233f7f2eadf8c3, slug: noom.com }
+      - { id: lst_11dca9e79faee2d2c7b0f67e, slug: prospre.io }
+      - { id: lst_7e98432eaf369bbe2e07c163, slug: burnbacon.com }
+      - { id: lst_45cd9f6e2d4e9be94a628c5f, slug: strongrfastr.com }
+  # logmeal.com: food-recognition APIs and nutrition software for nutritionists.
+  - action: listing-alternatives-set
+    id: lst_a8739b53568298c9f55fa577
+    slug: logmeal.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_e069eddaec5769ea1d401d5c, slug: passio.ai }
+      - { id: lst_0e44439d5114b7736d469dda, slug: foodzilla.com }
+  # ludo.ai: AI generators of game art and assets.
+  - action: listing-alternatives-set
+    id: lst_adf0de610d6a2d30ba69aaf6
+    slug: ludo.ai
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_0da400ac20d782d1e7ecac5d, slug: scenario.com }
+      - { id: lst_40172f1aa644fec36147b9a9, slug: meshy.ai }
+  # lunit.io: AI that helps radiologists detect cancer in medical images.
+  - action: listing-alternatives-set
+    id: lst_62486e5c650282a1ce226a4c
+    slug: lunit.io
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_9b3385588dbf39b3a86ea82d, slug: oatmealhealth.com }
+  # mealgenie.ai: AI meal planners that build weekly plans around your diet and preferences.
+  - action: listing-alternatives-set
+    id: lst_35e8652793035bd6a8e0ab59
+    slug: mealgenie.ai
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_48413524f219b723c707b224, slug: mealmind.io }
+      - { id: lst_54d4e8537ad651fd8e8fe1ae, slug: mealpractice.com }
+      - { id: lst_11dca9e79faee2d2c7b0f67e, slug: prospre.io }
+      - { id: lst_02764b81a4579c713ec42dd8, slug: dishgen.com }
+      - { id: lst_45cd9f6e2d4e9be94a628c5f, slug: strongrfastr.com }
+      - { id: lst_43035a5ac8087341f79feeb0, slug: casadesante.com }
+  # mealmind.io: AI meal planners that build weekly plans around your diet and preferences, with
+  # shopping lists.
+  - action: listing-alternatives-set
+    id: lst_48413524f219b723c707b224
+    slug: mealmind.io
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_35e8652793035bd6a8e0ab59, slug: mealgenie.ai }
+      - { id: lst_54d4e8537ad651fd8e8fe1ae, slug: mealpractice.com }
+      - { id: lst_11dca9e79faee2d2c7b0f67e, slug: prospre.io }
+      - { id: lst_02764b81a4579c713ec42dd8, slug: dishgen.com }
+      - { id: lst_45cd9f6e2d4e9be94a628c5f, slug: strongrfastr.com }
+      - { id: lst_43035a5ac8087341f79feeb0, slug: casadesante.com }
+  # mealpractice.com: weekly meal planners with recipes and shopping lists.
+  - action: listing-alternatives-set
+    id: lst_54d4e8537ad651fd8e8fe1ae
+    slug: mealpractice.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_35e8652793035bd6a8e0ab59, slug: mealgenie.ai }
+      - { id: lst_48413524f219b723c707b224, slug: mealmind.io }
+      - { id: lst_11dca9e79faee2d2c7b0f67e, slug: prospre.io }
+      - { id: lst_02764b81a4579c713ec42dd8, slug: dishgen.com }
+      - { id: lst_45cd9f6e2d4e9be94a628c5f, slug: strongrfastr.com }
+      - { id: lst_43035a5ac8087341f79feeb0, slug: casadesante.com }
+  # mealsai.com: AI recipe generators that write a recipe from an idea or the ingredients you have.
+  - action: listing-alternatives-set
+    id: lst_0c67097a483a157faf374524
+    slug: mealsai.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_02764b81a4579c713ec42dd8, slug: dishgen.com }
+      - { id: lst_fa92720f8ceb06bd69ce6eac, slug: chefgpt.xyz }
+      - { id: lst_ddab070eba92ebf32b67edbd, slug: cookaifood.com }
+      - { id: lst_c5d360500e966d245acfdebd, slug: what-the-chef.com }
+      - { id: lst_f0f93b3746a8a0d24a036d12, slug: yougotcooking.com }
+  # medisearch.io: AI answers to medical questions from scientific sources.
+  - action: listing-alternatives-set
+    id: lst_7e9942ec5b64653e225b9f4b
+    slug: medisearch.io
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_5a1b622f42236a0ba8af92a8, slug: leny.ai }
+      - { id: lst_9519fb856be1eaa8bc6b0ed1, slug: consensus.app }
+      - { id: lst_ff033fe6adba15c676edcd28, slug: glass.health }
+      - { id: lst_dca56319fbf41dad0cbbcdf8, slug: docus.ai }
+  # mindsera.com: AI journals for mental wellbeing.
+  - action: listing-alternatives-set
+    id: lst_57f5fb75588cdb10c64842a6
+    slug: mindsera.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_0c2d05a1b976ecd305685028, slug: reflectr.ai }
+      - { id: lst_9316f6b869b41626d406186d, slug: earkick.com }
+  # mindtrip.ai: AI travel planners that build trip itineraries and help book them.
+  - action: listing-alternatives-set
+    id: lst_e48c7df481c37405e7f05554
+    slug: mindtrip.ai
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_146e9c03725e7d0989d9ecff, slug: roamaround.io }
+      - { id: lst_7a4b25f8935ab2b6acd7036a, slug: tripplanner.ai }
+      - { id: lst_b5995f85a96384b731b9d043, slug: usevacay.com }
+      - { id: lst_16307c329eee19586e5b2c0e, slug: copilot2trip.com }
+      - { id: lst_1e0941a261d67f48c38fdec2, slug: nowy.io }
+      - { id: lst_4a72ed466564dd8584638c4c, slug: kayak.com }
+  # noom.com: weight-loss and healthy-eating coaching apps.
+  - action: listing-alternatives-set
+    id: lst_e530b8e6aa233f7f2eadf8c3
+    slug: noom.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_632d27a715cc6607caaf10a3, slug: lifesum.com }
+      - { id: lst_d836059a52c3010671356eb3, slug: welling.ai }
+      - { id: lst_7e98432eaf369bbe2e07c163, slug: burnbacon.com }
+  # nowy.io: AI travel planners that build trip itineraries; Nowy starts from a travel video.
+  - action: listing-alternatives-set
+    id: lst_1e0941a261d67f48c38fdec2
+    slug: nowy.io
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_e48c7df481c37405e7f05554, slug: mindtrip.ai }
+      - { id: lst_146e9c03725e7d0989d9ecff, slug: roamaround.io }
+      - { id: lst_7a4b25f8935ab2b6acd7036a, slug: tripplanner.ai }
+      - { id: lst_b5995f85a96384b731b9d043, slug: usevacay.com }
+      - { id: lst_16307c329eee19586e5b2c0e, slug: copilot2trip.com }
+  # oatmealhealth.com: AI that helps radiologists detect cancer in medical images.
+  - action: listing-alternatives-set
+    id: lst_9b3385588dbf39b3a86ea82d
+    slug: oatmealhealth.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_62486e5c650282a1ce226a4c, slug: lunit.io }
+  # onvy.health: personal health insights from your own health and wearable data.
+  - action: listing-alternatives-set
+    id: lst_06e5791126847f1fe5c6066a
+    slug: onvy.health
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_1cfcd1d1ecfd8c65410ab204, slug: rejuve.ai }
+  # passio.ai: food-recognition and nutrition APIs for app developers.
+  - action: listing-alternatives-set
+    id: lst_e069eddaec5769ea1d401d5c
+    slug: passio.ai
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_a8739b53568298c9f55fa577, slug: logmeal.com }
+  # plantripai.com: personalised AI trip plans and city guides.
+  - action: listing-alternatives-set
+    id: lst_c6f976a06f20b03afae07efd
+    slug: plantripai.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_e48c7df481c37405e7f05554, slug: mindtrip.ai }
+      - { id: lst_146e9c03725e7d0989d9ecff, slug: roamaround.io }
+      - { id: lst_7a4b25f8935ab2b6acd7036a, slug: tripplanner.ai }
+      - { id: lst_b5995f85a96384b731b9d043, slug: usevacay.com }
+  # prospre.io: meal plans built to hit fitness and macro goals.
+  - action: listing-alternatives-set
+    id: lst_11dca9e79faee2d2c7b0f67e
+    slug: prospre.io
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_45cd9f6e2d4e9be94a628c5f, slug: strongrfastr.com }
+      - { id: lst_35e8652793035bd6a8e0ab59, slug: mealgenie.ai }
+      - { id: lst_48413524f219b723c707b224, slug: mealmind.io }
+      - { id: lst_632d27a715cc6607caaf10a3, slug: lifesum.com }
+      - { id: lst_54d4e8537ad651fd8e8fe1ae, slug: mealpractice.com }
+      - { id: lst_7e98432eaf369bbe2e07c163, slug: burnbacon.com }
+  # qventus.com: AI agents that take routine work off health-system staff.
+  - action: listing-alternatives-set
+    id: lst_6422d979e3793b44dfb339a1
+    slug: qventus.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_12901702b8bc0f9facb50d6a, slug: hippocraticai.com }
+  # reflectr.ai: AI journals that talk back and give insights.
+  - action: listing-alternatives-set
+    id: lst_0c2d05a1b976ecd305685028
+    slug: reflectr.ai
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_57f5fb75588cdb10c64842a6, slug: mindsera.com }
+      - { id: lst_9316f6b869b41626d406186d, slug: earkick.com }
+  # rejuve.ai: personal health insights from your own health and wearable data.
+  - action: listing-alternatives-set
+    id: lst_1cfcd1d1ecfd8c65410ab204
+    slug: rejuve.ai
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_06e5791126847f1fe5c6066a, slug: onvy.health }
+  # roamaround.io: AI travel planners that build trip itineraries.
+  - action: listing-alternatives-set
+    id: lst_146e9c03725e7d0989d9ecff
+    slug: roamaround.io
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_e48c7df481c37405e7f05554, slug: mindtrip.ai }
+      - { id: lst_7a4b25f8935ab2b6acd7036a, slug: tripplanner.ai }
+      - { id: lst_b5995f85a96384b731b9d043, slug: usevacay.com }
+      - { id: lst_16307c329eee19586e5b2c0e, slug: copilot2trip.com }
+      - { id: lst_1e0941a261d67f48c38fdec2, slug: nowy.io }
+      - { id: lst_4a72ed466564dd8584638c4c, slug: kayak.com }
+  # scenario.com: AI generators of game art and assets.
+  - action: listing-alternatives-set
+    id: lst_0da400ac20d782d1e7ecac5d
+    slug: scenario.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_adf0de610d6a2d30ba69aaf6, slug: ludo.ai }
+      - { id: lst_40172f1aa644fec36147b9a9, slug: meshy.ai }
+  # sillyrobotcards.com: AI personalised greeting cards and wishes.
+  - action: listing-alternatives-set
+    id: lst_1500c5e53bd8dfd39a656582
+    slug: sillyrobotcards.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_95546321da94053fbcce0d64, slug: wishesai.com }
+  # somniai.com: AI dream interpreters and dream journals.
+  - action: listing-alternatives-set
+    id: lst_4bde66e5b034586391b43af7
+    slug: somniai.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_b262c9bb9ec59cd655965ae7, slug: dreamstory.me }
+      - { id: lst_11d69feb99f1c38017be1b4b, slug: dreamdecoder.me }
+      - { id: lst_63448a1a0037c4801f92dbb8, slug: dreaminterpreter.ai }
+  # strongrfastr.com: AI meal and training plans; BurnBacon does both, the meal planners and workout
+  # apps each do one half.
+  - action: listing-alternatives-set
+    id: lst_45cd9f6e2d4e9be94a628c5f
+    slug: strongrfastr.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_7e98432eaf369bbe2e07c163, slug: burnbacon.com }
+      - { id: lst_11dca9e79faee2d2c7b0f67e, slug: prospre.io }
+      - { id: lst_48413524f219b723c707b224, slug: mealmind.io }
+      - { id: lst_35e8652793035bd6a8e0ab59, slug: mealgenie.ai }
+      - { id: lst_14bb8a79bbaca662bc7364f8, slug: fitbod.me }
+      - { id: lst_26cc57d84f3784e8cf17286b, slug: dr-muscle.com }
+  # symptomchecker.io: AI symptom checkers.
+  - action: listing-alternatives-set
+    id: lst_03f90b7d527851ade6880f2a
+    slug: symptomchecker.io
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_9eb69c91201a22a7239de775, slug: ubiehealth.com }
+      - { id: lst_5d9964eee033c567494379df, slug: buoyhealth.com }
+      - { id: lst_dca56319fbf41dad0cbbcdf8, slug: docus.ai }
+  # thetripboutique.ai: AI itinerary tools for travel agencies (Vacay also has tools for travel
+  # advisors).
+  - action: listing-alternatives-set
+    id: lst_a4b704e3da4d55fbeec88ee2
+    slug: thetripboutique.ai
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_b5995f85a96384b731b9d043, slug: usevacay.com }
+  # travelplan-ai.com: AI travel planners that build trip itineraries (the site is now GuideGo, an AI
+  # trip planner).
+  - action: listing-alternatives-set
+    id: lst_0a88d592b99e8562ede91d9d
+    slug: travelplan-ai.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_e48c7df481c37405e7f05554, slug: mindtrip.ai }
+      - { id: lst_146e9c03725e7d0989d9ecff, slug: roamaround.io }
+      - { id: lst_7a4b25f8935ab2b6acd7036a, slug: tripplanner.ai }
+      - { id: lst_b5995f85a96384b731b9d043, slug: usevacay.com }
+      - { id: lst_16307c329eee19586e5b2c0e, slug: copilot2trip.com }
+      - { id: lst_1e0941a261d67f48c38fdec2, slug: nowy.io }
+  # tripplanner.ai: AI travel planners that build trip itineraries.
+  - action: listing-alternatives-set
+    id: lst_7a4b25f8935ab2b6acd7036a
+    slug: tripplanner.ai
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_e48c7df481c37405e7f05554, slug: mindtrip.ai }
+      - { id: lst_146e9c03725e7d0989d9ecff, slug: roamaround.io }
+      - { id: lst_b5995f85a96384b731b9d043, slug: usevacay.com }
+      - { id: lst_16307c329eee19586e5b2c0e, slug: copilot2trip.com }
+      - { id: lst_1e0941a261d67f48c38fdec2, slug: nowy.io }
+      - { id: lst_4a72ed466564dd8584638c4c, slug: kayak.com }
+  # ubiehealth.com: AI symptom checkers.
+  - action: listing-alternatives-set
+    id: lst_9eb69c91201a22a7239de775
+    slug: ubiehealth.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_5d9964eee033c567494379df, slug: buoyhealth.com }
+      - { id: lst_03f90b7d527851ade6880f2a, slug: symptomchecker.io }
+      - { id: lst_dca56319fbf41dad0cbbcdf8, slug: docus.ai }
+  # upit.com: AI that turns a game idea into a playable game.
+  - action: listing-alternatives-set
+    id: lst_1fde716ad15a5420fad1e284
+    slug: upit.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_1ef05b9d94020ddfff6f8480, slug: gptgame.app }
+  # usevacay.com: AI travel planners that build trip itineraries.
+  - action: listing-alternatives-set
+    id: lst_b5995f85a96384b731b9d043
+    slug: usevacay.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_e48c7df481c37405e7f05554, slug: mindtrip.ai }
+      - { id: lst_146e9c03725e7d0989d9ecff, slug: roamaround.io }
+      - { id: lst_7a4b25f8935ab2b6acd7036a, slug: tripplanner.ai }
+      - { id: lst_16307c329eee19586e5b2c0e, slug: copilot2trip.com }
+      - { id: lst_1e0941a261d67f48c38fdec2, slug: nowy.io }
+  # welling.ai: AI nutrition coaches that log meals and track macros.
+  - action: listing-alternatives-set
+    id: lst_d836059a52c3010671356eb3
+    slug: welling.ai
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_632d27a715cc6607caaf10a3, slug: lifesum.com }
+      - { id: lst_e530b8e6aa233f7f2eadf8c3, slug: noom.com }
+      - { id: lst_7e98432eaf369bbe2e07c163, slug: burnbacon.com }
+      - { id: lst_11dca9e79faee2d2c7b0f67e, slug: prospre.io }
+  # what-the-chef.com: AI recipes from the ingredients you have on hand.
+  - action: listing-alternatives-set
+    id: lst_c5d360500e966d245acfdebd
+    slug: what-the-chef.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_fa92720f8ceb06bd69ce6eac, slug: chefgpt.xyz }
+      - { id: lst_f0f93b3746a8a0d24a036d12, slug: yougotcooking.com }
+      - { id: lst_02764b81a4579c713ec42dd8, slug: dishgen.com }
+      - { id: lst_ddab070eba92ebf32b67edbd, slug: cookaifood.com }
+      - { id: lst_0c67097a483a157faf374524, slug: mealsai.com }
+  # wishesai.com: AI personalised greeting cards and wishes.
+  - action: listing-alternatives-set
+    id: lst_95546321da94053fbcce0d64
+    slug: wishesai.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_1500c5e53bd8dfd39a656582, slug: sillyrobotcards.com }
+  # wysa.com: AI chat for everyday mental-health self-help.
+  - action: listing-alternatives-set
+    id: lst_2abbc573c1d68462a3b73290
+    slug: wysa.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_9316f6b869b41626d406186d, slug: earkick.com }
+      - { id: lst_57f5fb75588cdb10c64842a6, slug: mindsera.com }
+  # yougotcooking.com: AI recipe suggestions from the ingredients you already have.
+  - action: listing-alternatives-set
+    id: lst_f0f93b3746a8a0d24a036d12
+    slug: yougotcooking.com
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_c5d360500e966d245acfdebd, slug: what-the-chef.com }
+      - { id: lst_fa92720f8ceb06bd69ce6eac, slug: chefgpt.xyz }
+      - { id: lst_02764b81a4579c713ec42dd8, slug: dishgen.com }
+      - { id: lst_ddab070eba92ebf32b67edbd, slug: cookaifood.com }
+      - { id: lst_0c67097a483a157faf374524, slug: mealsai.com }
