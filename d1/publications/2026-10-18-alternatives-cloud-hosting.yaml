@@ -10,10 +10,12 @@
 # text-to-speech service, a sketch-to-image tool and an AI platform, so they get their own kind. Every
 # listing and pick is a v1 import listing, with the same id and slug on staging and production. The
 # reason for each listing is the comment above its operation.
-# Five listings have no operation, because nothing in the catalog substitutes for them: CyraCom
-# (interpreting services), Linqto (private-company investing), LuxSci (HIPAA-compliant email),
-# Sherweb (a cloud marketplace for MSPs), and TrueVault (privacy compliance software). Their pages keep
-# the similar-listings fallback.
+# Four listings have no operation, because nothing in the catalog substitutes for them: CyraCom
+# (interpreting services), Linqto (private-company investing), Sherweb (a cloud marketplace for MSPs),
+# and TrueVault (privacy compliance software). Their pages keep the similar-listings fallback.
+# No listing picks Banana (banana.dev shut its GPU service down on 2024-03-31), Takomo (takomo.ai
+# redirects to verda.com) or GPUX.AI (app.gpux.ai and its API return 522), because nobody can switch
+# to them. Their own pages keep picks, so their visitors find live substitutes.
 # Each listing-alternatives-set compares and swaps the listing's slug and current picks (none yet),
 # refuses a pick that isn't live with that id and slug, keeps the listing's checksum, and logs an
 # `edited` event. Row-level, so the batch is refused with nothing written if any listing changed.
@@ -26,18 +28,19 @@ provenance:
   actor: devinschumacher
   workflow: github/publish-d1
 operations:
-  # aws.amazon.com: the listing is Amazon Polly, a text-to-speech API: other text-to-speech services with APIs.
+  # aws.amazon.com: the listing is Amazon Polly, a text-to-speech API: other text-to-speech services with APIs, the API-first voice platforms ElevenLabs, WellSaid and Resemble first, then Woord (API and SSML), Murf.ai and SpeechGen.
   - action: listing-alternatives-set
     id: lst_31a93dfdd1a9daea71399d95
     slug: aws.amazon.com
     reason: '#539: hand-picked alternatives (batch 1)'
     expected: []
     alternatives:
-      - { id: lst_2cb80a795c682957b11959c1, slug: getwoord.com }
-      - { id: lst_58eb4f4e495886d56ca8da1f, slug: speechgen.io }
-      - { id: lst_aa009aa814714d281d96859d, slug: voicemaker.in }
+      - { id: lst_23509d85df29e3b7df8551a8, slug: elevenlabs.io }
+      - { id: lst_4537e2f15efdc8f6b30aad2b, slug: wellsaid.io }
       - { id: lst_d4a5d72b42f2f330a5df94f0, slug: resemble.ai }
+      - { id: lst_2cb80a795c682957b11959c1, slug: getwoord.com }
       - { id: lst_15caf71f765ce253eb674674, slug: murf.ai }
+      - { id: lst_58eb4f4e495886d56ca8da1f, slug: speechgen.io }
   # azure.microsoft.com: general-purpose public clouds.
   - action: listing-alternatives-set
     id: lst_a590ff5f631d1250224df4e3
@@ -50,7 +53,7 @@ operations:
       - { id: lst_801ae8c07b36a4d79b995b9e, slug: linode.com }
       - { id: lst_722eeba2738dce43e72dafeb, slug: cloudsigma.com }
       - { id: lst_08e038eaff1ce9f10863aca2, slug: gcore.com }
-  # banana.dev: serverless GPU inference hosting.
+  # banana.dev: serverless GPU inference hosting (GPUX.AI is left out: its app and API return 522).
   - action: listing-alternatives-set
     id: lst_0d20ea83fa90e11524d79382
     slug: banana.dev
@@ -59,7 +62,6 @@ operations:
     alternatives:
       - { id: lst_ae75e6d9d1e53babb32e9a5e, slug: runpod.io }
       - { id: lst_20b9297ba604b6d4b976027b, slug: datacrunch.io }
-      - { id: lst_564c3b5203b3edeb6c578751, slug: gpux.ai }
       - { id: lst_4f5723dbdd28a781c3ffd776, slug: paperspace.com }
   # bytegrid.com: compliant data center and colocation providers.
   - action: listing-alternatives-set
@@ -210,7 +212,7 @@ operations:
       - { id: lst_3cb5e9fc26078f7ecfeae57d, slug: latitude.sh }
       - { id: lst_051a5eaf107b911300d30a8b, slug: cudocompute.com }
       - { id: lst_ae75e6d9d1e53babb32e9a5e, slug: runpod.io }
-  # gpux.ai: serverless GPU inference.
+  # gpux.ai: serverless GPU inference (Banana is left out: it shut its GPU service down on 2024-03-31).
   - action: listing-alternatives-set
     id: lst_564c3b5203b3edeb6c578751
     slug: gpux.ai
@@ -218,7 +220,7 @@ operations:
     expected: []
     alternatives:
       - { id: lst_ae75e6d9d1e53babb32e9a5e, slug: runpod.io }
-      - { id: lst_0d20ea83fa90e11524d79382, slug: banana.dev }
+      - { id: lst_b979adf02dcfbb11c72c6a76, slug: koyeb.com }
       - { id: lst_20b9297ba604b6d4b976027b, slug: datacrunch.io }
   # greengeeks.com: web hosting for websites and WordPress.
   - action: listing-alternatives-set
@@ -286,7 +288,7 @@ operations:
       - { id: lst_2f4f55add995e9cd49551f1b, slug: tensordock.com }
       - { id: lst_7e9736364b5d462013a79498, slug: lambda.ai }
       - { id: lst_20b9297ba604b6d4b976027b, slug: datacrunch.io }
-  # koyeb.com: serverless container and GPU platforms.
+  # koyeb.com: serverless container and GPU platforms (Takomo and GPUX.AI are left out: takomo.ai redirects to verda.com, and GPUX.AI's app and API return 522).
   - action: listing-alternatives-set
     id: lst_b979adf02dcfbb11c72c6a76
     slug: koyeb.com
@@ -294,7 +296,6 @@ operations:
     expected: []
     alternatives:
       - { id: lst_ae75e6d9d1e53babb32e9a5e, slug: runpod.io }
-      - { id: lst_e46c716e49f17b17301f2fab, slug: takomo.ai }
   # lambda.ai: GPU clouds for AI training and inference.
   - action: listing-alternatives-set
     id: lst_7e9736364b5d462013a79498
@@ -379,6 +380,14 @@ operations:
       - { id: lst_309158928b06f61850ba2410, slug: databasemart.com }
       - { id: lst_752764c40458318859bca9b3, slug: leaseweb.com }
       - { id: lst_550deeba4d8724905250b26e, slug: greengeeks.com }
+  # luxsci.com: HIPAA-compliant email for healthcare: HIPAA Vault sells HIPAA-compliant encrypted email alongside its hosting.
+  - action: listing-alternatives-set
+    id: lst_7db2b41213a0fa3aa0e732ae
+    slug: luxsci.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_e7ec160437237670f8d55f33, slug: hipaavault.com }
   # medstack.co: HIPAA-compliant cloud platforms for healthcare apps.
   - action: listing-alternatives-set
     id: lst_5feb6ba9a5a2f56731e83c1d
@@ -491,7 +500,7 @@ operations:
       - { id: lst_14c6281f69f0dacb6d778bf1, slug: ovhcloud.com }
       - { id: lst_3cb5e9fc26078f7ecfeae57d, slug: latitude.sh }
       - { id: lst_309158928b06f61850ba2410, slug: databasemart.com }
-  # takomo.ai: serverless AI inference (its site now redirects to Verda, the former DataCrunch, so DataCrunch is left out).
+  # takomo.ai: serverless AI inference (its site now redirects to Verda, the former DataCrunch, so DataCrunch is left out; Banana and GPUX.AI are left out because their services are gone).
   - action: listing-alternatives-set
     id: lst_e46c716e49f17b17301f2fab
     slug: takomo.ai
@@ -499,8 +508,6 @@ operations:
     expected: []
     alternatives:
       - { id: lst_ae75e6d9d1e53babb32e9a5e, slug: runpod.io }
-      - { id: lst_564c3b5203b3edeb6c578751, slug: gpux.ai }
-      - { id: lst_0d20ea83fa90e11524d79382, slug: banana.dev }
       - { id: lst_b979adf02dcfbb11c72c6a76, slug: koyeb.com }
   # tencentcloud.com: global public clouds.
   - action: listing-alternatives-set

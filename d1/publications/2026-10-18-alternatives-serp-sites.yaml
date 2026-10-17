@@ -23,16 +23,16 @@ provenance:
   actor: devinschumacher
   workflow: github/publish-d1
 operations:
-  # tools.serp.co: free online file tools: LightPDF and Scanner Go convert, compress and edit files and PDFs online, Pixlr edits images in the browser.
+  # tools.serp.co: free online file tools: TinyWow converts and compresses PDFs, images and video in the browser, LightPDF and Scanner Go convert, compress and edit files and PDFs online (Pixlr, a photo editor, is left out).
   - action: listing-alternatives-set
     id: lst_e7dc82255f70c7bb508c6d12
     slug: tools.serp.co
     reason: '#539: hand-picked alternatives (batch 1)'
     expected: []
     alternatives:
+      - { id: lst_c3997e13624668b7a4e77625, slug: tinywow.com }
       - { id: lst_4254ca7b9522a4b88217dbfa, slug: lightpdf.com }
       - { id: lst_0dc1892c0f74b7a5af56255f, slug: scannergo.net }
-      - { id: lst_507b5e0124e9385cd0def1ec, slug: pixlr.com }
   # serplists.com: checklist software: Process Street runs checklist templates as tracked workflows, Checklist.gg manages reusable checklists.
   - action: listing-alternatives-set
     id: lst_760ff525d9033ca34a8beb36
