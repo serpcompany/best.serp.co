@@ -35,7 +35,6 @@ operations:
     alternatives:
       - { id: lst_b9856976c3c0384d249226a7, slug: topaz.ai }
       - { id: lst_c825b2092f89feb41eefb02c, slug: hitpaw.com }
-      - { id: lst_0e4b7edf089ea97cba9d00b5, slug: pixop.com }
       - { id: lst_801402b5de773e803e6921f9, slug: bigmp4.com }
   # bhuman.ai: personalized AI videos at scale from a recorded or cloned presenter.
   - action: listing-alternatives-set
@@ -72,7 +71,6 @@ operations:
       - { id: lst_c825b2092f89feb41eefb02c, slug: hitpaw.com }
       - { id: lst_7229e6b2efff762306abee48, slug: avc.ai }
       - { id: lst_b9856976c3c0384d249226a7, slug: topaz.ai }
-      - { id: lst_0e4b7edf089ea97cba9d00b5, slug: pixop.com }
   # capcut.com: all-purpose video editors for creators.
   - action: listing-alternatives-set
     id: lst_2aa45f1e543fb2080e0eb91a
