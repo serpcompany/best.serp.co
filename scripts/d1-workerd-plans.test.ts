@@ -1861,6 +1861,43 @@ operations:
     )
     expect(await live()).toEqual(flaggedState)
 
+    // #523: a long description written where there was none (`content IS NULL`), on D1 too.
+    const contentManifest = (id: string) => `version: 1
+id: ${id}
+concurrency: rows
+provenance:
+  actor: test
+  workflow: test/workerd
+operations:
+  - action: listing-content-set
+    id: lst_moved_workerd
+    slug: moved.example
+    reason: the listing had no description
+    expected: { content: null }
+    content: "Moved builds checklists.\\n\\n## Moved Overview\\n\\nRun them every time."
+`
+    const undescribed = await live()
+    const described = contentManifest('workerd-content-moved.example')
+    await executePublicationPlan(
+      db,
+      buildPublicationPlan(parseManifest(described), described, NOW, undescribed)
+    )
+    expect(await listing('lst_moved_workerd')).toMatchObject({
+      content: 'Moved builds checklists.\n\n## Moved Overview\n\nRun them every time.'
+    })
+    const describedState = await live()
+    expect(describedState.version).toBe(undescribed.version + 1)
+    const describeTwice = contentManifest('workerd-content-again')
+    await expect(
+      executePublicationPlan(
+        db,
+        buildPublicationPlan(parseManifest(describeTwice), describeTwice, NOW, describedState)
+      )
+    ).rejects.toThrow(
+      /bad JSON path: 'listing-content-set moved\.example: the listing is not approved, or its slug or description changed since the manifest'/u
+    )
+    expect(await live()).toEqual(describedState)
+
     // A listing whose website moved: the guard's malformed JSON rolls the whole batch back.
     const after = await live()
     const stale = manifest('lst_moved_workerd', 'moved.example', 'https://elsewhere.example/')

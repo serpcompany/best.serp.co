@@ -1,0 +1,39 @@
+# serpcompany/best.serp.co#523 (part 1 of 2): clearer short descriptions for two of today's five
+# listings (#506), whose one-line copy said little: SERP Games ("Play free games online.") and
+# SERP Lists ("Create and run checklists for your processes."). The new lines use only what each
+# site said when read on 2026-10-17. The other three keep their sites' own homepage descriptions.
+# PRODUCTION ONLY, like 2026-10-17-serp-sites-fill (#506: the owner put the five on production
+# only); on staging both operations are refused, leaving the catalog unchanged.
+# Each listing-details-set compares and swaps the slug, name, short description, and website as
+# 2026-10-17-serp-sites created them, refuses a listing that isn't approved or whose own submission
+# is in review or was rejected, and logs an `edited` event. Row-level, so the batch is refused with
+# nothing written if either listing changed since.
+# Publish on production after the promotion that carries it, in any order with
+# 2026-10-17-serp-sites-fill and 2026-10-17-serp-sites-fill-logos.
+version: 1
+id: 2026-10-17-serp-sites-fill-details
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  - action: listing-details-set
+    id: lst_94f4216c04d33a9a8bc2adf3
+    slug: games.serp.co
+    reason: '#523: the short description said little'
+    expected:
+      name: SERP Games
+      description: Play free games online.
+      website: https://games.serp.co
+    details:
+      description: Play more than 2,500 free browser games, from 2048 and Minesweeper to arcade, driving, sports, and puzzle games, sorted by category and tag.
+  - action: listing-details-set
+    id: lst_760ff525d9033ca34a8beb36
+    slug: serplists.com
+    reason: '#523: the short description said little'
+    expected:
+      name: SERP Lists
+      description: Create and run checklists for your processes.
+      website: https://serplists.com
+    details:
+      description: Build reusable checklist templates, run them with progress tracked per run, and share the results or publish templates to a public library.

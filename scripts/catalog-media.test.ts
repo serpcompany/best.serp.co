@@ -53,7 +53,9 @@ function manifestTargets(): Array<{
             ? { content: op.listing.content, media: op.listing.media, slug: op.listing.slug }
             : op.action === 'listing-media-update'
               ? { content: undefined, media: op.media, slug: op.slug }
-              : null
+              : op.action === 'listing-content-set'
+                ? { content: op.content, media: undefined, slug: op.slug }
+                : null
         if (!target) return []
         const images = [
           ...(target.media?.logo ? [['logo', target.media.logo] as const] : []),

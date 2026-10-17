@@ -82,6 +82,7 @@ describe('D1 compatibility of generated statements (#95 release blocker, SQLITE_
       'listing-claim-hold-add',
       'listing-claim-hold-clear',
       'listing-content-remove-suffix',
+      'listing-content-set',
       'listing-create',
       'listing-details-set',
       'listing-feature-listing-set',
