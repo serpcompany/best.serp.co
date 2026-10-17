@@ -664,7 +664,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
       '<a href="https://dr.serp.co/sites/best.serp.co" target="_blank" rel="noopener noreferrer"'
     )
     const image = escapeRegExp(
-      '<img src="https://dr.serp.co/badge/best.serp.co?style=serp-dr-v3" alt="Verified DR 78 for best.serp.co" width="200" height="50" loading="lazy" decoding="async"'
+      '<img src="https://dr.serp.co/badge/best.serp.co?style=serp-dr-v3" alt="Verified DR 78 for best.serp.co" width="200" height="50" loading="lazy" decoding="async" class="h-[50px]"'
     )
     const badge = new RegExp(`${link}[^>]*>${image}[^>]*/></a>`, 'gu')
     const { listing } = await catalogSample(request, baseURL)

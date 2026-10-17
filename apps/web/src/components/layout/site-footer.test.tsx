@@ -29,5 +29,6 @@ describe('the public footer', () => {
     expect(image).toContain('height="50"')
     expect(image).toContain('loading="lazy"')
     expect(image).toContain('decoding="async"')
+    expect(image).toContain('class="h-[50px]"')
   })
 })
