@@ -3703,6 +3703,51 @@ describe('the refund that sent the money back, and the refund_failed flag (#486)
     expect(liveOf(f, 'lst_claimed')).toBe(0)
   })
 
+  // Codex on #498: the dashboard refunded the payment in more parts than one page of Stripe's
+  // list holds (100). The provider reads every page, so the total is the whole charge and the
+  // site's refund failing flags nothing.
+  it('flags nothing when the refunds that sent the money back fill more than a page (#486)', async () => {
+    const f = fixture()
+    claimedListing(f)
+    await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+    f.provider.setRefunds('pi_claim', [
+      ...Array.from({ length: 104 }, (_, index) => ({
+        amountCents: index < 100 ? 45 : 100,
+        id: `re_part_${index}`,
+        orderId: null,
+        status: 'succeeded' as const
+      })),
+      { amountCents: 4900, id: 're_1', orderId: 'ord_claim', status: 'failed' }
+    ])
+    await webhook(
+      f,
+      paymentEvent('payment_refund_failed', 'pi_claim', { id: 'evt_failed', refundId: 're_1' })
+    )
+    expect(outcomeOf(f, 'evt_failed')).toBe('refund_failed_superseded')
+    expect(f.row('SELECT status, attention FROM orders')).toEqual({
+      attention: null,
+      status: 'refunded'
+    })
+  })
+
+  // More refunds than the provider reads: an unknown, as when Stripe is down, never a short total.
+  // The failure decides as before, and the delivery answers 500 so Stripe delivers it again.
+  it('decides as before when the provider can’t read all of a payment’s refunds (#486)', async () => {
+    const f = fixture()
+    claimedListing(f)
+    await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+    f.provider.paymentRefunds = async () => {
+      throw new BillingProviderError('More refunds than it reads.', 'refunds_incomplete', 502)
+    }
+    const failed = paymentEvent('payment_refund_failed', 'pi_claim', {
+      id: 'evt_failed',
+      refundId: 're_1'
+    })
+    await expect(webhook(f, failed)).rejects.toBeInstanceOf(BillingProviderError)
+    expect(f.row('SELECT attention FROM orders')).toEqual({ attention: 'refund_failed' })
+    expect(processed(f, 'evt_failed')).toBe(false)
+  })
+
   // Stripe can't be reached: the report decides as before, and the delivery answers 500, so
   // Stripe delivers it again; once Stripe answers, its record decides.
   it('decides a failure as before while Stripe can’t be reached, then by Stripe on the retry (#486)', async () => {

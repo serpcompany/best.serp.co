@@ -160,7 +160,8 @@ export interface BillingProvider {
   checkoutForPayment(paymentId: string): Promise<CheckoutState | null>
   /**
    * The payment's refunds as the provider records them now, newest first (#486): which refund
-   * sent the money back, and whether any still does, whatever order their events arrive in.
+   * sent the money back, and whether any still does, whatever order their events arrive in. All
+   * of them, or the provider's error: the service totals them, so never a partial list.
    */
   paymentRefunds(paymentId: string): Promise<ProviderRefund[]>
   /** The provider's refund id, or null when the payment had already been refunded. */

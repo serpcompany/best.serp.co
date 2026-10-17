@@ -10,6 +10,7 @@ import { describe, expect, it } from 'vitest'
 import { BillingProviderError, BillingWebhookError } from '../provider'
 import {
   createStripeProvider,
+  STRIPE_REFUND_PAGES,
   stripeCheckoutState,
   stripeSignature,
   verifyStripeSignature
@@ -319,6 +320,84 @@ describe('Stripe provider', () => {
     // Anything but a PaymentIntent id is never sent.
     await expect(stripe.paymentRefunds('cs_test_1')).resolves.toEqual([])
     expect(calls).toHaveLength(2)
+  })
+
+  // Codex on #498: Stripe lists 100 refunds a page, newest first. A payment refunded in more
+  // parts than that is read to its last page, so the service's total is the whole record.
+  it('reads every page of a payment’s refunds, older ones after the last it read (#486)', async () => {
+    const newest = Array.from({ length: 100 }, (_, index) => ({
+      amount: 45,
+      id: `re_part_${index}`,
+      status: 'succeeded'
+    }))
+    const { calls, fetcher } = recorder([
+      { body: { data: newest, has_more: true, object: 'list' } },
+      {
+        body: {
+          data: [
+            { amount: 400, id: 're_older', status: 'succeeded' },
+            { amount: 4900, id: 're_site', metadata: { order_id: 'order-1' }, status: 'failed' }
+          ],
+          has_more: false,
+          object: 'list'
+        }
+      }
+    ])
+    const stripe = createStripeProvider({
+      fetcher,
+      live: false,
+      prices: PRICES,
+      secretKey: 'sk_test_x',
+      webhookSecret: SECRET
+    })
+    const refunds = await stripe.paymentRefunds('pi_1')
+    expect(refunds).toHaveLength(102)
+    expect(refunds.at(-1)).toEqual({
+      amountCents: 4900,
+      id: 're_site',
+      orderId: 'order-1',
+      status: 'failed'
+    })
+    // 100 × 45 on the first page and 400 on the second: all 4,900 of the charge went back.
+    const sent = refunds
+      .filter(refund => refund.status === 'succeeded')
+      .reduce((sum, refund) => sum + refund.amountCents, 0)
+    expect(sent).toBe(4900)
+    expect(calls.map(call => call.url)).toEqual([
+      'https://api.stripe.com/v1/refunds?limit=100&payment_intent=pi_1',
+      'https://api.stripe.com/v1/refunds?limit=100&payment_intent=pi_1&starting_after=re_part_99'
+    ])
+  })
+
+  // More pages than it reads, or a page with no last id to read on from: an error, as when
+  // Stripe is down, so the service falls back and the webhook is delivered again, never a short
+  // total read as a partial refund.
+  it('answers a refund list it can’t read to the end as an error, never a short list (#486)', async () => {
+    const endless = recorder(
+      Array.from({ length: STRIPE_REFUND_PAGES + 1 }, (_, page) => ({
+        body: {
+          data: [{ amount: 1, id: `re_page_${page}`, status: 'succeeded' }],
+          has_more: true,
+          object: 'list'
+        }
+      }))
+    )
+    const config = {
+      live: false,
+      prices: PRICES,
+      secretKey: 'sk_test_x',
+      webhookSecret: SECRET
+    }
+    await expect(
+      createStripeProvider({ ...config, fetcher: endless.fetcher }).paymentRefunds('pi_1')
+    ).rejects.toMatchObject({ code: 'refunds_incomplete', status: 502 })
+    expect(endless.calls).toHaveLength(STRIPE_REFUND_PAGES)
+    expect(endless.calls.at(-1)?.url).toContain(`starting_after=re_page_${STRIPE_REFUND_PAGES - 2}`)
+    const stuck = recorder([{ body: { data: [], has_more: true, object: 'list' } }])
+    await expect(
+      createStripeProvider({ ...config, fetcher: stuck.fetcher }).paymentRefunds('pi_1')
+    ).rejects.toMatchObject({ code: 'refunds_incomplete' })
+    expect(stuck.calls).toHaveLength(1)
   })
 
   it('verifies the signature over the raw body, within the tolerance', async () => {
