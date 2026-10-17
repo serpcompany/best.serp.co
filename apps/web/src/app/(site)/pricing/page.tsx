@@ -13,7 +13,7 @@ import { siteConfig } from '@/lib/site/site-config'
 export function generateMetadata(): Metadata {
   return generateBaseMetadata({
     title: `${siteConfig.name} Pricing`,
-    description: `Choose a plan to list, feature, and promote a product or resource on ${siteConfig.name}: submit a directory listing for review, or sponsor ${siteConfig.name} to reach its audience.`,
+    description: `Choose a plan to list, feature, and promote a product or resource on ${siteConfig.name}: submit a directory listing for review.`,
     path: '/pricing/'
   })
 }
@@ -41,7 +41,7 @@ function PlanCard({
   )
 }
 
-/** serplists' Pricing (#275): a centered hero, then the plans side by side. */
+/** serplists' Pricing (#275): a centered hero, then the plan. */
 export default function PricingPage() {
   return (
     <>
@@ -53,22 +53,13 @@ export default function PricingPage() {
         />
       </PageSection>
       <PageSection className="pt-0" spacing="spacious" width="narrow">
-        <CardGrid columns={2}>
+        <CardGrid columns={1}>
           <PlanCard
             title="Directory listing"
             description="Submit a product or resource for review by the SERP team."
             action={
               <Link href={getRoute('submit')} className={buttonVariants()}>
                 Submit a listing
-              </Link>
-            }
-          />
-          <PlanCard
-            title="Sponsorship"
-            description={`Promote a relevant product to the ${siteConfig.name} audience.`}
-            action={
-              <Link href="/sponsor/" className={buttonVariants({ variant: 'outline' })}>
-                Sponsor {siteConfig.name}
               </Link>
             }
           />

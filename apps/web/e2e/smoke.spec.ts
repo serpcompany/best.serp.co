@@ -209,6 +209,12 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     )
   })
 
+  test('permanently redirects the retired sponsor page to Pricing in one hop (#531)', async ({
+    request
+  }) => {
+    for (const from of ['/sponsor/', '/sponsor']) await expectOneHop(request, from, '/pricing/')
+  })
+
   test('serves one canonical form per URL under the trailing-slash standard', async ({
     baseURL,
     request
@@ -520,7 +526,6 @@ test.describe('best.serp.co D1 Worker smoke', () => {
       { path: '/brands/', heading: /^brands$/i },
       { path: '/contact/', heading: /^contact serp best$/i },
       { path: '/pricing/', heading: /^serp best pricing$/i },
-      { path: '/sponsor/', heading: /^sponsor serp best$/i },
       { path: '/submit/', heading: /^submit a product$/i },
       { path: '/legal/privacy-policy/', heading: /^privacy policy$/i },
       { path: '/legal/terms-conditions/', heading: /^terms of service$/i }

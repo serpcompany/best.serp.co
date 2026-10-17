@@ -343,7 +343,6 @@ const registryPageModules: Record<
   '/search/': () => import('../../app/(site)/search/page'),
   '/sitemap/': () => import('../../app/(site)/sitemap/page'),
   '/sitemap/listings/': () => import('../../app/(site)/sitemap/listings/page'),
-  '/sponsor/': () => import('../../app/(site)/sponsor/page'),
   '/submit/': () => import('../../app/(site)/submit/page')
 }
 

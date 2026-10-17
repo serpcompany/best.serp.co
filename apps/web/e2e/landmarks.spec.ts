@@ -28,7 +28,6 @@ const publicPages = [
   '/legal/',
   '/legal/privacy-policy/',
   '/pricing/',
-  '/sponsor/',
   '/products/',
   '/products/categories/',
   categoryPath(sampleCategory.slug),

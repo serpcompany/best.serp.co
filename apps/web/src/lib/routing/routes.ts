@@ -114,7 +114,6 @@ export const routes = {
     listingsPage: htmlSitemapPaths.listingsPage
   },
   login: '/login/',
-  sponsor: '/sponsor/',
   submit: '/submit/',
   terms: '/legal/terms-conditions/',
   rss: '/rss.xml'
@@ -157,7 +156,6 @@ type StaticRoutes =
   | 'sitemap.index'
   | 'sitemap.listings'
   | 'submit'
-  | 'sponsor'
   | 'terms'
   | 'rss'
 

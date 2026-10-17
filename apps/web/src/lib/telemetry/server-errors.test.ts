@@ -139,8 +139,7 @@ const PUBLIC_SEGMENTS = [
   'sitemap-index.xml',
   'sitemap-pages.xml',
   'sitemap-products.xml',
-  'sitemap-tags.xml',
-  'sponsor'
+  'sitemap-tags.xml'
 ]
 
 /** The first URL segment of every route folder in `src/app`, looking through route groups. */

@@ -127,7 +127,7 @@ search is `components/directory/empty-state.tsx`: the stock `Empty`, as serplist
 | Search | `/search/` | `components/search/index-page.tsx`: `PageHero` with the page's search field, then the results |
 | About | `/about/` | `components/static-pages/about-page.tsx`: `PageHero`, then `SectionHeader`s over `ListCard`s in `CardGrid` |
 | Brands | `/brands/` | `components/static-pages/brands-page.tsx`: `PageHero` over `ListCard`s in `CardGrid` |
-| Contact, sponsor | `/contact/`, `/sponsor/` | Their route files: `PageHero` over a `ListCard` in a one-column `CardGrid` |
+| Contact | `/contact/` | Its route file: `PageHero` over a `ListCard` in a one-column `CardGrid` |
 | Pricing | `/pricing/` | `PageHero`, then serplists' `PlanCard` (a stock `Card`) per plan in `CardGrid` |
 | Legal | `/legal/`, `/legal/<policy>/` | `PageShell`'s docs layout with `LegalNav`; the index is a `ListCard` per policy |
 | Sign in | `/login/` | `components/auth/login-card.tsx` in serplists' `AuthCard` |
