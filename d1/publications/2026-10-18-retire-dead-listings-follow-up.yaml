@@ -1,5 +1,7 @@
 # serpcompany/best.serp.co#546, the follow-up to 2026-10-18-retire-dead-listings.yaml. A manifest
-# names a listing once, so the operations on listings that manifest already names are here:
+# names a listing once, so the redirects for listings that manifest unpublishes are here.
+# Datasette's feature flag is in its own manifest (-datasette-flag), so a flag that differs between
+# environments can't block these redirects:
 # - Redirect (2): that manifest unpublishes these 2 listings; each has a clear successor in the
 #   catalog, so its URL answers a permanent redirect (308) to the successor's page instead of 410
 #   Gone, which keeps the retired URL's links and sends visitors to the product (the SEO rule for
@@ -8,14 +10,11 @@
 #   out of the sitemap, search, RSS and category pages; Republish in /admin still brings one back,
 #   its live page then winning over the redirect. -retire-dead-listings' comments give the evidence
 #   (checked 2026-10-18).
-# - Feature flag (1): that manifest renames Datasette ChatGPT plugin to Datasette, which names
-#   Datasette itself, not one feature of a larger site, so its flag from 2026-10-12-feature-listings
-#   comes off (#551 review): a best page may pin it again. No public page changes.
-# Publish after 2026-10-18-retire-dead-listings.yaml on the same environment: until then the
-# retired listings are live and the redirects refuse. Row-level: the batch refuses whole, with
-# nothing written, if a retired listing isn't unpublished, a successor isn't live (or its id or slug
-# changed), a retired slug already redirects, a redirect would chain, or Datasette's slug or flag
-# changed. Apply staging first, then production after promotion.
+# Publish after 2026-10-18-retire-dead-listings.yaml on the same environment: until then the retired
+# listings are live and the redirects refuse. Row-level: the batch refuses whole, with nothing
+# written, if a retired listing isn't unpublished, a successor isn't live (or its id or slug
+# changed), a retired slug already redirects, or a redirect would chain. Apply staging first, then
+# production after promotion.
 version: 1
 id: 2026-10-18-retire-dead-listings-follow-up
 concurrency: rows
@@ -39,9 +38,3 @@ operations:
       id: lst_4251455a4d740603c89dd58a
       slug: onlyfans-downloader
     reason: "#546 successor (checked 2026-10-18): its own page is gone; its link already opens OnlyFans Downloader, the kept live listing"
-  - action: listing-feature-listing-set
-    id: lst_61ec380de1e7194c1d8634ca
-    slug: datasette.io
-    reason: "#546 (#551 review): renamed Datasette, the listing names Datasette itself, not one feature of a larger site"
-    expected: true
-    featureListing: false

@@ -1,0 +1,21 @@
+# serpcompany/best.serp.co#546: Datasette's feature-listing flag comes off.
+# 2026-10-18-retire-dead-listings.yaml renames "Datasette ChatGPT plugin" to Datasette, which names
+# Datasette itself, not one feature of a larger site, so its flag from 2026-10-12-feature-listings
+# comes off (#551 review); a best page may pin it again. No public page changes. It is a manifest of
+# its own so that, if the flag already differs on an environment, only this one operation is
+# refused, not the #546 redirects. Publish after 2026-10-18-retire-dead-listings.yaml (which names
+# Datasette) on the same environment. Row-level: refused, with nothing written, if Datasette's slug
+# or flag changed.
+version: 1
+id: 2026-10-18-retire-dead-listings-datasette-flag
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  - action: listing-feature-listing-set
+    id: lst_61ec380de1e7194c1d8634ca
+    slug: datasette.io
+    reason: "#546 (#551 review): renamed Datasette, the listing names Datasette itself, not one feature of a larger site"
+    expected: true
+    featureListing: false
