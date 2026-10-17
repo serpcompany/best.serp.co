@@ -11,8 +11,8 @@ The webhook also takes `charge.refunded`, `charge.dispute.created`, `charge.disp
 `refund.failed`, with the same signature check and once-per-event handling, and finds the order by
 the charge's PaymentIntent (an unknown one is recorded as `unknown_order` and answered 200).
 Everything is recorded before the answer; only the admin's email (`admin-payment-alert`) goes
-after it, and the sweep re-sends it. The four events stay dormant until the owner ticks them on
-both webhooks ([Configuration](./billing.md#configuration-owner)).
+after it, and the sweep re-sends it. Both webhooks have sent the four events since 2026-10-17
+([Configuration](./billing.md#configuration-owner)).
 
 A refund of a payment the site hasn't recorded yet (before the checkout's own report, the buyer's
 return or the sweep) finds its order by the `order_id` the checkout put on the PaymentIntent,

@@ -178,8 +178,7 @@ const CHECKOUT_EVENTS: Readonly<Record<string, BillingEvent['type']>> = {
 
 /**
  * The payment events (#473): refunds and disputes, made in the dashboard or by the buyer's bank,
- * and the object each must carry. The owner subscribes both endpoints to them; until then none
- * arrives.
+ * and the object each must carry. Both endpoints have sent them since 2026-10-17.
  */
 const PAYMENT_EVENTS: Readonly<
   Record<string, { object: string; type: Exclude<BillingEvent['type'], `checkout_${string}`> }>
