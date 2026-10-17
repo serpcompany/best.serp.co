@@ -128,6 +128,18 @@ export interface RefundRequest {
   paymentId: string
 }
 
+/**
+ * A refund of a payment as the provider records it now (#486). A `pending` or `succeeded` refund
+ * sends the money back; a `failed` or `canceled` one never will.
+ */
+export interface ProviderRefund {
+  amountCents: number
+  id: string
+  /** The order the site's own refund named (`RefundRequest.orderId`); null outside the site. */
+  orderId: string | null
+  status: 'canceled' | 'failed' | 'pending' | 'succeeded'
+}
+
 export interface BillingProvider {
   /** Stored in `orders.provider` and `billing_events.provider`. */
   readonly name: string
@@ -146,6 +158,12 @@ export interface BillingProvider {
    * payment, which names no order itself (#484).
    */
   checkoutForPayment(paymentId: string): Promise<CheckoutState | null>
+  /**
+   * The payment's refunds as the provider records them now, newest first (#486): which refund
+   * sent the money back, and whether any still does, whatever order their events arrive in. All
+   * of them, or the provider's error: the service totals them, so never a partial list.
+   */
+  paymentRefunds(paymentId: string): Promise<ProviderRefund[]>
   /** The provider's refund id, or null when the payment had already been refunded. */
   refund(request: RefundRequest): Promise<{ refundId: string | null }>
   /**

@@ -19,6 +19,11 @@ import {
 export const STRIPE_API_BASE = 'https://api.stripe.com'
 /** The API version every request pins, so a dashboard upgrade never changes these shapes. */
 export const STRIPE_API_VERSION = '2024-06-20'
+/**
+ * The most pages of a payment's refunds `paymentRefunds` reads (100 a page). A payment with more
+ * is answered as an error, so the service falls back as it does when Stripe is down (#486).
+ */
+export const STRIPE_REFUND_PAGES = 10
 /** Stripe's own default tolerance for a webhook's signed timestamp. */
 export const STRIPE_WEBHOOK_TOLERANCE_SECONDS = 300
 
@@ -349,6 +354,58 @@ export function createStripeProvider(config: StripeConfig): BillingProvider {
       return checkout.paymentId === paymentId ? checkout : null
     },
 
+    async paymentRefunds(paymentId) {
+      // Never sent to Stripe, and an error: "no refunds" would read as nothing sent back.
+      if (!/^pi_[A-Za-z0-9_]+$/u.test(paymentId)) {
+        throw new BillingProviderError('Not a PaymentIntent id.', 'invalid_payment', 400)
+      }
+      // The Refunds read that the Refunds write a restricted key needs already includes (#486).
+      // Every page, older ones after `starting_after`: the service totals them all, so a payment
+      // with more refunds than a page holds is never read as partly refunded.
+      const data: StripeObject[] = []
+      let after: string | undefined
+      for (let page = 0; ; page++) {
+        if (page === STRIPE_REFUND_PAGES) {
+          // Not the whole record: an error, as when Stripe is down, never a short total.
+          throw new BillingProviderError(
+            `The payment has more than ${STRIPE_REFUND_PAGES} pages of refunds.`,
+            'refunds_incomplete',
+            502
+          )
+        }
+        const list = await call(
+          'GET',
+          `/v1/refunds?${form({ limit: 100, payment_intent: paymentId, starting_after: after })}`
+        )
+        const rows = Array.isArray(list.data) ? (list.data as StripeObject[]) : []
+        data.push(...rows)
+        if (list.has_more !== true) break
+        after = idOf(rows.at(-1)) ?? undefined
+        if (!after) {
+          throw new BillingProviderError('Stripe gave no next page.', 'refunds_incomplete', 502)
+        }
+      }
+      return data.flatMap(refund => {
+        const id = text(refund.id)
+        const amountCents = cents(refund.amount)
+        if (!id || amountCents === null) return []
+        const metadata = (refund.metadata ?? {}) as Record<string, unknown>
+        const status = refund.status
+        return [
+          {
+            amountCents,
+            id,
+            orderId: text(metadata.order_id),
+            // `requires_action` (and anything newer) may still send the money back.
+            status:
+              status === 'succeeded' || status === 'failed' || status === 'canceled'
+                ? status
+                : 'pending'
+          }
+        ]
+      })
+    },
+
     dashboardUrl(reference) {
       const mode = config.live ? '' : '/test'
       if (/^pi_[A-Za-z0-9_]+$/u.test(reference)) {
@@ -389,7 +446,8 @@ export function createStripeProvider(config: StripeConfig): BillingProvider {
         }
         return { refundId: text(refund.id) }
       } catch (error) {
-        // Refunded already (by an earlier attempt whose idempotency key has expired).
+        // Refunded already: by an earlier attempt whose idempotency key has expired, or outside
+        // the site; the service asks `paymentRefunds` which (#486).
         if (error instanceof BillingProviderError && error.code === 'charge_already_refunded') {
           return { refundId: null }
         }

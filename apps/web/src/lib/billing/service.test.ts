@@ -32,9 +32,11 @@ import { createPaidClaims } from './paid-claims'
 import {
   type BillingEvent,
   type BillingProvider,
+  BillingProviderError,
   BillingWebhookError,
   type CheckoutState,
   type PaymentChange,
+  type ProviderRefund,
   type RefundRequest
 } from './provider'
 import {
@@ -66,6 +68,59 @@ function fakeProvider() {
   const refuseRefunds = { value: false }
   /** The provider can't confirm expiring a checkout (it may have been paid). */
   const expireFails = { value: false }
+  /**
+   * The provider's record of each payment's refunds (`paymentRefunds`, #486), newest first. It
+   * follows the refunds the site makes and the refund events delivered (each event once), as the
+   * provider's own record would; a payment a test set (`setRefunds`) keeps exactly that.
+   */
+  const refundsAt = new Map<string, ProviderRefund[]>()
+  const pinned = new Set<string>()
+  const mirrored = new Set<string>()
+  /** The provider can't be reached for its record of a payment's refunds (#486). */
+  const refundsUnreachable = { value: false }
+  let refundIds = 0
+  const record = (paymentId: string, refund: Omit<ProviderRefund, 'id'> & { id?: string }) => {
+    refundIds += 1
+    const recorded = { ...refund, id: refund.id ?? `re_${refundIds}` }
+    if (!pinned.has(paymentId)) {
+      refundsAt.set(paymentId, [recorded, ...(refundsAt.get(paymentId) ?? [])])
+    }
+    return recorded.id
+  }
+  const sending = (paymentId: string) =>
+    (refundsAt.get(paymentId) ?? []).filter(
+      refund => refund.status === 'pending' || refund.status === 'succeeded'
+    )
+  /** What a delivered event says happened at the provider, on its record of the refunds. */
+  const mirror = (event: BillingEvent) => {
+    const payment = event.payment
+    if (!payment || pinned.has(payment.paymentId) || mirrored.has(event.id)) return
+    mirrored.add(event.id)
+    if (event.type === 'payment_refunded' && !payment.partial) {
+      // The site's own refund (its request key) is on the record already.
+      if (payment.requestKey?.startsWith('refund:') || sending(payment.paymentId).length > 0) {
+        return
+      }
+      record(payment.paymentId, {
+        amountCents: payment.amountCents ?? 4900,
+        orderId: null,
+        status: 'succeeded'
+      })
+    }
+    if (event.type === 'payment_refund_failed') {
+      const refunds = refundsAt.get(payment.paymentId) ?? []
+      const failed = payment.refundId
+        ? refunds.find(refund => refund.id === payment.refundId)
+        : sending(payment.paymentId)[0]
+      if (failed) failed.status = 'failed'
+      else if (payment.refundId) {
+        refundsAt.set(payment.paymentId, [
+          ...refunds,
+          { amountCents: 4900, id: payment.refundId, orderId: null, status: 'failed' }
+        ])
+      }
+    }
+  }
   let created = 0
   const provider: BillingProvider & {
     /**
@@ -73,6 +128,8 @@ function fakeProvider() {
      * (#250), charging the price less it, and nothing to pay at 100% off.
      */
     pay(checkoutId: string, charged?: number, discount?: number): CheckoutState
+    /** Sets the provider's record of a payment's refunds (newest first); events no longer change it. */
+    setRefunds(paymentId: string, refunds: ProviderRefund[]): void
   } = {
     async checkoutForPayment(paymentId) {
       return [...sessions.values()].find(session => session.paymentId === paymentId) ?? null
@@ -128,6 +185,12 @@ function fakeProvider() {
       sessions.set(checkoutId, paid)
       return paid
     },
+    async paymentRefunds(paymentId) {
+      if (refundsUnreachable.value) {
+        throw new BillingProviderError('unreachable', 'provider_unreachable', 503)
+      }
+      return (refundsAt.get(paymentId) ?? []).map(refund => ({ ...refund }))
+    },
     async refund(request) {
       refundSeen.count += 1
       if (refuseRefunds.value) throw new Error('charge_disputed')
@@ -136,11 +199,22 @@ function fakeProvider() {
         throw new Error('provider down')
       }
       refunds.push(request)
-      return { refundId: `re_${refunds.length}` }
+      return {
+        refundId: record(request.paymentId, {
+          amountCents: request.amountCents,
+          orderId: request.orderId,
+          status: 'succeeded'
+        })
+      }
+    },
+    setRefunds(paymentId, refunds) {
+      pinned.add(paymentId)
+      refundsAt.set(paymentId, refunds)
     },
     async verifyWebhook({ body }) {
       const event = JSON.parse(body) as BillingEvent & { forged?: boolean }
       if (event.forged) throw new BillingWebhookError('bad signature')
+      mirror(event)
       return event
     }
   }
@@ -151,6 +225,7 @@ function fakeProvider() {
     provider,
     refundSeen,
     refunds,
+    refundsUnreachable,
     refuseRefunds,
     sessions
   }
@@ -168,8 +243,16 @@ function fixture(options: { guardrails?: GuardrailResult; badge?: 'missing' | 'p
   `)
   const client = createDatabase(sqlite.asD1Database())
   const operations = createBillingOperations({ client })
-  const { expired, expireFails, failNextRefund, provider, refundSeen, refunds, refuseRefunds } =
-    fakeProvider()
+  const {
+    expired,
+    expireFails,
+    failNextRefund,
+    provider,
+    refundSeen,
+    refunds,
+    refundsUnreachable,
+    refuseRefunds
+  } = fakeProvider()
   const clock = { now: NOW }
   const badgeChecks = { count: 0 }
   const emails: Array<{
@@ -265,6 +348,7 @@ function fixture(options: { guardrails?: GuardrailResult; badge?: 'missing' | 'p
     provider,
     refundSeen,
     refunds,
+    refundsUnreachable,
     refuseRefunds,
     row,
     rows,
@@ -1452,9 +1536,10 @@ describe('refunds', () => {
     ).rejects.toThrow('provider down')
     const payment = f.row<{ id: string }>('SELECT provider_payment_id AS id FROM orders').id
     await webhook(f, paymentEvent('payment_refunded', payment))
+    // Credited to the refund that sent the money back, made outside the site (#486).
     expect(f.row('SELECT status, refund_reason, refunded_by FROM orders')).toEqual({
       refund_reason: 'rejected',
-      refunded_by: 'devin@serp.co',
+      refunded_by: 'provider',
       status: 'refunded'
     })
     // The order only: the rejection's refund (the sweep's) records the submission and emails.
@@ -1467,6 +1552,63 @@ describe('refunds', () => {
       expect.arrayContaining(['admin-payment-alert', 'submission-rejected-refunded'])
     )
   })
+
+  // #498's review: after the rejection's refund failed, a refund in the dashboard failed too, and
+  // its report (retried by Stripe) lands after that failure's report, or before it. Stripe's
+  // record says no refund sends the money back, so the order stays `refunding`, flagged, and the
+  // sweep tells the owner the rejection was refunded only once its own retry of the refund
+  // succeeds (Stripe refuses it here).
+  it.each(['after', 'before'] as const)(
+    'leaves a rejection’s refund flagged when a failed dashboard refund is reported %s its failure (#498)',
+    async when => {
+      const f = fixture()
+      await paidLive(f)
+      await rejectLiveAsOther(f)
+      f.failNextRefund.value = true
+      await expect(
+        refundRejectedSubmission(f.deps, { actor: 'devin@serp.co', submissionId: 's1' })
+      ).rejects.toThrow('provider down')
+      const payment = f.row<{ id: string }>('SELECT provider_payment_id AS id FROM orders').id
+      f.provider.setRefunds(payment, [
+        { amountCents: 4900, id: 're_dash', orderId: null, status: 'failed' }
+      ])
+      const failed = paymentEvent('payment_refund_failed', payment, {
+        id: 'evt_dash_failed',
+        refundId: 're_dash'
+      })
+      if (when === 'after') await webhook(f, failed)
+      await webhook(
+        f,
+        paymentEvent('payment_refunded', payment, {
+          id: 'evt_dash_refunded',
+          requestKey: 'dashboard-request'
+        })
+      )
+      expect(
+        f.row(`SELECT outcome FROM billing_events WHERE event_id='evt_dash_refunded'`)
+      ).toEqual({ outcome: 'refund_failed' })
+      expect(f.row('SELECT status, attention FROM orders')).toEqual({
+        attention: 'refund_failed',
+        status: 'refunding'
+      })
+      if (when === 'before') await webhook(f, failed)
+      f.refuseRefunds.value = true
+      f.clock.now = new Date(NOW.getTime() + 2 * 60 * 60 * 1000)
+      await runBillingSweep(f.deps, { limit: 10 })
+      expect(f.row('SELECT status, attention FROM orders')).toEqual({
+        attention: 'refund_failed',
+        status: 'refunding'
+      })
+      expect(
+        f.row(`SELECT refunded_at IS NOT NULL AS refunded FROM listing_submissions WHERE id='s1'`)
+      ).toEqual({ refunded: 0 })
+      expect(f.refunds).toEqual([])
+      expect(f.emails.map(email => email.template)).not.toContain('submission-rejected-refunded')
+      expect(f.emails).toContainEqual(
+        expect.objectContaining({ input: expect.objectContaining({ kind: 'refund_failed' }) })
+      )
+    }
+  )
 
   it('leaves a rejected listing down when a dispute opens while its refund is pending (#473)', async () => {
     const f = fixture()
@@ -2021,13 +2163,14 @@ describe('refunds and disputes made outside the site (#473)', () => {
     ).rejects.toThrow('provider down')
     expect(liveOf(f, order.listing)).toBe(1)
     await webhook(f, paymentEvent('payment_refunded', order.payment))
-    // The claimed refund, as the site's would have recorded it: its listing change, `refunded`.
+    // The claimed refund, as the site's would have recorded it: its listing change, `refunded`,
+    // credited to the dashboard's refund that sent the money back (#486).
     expect(
       f.row('SELECT status, refunded_by, refund_listing_action, provider_refund_id FROM orders')
     ).toEqual({
-      provider_refund_id: null,
+      provider_refund_id: 're_1',
       refund_listing_action: 'unpublish',
-      refunded_by: 'devin@serp.co',
+      refunded_by: 'provider',
       status: 'refunded'
     })
     expect(liveOf(f, order.listing)).toBe(0)
@@ -2042,10 +2185,10 @@ describe('refunds and disputes made outside the site (#473)', () => {
     expect(
       f.row(`SELECT outcome FROM billing_events WHERE event_id LIKE 'evt_payment_refunded%'`)
     ).toEqual({ outcome: 'refunded_at_provider' })
-    // "Refund…" again finds it refunded: nothing more is asked of the provider.
+    // "Refund…" again finds it refunded outside the site: nothing more is asked of the provider.
     await expect(
       refundOrder(f.deps, { actor: 'devin@serp.co', orderId: order.id })
-    ).resolves.toEqual({ listing: 'unpublished', ok: true, replayed: true })
+    ).resolves.toMatchObject({ error: 'refunded_outside', status: 409 })
     expect(f.refunds).toEqual([])
   })
 
@@ -2244,10 +2387,11 @@ describe('refunds and disputes made outside the site (#473)', () => {
       refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
     ).rejects.toThrow('provider down')
     await webhook(f, paymentEvent('payment_refunded', 'pi_claim'))
-    // The admin's refund of a claim keeps the listing (the order alone), and so does its finish.
+    // The admin's refund of a claim keeps the listing (the order alone), and so does its finish,
+    // credited to the dashboard's refund (#486).
     expect(f.row('SELECT status, refunded_by, refund_listing_action FROM orders')).toEqual({
       refund_listing_action: 'none',
-      refunded_by: 'devin@serp.co',
+      refunded_by: 'provider',
       status: 'refunded'
     })
     expect(liveOf(f, 'lst_claimed')).toBe(1)
@@ -2421,7 +2565,8 @@ describe('refunds and disputes made outside the site (#473)', () => {
         f.row('SELECT status, attention, refunded_by, provider_refund_id FROM orders')
       ).toEqual({
         attention: clears ? null : 'refund_failed',
-        provider_refund_id: clears ? null : 're_1',
+        // The refund that sent the money back, by the provider's record (#486).
+        provider_refund_id: clears ? 're_2' : 're_1',
         refunded_by: 'devin@serp.co',
         status: 'refunded'
       })
@@ -2445,8 +2590,8 @@ describe('refunds and disputes made outside the site (#473)', () => {
   )
 
   // The refund in Stripe's dashboard that cleared the flag can fail too (#485 round 3): a retry to
-  // the payment method that refused the site's refund often does. The clear forgot the site's
-  // refund, so that failure flags the order again and a later dispute takes the listing down.
+  // the payment method that refused the site's refund often does. The clear recorded that refund
+  // (#486), so its failure flags the order again and a later dispute takes the listing down.
   it('flags a refunded claim again when the refund in Stripe that cleared its flag fails', async () => {
     const f = fixture()
     claimedListing(f)
@@ -2461,7 +2606,7 @@ describe('refunds and disputes made outside the site (#473)', () => {
     )
     expect(f.row('SELECT attention, provider_refund_id FROM orders')).toEqual({
       attention: null,
-      provider_refund_id: null
+      provider_refund_id: 're_2'
     })
     await webhook(
       f,
@@ -3317,6 +3462,595 @@ describe('dispute and refund follow-ups (#483, #484)', () => {
       const version = f.row('SELECT version FROM publication_state')
       await webhook(f, paymentEvent('payment_refund_failed', payment, { id: 'evt_failed_again' }))
       expect(f.row('SELECT version FROM publication_state')).toEqual(version)
+    }
+  )
+})
+
+describe('the refund that sent the money back, and the refund_failed flag (#486)', () => {
+  const REFUNDED_OUTSIDE = {
+    error: 'refunded_outside',
+    message: 'This payment was refunded outside the site, so nothing was refunded here.',
+    ok: false,
+    status: 409
+  }
+  const alerts = (f: Fixture) =>
+    [
+      ...new Set(
+        f.emails
+          .filter(email => email.template === 'admin-payment-alert')
+          .map(email => email.eventKey)
+      )
+    ].sort()
+  const outcomeOf = (f: Fixture, eventId: string) =>
+    f.row<{ outcome: string | null }>(
+      `SELECT outcome FROM billing_events WHERE event_id='${eventId}'`
+    ).outcome
+  const processed = (f: Fixture, eventId: string) =>
+    f.row<{ done: number }>(
+      `SELECT processed_at IS NOT NULL AS done FROM billing_events WHERE event_id='${eventId}'`
+    ).done === 1
+
+  // A refund made in Stripe's dashboard lands in the admin's refund's first ten minutes: its
+  // report finds the admin's refund still running, and the admin's call finds the charge refunded
+  // already (`charge_already_refunded`, answered as `refundId: null`). Either way round, the order
+  // credits the refund that sent the money back.
+  it.each([
+    ['while the admin’s refund runs', 'during'],
+    ['after the admin’s refund finds the charge refunded', 'after']
+  ] as const)(
+    'credits a refund made outside the site, reported %s, to that refund (#486)',
+    async (_when, reported) => {
+      const f = fixture({ badge: 'missing' })
+      const order = await publishedOrder(f)
+      f.db.exec(`UPDATE listing_submissions SET status='approved' WHERE id='s1'`)
+      const outside = paymentEvent('payment_refunded', order.payment, {
+        id: 'evt_outside',
+        requestKey: 'dashboard-request'
+      })
+      if (reported === 'after') {
+        f.provider.setRefunds(order.payment, [
+          { amountCents: 4900, id: 're_dashboard', orderId: null, status: 'succeeded' }
+        ])
+      }
+      f.provider.refund = async () => {
+        if (reported === 'during') await webhook(f, outside)
+        return { refundId: null }
+      }
+      await expect(
+        refundOrder(f.deps, { actor: 'devin@serp.co', orderId: order.id })
+      ).resolves.toEqual(REFUNDED_OUTSIDE)
+      if (reported === 'during') expect(outcomeOf(f, 'evt_outside')).toBe('already_refunding')
+      else await webhook(f, outside)
+      // Recorded as refunded outside the site ("Refunded outside the site" in admin Orders), with
+      // the refund that did it. The money and the listing are as before: the admin's decision
+      // (no badge: unpublish) applied.
+      expect(
+        f.row(
+          'SELECT status, refund_reason, refunded_by, refund_listing_action, provider_refund_id FROM orders'
+        )
+      ).toEqual({
+        provider_refund_id: reported === 'during' ? 're_1' : 're_dashboard',
+        refund_listing_action: 'unpublish',
+        refund_reason: 'admin',
+        refunded_by: 'provider',
+        status: 'refunded'
+      })
+      expect(liveOf(f, order.listing)).toBe(0)
+      expect(
+        f.row(`SELECT refunded_at IS NOT NULL AS refunded FROM listing_submissions WHERE id='s1'`)
+      ).toEqual({ refunded: 1 })
+      if (reported === 'after') expect(outcomeOf(f, 'evt_outside')).toBe('refunded_at_provider')
+      // The admin is told it was refunded outside the site (the email ledger sends it once).
+      expect(alerts(f)).toEqual([`payment-alert:refunded:${order.id}`])
+      expect(f.emails).toContainEqual(
+        expect.objectContaining({
+          input: { kind: 'refunded', listingLive: false, orderNumber: 1001, productName: 'Name s1' }
+        })
+      )
+      // "Refund…" again, and its preview, answer the same.
+      await expect(
+        refundOrder(f.deps, { actor: 'devin@serp.co', orderId: order.id })
+      ).resolves.toEqual(REFUNDED_OUTSIDE)
+      await expect(previewRefund(f.deps, { orderId: order.id })).resolves.toEqual(REFUNDED_OUTSIDE)
+    }
+  )
+
+  // The admin's refund failed (Stripe down); before its retry, the payment was refunded in the
+  // dashboard, and no report of that came (the events not ticked yet, say). The retry finds the
+  // charge refunded already, and Stripe's record names the dashboard's refund.
+  it.each(['“Refund…” again', 'the sweep'] as const)(
+    'credits a refund made outside the site before %s retried the admin’s to that refund (#486)',
+    async how => {
+      const f = fixture({ badge: 'missing' })
+      const order = await publishedOrder(f)
+      f.db.exec(`UPDATE listing_submissions SET status='approved' WHERE id='s1'`)
+      f.failNextRefund.value = true
+      await expect(
+        refundOrder(f.deps, { actor: 'devin@serp.co', orderId: order.id })
+      ).rejects.toThrow('provider down')
+      f.provider.setRefunds(order.payment, [
+        { amountCents: 4900, id: 're_dashboard', orderId: null, status: 'succeeded' }
+      ])
+      f.provider.refund = async () => ({ refundId: null })
+      if (how === 'the sweep') {
+        f.clock.now = new Date(NOW.getTime() + 2 * 60 * 60 * 1000)
+        await runBillingSweep(f.deps, { limit: 10 })
+      } else {
+        await expect(
+          refundOrder(f.deps, { actor: 'devin@serp.co', orderId: order.id })
+        ).resolves.toEqual(REFUNDED_OUTSIDE)
+      }
+      expect(
+        f.row('SELECT status, refunded_by, refund_listing_action, provider_refund_id FROM orders')
+      ).toEqual({
+        provider_refund_id: 're_dashboard',
+        refund_listing_action: 'unpublish',
+        refunded_by: 'provider',
+        status: 'refunded'
+      })
+      expect(liveOf(f, order.listing)).toBe(0)
+      expect(alerts(f)).toEqual([`payment-alert:refunded:${order.id}`])
+    }
+  )
+
+  it('answers a rejection’s refund from Orders that a refund outside the site beat as that (#486)', async () => {
+    const f = fixture()
+    const order = await publishedOrder(f)
+    // Rejected, its refund still owed (the hook never ran: a Worker stopped, say).
+    await expect(
+      rejectSubmission(
+        {
+          ...adminContext(f),
+          refunds: {
+            refundRejectedSubmission: async () => {
+              throw new Error('stopped')
+            }
+          }
+        },
+        { category: 'other', reason: 'Not a fit.', submissionId: 's1' }
+      )
+    ).resolves.toMatchObject({ refundPending: true })
+    f.provider.setRefunds(order.payment, [
+      { amountCents: 4900, id: 're_dashboard', orderId: null, status: 'succeeded' }
+    ])
+    f.provider.refund = async () => ({ refundId: null })
+    await expect(
+      refundOrder(f.deps, { actor: 'devin@serp.co', orderId: order.id })
+    ).resolves.toEqual(REFUNDED_OUTSIDE)
+    expect(
+      f.row('SELECT status, refund_reason, refunded_by, provider_refund_id FROM orders')
+    ).toEqual({
+      provider_refund_id: 're_dashboard',
+      refund_reason: 'rejected',
+      refunded_by: 'provider',
+      status: 'refunded'
+    })
+    // The money went back, so the owner hears the rejection was refunded, and the admin how.
+    expect(f.emails.map(email => email.template)).toEqual(
+      expect.arrayContaining(['admin-payment-alert', 'submission-rejected-refunded'])
+    )
+  })
+
+  // After the site's refund failed, a full refund's report finishes it; when Stripe can't say
+  // which refund it was, the report's request key does, as before, and the delivery answers 500
+  // so Stripe delivers it again.
+  it.each([
+    ['a refund in the dashboard', 'dashboard-request', 'provider'],
+    ['the site’s own refund', 'refund:ord_claim', 'devin@serp.co']
+  ] as const)(
+    'credits %s by its request key when Stripe can’t say (#486)',
+    async (_which, requestKey, refundedBy) => {
+      const f = fixture()
+      claimedListing(f)
+      f.failNextRefund.value = true
+      await expect(
+        refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+      ).rejects.toThrow('provider down')
+      f.refundsUnreachable.value = true
+      await expect(
+        webhook(f, paymentEvent('payment_refunded', 'pi_claim', { requestKey }))
+      ).rejects.toBeInstanceOf(BillingProviderError)
+      expect(f.row('SELECT status, refunded_by, provider_refund_id FROM orders')).toEqual({
+        provider_refund_id: null,
+        refunded_by: refundedBy,
+        status: 'refunded'
+      })
+    }
+  )
+
+  it('credits the site’s own earlier refund, by the order it names, when its key expired (#486)', async () => {
+    const f = fixture()
+    claimedListing(f)
+    f.provider.setRefunds('pi_claim', [
+      { amountCents: 4900, id: 're_earlier', orderId: 'ord_claim', status: 'succeeded' }
+    ])
+    f.provider.refund = async () => ({ refundId: null })
+    await expect(
+      refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+    ).resolves.toEqual({ listing: 'unchanged', ok: true, replayed: false })
+    expect(f.row('SELECT status, refunded_by, provider_refund_id FROM orders')).toEqual({
+      provider_refund_id: 're_earlier',
+      refunded_by: 'devin@serp.co',
+      status: 'refunded'
+    })
+    expect(alerts(f)).toEqual([])
+  })
+
+  it('credits the admin, as before, when Stripe can’t say which refund sent the money back (#486)', async () => {
+    const f = fixture()
+    claimedListing(f)
+    f.provider.refund = async () => ({ refundId: null })
+    f.refundsUnreachable.value = true
+    await expect(
+      refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+    ).resolves.toEqual({ listing: 'unchanged', ok: true, replayed: false })
+    expect(f.row('SELECT status, refunded_by, provider_refund_id FROM orders')).toEqual({
+      provider_refund_id: null,
+      refunded_by: 'devin@serp.co',
+      status: 'refunded'
+    })
+    expect(alerts(f)).toEqual([])
+  })
+
+  // #485's third review: a refund in Stripe's dashboard sent the money back after the site's
+  // refund failed, and its report arrives before the site's refund's failure. Stripe's record
+  // says the money is back, so the failure flags nothing and a dispute keeps the listing up.
+  it('flags nothing when a refund’s failure arrives after a later refund’s report (#486)', async () => {
+    const f = fixture()
+    claimedListing(f)
+    await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+    f.provider.setRefunds('pi_claim', [
+      { amountCents: 4900, id: 're_dashboard', orderId: null, status: 'succeeded' },
+      { amountCents: 4900, id: 're_1', orderId: 'ord_claim', status: 'failed' }
+    ])
+    await webhook(
+      f,
+      paymentEvent('payment_refunded', 'pi_claim', {
+        id: 'evt_dashboard_refunded',
+        requestKey: 'dashboard-request'
+      })
+    )
+    await webhook(
+      f,
+      paymentEvent('payment_refund_failed', 'pi_claim', { id: 'evt_failed', refundId: 're_1' })
+    )
+    expect(outcomeOf(f, 'evt_failed')).toBe('refund_failed_superseded')
+    expect(f.row('SELECT status, attention FROM orders')).toEqual({
+      attention: null,
+      status: 'refunded'
+    })
+    await webhook(f, paymentEvent('payment_disputed', 'pi_claim'))
+    expect(liveOf(f, 'lst_claimed')).toBe(1)
+    expect(alerts(f)).toEqual(['payment-alert:disputed:ord_claim'])
+  })
+
+  // #485's third review: the dashboard's refund that would clear the flag failed too, and its
+  // report (retried by Stripe) lands after its failure. Stripe's record says the money never went
+  // back, so the flag stays and a dispute takes the listing down.
+  it('keeps the flag when a refund’s retried report lands after its failure (#486)', async () => {
+    const f = fixture()
+    claimedListing(f)
+    await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+    await webhook(f, paymentEvent('payment_refund_failed', 'pi_claim', { refundId: 're_1' }))
+    f.provider.setRefunds('pi_claim', [
+      { amountCents: 4900, id: 're_dashboard', orderId: null, status: 'failed' },
+      { amountCents: 4900, id: 're_1', orderId: 'ord_claim', status: 'failed' }
+    ])
+    await webhook(
+      f,
+      paymentEvent('payment_refund_failed', 'pi_claim', {
+        id: 'evt_dashboard_failed',
+        refundId: 're_dashboard'
+      })
+    )
+    await webhook(
+      f,
+      paymentEvent('payment_refunded', 'pi_claim', {
+        id: 'evt_dashboard_refunded_retried',
+        requestKey: 'dashboard-request'
+      })
+    )
+    expect(outcomeOf(f, 'evt_dashboard_refunded_retried')).toBe('already_refunded')
+    expect(f.row('SELECT status, attention, provider_refund_id FROM orders')).toEqual({
+      attention: 'refund_failed',
+      provider_refund_id: 're_1',
+      status: 'refunded'
+    })
+    await webhook(f, paymentEvent('payment_disputed', 'pi_claim'))
+    expect(liveOf(f, 'lst_claimed')).toBe(0)
+  })
+
+  // Codex on #498: the dashboard refunded the payment in more parts than one page of Stripe's
+  // list holds (100). The provider reads every page, so the total is the whole charge and the
+  // site's refund failing flags nothing.
+  it('flags nothing when the refunds that sent the money back fill more than a page (#486)', async () => {
+    const f = fixture()
+    claimedListing(f)
+    await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+    f.provider.setRefunds('pi_claim', [
+      ...Array.from({ length: 104 }, (_, index) => ({
+        amountCents: index < 100 ? 45 : 100,
+        id: `re_part_${index}`,
+        orderId: null,
+        status: 'succeeded' as const
+      })),
+      { amountCents: 4900, id: 're_1', orderId: 'ord_claim', status: 'failed' }
+    ])
+    await webhook(
+      f,
+      paymentEvent('payment_refund_failed', 'pi_claim', { id: 'evt_failed', refundId: 're_1' })
+    )
+    expect(outcomeOf(f, 'evt_failed')).toBe('refund_failed_superseded')
+    expect(f.row('SELECT status, attention FROM orders')).toEqual({
+      attention: null,
+      status: 'refunded'
+    })
+  })
+
+  // More refunds than the provider reads: an unknown, as when Stripe is down, never a short total.
+  // The failure decides as before, and the delivery answers 500 so Stripe delivers it again.
+  it('decides as before when the provider can’t read all of a payment’s refunds (#486)', async () => {
+    const f = fixture()
+    claimedListing(f)
+    await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+    f.provider.paymentRefunds = async () => {
+      throw new BillingProviderError('More refunds than it reads.', 'refunds_incomplete', 502)
+    }
+    const failed = paymentEvent('payment_refund_failed', 'pi_claim', {
+      id: 'evt_failed',
+      refundId: 're_1'
+    })
+    await expect(webhook(f, failed)).rejects.toBeInstanceOf(BillingProviderError)
+    expect(f.row('SELECT attention FROM orders')).toEqual({ attention: 'refund_failed' })
+    expect(processed(f, 'evt_failed')).toBe(false)
+  })
+
+  // Stripe can't be reached: the report decides as before, and the delivery answers 500, so
+  // Stripe delivers it again; once Stripe answers, its record decides.
+  it('decides a failure as before while Stripe can’t be reached, then by Stripe on the retry (#486)', async () => {
+    const f = fixture()
+    claimedListing(f)
+    await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+    // The first refund's failure, after a dashboard refund sent the money back (as above).
+    f.provider.setRefunds('pi_claim', [
+      { amountCents: 4900, id: 're_dashboard', orderId: null, status: 'succeeded' },
+      { amountCents: 4900, id: 're_1', orderId: 'ord_claim', status: 'failed' }
+    ])
+    const failed = paymentEvent('payment_refund_failed', 'pi_claim', {
+      id: 'evt_failed',
+      refundId: 're_1'
+    })
+    f.refundsUnreachable.value = true
+    await expect(webhook(f, failed)).rejects.toBeInstanceOf(BillingProviderError)
+    // As before: the order's own refund failed, so it is flagged; the event stays unprocessed.
+    expect(f.row('SELECT attention FROM orders')).toEqual({ attention: 'refund_failed' })
+    expect(processed(f, 'evt_failed')).toBe(false)
+    f.refundsUnreachable.value = false
+    await expect(webhook(f, failed)).resolves.toEqual({ body: { received: true }, status: 200 })
+    expect(outcomeOf(f, 'evt_failed')).toBe('refund_failed_superseded')
+    expect(f.row('SELECT attention, provider_refund_id FROM orders')).toEqual({
+      attention: null,
+      provider_refund_id: 're_dashboard'
+    })
+  })
+
+  it('decides a refund’s report as before while Stripe can’t be reached, then by Stripe on the retry (#486)', async () => {
+    const f = fixture()
+    claimedListing(f)
+    await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+    await webhook(f, paymentEvent('payment_refund_failed', 'pi_claim', { refundId: 're_1' }))
+    // The dashboard refund's report, retried after that refund failed too (as above).
+    f.provider.setRefunds('pi_claim', [
+      { amountCents: 4900, id: 're_dashboard', orderId: null, status: 'failed' },
+      { amountCents: 4900, id: 're_1', orderId: 'ord_claim', status: 'failed' }
+    ])
+    const refunded = paymentEvent('payment_refunded', 'pi_claim', {
+      id: 'evt_dashboard_refunded',
+      requestKey: 'dashboard-request'
+    })
+    f.refundsUnreachable.value = true
+    await expect(webhook(f, refunded)).rejects.toBeInstanceOf(BillingProviderError)
+    // As before: a report of another refund than the site's clears the flag.
+    expect(f.row('SELECT attention FROM orders')).toEqual({ attention: null })
+    expect(processed(f, 'evt_dashboard_refunded')).toBe(false)
+    f.emails.length = 0
+    f.refundsUnreachable.value = false
+    await expect(webhook(f, refunded)).resolves.toEqual({ body: { received: true }, status: 200 })
+    // Stripe's record: no refund sends the money back, so the order is flagged again.
+    expect(f.row('SELECT status, attention FROM orders')).toEqual({
+      attention: 'refund_failed',
+      status: 'refunded'
+    })
+    expect(alerts(f)).toEqual(['payment-alert:refund_failed:ord_claim'])
+    await webhook(f, paymentEvent('payment_disputed', 'pi_claim'))
+    expect(liveOf(f, 'lst_claimed')).toBe(0)
+  })
+
+  // #498's review: the dashboard refund's failure is recorded while another refund event asks
+  // Stripe for the payment's refunds, and Stripe's answer predates it (the refund still pending).
+  // The clear is compared and swapped on the order as read before Stripe was asked, so the event
+  // reads both again, and the flag stays.
+  it.each([
+    ['a dashboard refund’s report', 'refunded'],
+    ['a retried failure', 'failed']
+  ] as const)(
+    'keeps the flag when a refund’s failure is recorded while %s reads Stripe (#498)',
+    async (_which, event) => {
+      const f = fixture()
+      claimedListing(f)
+      await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+      const failed = paymentEvent('payment_refund_failed', 'pi_claim', {
+        id: 'evt_failed',
+        refundId: 're_1'
+      })
+      // A retried failure: its first delivery found Stripe down, decided as before, and answered 500.
+      f.refundsUnreachable.value = event === 'failed'
+      await webhook(f, failed).catch(() => undefined)
+      f.refundsUnreachable.value = false
+      expect(f.row('SELECT attention FROM orders')).toEqual({ attention: 'refund_failed' })
+      // Stripe's record once the dashboard's refund failed too.
+      f.provider.setRefunds('pi_claim', [
+        { amountCents: 4900, id: 're_dash', orderId: null, status: 'failed' },
+        { amountCents: 4900, id: 're_1', orderId: 'ord_claim', status: 'failed' }
+      ])
+      const read = f.provider.paymentRefunds
+      let asked = false
+      f.provider.paymentRefunds = async paymentId => {
+        if (asked) return read(paymentId)
+        asked = true
+        f.clock.now = new Date(f.clock.now.getTime() + 1000)
+        await webhook(
+          f,
+          paymentEvent('payment_refund_failed', 'pi_claim', {
+            id: 'evt_dash_failed',
+            refundId: 're_dash'
+          })
+        )
+        return [
+          { amountCents: 4900, id: 're_dash', orderId: null, status: 'pending' },
+          { amountCents: 4900, id: 're_1', orderId: 'ord_claim', status: 'failed' }
+        ]
+      }
+      await webhook(
+        f,
+        event === 'failed'
+          ? failed
+          : paymentEvent('payment_refunded', 'pi_claim', {
+              id: 'evt_dash_refunded',
+              requestKey: 'dashboard-request'
+            })
+      )
+      expect(f.row('SELECT status, attention FROM orders')).toEqual({
+        attention: 'refund_failed',
+        status: 'refunded'
+      })
+      await webhook(f, paymentEvent('payment_disputed', 'pi_claim'))
+      expect(liveOf(f, 'lst_claimed')).toBe(0)
+    }
+  )
+
+  // Something else changed the order while Stripe was read (no refund's failure): the event
+  // reads both again, and Stripe's record still clears the flag.
+  it.each(['report', 'failure'] as const)(
+    'reads again, and clears the flag, when the order changed while a refund’s %s read Stripe (#498)',
+    async event => {
+      const f = fixture()
+      claimedListing(f)
+      await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+      const failed = paymentEvent('payment_refund_failed', 'pi_claim', {
+        id: 'evt_failed',
+        refundId: 're_1'
+      })
+      f.refundsUnreachable.value = event === 'failure'
+      await webhook(f, failed).catch(() => undefined)
+      f.refundsUnreachable.value = false
+      let reads = 0
+      f.provider.paymentRefunds = async () => {
+        reads += 1
+        if (reads === 1) {
+          f.clock.now = new Date(f.clock.now.getTime() + 1000)
+          f.db.exec(`UPDATE orders SET updated_at='${f.clock.now.toISOString()}'`)
+        }
+        return [
+          { amountCents: 4900, id: 're_dash', orderId: null, status: 'succeeded' },
+          { amountCents: 4900, id: 're_1', orderId: 'ord_claim', status: 'failed' }
+        ]
+      }
+      await webhook(
+        f,
+        event === 'failure'
+          ? failed
+          : paymentEvent('payment_refunded', 'pi_claim', { requestKey: 'dashboard-request' })
+      )
+      expect(reads).toBe(2)
+      expect(f.row('SELECT attention, provider_refund_id FROM orders')).toEqual({
+        attention: null,
+        provider_refund_id: 're_dash'
+      })
+    }
+  )
+
+  // The order keeps changing while Stripe is read: after reading both again once, the flag stays
+  // and the delivery answers 500, so Stripe delivers it again.
+  it('keeps the flag and answers 500 when the order keeps changing while Stripe is read (#498)', async () => {
+    const f = fixture()
+    claimedListing(f)
+    await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+    await webhook(f, paymentEvent('payment_refund_failed', 'pi_claim', { refundId: 're_1' }))
+    let reads = 0
+    f.provider.paymentRefunds = async () => {
+      reads += 1
+      f.clock.now = new Date(f.clock.now.getTime() + 1000)
+      f.db.exec(`UPDATE orders SET updated_at='${f.clock.now.toISOString()}'`)
+      return [
+        { amountCents: 4900, id: 're_dash', orderId: null, status: 'succeeded' },
+        { amountCents: 4900, id: 're_1', orderId: 'ord_claim', status: 'failed' }
+      ]
+    }
+    const refunded = paymentEvent('payment_refunded', 'pi_claim', {
+      id: 'evt_dash_refunded',
+      requestKey: 'dashboard-request'
+    })
+    await expect(webhook(f, refunded)).rejects.toMatchObject({
+      code: 'billing_payment_change_not_recorded'
+    })
+    expect(reads).toBe(2)
+    expect(f.row('SELECT attention FROM orders')).toEqual({ attention: 'refund_failed' })
+    expect(processed(f, 'evt_dash_refunded')).toBe(false)
+  })
+
+  // #498's review: nothing has run the restricted key's Refunds read against Stripe. A key refused
+  // it (401, 403) won't be let in on a retry, so the event decides as before and is answered, with
+  // the error logged; a rate limit or Stripe's own error answers 500 so Stripe delivers it again.
+  it.each([
+    ['failure', 401, 200],
+    ['failure', 403, 200],
+    ['failure', 429, 500],
+    ['failure', 500, 500],
+    ['report', 403, 200],
+    ['report', 503, 500]
+  ] as const)(
+    'decides a refund’s %s as before when the refunds read answers %i, and answers %i (#498)',
+    async (event, status, answered) => {
+      const f = fixture()
+      claimedListing(f)
+      await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+      if (event === 'report') {
+        await webhook(f, paymentEvent('payment_refund_failed', 'pi_claim', { refundId: 're_1' }))
+      }
+      f.provider.paymentRefunds = async () => {
+        throw new BillingProviderError(`Stripe answered ${status}.`, 'provider_error', status)
+      }
+      const delivered =
+        event === 'failure'
+          ? paymentEvent('payment_refund_failed', 'pi_claim', { id: 'evt_x', refundId: 're_1' })
+          : paymentEvent('payment_refunded', 'pi_claim', {
+              id: 'evt_x',
+              requestKey: 'dashboard-request'
+            })
+      const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+      try {
+        if (answered === 200) {
+          await expect(webhook(f, delivered)).resolves.toEqual({
+            body: { received: true },
+            status: 200
+          })
+        } else {
+          await expect(webhook(f, delivered)).rejects.toBeInstanceOf(BillingProviderError)
+        }
+        expect(errors).toHaveBeenCalledWith(
+          expect.stringMatching(
+            new RegExp(`"event":"billing_refunds_unchecked".*"retry":${answered === 500}`)
+          )
+        )
+      } finally {
+        errors.mockRestore()
+      }
+      expect(processed(f, 'evt_x')).toBe(answered === 200)
+      // As before: the order's own refund's failure flags it; another refund's report clears it.
+      expect(f.row('SELECT attention FROM orders')).toEqual({
+        attention: event === 'failure' ? 'refund_failed' : null
+      })
     }
   )
 })

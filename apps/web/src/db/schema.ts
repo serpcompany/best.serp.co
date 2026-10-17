@@ -1695,7 +1695,8 @@ export type OrderOutcome = (typeof orderOutcomes)[number]
 /**
  * Why an order was refunded: an `other` rejection, an admin's refund, or an unapplied payment.
  * `admin` also records a refund made at the provider, outside the site (#473): its
- * `refunded_by` is then `provider` (`PROVIDER_ACTOR`).
+ * `refunded_by` is then `provider` (`PROVIDER_ACTOR`), as it is for any reason when such a refund
+ * sent the money back while the site's own was claimed (#486).
  */
 export const orderRefundReasons = ['rejected', 'admin', 'unapplied'] as const
 export type OrderRefundReason = (typeof orderRefundReasons)[number]

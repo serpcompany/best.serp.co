@@ -403,19 +403,23 @@ export function buildRecordRefundFailurePlans(input: {
 /**
  * `refunding` → `refunded`, once the provider confirmed the refund (the site's, the sweep's, or
  * one made in its dashboard). A `refund_failed` flag from an earlier failure is cleared: the money
- * went back. A `refund.failed` reported later flags it again.
+ * went back. A `refund.failed` reported later flags it again. `refundedBy` (`PROVIDER_ACTOR`)
+ * credits a refund made outside the site that sent the money back while this one was claimed
+ * (#486); otherwise the claim's actor stays.
  */
 export function buildFinishRefundPlans(input: {
   now: string
   orderId: string
+  refundedBy?: string | null
   refundId: string | null
 }): StatementPlan[] {
   return [
     {
-      sql: `UPDATE orders SET status='refunded',provider_refund_id=?,refunded_at=?,
+      sql: `UPDATE orders SET status='refunded',provider_refund_id=?,
+          refunded_by=COALESCE(?,refunded_by),refunded_at=?,
           attention=CASE WHEN attention='refund_failed' THEN NULL ELSE attention END,updated_at=?
         WHERE id=? AND status='refunding'`,
-      params: [input.refundId, input.now, input.now, input.orderId]
+      params: [input.refundId, input.refundedBy ?? null, input.now, input.now, input.orderId]
     },
     assertPreviousStatementChangedOne('order_refunded')
   ]
@@ -501,21 +505,27 @@ export function buildFlagRefundFailedPlans(input: {
 /**
  * Clears a `refunded` order's `refund_failed` flag once a later refund of the whole payment
  * succeeded at the provider (refunded again in its dashboard, #485): the money went back, so a
- * dispute no longer takes its listing down. It blanks the recorded refund too: the order no
- * longer knows which refund sent the money back, so any later failure (that dashboard refund's
- * own) flags it again. Compared and swapped on the flag, so it changes nothing once the order
- * moved on.
+ * dispute no longer takes its listing down. It records the refund that sent the money back
+ * (`refundId`, when the provider said which, #486), or blanks the recorded one: either way the
+ * failed refund is no longer the order's, so a later failure of the one that sent it back flags
+ * it again. Compared and swapped on the flag and on `updated_at` as read before the provider was
+ * asked (`updatedAt`), so a refund's failure recorded meanwhile (its flag write bumps it, though
+ * the flag was set already) refuses the batch and the caller decides again (#498's review).
  */
 export function buildClearRefundFailedPlans(input: {
   now: string
   orderId: string
+  refundId?: string | null
+  /** The order's `updated_at` when the clear was decided. */
+  updatedAt: string
 }): StatementPlan[] {
   return [
     {
-      sql: `UPDATE orders SET attention=NULL,provider_refund_id=NULL,updated_at=?
-        WHERE id=? AND status='refunded' AND attention='refund_failed'`,
-      params: [input.now, input.orderId]
-    }
+      sql: `UPDATE orders SET attention=NULL,provider_refund_id=?,updated_at=?
+        WHERE id=? AND status='refunded' AND attention='refund_failed' AND updated_at=?`,
+      params: [input.refundId ?? null, input.now, input.orderId, input.updatedAt]
+    },
+    assertPreviousStatementChangedOne('order_refund_failed_cleared')
   ]
 }
 
