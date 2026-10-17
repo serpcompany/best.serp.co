@@ -25,6 +25,7 @@ import { planLabel } from '../admin/listing-labels'
 import { listingDetailView } from '../admin/listing-view'
 import { submissionView } from '../admin/review-view'
 import { checkBadgeAtRefund } from '../badge-program/refund'
+import { emailEventKey } from '../email/service'
 import { features, type SiteFeatures } from '../features'
 import { CONFIRM_AGAIN_HASH, SHORTEST_CHECKOUT_MS } from './checkout-window'
 import type { GuardrailResult } from './guardrails'
@@ -1879,6 +1880,19 @@ describe('sweep', () => {
     ])
   })
 })
+
+/**
+ * The admin's "refund failed" email key (#503): the order's, and the failed refund's id hashed, as
+ * the email ledger's key can't hold a Stripe id's capitals; a `refunding` order's is the order's.
+ */
+async function refundFailedKey(orderId: string, refundId?: string): Promise<string> {
+  if (!refundId) return `payment-alert:refund_failed:${orderId}`
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(refundId))
+  const hex = [...new Uint8Array(digest).slice(0, 16)]
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('')
+  return `payment-alert:refund_failed:${orderId}:${hex}`
+}
 
 /**
  * A payment event (#473): a refund, a failed refund, or a dispute, of `paymentId`; a refund may
@@ -3860,11 +3874,21 @@ describe('the refund that sent the money back, and the refund_failed flag (#486)
       })
     )
     expect(outcomeOf(f, 'evt_dashboard_refunded_retried')).toBe('already_refunded')
+    // The order records the dashboard's refund, the one that failed, though no report of it ever
+    // cleared the flag (#503), so the admin is emailed for each failed refund.
     expect(f.row('SELECT status, attention, provider_refund_id FROM orders')).toEqual({
       attention: 'refund_failed',
-      provider_refund_id: 're_1',
+      provider_refund_id: 're_dashboard',
       status: 'refunded'
     })
+    expect(alerts(f)).toEqual(
+      (
+        await Promise.all([
+          refundFailedKey('ord_claim', 're_1'),
+          refundFailedKey('ord_claim', 're_dashboard')
+        ])
+      ).sort()
+    )
     await webhook(f, paymentEvent('payment_disputed', 'pi_claim'))
     expect(liveOf(f, 'lst_claimed')).toBe(0)
   })
@@ -3943,37 +3967,46 @@ describe('the refund that sent the money back, and the refund_failed flag (#486)
     })
   })
 
-  it('decides a refund’s report as before while Stripe can’t be reached, then by Stripe on the retry (#486)', async () => {
-    const f = fixture()
-    claimedListing(f)
-    await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
-    await webhook(f, paymentEvent('payment_refund_failed', 'pi_claim', { refundId: 're_1' }))
-    // The dashboard refund's report, retried after that refund failed too (as above).
-    f.provider.setRefunds('pi_claim', [
-      { amountCents: 4900, id: 're_dashboard', orderId: null, status: 'failed' },
-      { amountCents: 4900, id: 're_1', orderId: 'ord_claim', status: 'failed' }
-    ])
-    const refunded = paymentEvent('payment_refunded', 'pi_claim', {
-      id: 'evt_dashboard_refunded',
-      requestKey: 'dashboard-request'
-    })
-    f.refundsUnreachable.value = true
-    await expect(webhook(f, refunded)).rejects.toBeInstanceOf(BillingProviderError)
-    // As before: a report of another refund than the site's clears the flag.
-    expect(f.row('SELECT attention FROM orders')).toEqual({ attention: null })
-    expect(processed(f, 'evt_dashboard_refunded')).toBe(false)
-    f.emails.length = 0
-    f.refundsUnreachable.value = false
-    await expect(webhook(f, refunded)).resolves.toEqual({ body: { received: true }, status: 200 })
-    // Stripe's record: no refund sends the money back, so the order is flagged again.
-    expect(f.row('SELECT status, attention FROM orders')).toEqual({
-      attention: 'refund_failed',
-      status: 'refunded'
-    })
-    expect(alerts(f)).toEqual(['payment-alert:refund_failed:ord_claim'])
-    await webhook(f, paymentEvent('payment_disputed', 'pi_claim'))
-    expect(liveOf(f, 'lst_claimed')).toBe(0)
-  })
+  // #513 (#509's review): a refund's report while Stripe can't say for now (down, a 5xx, a partial
+  // list) records nothing: the flag stays, so a dispute meanwhile still reads the refund as failed,
+  // and the delivery answers 500. Stripe's retry then decides by its record.
+  it.each([
+    ['sent the money back', 'succeeded', null, 're_dashboard'],
+    ['failed too', 'failed', 'refund_failed', 're_1']
+  ] as const)(
+    'keeps the flag while Stripe can’t say, then decides a refund’s report by Stripe on the retry when that refund %s (#513)',
+    async (_how, status, attention, providerRefundId) => {
+      const f = fixture()
+      claimedListing(f)
+      await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+      await webhook(f, paymentEvent('payment_refund_failed', 'pi_claim', { refundId: 're_1' }))
+      const before = f.row('SELECT * FROM orders')
+      f.emails.length = 0
+      const refunded = paymentEvent('payment_refunded', 'pi_claim', {
+        id: 'evt_dashboard_refunded',
+        requestKey: 'dashboard-request'
+      })
+      f.refundsUnreachable.value = true
+      await expect(webhook(f, refunded)).rejects.toBeInstanceOf(BillingProviderError)
+      expect(f.row('SELECT * FROM orders')).toEqual(before)
+      expect(processed(f, 'evt_dashboard_refunded')).toBe(false)
+      f.refundsUnreachable.value = false
+      f.provider.setRefunds('pi_claim', [
+        { amountCents: 4900, id: 're_dashboard', orderId: null, status },
+        { amountCents: 4900, id: 're_1', orderId: 'ord_claim', status: 'failed' }
+      ])
+      await expect(webhook(f, refunded)).resolves.toEqual({ body: { received: true }, status: 200 })
+      expect(f.row('SELECT status, attention, provider_refund_id FROM orders')).toEqual({
+        attention,
+        provider_refund_id: providerRefundId,
+        status: 'refunded'
+      })
+      // Flagged already for the site's refund: nothing new to tell the admin.
+      expect(alerts(f)).toEqual([])
+      await webhook(f, paymentEvent('payment_disputed', 'pi_claim'))
+      expect(liveOf(f, 'lst_claimed')).toBe(attention ? 0 : 1)
+    }
+  )
 
   // #498's review: the dashboard refund's failure is recorded while another refund event asks
   // Stripe for the payment's refunds, and Stripe's answer predates it (the refund still pending).
@@ -4116,7 +4149,9 @@ describe('the refund that sent the money back, and the refund_failed flag (#486)
     ['failure', 403, 200],
     ['failure', 429, 500],
     ['failure', 500, 500],
+    ['report', 401, 200],
     ['report', 403, 200],
+    ['report', 429, 500],
     ['report', 503, 500]
   ] as const)(
     'decides a refund’s %s as before when the refunds read answers %i, and answers %i (#498)',
@@ -4156,10 +4191,127 @@ describe('the refund that sent the money back, and the refund_failed flag (#486)
         errors.mockRestore()
       }
       expect(processed(f, 'evt_x')).toBe(answered === 200)
-      // As before: the order's own refund's failure flags it; another refund's report clears it.
+      // As before: the order's own refund's failure flags it, and when the key is refused the read,
+      // another refund's report clears it; while Stripe can't say for now, it stays (#513).
       expect(f.row('SELECT attention FROM orders')).toEqual({
-        attention: event === 'failure' ? 'refund_failed' : null
+        attention: event === 'report' && answered === 200 ? null : 'refund_failed'
       })
     }
   )
+
+  // #503 (#498's review): the admin's "refund failed" email is keyed on the refund that failed, so
+  // a dashboard refund that cleared the flag and then failed too emails the admin again, while a
+  // retried report of the same failure (Stripe's retry after a 500, or another report) doesn't.
+  it('emails the admin once for each failed refund of an order (#503)', async () => {
+    const f = fixture()
+    claimedListing(f)
+    await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+    const failed = paymentEvent('payment_refund_failed', 'pi_claim', {
+      id: 'evt_failed',
+      refundId: 're_1'
+    })
+    // Its first delivery finds Stripe down: flagged as reported, and answered 500.
+    f.refundsUnreachable.value = true
+    await expect(webhook(f, failed)).rejects.toBeInstanceOf(BillingProviderError)
+    f.refundsUnreachable.value = false
+    await webhook(f, failed)
+    await webhook(
+      f,
+      paymentEvent('payment_refund_failed', 'pi_claim', {
+        id: 'evt_failed_again',
+        refundId: 're_1'
+      })
+    )
+    const first = await refundFailedKey('ord_claim', 're_1')
+    expect(alerts(f)).toEqual([first])
+    // A refund in Stripe's dashboard sends the money back, then fails too.
+    await webhook(
+      f,
+      paymentEvent('payment_refunded', 'pi_claim', {
+        id: 'evt_refunded_again',
+        requestKey: 'dashboard-request'
+      })
+    )
+    expect(f.row('SELECT attention, provider_refund_id FROM orders')).toEqual({
+      attention: null,
+      provider_refund_id: 're_2'
+    })
+    await webhook(
+      f,
+      paymentEvent('payment_refund_failed', 'pi_claim', {
+        id: 'evt_dashboard_failed',
+        refundId: 're_2'
+      })
+    )
+    expect(f.row('SELECT attention, provider_refund_id FROM orders')).toEqual({
+      attention: 'refund_failed',
+      provider_refund_id: 're_2'
+    })
+    const second = await refundFailedKey('ord_claim', 're_2')
+    expect(alerts(f)).toEqual([first, second].sort())
+    // The sweep's resend of each names the refund the flagged order records: no third email.
+    f.clock.now = new Date(NOW.getTime() + 30 * 60 * 1000)
+    await runBillingSweep(f.deps, { limit: 10 })
+    const resent = f.emails.filter(email => email.recover).map(email => email.eventKey)
+    expect(resent).toHaveLength(3)
+    expect(new Set(resent)).toEqual(new Set([second]))
+    expect(alerts(f)).toEqual([first, second].sort())
+  })
+
+  // #503: the sweep sends a failed refund's email again only while the order is flagged. Once a
+  // refund cleared the flag, the order records that refund, whose own failure needs its own email.
+  it.each([
+    ['the order is still flagged', false],
+    ['a refund cleared the flag since', true]
+  ] as const)(
+    'sends a failed refund’s email again from the sweep only while %s (#503)',
+    async (_state, cleared) => {
+      const f = fixture()
+      claimedListing(f)
+      await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+      await webhook(f, paymentEvent('payment_refund_failed', 'pi_claim', { refundId: 're_1' }))
+      if (cleared) {
+        await webhook(
+          f,
+          paymentEvent('payment_refunded', 'pi_claim', {
+            id: 'evt_refunded_again',
+            requestKey: 'dashboard-request'
+          })
+        )
+      }
+      f.emails.length = 0
+      f.clock.now = new Date(NOW.getTime() + 30 * 60 * 1000)
+      await runBillingSweep(f.deps, { limit: 10 })
+      expect(alerts(f)).toEqual(cleared ? [] : [await refundFailedKey('ord_claim', 're_1')])
+      if (!cleared) return
+      // The refund that cleared it fails: its own email goes out.
+      await webhook(
+        f,
+        paymentEvent('payment_refund_failed', 'pi_claim', {
+          id: 'evt_dashboard_failed',
+          refundId: 're_2'
+        })
+      )
+      expect(alerts(f)).toEqual([await refundFailedKey('ord_claim', 're_2')])
+    }
+  )
+
+  // #503: a Stripe refund id has capitals, which the email ledger's key can't hold, so the key
+  // carries it hashed, and the real key builder takes it.
+  it('keys a failed refund’s email on a Stripe refund id in a form the email ledger takes (#503)', async () => {
+    const f = fixture()
+    f.deps.eventKey = emailEventKey
+    claimedListing(f)
+    const refundId = 're_3PqXyZ2eZvKYlo2C0aBcDeFg'
+    f.provider.refund = async () => ({ refundId })
+    await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+    f.provider.setRefunds('pi_claim', [
+      { amountCents: 4900, id: refundId, orderId: 'ord_claim', status: 'failed' }
+    ])
+    await expect(
+      webhook(f, paymentEvent('payment_refund_failed', 'pi_claim', { refundId }))
+    ).resolves.toEqual({ body: { received: true }, status: 200 })
+    // The real key builder throws on a key the ledger can't hold, which would answer it 500.
+    expect(alerts(f)).toEqual([await refundFailedKey('ord_claim', refundId)])
+  })
 })

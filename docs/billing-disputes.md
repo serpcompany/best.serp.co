@@ -70,9 +70,10 @@ A partial refund changes nothing but records the amount refunded so far
 (`partial_refund_cents`, `0017_order_partial_refunds`), which admin Orders shows ("Partly refunded
 outside the site: $…"), and emails the admin (#484).
 
-`refund.failed` flags the site's refund `refund_failed` and emails the admin; a refund that then
-succeeds clears it: the site's retry, or a full refund in Stripe's dashboard of an order already
-`refunded` (#485). Their events arrive in any order, so before flagging or clearing, the webhook
+`refund.failed` flags the site's refund `refund_failed` and emails the admin, once for each refund
+that fails (#503); a refund that then succeeds clears it: the site's retry, or a full refund in
+Stripe's dashboard of an order already `refunded` (#485). Their events arrive in any order, so
+before flagging or clearing, the webhook
 asks Stripe for the payment's refunds (`GET /v1/refunds?payment_intent=`, #486), every page of them
 (`starting_after`), and the flag follows Stripe's record. While refunds that haven't failed
 (`pending` or `succeeded`) send the whole payment back, a `refund.failed` flags nothing (a later
@@ -80,17 +81,24 @@ refund sent the money back, and its report came first) and a `charge.refunded` c
 recording the refund that sent it back (`provider_refund_id`), so that refund's own failure flags
 the order again and a later dispute takes the listing down. When none does, a `refund.failed` flags
 the order, and so does a `charge.refunded` of a `refunded` order: a retried report that lands after
-its refund failed never clears it. A clear is compared and swapped on the order as read before
-Stripe was asked (its `updated_at`), so a refund's failure recorded during that call makes the event
-read both again; when the order keeps changing, the flag stays and the delivery answers 500
-(#498's review). If Stripe can't be reached, or the payment has more refunds than the ten pages of
-100 the site reads (never read as a short total), the event decides as before and the delivery
-answers 500, so Stripe delivers it again and its record then decides: a `refund.failed` for a refund
-other than the one the order records (`provider_refund_id`: an earlier one, reported after the
-site's retry succeeded) flags nothing, and a `charge.refunded` clears the flag unless it is the
-site's own refund's (its `refund:<order>` key: the refund that failed, delivered late). If Stripe
-refuses the read (401 or 403), the event decides as before and is answered, as
-[Configuration](./billing.md#configuration-owner) describes.
+its refund failed never clears it. A `refunded` order's flag records the refund that failed (the
+`refund.failed`'s, as `provider_refund_id`), and the admin's email is keyed on it, hashed (an email
+key can't hold Stripe's capitals): the dashboard refund that cleared a flag and then failed too
+emails the admin again, and a retried report of the same failure doesn't. A `refunding` order
+records no refund until its refund finishes, so its failure is keyed on the order. The sweep sends
+a failed refund's email again only while the order is still flagged. A clear is compared and
+swapped on the order as read before Stripe was asked (its `updated_at`), so a refund's failure
+recorded during that call makes the event read both again; when the order keeps changing, the flag
+stays and the delivery answers 500 (#498's review). If Stripe can't say for now (unreachable, a
+timeout, 429, a 5xx, or more refunds than the ten pages of 100 the site reads, never read as a short
+total), the delivery answers 500, so Stripe delivers it again and its record then decides. Until
+then a `charge.refunded` records nothing, so a flag stays (#513), and a `refund.failed` decides as
+before: it flags the order unless it is for a refund other than the one the order records
+(`provider_refund_id`: an earlier one, reported after the site's retry succeeded). If Stripe refuses
+the read (401 or 403), the event decides as before and is answered, as
+[Configuration](./billing.md#configuration-owner) describes: a `refund.failed` as above, and a
+`charge.refunded` clears the flag unless it is the site's own refund's (its `refund:<order>` key:
+the refund that failed, delivered late).
 
 The site's own refund's `charge.refunded` finds the order `refunded`, or `refunding` while that
 refund may still run (claimed under ten minutes ago, never failed), and changes nothing. A refund
@@ -107,9 +115,10 @@ submission and emails the owner), unless Stripe's record shows its refunds that 
 don't send the payment back (the reported refund failed since, its report retried after its
 failure): then nothing went back, so the order stays `refunding`, flagged `refund_failed`, and the
 owner is never told the rejection was refunded (#498's review). While Stripe can't be read for
-now (unreachable, rate-limited, or more refunds than the site reads), the report alone can't show
-the money went back, so nothing is recorded: the delivery answers 500, the order stays as it was,
-and Stripe's retry finishes it by its record (#504). One Stripe's record shows naming the order
+now (unreachable, rate-limited, a 5xx, or more refunds than the site reads), the report alone can't
+show the money went back, so nothing is recorded: the delivery answers 500, the order stays as it
+was, and Stripe's retry decides it by its record (#504): it finishes the refund, or flags
+`refund_failed` when the refund failed. One Stripe's record shows naming the order
 (or, when Stripe refuses the read, whose event carries the site's `refund:<order>` idempotency key:
 a call that timed out after Stripe refunded) finishes it as the site's refund, with no "refunded
 outside the site" email (#484). An admin's "Refund…" on an order refunded outside the site,

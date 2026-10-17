@@ -470,13 +470,17 @@ export function buildRecordProviderRefundPlans(input: {
  * compares and swaps on the dispute it read (#484): `disputed` (open or lost) is sent with the
  * takedown of its listing, and a flag without one asserts no such dispute was recorded meanwhile,
  * so a dispute and a failed refund that race always meet (one of them takes the listing down).
- * Either refuses the batch once the order moved on.
+ * Either refuses the batch once the order moved on. A `refunded` order records the refund that
+ * failed (`refundId`, when the report names it) as its refund, so the admin's email for it is keyed
+ * on that refund however its events arrive (#503); without one it keeps the refund it records.
  */
 export function buildFlagRefundFailedPlans(input: {
   disputed?: boolean
   now: string
   orderId: string
   refunded?: boolean
+  /** The refund that failed, as its report names it (a `refunded` order only). */
+  refundId?: string | null
 }): StatementPlan[] {
   if (input.disputed || input.refunded) {
     const dispute = input.disputed
@@ -484,9 +488,10 @@ export function buildFlagRefundFailedPlans(input: {
       : `COALESCE(dispute_status,'') NOT IN ('open','lost')`
     return [
       {
-        sql: `UPDATE orders SET attention='refund_failed',updated_at=?
+        sql: `UPDATE orders SET attention='refund_failed',
+            provider_refund_id=COALESCE(?,provider_refund_id),updated_at=?
           WHERE id=? AND status='refunded' AND ${dispute}`,
-        params: [input.now, input.orderId]
+        params: [input.refundId ?? null, input.now, input.orderId]
       },
       assertPreviousStatementChangedOne(
         input.disputed ? 'order_refund_failed_disputed' : 'order_refund_failed_undisputed'
