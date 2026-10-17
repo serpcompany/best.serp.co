@@ -2,7 +2,6 @@ import type { PublishedCategory } from '@/db/contracts'
 import { siteCopy } from '../site/site-copy'
 
 interface CategorySEOConfig {
-  metaTitle: string
   metaDescription: string
   keywords: string[]
   h1Title: string
@@ -26,7 +25,6 @@ export function getCategorySEO(
   const categoryDescription = category.description
 
   return {
-    metaTitle: `${categoryName} ${siteCopy.listingName.pluralTitle} Directory`,
     metaDescription: `Discover curated ${toKeywordValue(categoryName)} ${
       siteCopy.listingName.plural
     } and resources. ${categoryDescription}`,

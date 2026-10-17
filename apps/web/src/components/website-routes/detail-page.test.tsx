@@ -189,6 +189,16 @@ describe('a listing names its hub as D1 does (#416)', () => {
     expect(JSON.stringify(metadata)).not.toMatch(/\bAudio\b(?! &)/u)
   })
 
+  it('is titled with the listing pattern and leads its description with its words (#521)', async () => {
+    const metadata = await generateWebsiteDetailRouteMetadata(project, categoryNames)
+    expect(metadata.title).toBe('Tunes Review, Rating & Alternatives')
+    expect(metadata.openGraph?.title).toBe('Tunes Review, Rating & Alternatives')
+    expect(metadata.openGraph?.siteName).toBe('SERP Best')
+    expect(metadata.description).toBe(
+      'Tunes review, rating & alternatives. Music. Category: Audio & Music. Explore Tunes in the SERP Best directory.'
+    )
+  })
+
   it('requires the names, so tsc catches a caller that drops them (#421 review)', () => {
     expectTypeOf(generateWebsiteDetailRouteMetadata)
       .parameter(1)

@@ -12,7 +12,7 @@ import { siteCopy } from '@/lib/site/site-copy'
 
 const bestPath = getRoute('best.index')
 
-// The root layout's title template adds ` | SERP`.
+// The root layout's title template adds ` | SERP Best`.
 export async function generateMetadata(): Promise<Metadata> {
   return generateBaseMetadata({
     title: `Best ${siteCopy.listingName.singularTitle} Lists`,

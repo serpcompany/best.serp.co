@@ -8,7 +8,7 @@ import { generateBaseMetadata } from '@/lib/seo/seo-config'
 export function generateMetadata(): Metadata {
   return generateBaseMetadata({
     title: 'Submissions',
-    description: 'Your submissions to SERP.',
+    description: 'Your submissions to SERP Best.',
     path: '/account/submissions/',
     noindex: true
   })

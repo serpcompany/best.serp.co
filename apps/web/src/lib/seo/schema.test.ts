@@ -5,7 +5,7 @@ import {
   type ListingPricing,
   type WebsiteMetadataLike
 } from './schema'
-import { siteLogoUrl } from './seo-config'
+import { generateWebsiteSchema, siteLogoUrl } from './seo-config'
 
 const SITE_PUBLIC_URL = 'https://best.serp.co'
 
@@ -207,5 +207,23 @@ describe('listing detail JSON-LD category (#416)', () => {
     ).toBe('Audio & Music')
     // Without a hub (no names at hand) the slug is the last resort.
     expect(softwareNode(generateWebsiteDetailSchema(audio)).applicationCategory).toBe('Audio')
+  })
+})
+
+describe('JSON-LD names (#521)', () => {
+  it('names the website SERP Best and the company that publishes it SERP', () => {
+    const website = generateWebsiteSchema()
+
+    expect(website.name).toBe('SERP Best')
+    expect(website.publisher).toMatchObject({ '@type': 'Organization', name: 'SERP' })
+    // The company owns SERP's social profiles.
+    expect(website.publisher.sameAs.length).toBeGreaterThan(0)
+  })
+
+  it('credits a listing article to the company, SERP', () => {
+    const article = graphNode(generateWebsiteDetailSchema(listing), 'TechArticle')
+
+    expect(article.author).toMatchObject({ '@type': 'Organization', name: 'SERP' })
+    expect(article.publisher).toMatchObject({ '@type': 'Organization', name: 'SERP' })
   })
 })

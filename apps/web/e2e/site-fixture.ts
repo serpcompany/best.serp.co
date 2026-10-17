@@ -16,7 +16,7 @@ export const site = {
   },
   /** `?via=` on every serp.ly link the site renders (#169). */
   dubPartnerId: 'best.serp.co',
-  name: 'SERP',
+  name: 'SERP Best',
   publicUrl: 'https://best.serp.co',
   /** Served instead of redirected on a deployed Worker's workers.dev host; CI sends it there. */
   smokeTestHeader: 'x-best-serp-co-smoke-test',
@@ -25,7 +25,7 @@ export const site = {
    * standard, so not a secret. Only the password is checked; people and Ahrefs use `staging`.
    */
   stagingAccess: { password: 'stagingpassword', username: 'staging' },
-  title: 'SERP Directory of Products and Resources'
+  title: 'SERP Best Directory of Products and Resources'
 } as const
 
 /**

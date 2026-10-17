@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { generateBaseMetadata, listingTitle } from './seo-config'
+import { generateBaseMetadata } from './seo-config'
 import {
   composeMetaDescription,
   META_DESCRIPTION_MAX_LENGTH,
@@ -43,17 +43,6 @@ describe('composeMetaDescription', () => {
     const description = composeMetaDescription(base)
     expect(description.length).toBeLessThanOrEqual(META_DESCRIPTION_MAX_LENGTH)
     expect(description.endsWith('word...')).toBe(true)
-  })
-})
-
-describe('listingTitle', () => {
-  it('keeps the type suffix while the full title stays short', () => {
-    expect(listingTitle('AI Canvas')).toBe('AI Canvas - Product')
-  })
-
-  it('drops the type suffix from long listing names', () => {
-    const name = 'HiFiveStar - Reviews and Reputation Management Software'
-    expect(listingTitle(name)).toBe(name)
   })
 })
 

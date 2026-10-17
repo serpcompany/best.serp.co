@@ -664,7 +664,7 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
         <p className="text-sm text-muted-foreground">
           {`Paste this into the HTML of ${site} and keep the link dofollow.`}
         </p>
-        <img src={badge.previewUrl} alt="Featured on SERP" width={170} height={42} />
+        <img src={badge.previewUrl} alt="Featured on SERP Best" width={170} height={42} />
         <EmbedCode code={embed} label="Badge snippet" />
         <span className="text-xs text-muted-foreground">
           {checksLeft} of {BADGE_CHECKS} checks left

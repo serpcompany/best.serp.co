@@ -13,8 +13,7 @@ import { siteConfig } from '@/lib/site/site-config'
 export function generateMetadata(): Metadata {
   return generateBaseMetadata({
     title: `${siteConfig.name} Pricing`,
-    description:
-      'Choose a plan to list, feature, and promote a product or resource on SERP: submit a directory listing for review, or sponsor SERP to reach its audience.',
+    description: `Choose a plan to list, feature, and promote a product or resource on ${siteConfig.name}: submit a directory listing for review, or sponsor ${siteConfig.name} to reach its audience.`,
     path: '/pricing/'
   })
 }
@@ -49,8 +48,8 @@ export default function PricingPage() {
       <PageSection spacing="hero">
         <PageHero
           align="center"
-          title="SERP Pricing"
-          description="Choose a plan to list, feature, and promote a product or resource on SERP."
+          title={`${siteConfig.name} Pricing`}
+          description={`Choose a plan to list, feature, and promote a product or resource on ${siteConfig.name}.`}
         />
       </PageSection>
       <PageSection className="pt-0" spacing="spacious" width="narrow">
@@ -66,10 +65,10 @@ export default function PricingPage() {
           />
           <PlanCard
             title="Sponsorship"
-            description="Promote a relevant product to the SERP audience."
+            description={`Promote a relevant product to the ${siteConfig.name} audience.`}
             action={
               <Link href="/sponsor/" className={buttonVariants({ variant: 'outline' })}>
-                Sponsor SERP
+                Sponsor {siteConfig.name}
               </Link>
             }
           />

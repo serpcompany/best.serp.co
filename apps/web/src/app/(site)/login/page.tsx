@@ -9,7 +9,7 @@ import { generateBaseMetadata } from '@/lib/seo/seo-config'
 export function generateMetadata(): Metadata {
   return generateBaseMetadata({
     title: 'Sign up or sign in',
-    description: 'Sign up or sign in to SERP with a 6-digit code sent to your email.',
+    description: 'Sign up or sign in to SERP Best with a 6-digit code sent to your email.',
     path: '/login/',
     noindex: true
   })

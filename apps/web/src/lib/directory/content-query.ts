@@ -431,14 +431,19 @@ export function resolveAboutPage(aboutPages: AboutPageEntry[]): AboutPageMetadat
  * Legal MDX names contact addresses only through `{{legalEmailDomain}}`: the domain whose
  * `dmca@` and `privacy@` mailboxes receive mail. It defaults to the site domain; a site keeps
  * it elsewhere until Email Routing forwards its own addresses.
+ *
+ * `{{companyName}}` is the operator, the company that runs the site and is liable for it
+ * ("SERP operates the SERP Best website"); `{{siteName}}` is the website. The company defaults
+ * to the site name for a site that has no separate one.
  */
 export function applyLegalContentBranding(
   content: string,
-  options: { siteName: string; domain: string; legalEmailDomain?: string }
+  options: { siteName: string; companyName?: string; domain: string; legalEmailDomain?: string }
 ): string {
   return content
     .replace(/(?<![\w.@-])(?<!\[@\])serp\.co(?![\w-])/gi, options.domain)
     .replace(/\bSERP\b/g, options.siteName)
+    .replace(/\{\{companyName\}\}/g, options.companyName ?? options.siteName)
     .replace(/\{\{siteName\}\}/g, options.siteName)
     .replace(/\{\{domain\}\}/g, options.domain)
     .replace(/\{\{legalEmailDomain\}\}/g, options.legalEmailDomain ?? options.domain)

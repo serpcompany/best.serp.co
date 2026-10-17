@@ -240,6 +240,31 @@ Per serp's `docs/engineering/standards/web-stack/404-pages.md` (#53):
 
 ## What pages publish for search engines
 
+- **Page titles** (#521). The site is "SERP Best" (`site.name`): the title template appends
+  ` | SERP Best` to every title but the homepage's (`SERP Best Directory of Products and
+  Resources`), and `og:site_name`, the JSON-LD `WebSite` and the feed use it. The company stays
+  "SERP" (`site.networkName`): the JSON-LD `Organization`, linked to SERP's social profiles, and
+  the legal pages' operator (`{{companyName}}`). `apps/web/src/lib/seo/page-titles.ts` writes the
+  keyword titles from D1, with the page's own count and the year per request (cached a day at most):
+
+  | Page | Title, before ` \| SERP Best` |
+  | --- | --- |
+  | `/products/<slug>/` | `{Name} Review, Rating & Alternatives` |
+  | A category or tag | `{N}+ Best {Name} {Noun} in {Year}` |
+  | `/best/<keyword>/` | `{N} Best {Keyword} in {Year}`: exact count, D1 title minus "Best" |
+
+  `{Noun}` is none when the name's last word is already a plural for tools (ends in "s" but not
+  "ss", "us", "is" or "ics", or is Agents, Apps, Software or Tools); else "Software", the most
+  searched of Software, Tools and Apps for 7 of 13 live names (Ahrefs US, October 2026:
+  `ai accounting software` 3,100 to 520 for tools), except `SEO Tools` (319,000), `Productivity
+  Apps` (75,500 to 2,700) and `Education Apps` (790 to 600). An all-lower-case name is
+  title-cased in titles only (`ai time tracking` is "AI Time Tracking Software").
+
+  Search results show about 60 characters, so a long name steps down rather than being cut, the
+  suffix kept and counted: a listing drops "Rating", "Review", then "Alternatives" (the
+  highest-intent word stays longest); a collection page drops "in {Year}", then the count. The
+  meta description leads with every word of the longest title, Open Graph and Twitter titles drop
+  the suffix, and the H1 stays the plain name or heading. Pages 2+ add " - Page N" (noindex).
 - **Sitemaps.** On best.serp.co, `/robots.txt` advertises `/sitemap-index.xml` (every other host
   serves a disallow-all robots.txt; staging's gives Ahrefs' Site Audit best.serp.co's rules and
   its own sitemap index; see [Environments and hosts](./architecture.md#environments-and-hosts)).

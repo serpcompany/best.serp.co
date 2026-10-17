@@ -9,6 +9,7 @@ import type {
 } from '../../lib/directory/content-query'
 import { resolveListingDetailTemplate } from '../../lib/directory/listing-detail-template'
 import { getCanonicalListingListRoute, getRoute } from '../../lib/routing/routes'
+import { listingDescriptionLead } from '../../lib/seo/page-titles'
 import { generateWebsiteDetailSchema } from '../../lib/seo/schema'
 import { composeMetaDescription, generateDynamicMetadata } from '../../lib/seo/seo-config'
 import { siteConfig } from '../../lib/site/site-config'
@@ -42,14 +43,18 @@ export async function generateWebsiteDetailRouteMetadata(
 ): Promise<Metadata> {
   const categoryFormatted = project.category ? categoryName(project.category, categoryNames) : null
 
-  // Short descriptions are padded with directory context, long ones truncated (#151).
-  const seoDescription = composeMetaDescription(project.description, [
+  // It leads with every word of the longest title (#521). Short descriptions are padded with
+  // the hub, then directory context; long ones are truncated (#151).
+  const seoDescription = composeMetaDescription(
+    `${listingDescriptionLead(project.name)} ${project.description}`,
     [
-      `Explore ${project.name} in the ${siteConfig.name} directory, with resource links, category details, and related entries.`,
-      `Explore ${project.name} in the ${siteConfig.name} directory.`
-    ],
-    categoryFormatted ? [`Category: ${categoryFormatted}.`] : []
-  ])
+      categoryFormatted ? [`Category: ${categoryFormatted}.`] : [],
+      [
+        `Explore ${project.name} in the ${siteConfig.name} directory, with resource links, category details, and related entries.`,
+        `Explore ${project.name} in the ${siteConfig.name} directory.`
+      ]
+    ]
+  )
 
   const keywords = [
     project.name,

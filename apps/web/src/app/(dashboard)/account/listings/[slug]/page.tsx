@@ -10,7 +10,7 @@ import { generateBaseMetadata } from '@/lib/seo/seo-config'
 export function generateMetadata(): Metadata {
   return generateBaseMetadata({
     title: 'Listing',
-    description: 'Your listing on SERP.',
+    description: 'Your listing on SERP Best.',
     path: '/account/listings/',
     noindex: true
   })

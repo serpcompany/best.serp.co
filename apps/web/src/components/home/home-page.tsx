@@ -121,7 +121,7 @@ export function homePageMetadata(): Metadata {
   return {
     ...homeMetadata,
     // The homepage sits in `(site)`, below the root layout, so its title template would add
-    // ` | SERP`; the homepage title is already the full name.
+    // ` | SERP Best`; the homepage title is already the full name.
     title: { absolute: HOME_TITLE },
     openGraph: { ...homeOpenGraph, url: undefined }
   }

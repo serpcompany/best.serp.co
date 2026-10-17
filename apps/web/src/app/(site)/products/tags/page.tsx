@@ -15,7 +15,7 @@ import { siteCopy } from '@/lib/site/site-copy'
 
 const tagsPath = getRoute('tag.index')
 
-// The root layout's title template adds ` | SERP`.
+// The root layout's title template adds ` | SERP Best`.
 export function generateMetadata(): Metadata {
   return generateBaseMetadata({
     title: `${siteCopy.listingName.pluralTitle} by Tag`,

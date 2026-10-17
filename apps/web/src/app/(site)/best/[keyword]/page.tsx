@@ -12,10 +12,10 @@ import {
 } from '@/lib/catalog/repository'
 import { getRoute } from '@/lib/routing/routes'
 import { type PageSearchParams, redirectMovedTaxonomyPage } from '@/lib/routing/taxonomy-redirect'
+import { bestPageDescriptionLead, bestPageTitle, currentYear } from '@/lib/seo/page-titles'
 import { composeMetaDescription, generateBaseMetadata } from '@/lib/seo/seo-config'
 import { META_DESCRIPTION_MIN_LENGTH } from '@/lib/seo/seo-helpers'
 import { bestPageEntryCount, isBestPageIndexable } from '@/lib/seo/taxonomy-indexing'
-import { formatListingCount } from '@/lib/site/site-copy'
 
 interface BestPageProps {
   params: Promise<{ keyword: string }>
@@ -74,12 +74,17 @@ export async function generateMetadata({ params }: BestPageProps): Promise<Metad
   if (!found)
     return { title: 'Page Not Found', description: 'The requested page could not be found.' }
   const { items, page } = found
-  // The title and H1 are the page's own (D1); the root layout's template adds " | SERP".
+  // `{N} Best {Keyword} in {Year}` from the page's own title (D1) and its exact entry count (#521);
+  // the H1 stays the page's heading. The root layout's template adds ` | SERP Best`.
+  const parts = { count: items.length, year: currentYear() }
   return generateBaseMetadata({
-    title: page.title,
-    // The intro's first sentence plus the count (design 5.1), padded with its top entries (#426).
+    title: bestPageTitle(page.title, parts),
+    // Every word of the longest title, then the intro's first sentence (design 5.1), padded with
+    // its top entries (#426).
     description: bestPageDescription(
-      [firstSentence(page.intro), `${formatListingCount(items.length)}.`].filter(Boolean).join(' '),
+      [bestPageDescriptionLead(page.title, parts), firstSentence(page.intro)]
+        .filter(Boolean)
+        .join(' '),
       items
     ),
     keywords: [page.keyword],

@@ -62,14 +62,14 @@ export function GoneListing({
             {listing.name} is no longer listed
           </h1>
           <p className="max-w-xl text-lg text-pretty text-foreground/80">
-            This listing was removed from SERP. Browse other products in{' '}
+            This listing was removed from SERP Best. Browse other products in{' '}
             <Link href={categoryHref} className="underline underline-offset-4">
               {hub?.name ?? 'the directory'}
             </Link>
             .
           </p>
           <p className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
-            Is this your product? Sign in to relist it on SERP.
+            Is this your product? Sign in to relist it on SERP Best.
             <Link
               href={getRoute('submit')}
               // `cn` drops the base's `border-transparent`, so the outline shows on a link.

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
+import { TITLE_SUFFIX } from '../../lib/seo/page-titles'
 import {
   SITE_DESCRIPTION,
   SITE_NAME,
@@ -21,7 +22,8 @@ export function rootLayoutMetadata(): Metadata {
   return {
     title: {
       default: `${SITE_NAME} - ${SITE_TAGLINE}`,
-      template: `%s | ${SITE_NAME}`
+      // The suffix the page titles' step-down measures (#521).
+      template: `%s${TITLE_SUFFIX}`
     },
     description: SITE_DESCRIPTION,
     metadataBase: new URL(siteOrigin()),

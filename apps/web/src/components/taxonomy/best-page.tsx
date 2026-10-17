@@ -5,7 +5,13 @@ import { getCategoryIcon } from '@/lib/directory/categories'
 import { cn } from '@/lib/utils'
 import { withDubVia } from '../../lib/analytics/dub-via'
 import { getRoute } from '../../lib/routing/routes'
-import { SITE_NAME, siteLogoUrl, siteOrigin, siteWebsiteId } from '../../lib/seo/seo-config'
+import {
+  ORGANIZATION_NAME,
+  SITE_NAME,
+  siteLogoUrl,
+  siteOrigin,
+  siteWebsiteId
+} from '../../lib/seo/seo-config'
 import { bestPageEntryCount } from '../../lib/seo/taxonomy-indexing'
 import { siteConfig } from '../../lib/site/site-config'
 import { CardGrid } from '../layout/card-grid'
@@ -90,7 +96,7 @@ export function bestPageSchema(page: PublishedBestPage, items: BestPageItem[]) {
     },
     publisher: {
       '@type': 'Organization',
-      name: SITE_NAME,
+      name: ORGANIZATION_NAME,
       url: origin,
       logo: { '@type': 'ImageObject', url: siteLogoUrl() }
     },

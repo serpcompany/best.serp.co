@@ -11,7 +11,7 @@ export function generateMetadata(): Metadata {
   return generateBaseMetadata({
     title: `Contact ${siteConfig.name}`,
     description:
-      'Contact the SERP team for listing, partnership, and support questions about the SERP directory of products and resources.',
+      'Contact the SERP team for listing, partnership, and support questions about the SERP Best directory of products and resources.',
     path: '/contact/'
   })
 }
@@ -23,7 +23,7 @@ export default function ContactPage() {
       <PageSection spacing="hero">
         <PageHero
           align="center"
-          title="Contact SERP"
+          title={`Contact ${siteConfig.name}`}
           description="Contact the SERP team for listing, partnership, and support questions."
         />
       </PageSection>
