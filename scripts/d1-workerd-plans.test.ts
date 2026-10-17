@@ -1636,6 +1636,23 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
       attention: null,
       provider_refund_id: 're_dash'
     })
+    // A `refund.failed`'s flag compares and swaps on `updated_at` as read before the provider was
+    // asked (#516's review): refused once the order changed, else it records the refund that failed.
+    const flagAsRead = (updatedAt: string) =>
+      B.buildFlagRefundFailedPlans({
+        disputed: true,
+        now: NOW,
+        orderId: 'ord-dispute',
+        refundId: 're_2',
+        updatedAt
+      })
+    await expect(run(flagAsRead('before'))).rejects.toThrow()
+    expect(await order('ord-dispute')).toMatchObject({ attention: null })
+    await run(flagAsRead(String((await order('ord-dispute'))?.updated_at)))
+    expect(await order('ord-dispute')).toMatchObject({
+      attention: 'refund_failed',
+      provider_refund_id: 're_2'
+    })
     // The alerts the sweep sends again come from the events' outcomes.
     const event = {
       eventId: 'evt_dispute',

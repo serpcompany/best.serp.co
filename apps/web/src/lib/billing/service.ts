@@ -88,8 +88,8 @@ const SWEEP_PROVIDER_CALLS = 20
 const PUBLICATION_ATTEMPTS = 3
 /**
  * How many times a refund event decides an order's `refund_failed` flag on the provider's record
- * before its delivery answers 500 (#498's review): a clear refused because the order changed
- * while the provider was asked reads both again once.
+ * before its delivery answers 500 (#498's review): a clear, or a `refund.failed`'s flag (#516's
+ * review), refused because the order changed while the provider was asked reads both again once.
  */
 const REFUND_FLAG_DECISIONS = 2
 /**
@@ -2196,8 +2196,11 @@ async function alertPartialRefund(
  * can't say, the report decides as before: a failure of a refund other than the one the order
  * records (`provider_refund_id`: an earlier one, reported after a newer one succeeded, #485) flags
  * nothing; the error then answers the delivery 500, so the provider's retry checks again. A clear
- * the order changed under while the provider was asked reads both again, as `settleRefundFlag`'s
- * does.
+ * or a flag the order changed under while the provider was asked (both compare and swap on its
+ * `updated_at`) reads both again, as `settleRefundFlag`'s clear does: a refund decided on a stale
+ * read is never recorded over one a concurrent report recorded meanwhile, whose email would then
+ * never be sent again (#516's review). When that keeps losing, nothing is recorded and the delivery
+ * answers 500.
  */
 async function flagRefundFailed(
   deps: BillingDependencies,
@@ -2231,8 +2234,11 @@ async function flagRefundFailed(
       deps,
       current,
       atProvider.checked ? null : refundId,
-      failedRefundId
+      failedRefundId,
+      true
     )
+    // The order changed while the provider was asked: read both again and decide again.
+    if (outcome === null) continue
     if (!atProvider.checked && atProvider.error) throw atProvider.error
     return outcome
   }
@@ -2253,18 +2259,38 @@ async function flagRefundFailed(
  * always flags. `failedRefundId`: the refund that failed (`flagRefundFailed`'s: the one its report
  * names while the order isn't flagged or records that one, #514, else the newest failed one in the
  * provider's record; `settleRefundFlag`'s: that newest one), which a `refunded` order then records
- * as its refund, so the admin's email is keyed on that refund (`alertKey`, #503). Three lost writes
- * throw, so the provider's retry runs it again.
+ * as its refund, so the admin's email is keyed on that refund (`alertKey`, #503). `asRead`
+ * (`flagRefundFailed`'s, #516's review): that refund was decided on `order` as read before the
+ * provider was asked, so a `refunded` order's write compares and swaps on its `updated_at`. Once
+ * the order changed (a newer refund's failure recorded meanwhile, say), it records and sends
+ * nothing and returns null, and the caller decides again; a write lost on an unchanged order (the
+ * catalog publication race) is tried again. Three lost writes throw, so the provider's retry runs
+ * it again.
  */
+function flagRefundFailedNow(
+  deps: BillingDependencies,
+  order: OrderRecord,
+  unlessSupersededBy: string | null,
+  failedRefundId?: string | null
+): Promise<string>
+function flagRefundFailedNow(
+  deps: BillingDependencies,
+  order: OrderRecord,
+  unlessSupersededBy: string | null,
+  failedRefundId: string | null,
+  asRead: true
+): Promise<string | null>
 async function flagRefundFailedNow(
   deps: BillingDependencies,
   order: OrderRecord,
   unlessSupersededBy: string | null,
-  failedRefundId: string | null = null
-): Promise<string> {
+  failedRefundId: string | null = null,
+  asRead = false
+): Promise<string | null> {
   for (let attempt = 0; attempt < PUBLICATION_ATTEMPTS; attempt += 1) {
     const current = attempt === 0 ? order : await deps.operations.order(order.id)
     if (!current) return 'unknown_order'
+    if (asRead && current.updatedAt !== order.updatedAt) return null
     // An earlier refund's failure, reported after a newer one (the site's retry once its request
     // key expired) succeeded and was recorded (#485): the money went back, so it flags nothing.
     if (
@@ -2285,7 +2311,8 @@ async function flagRefundFailedNow(
         now: nowIso(deps),
         orderId: current.id,
         refunded,
-        refundId: failedRefundId
+        refundId: failedRefundId,
+        updatedAt: asRead ? order.updatedAt : null
       })
     ])
     if (flagged) {

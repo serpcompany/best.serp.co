@@ -4714,6 +4714,108 @@ describe('the refund that sent the money back, and the refund_failed flag (#486)
     expect(sender.sent.filter(message => message.to === 'devin@serp.co')).toHaveLength(3)
   })
 
+  // #516's review: Stripe delivers the site refund's failure again (its first delivery flagged the
+  // order and emailed, then answered 500), and while the retry asks Stripe, a dashboard refund's
+  // own failure is recorded and its email fails to send. The retry decided on the order as read
+  // before that, so it would record the site's refund over the dashboard's, and the sweep, keyed on
+  // the recorded refund, would never resend the dashboard refund's email. The flag write compares
+  // and swaps on `updated_at`, so the retry reads both again, keeps the dashboard refund, and sends
+  // its email. Both reads that can be stale: the order flagged with the refund the report names,
+  // and not flagged (the dashboard refund cleared the flag before it failed).
+  it.each([
+    ['flagged with the refund the report names', false],
+    ['not flagged, a dashboard refund having cleared it', true]
+  ])(
+    'keeps a newer failed refund recorded while a retried report reads Stripe on an order %s, and resends its email (#516)',
+    async (_, clearFirst) => {
+      const f = fixture()
+      claimedListing(f)
+      const sender = createCapturingEmailSender()
+      const service = createEmailService({
+        ledger: createEmailDeliveryLedger({ client: f.client }),
+        log: () => undefined,
+        policy: resolveEmailPolicy({
+          D1_RUNTIME_ENV: 'production',
+          SITE_ENVIRONMENT: 'production'
+        }),
+        sender,
+        templates: appEmailTemplates,
+        waitUntil: () => undefined
+      })
+      f.deps.notify = async (template, request) => {
+        await service.deliver(template, request)
+      }
+      const flag = 'SELECT status, attention, provider_refund_id FROM orders'
+      await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+      const failed = paymentEvent('payment_refund_failed', 'pi_claim', {
+        id: 'evt_failed',
+        refundId: 're_1'
+      })
+      f.refundsUnreachable.value = true
+      await webhook(f, failed).catch(() => undefined)
+      f.refundsUnreachable.value = false
+      if (clearFirst) {
+        f.provider.setRefunds('pi_claim', [
+          { amountCents: 4900, id: 're_dash', orderId: null, status: 'pending' },
+          { amountCents: 4900, id: 're_1', orderId: 'ord_claim', status: 'failed' }
+        ])
+        await webhook(
+          f,
+          paymentEvent('payment_refunded', 'pi_claim', {
+            id: 'evt_dash_refunded',
+            requestKey: 'dashboard-request'
+          })
+        )
+      }
+      expect(f.row(flag)).toEqual(
+        clearFirst
+          ? { attention: null, provider_refund_id: 're_dash', status: 'refunded' }
+          : { attention: 'refund_failed', provider_refund_id: 're_1', status: 'refunded' }
+      )
+      f.provider.setRefunds('pi_claim', [
+        { amountCents: 4900, id: 're_dash', orderId: null, status: 'failed' },
+        { amountCents: 4900, id: 're_1', orderId: 'ord_claim', status: 'failed' }
+      ])
+      const read = f.provider.paymentRefunds
+      let reads = 0
+      f.provider.paymentRefunds = async paymentId => {
+        reads += 1
+        if (reads > 1) return read(paymentId)
+        f.clock.now = new Date(f.clock.now.getTime() + 1000)
+        sender.failNext(new Error('useSend is down'))
+        await webhook(
+          f,
+          paymentEvent('payment_refund_failed', 'pi_claim', {
+            id: 'evt_dash_failed',
+            refundId: 're_dash'
+          })
+        )
+        return read(paymentId)
+      }
+      const dashKey = await refundFailedKey('ord_claim', 're_dash')
+      const email = (key: string) =>
+        f.rows(`SELECT status, attempts FROM email_deliveries WHERE event_key='${key}'`)
+      const flaggedDash = {
+        attention: 'refund_failed',
+        provider_refund_id: 're_dash',
+        status: 'refunded'
+      }
+      await expect(webhook(f, failed)).resolves.toEqual({ body: { received: true }, status: 200 })
+      // The retry's first decision lost the write and asked Stripe again (the dashboard refund's
+      // report read it once in between).
+      expect(reads).toBe(3)
+      expect(f.row(flag)).toEqual(flaggedDash)
+      expect(email(dashKey)).toEqual([{ attempts: 2, status: 'sent' }])
+      f.clock.now = new Date(f.clock.now.getTime() + 30 * 60 * 1000)
+      await runBillingSweep(f.deps, { limit: 10 })
+      expect(f.row(flag)).toEqual(flaggedDash)
+      expect(email(dashKey)).toEqual([{ attempts: 2, status: 'sent' }])
+      expect(email(await refundFailedKey('ord_claim', 're_1'))).toEqual([
+        { attempts: 1, status: 'sent' }
+      ])
+    }
+  )
+
   // #503: the sweep sends a failed refund's email again only while the order is flagged. Once a
   // refund cleared the flag, the order records that refund, whose own failure needs its own email.
   it.each([
