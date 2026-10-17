@@ -150,7 +150,7 @@ describe('every email in every environment', () => {
           expect(email.html, label).toContain(
             `This address isn’t monitored. Reply from your dashboard: <a href="${dashboard}"`
           )
-          expect(email.text, label).toContain(`SERP Directory · ${origin}`)
+          expect(email.text, label).toContain(`SERP Best · ${origin}`)
           if (environment !== 'production') {
             expect(email.html, label).not.toContain('https://best.serp.co')
             expect(email.text, label).not.toContain('https://best.serp.co')
@@ -212,7 +212,7 @@ describe('submitter text is escaped', () => {
 describe('sign-in code', () => {
   it('puts the code in the subject and the body, and nowhere else', () => {
     const email = render('sign-in-code')
-    expect(email.subject).toBe('481902 is your SERP sign-in code')
+    expect(email.subject).toBe('481902 is your SERP Best sign-in code')
     expect(email.text).toBe(`Your sign-in code
 
 Enter this code on best.serp.co to sign in or create your account:
@@ -223,7 +223,7 @@ Enter this code on best.serp.co to sign in or create your account:
 It expires in 10 minutes and works once. If you didn't try to sign in, you can ignore this email.
 
 --
-SERP Directory · https://best.serp.co
+SERP Best · https://best.serp.co
 This address isn't monitored. Reply from your dashboard: https://best.serp.co/account/
 You're getting this because this address was entered at best.serp.co/login.`)
     expectCopyableCode(email, '481902')
@@ -289,7 +289,7 @@ We'll email you when it's been reviewed. Meanwhile, you can add FAQs and links f
 Open your dashboard: https://best.serp.co/account/
 
 --
-SERP Directory · https://best.serp.co
+SERP Best · https://best.serp.co
 This address isn't monitored. Reply from your dashboard: https://best.serp.co/account/
 You're getting this because you have an account on best.serp.co.`)
     expect(linksTo(email.html, 'https://best.serp.co/account/')).toBe(true)
@@ -368,17 +368,17 @@ describe('changes requested', () => {
 describe('listing approved', () => {
   it('shows the listing URL and links to it', () => {
     const email = renderWith('listing-approved', AFTER)
-    expect(email.subject).toBe('Quillmate is live on SERP')
+    expect(email.subject).toBe('Quillmate is live on SERP Best')
     expect(email.text).toBe(`Quillmate is live
 
-Quillmate passed review and is now listed on SERP:
+Quillmate passed review and is now listed on SERP Best:
 https://best.serp.co/products/quillmate.app/
 Keep the badge on https://quillmate.app/. We check it every week, and a free listing whose badge goes missing is removed.
 
 View your listing: https://best.serp.co/products/quillmate.app/
 
 --
-SERP Directory · https://best.serp.co
+SERP Best · https://best.serp.co
 This address isn't monitored. Reply from your dashboard: https://best.serp.co/account/
 You're getting this because you have an account on best.serp.co.`)
     expect(email.html).toContain('<b>https://best.serp.co/products/quillmate.app/</b>')
@@ -400,9 +400,9 @@ You're getting this because you have an account on best.serp.co.`)
 describe('live after payment', () => {
   it('confirms the payment and the refund promise', () => {
     const email = render('listing-live-paid')
-    expect(email.subject).toBe('Voxbloom is live on SERP')
+    expect(email.subject).toBe('Voxbloom is live on SERP Best')
     expect(email.text).toContain(
-      'Thanks for your payment of $49.00. Voxbloom passed our automatic checks and is now listed on SERP:\nhttps://best.serp.co/products/voxbloom.fm/'
+      'Thanks for your payment of $49.00. Voxbloom passed our automatic checks and is now listed on SERP Best:\nhttps://best.serp.co/products/voxbloom.fm/'
     )
     expect(email.text).toContain('The badge is optional for paid listings.')
     expect(linksTo(email.html, 'https://best.serp.co/products/voxbloom.fm/')).toBe(true)
@@ -453,9 +453,9 @@ describe('rejected', () => {
 describe('badge missing', () => {
   it('gives the check and recheck times in UTC and links to the listing', () => {
     const email = renderWith('badge-missing', LAUNCHED)
-    expect(email.subject).toBe('Action needed: the SERP badge is missing on ledgerly.app')
+    expect(email.subject).toBe('Action needed: the SERP Best badge is missing on ledgerly.app')
     expect(email.text).toContain(
-      "Our weekly check loaded https://ledgerly.app/ on Mon, Oct 5 at 09:14 UTC. The badge is there, but its link is marked nofollow.\nWe'll check again around Tue, Oct 6 at 09:14 UTC. If there still isn't a badge with a dofollow link to your listing, Ledgerly will be removed from SERP."
+      "Our weekly check loaded https://ledgerly.app/ on Mon, Oct 5 at 09:14 UTC. The badge is there, but its link is marked nofollow.\nWe'll check again around Tue, Oct 6 at 09:14 UTC. If there still isn't a badge with a dofollow link to your listing, Ledgerly will be removed from SERP Best."
     )
     expect(email.text).toContain(
       'Check my badge: https://best.serp.co/account/listings/ledgerly.app/\nRather not keep the badge? Upgrade to a paid listing for $49 one-off and the badge becomes optional.'
@@ -511,9 +511,9 @@ describe('badge missing', () => {
 describe('unlisted', () => {
   it('says when it was removed and offers the paid relisting', () => {
     const email = renderWith('listing-unlisted', LAUNCHED)
-    expect(email.subject).toBe('Scrapebird has been removed from SERP')
+    expect(email.subject).toBe('Scrapebird has been removed from SERP Best')
     expect(email.text).toContain(
-      'We rechecked https://scrapebird.dev/ on Wed, Sep 30 at 10:02 UTC and the badge was still missing, so Scrapebird has been removed from SERP, as we warned on Tue, Sep 29.'
+      'We rechecked https://scrapebird.dev/ on Wed, Sep 30 at 10:02 UTC and the badge was still missing, so Scrapebird has been removed from SERP Best, as we warned on Tue, Sep 29.'
     )
     expect(email.text).toContain(
       'Relist for $49: https://best.serp.co/account/listings/scrapebird.dev/'
@@ -524,7 +524,7 @@ describe('unlisted', () => {
   it('offers relisting only while paid listings (#68) are on', () => {
     const before = renderWith('listing-unlisted', { ...LAUNCHED, orders: false })
     expect(before.text).toContain(
-      'Scrapebird has been removed from SERP, as we warned on Tue, Sep 29.'
+      'Scrapebird has been removed from SERP Best, as we warned on Tue, Sep 29.'
     )
     expect(before.text).not.toMatch(/\$49|paid listing|relist/iu)
     expect(linksTo(before.html, 'https://best.serp.co/account/listings/scrapebird.dev/')).toBe(
@@ -536,7 +536,7 @@ describe('unlisted', () => {
 describe('claim code', () => {
   it('puts the code in the subject', () => {
     const email = render('claim-code')
-    expect(email.subject).toBe('730514 is your SERP code to claim Brieflow')
+    expect(email.subject).toBe('730514 is your SERP Best code to claim Brieflow')
     expect(email.text).toContain('Enter this code to confirm:\n\n    730514\n')
     expect(email.text).toContain(
       "You're getting this because this address was entered to claim a listing on best.serp.co."
@@ -562,7 +562,7 @@ Submitted by: maya@quillmate.app
 Review submission: https://best.serp.co/admin/submissions/s_4f9k2c/
 
 --
-SERP Directory · https://best.serp.co
+SERP Best · https://best.serp.co
 This address isn't monitored. Reply from your dashboard: https://best.serp.co/admin/submissions/
 You're getting this because devin@serp.co receives review alerts for best.serp.co.`)
     expect(linksTo(email.html, 'https://best.serp.co/admin/submissions/s_4f9k2c/')).toBe(true)
@@ -605,7 +605,7 @@ You're getting this because devin@serp.co receives review alerts for best.serp.c
 describe('ownership removed', () => {
   it('explains the removal and links to the listing to claim again', () => {
     const email = renderWith('ownership-removed', LAUNCHED)
-    expect(email.subject).toBe('You no longer manage Brieflow on SERP')
+    expect(email.subject).toBe('You no longer manage Brieflow on SERP Best')
     expect(email.text).toContain(
       'We rechecked https://brieflow.ai/ on Tue, Sep 22 at 09:10 UTC and the badge was still missing. Ownership came from the badge, so you no longer manage the Brieflow listing.'
     )
@@ -620,7 +620,7 @@ describe('ownership removed', () => {
     ]) {
       const email = renderWith('ownership-removed', features)
       expect(bodyText(email)).toContain(
-        'so you no longer manage the Brieflow listing.\nThe listing stays on SERP.'
+        'so you no longer manage the Brieflow listing.\nThe listing stays on SERP Best.'
       )
       expect(email.text).not.toMatch(/claim .*again|\$49/iu)
     }
@@ -643,7 +643,7 @@ describe('badge program emails with the site’s flags (#130, #133)', () => {
     )
     const removed = render('ownership-removed')
     expect(bodyText(removed)).toContain(
-      'The listing stays on SERP. To manage it again, claim it again with the badge or a $49 one-off payment.'
+      'The listing stays on SERP Best. To manage it again, claim it again with the badge or a $49 one-off payment.'
     )
     expect(removed.text).toContain(
       'Claim Brieflow again: https://best.serp.co/products/brieflow.ai/'
@@ -795,7 +795,7 @@ Because the content is prohibited, keybazaar.shop can't be submitted or claimed 
 Message us: https://best.serp.co/contact/
 
 --
-SERP Directory · https://best.serp.co
+SERP Best · https://best.serp.co
 This address isn't monitored. Reply from your dashboard: https://best.serp.co/account/
 You're getting this because you have an account on best.serp.co.`)
     expect(email.html).toContain('keybazaar.shop can’t be submitted again.')
@@ -826,7 +826,7 @@ If it's rejected for anything other than prohibited content, you get a full refu
 View submission: https://best.serp.co/account/submissions/s_7tq20z/
 
 --
-SERP Directory · https://best.serp.co
+SERP Best · https://best.serp.co
 This address isn't monitored. Reply from your dashboard: https://best.serp.co/account/
 You're getting this because you have an account on best.serp.co.`)
     expect(email.html).toContain('Kiddo Tutor goes live after a reviewer looks at it.')

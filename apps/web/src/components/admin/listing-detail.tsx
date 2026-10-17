@@ -57,6 +57,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { formatDay, initials, listingPath } from '@/lib/admin/format'
 import type { LinkRel, ListingDetailView } from '@/lib/admin/listing-view'
+import { siteConfig } from '@/lib/site/site-config'
 import { cn } from '@/lib/utils'
 import { adminRequest } from './api'
 import { Kv } from './kv'
@@ -683,7 +684,7 @@ export function ListingDetail({
               <FieldError>{error}</FieldError>
             ) : (
               <FieldDescription>
-                They need a SERP account.
+                They need a {siteConfig.name} account.
                 {view.owner ? ` ${view.owner.email} loses access right away.` : ''}
               </FieldDescription>
             )}

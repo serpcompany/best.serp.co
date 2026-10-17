@@ -235,7 +235,7 @@ test('checkout success: paid at checkout, live at once and in the review queue',
   await openHandoff(page, draft.id)
   await page.getByRole('button', { name: 'Pay' }).click()
   await expect(page).toHaveURL(new RegExp(`/submit/${draft.id}/checkout/return/\\?order=`, 'u'))
-  await expect(page.getByRole('heading', { name: /is live on SERP$/u })).toBeVisible()
+  await expect(page.getByRole('heading', { name: /is live on SERP Best$/u })).toBeVisible()
   await expect(page.getByText('Payment received', { exact: true })).toBeVisible()
   await expect(page.getByText(/^ORD-\d+$/u)).toBeVisible()
   await capture(page, '4d-live')
@@ -254,7 +254,7 @@ test('checkout success: paid at checkout, live at once and in the review queue',
   ).toEqual([{ n: 1 }])
   await expect
     .poll(() => emailSubjects(page.request, submitter.email))
-    .toContainEqual(expect.stringMatching(/is live on SERP$/u))
+    .toContainEqual(expect.stringMatching(/is live on SERP Best$/u))
 
   // The webhook arrives after the return: recorded, and nothing changes.
   const late = await postEvent(page.request, completedEvent(paid.provider_checkout_id ?? ''))

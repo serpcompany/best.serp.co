@@ -139,7 +139,7 @@ describe('page copy', () => {
         description: 'Free listing',
         failingNote: null,
         failingTitle: 'Fix the badge',
-        programCheckBy: 'SERP'
+        programCheckBy: 'SERP Best'
       },
       claim: { badgeCardNote: null, keepTheBadge: null },
       contentHint: 'Shown on your listing page.',

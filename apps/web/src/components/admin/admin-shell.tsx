@@ -21,6 +21,7 @@ import { type DashboardNavItem, isNavItemActive, NavMain } from '@/components/da
 import { NavSecondary } from '@/components/dashboard/nav-secondary'
 import { SidebarBrand } from '@/components/dashboard/sidebar-brand'
 import { buttonVariants } from '@/components/ui/button'
+import { siteConfig } from '@/lib/site/site-config'
 import { cn } from '@/lib/utils'
 
 /**
@@ -130,7 +131,9 @@ export function AdminShell({
         collapsible="icon"
         variant="sidebar"
         rail
-        sidebarHeader={<SidebarBrand href="/admin/submissions/" title="SERP" subtitle="Admin" />}
+        sidebarHeader={
+          <SidebarBrand href="/admin/submissions/" title={siteConfig.name} subtitle="Admin" />
+        }
         sidebarContent={
           <>
             <NavMain items={nav} />

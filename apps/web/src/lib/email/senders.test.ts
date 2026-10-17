@@ -9,7 +9,7 @@ import {
 } from './senders'
 
 const message: OutgoingEmail = {
-  from: { email: 'noreply@mail.serp.co', name: 'SERP Directory' },
+  from: { email: 'noreply@mail.serp.co', name: 'SERP Best' },
   headers: { 'Auto-Submitted': 'auto-generated' },
   html: '<p>Hello</p>',
   idempotencyKey: 'test-fixture:fixture:1',
@@ -55,7 +55,7 @@ describe('useSend sender', () => {
     expect(request?.headers.get('content-type')).toBe('application/json')
     expect(request?.headers.get('idempotency-key')).toBe('test-fixture:fixture:1')
     expect(await request?.json()).toEqual({
-      from: 'SERP Directory <noreply@mail.serp.co>',
+      from: 'SERP Best <noreply@mail.serp.co>',
       headers: { 'Auto-Submitted': 'auto-generated' },
       html: '<p>Hello</p>',
       subject: 'Hello',

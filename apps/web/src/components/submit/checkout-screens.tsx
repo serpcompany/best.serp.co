@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/item'
 import { Spinner } from '@/components/ui/spinner'
 import { formatUsd } from '@/lib/admin/format'
+import { siteConfig } from '@/lib/site/site-config'
 import { ProductLogo, ToneAlert } from './submit-ui'
 
 /**
@@ -256,7 +257,7 @@ export function CheckoutLive({
         <CardHeader>
           <CardTitle>
             <h1 className="font-semibold text-2xl tracking-tight">
-              {product.name} is live on SERP
+              {product.name} is live on {siteConfig.name}
             </h1>
           </CardTitle>
           <CardDescription className="break-all">{listingUrl}</CardDescription>

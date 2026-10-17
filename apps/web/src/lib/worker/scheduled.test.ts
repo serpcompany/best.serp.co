@@ -447,10 +447,10 @@ describe('scheduled badge program', () => {
     // Never an admin listing without a badge claim.
     expect(fetches.sort()).toEqual(['claim.example', 'free.example'])
     expect(subjects(FREE_OWNER)).toEqual([
-      'Action needed: the SERP badge is missing on free.example'
+      'Action needed: the SERP Best badge is missing on free.example'
     ])
     expect(subjects(CLAIM_OWNER)).toEqual([
-      'Action needed: the SERP badge is missing on claim.example'
+      'Action needed: the SERP Best badge is missing on claim.example'
     ])
     // The email names the recheck: Tuesday's daily window.
     expect(readDevEmailOutbox(FREE_OWNER)[0]?.text).toMatch(/check again around .*Oct 6/u)
@@ -463,12 +463,12 @@ describe('scheduled badge program', () => {
 
     await trigger(BADGE_DAILY_CRON, DAILY_AT)
     expect(subjects(FREE_OWNER)).toEqual([
-      'Action needed: the SERP badge is missing on free.example',
-      'Name free.example has been removed from SERP'
+      'Action needed: the SERP Best badge is missing on free.example',
+      'Name free.example has been removed from SERP Best'
     ])
     expect(subjects(CLAIM_OWNER)).toEqual([
-      'Action needed: the SERP badge is missing on claim.example',
-      'You no longer manage Name claim.example on SERP'
+      'Action needed: the SERP Best badge is missing on claim.example',
+      'You no longer manage Name claim.example on SERP Best'
     ])
     expect(
       rows(

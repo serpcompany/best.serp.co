@@ -91,7 +91,7 @@ describe('dev outboxes', () => {
     expect((await otpOutbox()).status).toBe(200)
     vi.spyOn(console, 'info').mockImplementation(() => undefined)
     await createLogEmailSender(undefined, { devOutbox: true }).send({
-      from: { email: 'noreply@mail.serp.co', name: 'SERP Directory' },
+      from: { email: 'noreply@mail.serp.co', name: 'SERP Best' },
       headers: {},
       html: '<p>Hi</p>',
       idempotencyKey: 'k',

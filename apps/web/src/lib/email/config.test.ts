@@ -23,7 +23,7 @@ describe('email environment policy', () => {
     expect(local).toEqual({
       delivery: 'log',
       environment: 'local',
-      from: { email: 'noreply@mail.serp.co', name: 'SERP Directory' },
+      from: { email: 'noreply@mail.serp.co', name: 'SERP Best' },
       linkOrigin: 'http://localhost:8787',
       recipientAllowlist: null,
       subjectPrefix: null
@@ -129,7 +129,7 @@ describe('email senders and useSend settings', () => {
     // people to the dashboard instead (#73). Staging shares the production sender (owner
     // decision: its useSend key is restricted to mail.serp.co); the `[staging]` prefix and the
     // allowlist mark and limit its mail.
-    expect(EMAIL_SENDER).toEqual({ email: 'noreply@mail.serp.co', name: 'SERP Directory' })
+    expect(EMAIL_SENDER).toEqual({ email: 'noreply@mail.serp.co', name: 'SERP Best' })
     for (const environment of ['local', 'staging', 'production'] as const) {
       expect(
         resolveEmailPolicy({ D1_RUNTIME_ENV: environment, SITE_ENVIRONMENT: environment }).from,

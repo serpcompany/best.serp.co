@@ -19,6 +19,7 @@ import { ordersEnabled } from '@/lib/billing/runtime'
 import { featureCopy } from '@/lib/feature-copy'
 import { features } from '@/lib/features'
 import { getRoute } from '@/lib/routing/routes'
+import { siteConfig } from '@/lib/site/site-config'
 import { AccountDashboard } from './account-dashboard'
 import { AccountCrumbs } from './account-shell'
 import { statusLegend } from './status'
@@ -42,10 +43,9 @@ const SCOPES = {
   },
   overview: {
     crumb: 'Overview',
-    description: 'Your submissions and listings on SERP.',
+    description: `Your submissions and listings on ${siteConfig.name}.`,
     empty: {
-      description:
-        'Submit your product to get it reviewed and listed. Already on SERP? Find its listing and claim it.',
+      description: `Submit your product to get it reviewed and listed. Already on ${siteConfig.name}? Find its listing and claim it.`,
       title: 'No listings yet'
     },
     noun: 'submissions and listings',
@@ -53,7 +53,7 @@ const SCOPES = {
   },
   submissions: {
     crumb: 'Submissions',
-    description: 'Everything you’ve submitted to SERP.',
+    description: `Everything you’ve submitted to ${siteConfig.name}.`,
     empty: {
       description: 'Submit your product to get it reviewed and listed.',
       title: 'No submissions yet'

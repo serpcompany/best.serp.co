@@ -143,10 +143,10 @@ describe('sign-in codes on staging', () => {
     const headers = init?.headers as Record<string, string>
     expect(headers.authorization).toBe(`Bearer ${FAKE_USESEND_KEY}`)
     const sent = JSON.parse(String(init?.body)) as Record<string, string>
-    expect(sent.from).toBe('SERP Directory <noreply@mail.serp.co>')
+    expect(sent.from).toBe('SERP Best <noreply@mail.serp.co>')
     expect(sent.from).toBe(`${EMAIL_SENDER.name} <${EMAIL_SENDER.email}>`)
     expect(sent.to).toBe('devin@serp.co')
-    const code = /^\[staging\] (\d+) is your SERP sign-in code$/u.exec(sent.subject ?? '')?.[1]
+    const code = /^\[staging\] (\d+) is your SERP Best sign-in code$/u.exec(sent.subject ?? '')?.[1]
     expect(code).toMatch(new RegExp(`^\\d{${OTP_LENGTH}}$`, 'u'))
     // The email states the lifetime Better Auth enforces, and links to staging.
     expect(sent.text).toContain(`It expires in ${OTP_EXPIRES_IN_SECONDS / 60} minutes`)

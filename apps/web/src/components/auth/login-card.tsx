@@ -13,6 +13,7 @@ import { InputOTP, InputOTPGroup, InputOTPSeparator, InputOTPSlot } from '@/comp
 import { Spinner } from '@/components/ui/spinner'
 import { callbackDestination } from '@/lib/auth/callback-url'
 import { getRoute } from '@/lib/routing/routes'
+import { siteConfig } from '@/lib/site/site-config'
 import { hostOf } from '@/lib/submissions/contract'
 import { cn } from '@/lib/utils'
 import { AuthCard } from './auth-card'
@@ -433,8 +434,8 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
                 <FieldError id="code-error">{message}</FieldError>
               ) : (
                 <FieldDescription id="code-description">
-                  From SERP Directory &lt;noreply@mail.serp.co&gt;. Check spam if it isn’t there in
-                  a minute.
+                  From {siteConfig.name} &lt;noreply@mail.serp.co&gt;. Check spam if it isn’t there
+                  in a minute.
                 </FieldDescription>
               )}
             </Field>
@@ -508,8 +509,8 @@ export function LoginCard({ callbackPath, signedInEmail }: LoginCardProps) {
       title="Sign up or sign in"
       description={
         <>
-          Enter your email and we’ll send you a {CODE_LENGTH}-digit code. New to SERP? The same code
-          creates your account.
+          Enter your email and we’ll send you a {CODE_LENGTH}-digit code. New to {siteConfig.name}?
+          The same code creates your account.
         </>
       }
     >
@@ -610,7 +611,7 @@ function LoginNotice({ notice, seconds }: { notice: Notice; seconds: number }) {
         <CircleX />
         <AlertTitle>Something went wrong</AlertTitle>
         <AlertDescription>
-          <p>We couldn’t reach SERP. Check your connection and try again.</p>
+          <p>We couldn’t reach {siteConfig.name}. Check your connection and try again.</p>
         </AlertDescription>
       </Alert>
     )

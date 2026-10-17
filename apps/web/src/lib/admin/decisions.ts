@@ -71,6 +71,7 @@ import {
   submissionTransitions
 } from '@/db/submission-plans'
 import { hasFileExtension } from '@/lib/file-extensions'
+import { siteConfig } from '@/lib/site/site-config'
 import { isReservedListingSlug } from '@/lib/site/site-routes'
 import { errorFields } from '@/lib/telemetry/error-fields'
 import type { AppEmailTemplates } from '../email/registry'
@@ -1485,7 +1486,7 @@ async function transferListingOwnerOnce(
     return failure(
       422,
       'no_account',
-      `${email} has no SERP account yet. They need to sign in once before you can transfer.`
+      `${email} has no ${siteConfig.name} account yet. They need to sign in once before you can transfer.`
     )
   }
   const snapshot = await listingSnapshot(context, input.listingId)

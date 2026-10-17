@@ -193,14 +193,14 @@ test('the weekly pass warns on conclusive misses only, and checks no curated or 
   }
 
   expect(await emailsTo(request, get('free').email)).toEqual([
-    `Action needed: the SERP badge is missing on ${host('free')}`
+    `Action needed: the SERP Best badge is missing on ${host('free')}`
   ])
   expect(await emailsTo(request, get('claim').email)).toEqual([
-    `Action needed: the SERP badge is missing on ${host('claim')}`
+    `Action needed: the SERP Best badge is missing on ${host('claim')}`
   ])
   expect(await emailsTo(request, get('down').email)).toEqual([])
   expect(await emailsTo(request, get('gone').email)).toEqual([
-    `Action needed: the SERP badge is missing on ${host('gone')}`
+    `Action needed: the SERP Best badge is missing on ${host('gone')}`
   ])
 
   // Replayed, and continued by the hourly trigger: nothing is checked or sent again.
@@ -279,12 +279,12 @@ test('the daily pass rechecks each warning and unpublishes or revokes on a confi
   ).toEqual([{ is_active: 1 }, { is_active: 1 }])
 
   expect(await emailsTo(request, get('free').email)).toEqual([
-    `Action needed: the SERP badge is missing on ${host('free')}`,
-    'Free product has been removed from SERP'
+    `Action needed: the SERP Best badge is missing on ${host('free')}`,
+    'Free product has been removed from SERP Best'
   ])
   expect(await emailsTo(request, get('claim').email)).toEqual([
-    `Action needed: the SERP badge is missing on ${host('claim')}`,
-    'You no longer manage Claimed product on SERP'
+    `Action needed: the SERP Best badge is missing on ${host('claim')}`,
+    'You no longer manage Claimed product on SERP Best'
   ])
   expect(await emailsTo(request, get('fixed').email)).toHaveLength(1)
 

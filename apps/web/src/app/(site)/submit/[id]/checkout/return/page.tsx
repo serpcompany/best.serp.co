@@ -10,14 +10,14 @@ import { checkoutPageProblem } from '@/lib/billing/guardrails'
 import { checkoutPage, toAccount } from '@/lib/billing/pages'
 import { billing } from '@/lib/billing/runtime'
 import { confirmReturn, orderDiscountCents } from '@/lib/billing/service'
-import { generateBaseMetadata } from '@/lib/seo/seo-config'
+import { generateBaseMetadata, SITE_NAME } from '@/lib/seo/seo-config'
 import { submissionBadgeTargets } from '@/lib/submissions/presentation'
 
 export const dynamic = 'force-dynamic'
 export function generateMetadata(): Metadata {
   return generateBaseMetadata({
     title: 'Payment',
-    description: 'Your payment for a listing on SERP.',
+    description: `Your payment for a listing on ${SITE_NAME}.`,
     path: '/submit/',
     noindex: true
   })

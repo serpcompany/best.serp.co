@@ -1,14 +1,14 @@
 import type { Metadata } from 'next'
 import { CheckoutHandoff } from '@/components/submit/checkout-screens'
 import { checkoutPage, checkoutPayable, toAccount } from '@/lib/billing/pages'
-import { generateBaseMetadata } from '@/lib/seo/seo-config'
+import { generateBaseMetadata, SITE_NAME } from '@/lib/seo/seo-config'
 import { site } from '@/lib/site'
 
 export const dynamic = 'force-dynamic'
 export function generateMetadata(): Metadata {
   return generateBaseMetadata({
     title: 'Checkout',
-    description: 'Pay for your listing on SERP.',
+    description: `Pay for your listing on ${SITE_NAME}.`,
     path: '/submit/',
     noindex: true
   })

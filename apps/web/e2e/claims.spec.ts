@@ -204,7 +204,7 @@ test('claims a listing with the badge and a domain-email code; the badge program
         m => m.subject
       )
     })
-    .toEqual(expect.arrayContaining([`You no longer manage Claimed product on SERP`]))
+    .toEqual(expect.arrayContaining([`You no longer manage Claimed product on SERP Best`]))
 
   await Promise.all([owner.context.dispose(), other.context.dispose(), adminContext.dispose()])
 })

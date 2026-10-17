@@ -22,6 +22,7 @@ import { NavSecondary } from '@/components/dashboard/nav-secondary'
 import { SidebarBrand } from '@/components/dashboard/sidebar-brand'
 import { buttonVariants } from '@/components/ui/button'
 import { getRoute } from '@/lib/routing/routes'
+import { siteConfig } from '@/lib/site/site-config'
 import { cn } from '@/lib/utils'
 
 /**
@@ -138,7 +139,7 @@ export function AccountShell({
   return (
     <CrumbsContext.Provider value={crumbsContext}>
       <AppShell
-        sidebarHeader={<SidebarBrand href={getRoute('account')} title="SERP" />}
+        sidebarHeader={<SidebarBrand href={getRoute('account')} title={siteConfig.name} />}
         sidebarContent={
           <>
             <NavMain

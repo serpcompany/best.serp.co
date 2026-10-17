@@ -39,7 +39,8 @@ export const site: SiteDefinition = {
     adminRecipient: 'devin@serp.co',
     // TODO(#73): '/account/messages/' once the dashboard inbox exists; the dashboard until then.
     dashboardPath: '/account/',
-    from: { address: 'noreply@mail.serp.co', name: 'SERP Directory' }
+    // The sender's display name is the site's name (`site.name`, #538).
+    from: { address: 'noreply@mail.serp.co' }
   },
   features: {
     showAuth: true,
