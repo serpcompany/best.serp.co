@@ -2091,7 +2091,7 @@ describe('admin lock gate', () => {
     ])
   })
 
-  it.each([200, 204, 308, 401, 404, 500, 503])(
+  it.each([200, 204, 303, 308, 401, 404, 500, 503])(
     'fails a production deploy with Access configured whose admin route answers %i',
     async status => {
       stubCrawlPolicy(adminAnswer(status))

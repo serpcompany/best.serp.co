@@ -179,6 +179,22 @@ describe('admin adapters re-check the allowlist on every request', () => {
     expect(await sessionAdmin(owner)).toBeNull()
   })
 
+  it('reads the allowlist for admin links only when the session role is admin (#494)', async () => {
+    const sqlite = localWorker()
+    const owner = await signIn('devin@serp.co', '192.0.2.16')
+    const visitor = await signIn('visitor@example.com', '192.0.2.17')
+    const allowlistReads = async (cookie: string) => {
+      sqlite.statements.length = 0
+      await sessionAdmin(cookie)
+      return sqlite.statements.filter(statement => statement.sql.includes('"admin_allowlist"'))
+    }
+
+    expect(await allowlistReads(visitor)).toEqual([])
+    expect(await allowlistReads('')).toEqual([])
+    // The same filter sees the read an admin session makes.
+    expect(await allowlistReads(owner)).toHaveLength(1)
+  })
+
   it('fails a page closed with a code that names the guard, when D1 cannot answer (#389)', async () => {
     const sqlite = localWorker()
     const owner = await signIn('devin@serp.co', '192.0.2.13')
