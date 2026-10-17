@@ -110,9 +110,10 @@ export type DecisionEmail =
  * (`after_rejection`), and send `submission-rejected-refunded` through `notify`. When it
  * throws, the rejection stands and the refund stays pending. It answers `disputed` when the
  * payment's dispute is open or lost (#483): nothing is refunded, the order records that the
- * dispute decides the money, and the refund is no longer pending. A replay runs it after the
- * refund is recorded too, to resend a failed email (#499): it then refunds nothing and sends
- * the same email under the same event key, which the ledger sends once.
+ * dispute decides the money, and the refund is no longer pending. It runs after the refund is
+ * recorded too, to resend a failed email (#499): it then refunds nothing and sends the same
+ * email under the same event key, which the ledger sends once; a throw then leaves the refund
+ * recorded, and the decision answers the email `not_sent`.
  */
 export interface AdminRefunds {
   refundRejectedSubmission(input: {
@@ -434,15 +435,21 @@ async function afterRejection(
       // Disputed (#483): nothing refunded, and nothing pending; the dispute decides the money.
       return { email, refundPending: false, refunded: recorded || refund === 'refunded' }
     } catch (error) {
-      log(
-        context,
-        'refund_rejected_submission',
-        submissionId,
-        recorded ? 'refunded' : 'refund_pending'
+      if (!recorded) {
+        log(context, 'refund_rejected_submission', submissionId, 'refund_pending')
+        console.error(JSON.stringify({ event: 'admin_refund_failed', ...errorFields(error) }))
+        return { ...none, refundPending: true }
+      }
+      // The refund stays recorded: only the retry of its email failed, so the toast says the
+      // email wasn't sent (unless the hook got as far as sending it), and the admin retries.
+      log(context, 'refund_rejected_submission', submissionId, 'email_not_sent')
+      console.error(
+        JSON.stringify({ event: 'admin_rejection_email_failed', ...errorFields(error) })
       )
-      console.error(JSON.stringify({ event: 'admin_refund_failed', ...errorFields(error) }))
-      // A recorded refund stays recorded: only the retry of its email failed.
-      return recorded ? { ...none, refunded: true } : { ...none, refundPending: true }
+      const unsent: DecisionEmail = review.submitter
+        ? { outcome: 'not_sent', to: review.submitter.email }
+        : NO_ACCOUNT
+      return { ...none, email: email ?? unsent, refunded: true }
     }
   }
   if (!review.rejectionReason) return none

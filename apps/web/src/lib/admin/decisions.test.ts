@@ -515,9 +515,22 @@ describe('submission decisions', () => {
     const refunded = { email: null, ok: true, refundPending: false, refunded: true, replayed: true }
     expect(await reject()).toEqual(refunded)
     expect(refundRejectedSubmission).toHaveBeenCalledTimes(3)
+    // The hook throws before its email: the toast warns the email wasn't sent, so the admin
+    // retries, and the log doesn't call it a failed refund.
     refundRejectedSubmission.mockRejectedValueOnce(new Error('D1 is unreachable.'))
     const quiet = vi.spyOn(console, 'error').mockImplementation(() => {})
-    expect(await reject()).toEqual(refunded)
+    const unsent = await reject()
+    expect(unsent).toEqual({
+      ...refunded,
+      email: { outcome: 'not_sent', to: 'maya@example.com' }
+    })
+    expect(unsent.ok && decisionEmailNote(unsent.email)).toEqual({
+      text: 'Email to maya@example.com wasn’t sent',
+      warn: true
+    })
+    expect(quiet.mock.calls.map(([line]) => JSON.parse(String(line)))).toEqual([
+      { code: 'UNKNOWN', event: 'admin_rejection_email_failed', name: 'Error' }
+    ])
     quiet.mockRestore()
     // With orders off there is no hook to run: the recorded refund is answered as it is.
     expect(

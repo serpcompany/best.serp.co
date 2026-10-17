@@ -91,6 +91,7 @@ values to its message. So:
   Sentry, an uncaught `CodedError` arrives as `Error: [redacted]` with its stack. The lines that
   spread in `errorFields` are `request_error`, `claim_failed`,
   `submission_request_failed`, `admin_decision_failed`, `admin_refund_failed`,
+  `admin_rejection_email_failed` (a recorded refund's email retry, #499),
   `auth_guard_error`, `billing_webhook_failed`, `billing_webhook_fulfilment_failed` (a
   payment's fulfilment after the webhook answered; also logged, at warn with its `outcome`, when
   it ended without applying: `retry_later` or `unknown_order`, #481), the billing service's
