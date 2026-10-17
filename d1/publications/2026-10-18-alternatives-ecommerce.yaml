@@ -1,0 +1,592 @@
+# serpcompany/best.serp.co#539 (batch A): hand-picked alternatives for the 60 live listings whose
+# primary category is Ecommerce, the next category in #539's order (categories by size). The picks
+# lead each page's Alternatives section; the page tops it up to six from similar listings.
+# Picked on 2026-10-18 from staging's live listings (read-only), each also live on production
+# (https://best.serp.co/sitemap-products.xml, read that day), by what each listing and its
+# candidates say they do: a pick does the same job for the same kind of user, best first, and a
+# listing gets fewer than six, or none, when nothing else fits. Picks may come from any category:
+# Square, Squarespace, Mixo, Wix ADI and Weblium (website builders that sell online), Shogun (a
+# Shopify storefront builder), and Ecomtent, Productify and TreeBrain (AI product-listing copy) are
+# filed elsewhere. Every listing and pick is a v1 import listing, with the same id and slug on
+# staging and production. The reason for each listing is the comment above its operation.
+# Eight listings have no operation, because nothing in the catalog substitutes for them: Broadn (B2B
+# quote-to-cash), BuyLensAI (a shopping extension that saves and compares products), Dropy AI (AI
+# dropshipping automation), Looria (shoppers' product research from independent reviews), PPSPY
+# (Shopify product and store research), EcoReturns (saara.io, a returns platform), SmartScout
+# (Amazon seller research) and SnapArt (AI product customization for Shopify). Their pages keep the
+# similar-listings fallback.
+# Each listing-alternatives-set compares and swaps the listing's slug and current picks (none yet),
+# refuses a pick that isn't live with that id and slug, keeps the listing's checksum, and logs an
+# `edited` event. Row-level, so the batch is refused with nothing written if any listing changed.
+# Needs migration 0018_listing_alternatives (#534, release 9). Publish on staging first, then on
+# production after the promotion that carries it.
+version: 1
+id: 2026-10-18-alternatives-ecommerce
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  # bigcommerce.com: online store platforms.
+  - action: listing-alternatives-set
+    id: lst_c621326d40f5e137745fa4fc
+    slug: bigcommerce.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_732248ec046f63b3e8ab89a4, slug: shopify.com }
+      - { id: lst_f55c4b031c099c726c684e3c, slug: woocommerce.com }
+      - { id: lst_bd08a9050b30eb82283e0e47, slug: shift4shop.com }
+      - { id: lst_fdf3ce3e8182c946ffe8f4e5, slug: ecwid.com }
+      - { id: lst_c15f52c9dcf33b02da879cbf, slug: squarespace.com }
+  # boostcommerce.net: AI product search, filtering and merchandising for online stores.
+  - action: listing-alternatives-set
+    id: lst_311304b2dfab23090c6cf3e8
+    slug: boostcommerce.net
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_41b1190f2301849601ed43f5, slug: klevu.com }
+      - { id: lst_66b61375ad57b219b13b3b86, slug: searchspring.com }
+      - { id: lst_ebb3c646d7640f4d990a477f, slug: tagalys.com }
+      - { id: lst_4acf2320d09ad7d8aa7b2369, slug: nosto.com }
+  # branchbob.ai: quick no-code store builders for new sellers: Shopify, then Mixo's AI-generated
+  # storefronts, Wix ADI, Square Online, Ecwid and Weblium.
+  - action: listing-alternatives-set
+    id: lst_e140bbb21cc492b813b13787
+    slug: branchbob.ai
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_732248ec046f63b3e8ab89a4, slug: shopify.com }
+      - { id: lst_13b5792e655e7863e085bbed, slug: mixo.io }
+      - { id: lst_b4d2f9f4314f39472ad55f00, slug: wix.com }
+      - { id: lst_70844fcbb0da94fad1da1dcb, slug: squareup.com }
+      - { id: lst_fdf3ce3e8182c946ffe8f4e5, slug: ecwid.com }
+      - { id: lst_3c9e642b6034758699860304, slug: weblium.com }
+  # brightpearl.com: multichannel retail order and inventory management.
+  - action: listing-alternatives-set
+    id: lst_6b122b2f0bf7741d5ea5f8f8
+    slug: brightpearl.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_b64a0b2a08c95889592eddb7, slug: linnworks.com }
+      - { id: lst_66ac6d5550027a4a919958c4, slug: orderhive.com }
+      - { id: lst_dd38fed21052497c5d9bf15e, slug: finaleinventory.com }
+  # channeladvisor.com: marketplace and channel management: listings, inventory and orders across
+  # marketplaces.
+  - action: listing-alternatives-set
+    id: lst_58af207610a862d1a415324e
+    slug: channeladvisor.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_0131f646b1f375abf40a3ffc, slug: channelengine.com }
+      - { id: lst_0fdf1c362aa279450ed6a168, slug: selleractive.com }
+      - { id: lst_28794b8f972103f315a600c8, slug: sellbrite.com }
+  # channelengine.com: marketplace and channel management: listings, inventory and orders across
+  # marketplaces.
+  - action: listing-alternatives-set
+    id: lst_0131f646b1f375abf40a3ffc
+    slug: channelengine.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_58af207610a862d1a415324e, slug: channeladvisor.com }
+      - { id: lst_0fdf1c362aa279450ed6a168, slug: selleractive.com }
+      - { id: lst_28794b8f972103f315a600c8, slug: sellbrite.com }
+  # cs-cart.com: software to launch a multivendor marketplace.
+  - action: listing-alternatives-set
+    id: lst_1b52b01ff3069870ea494f7d
+    slug: cs-cart.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_465658a2f4ec18411d5a8ca9, slug: yo-kart.com }
+      - { id: lst_b54cea55d3a5b8dfad4c290d, slug: dokan.co }
+      - { id: lst_dce8bafb3ca0f83418d32a36, slug: sharetribe.com }
+  # daasity.com: ecommerce data platforms that unify store, marketing and channel data.
+  - action: listing-alternatives-set
+    id: lst_5dddd562aedd9a37249257f3
+    slug: daasity.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_72ffd8e5cf8ff1c37524d3eb, slug: glew.io }
+      - { id: lst_1deff7611a374f09274cb3e3, slug: putler.com }
+  # dokan.co: software to launch a multivendor marketplace.
+  - action: listing-alternatives-set
+    id: lst_b54cea55d3a5b8dfad4c290d
+    slug: dokan.co
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_1b52b01ff3069870ea494f7d, slug: cs-cart.com }
+      - { id: lst_465658a2f4ec18411d5a8ca9, slug: yo-kart.com }
+      - { id: lst_dce8bafb3ca0f83418d32a36, slug: sharetribe.com }
+  # dreamgift.ai: AI gift finders.
+  - action: listing-alternatives-set
+    id: lst_0b84989062c1c293882e3c3a
+    slug: dreamgift.ai
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_45eef4a6e8d662fc1afe401f, slug: gifthuntr.com }
+      - { id: lst_d22b68e4da207815ae69e1df, slug: giftassistant.io }
+      - { id: lst_9adce30dc56d191a786d059b, slug: elfhelp.ai }
+  # easyship.com: multi-carrier shipping software: rate comparison and labels.
+  - action: listing-alternatives-set
+    id: lst_1fb3ed275fbdb3580c87a8f1
+    slug: easyship.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_54fd357e7b1710a550a8a1a4, slug: goshippo.com }
+      - { id: lst_10dd0423d78c009c890cf03d, slug: shipstation.com }
+      - { id: lst_7738979f0c489420004b26d0, slug: shippingeasy.com }
+      - { id: lst_902249117a475eab71d93f96, slug: ordoro.com }
+  # ecwid.com: online store platforms (Square Online, like Ecwid, has a free plan).
+  - action: listing-alternatives-set
+    id: lst_fdf3ce3e8182c946ffe8f4e5
+    slug: ecwid.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_732248ec046f63b3e8ab89a4, slug: shopify.com }
+      - { id: lst_70844fcbb0da94fad1da1dcb, slug: squareup.com }
+      - { id: lst_f55c4b031c099c726c684e3c, slug: woocommerce.com }
+      - { id: lst_c15f52c9dcf33b02da879cbf, slug: squarespace.com }
+      - { id: lst_c621326d40f5e137745fa4fc, slug: bigcommerce.com }
+      - { id: lst_bd08a9050b30eb82283e0e47, slug: shift4shop.com }
+  # elfhelp.ai: AI gift finders.
+  - action: listing-alternatives-set
+    id: lst_9adce30dc56d191a786d059b
+    slug: elfhelp.ai
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_d22b68e4da207815ae69e1df, slug: giftassistant.io }
+      - { id: lst_45eef4a6e8d662fc1afe401f, slug: gifthuntr.com }
+      - { id: lst_0b84989062c1c293882e3c3a, slug: dreamgift.ai }
+  # finaleinventory.com: multichannel inventory management.
+  - action: listing-alternatives-set
+    id: lst_dd38fed21052497c5d9bf15e
+    slug: finaleinventory.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_27a5800283b1032187f7e06e, slug: inflowinventory.com }
+      - { id: lst_66ac6d5550027a4a919958c4, slug: orderhive.com }
+      - { id: lst_b64a0b2a08c95889592eddb7, slug: linnworks.com }
+      - { id: lst_902249117a475eab71d93f96, slug: ordoro.com }
+      - { id: lst_6b122b2f0bf7741d5ea5f8f8, slug: brightpearl.com }
+  # fishbowlinventory.com: inventory and manufacturing management for small manufacturers.
+  - action: listing-alternatives-set
+    id: lst_fbfbfa56c591c33210b0bcd6
+    slug: fishbowlinventory.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_ba33b0311bee164e747ef6c0, slug: katanamrp.com }
+      - { id: lst_66ac6d5550027a4a919958c4, slug: orderhive.com }
+      - { id: lst_27a5800283b1032187f7e06e, slug: inflowinventory.com }
+  # giftassistant.io: AI gift finders.
+  - action: listing-alternatives-set
+    id: lst_d22b68e4da207815ae69e1df
+    slug: giftassistant.io
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_45eef4a6e8d662fc1afe401f, slug: gifthuntr.com }
+      - { id: lst_0b84989062c1c293882e3c3a, slug: dreamgift.ai }
+      - { id: lst_9adce30dc56d191a786d059b, slug: elfhelp.ai }
+  # gifthuntr.com: AI gift finders.
+  - action: listing-alternatives-set
+    id: lst_45eef4a6e8d662fc1afe401f
+    slug: gifthuntr.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_d22b68e4da207815ae69e1df, slug: giftassistant.io }
+      - { id: lst_0b84989062c1c293882e3c3a, slug: dreamgift.ai }
+      - { id: lst_9adce30dc56d191a786d059b, slug: elfhelp.ai }
+  # glew.io: ecommerce analytics that combine store, marketing and channel data.
+  - action: listing-alternatives-set
+    id: lst_72ffd8e5cf8ff1c37524d3eb
+    slug: glew.io
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_5dddd562aedd9a37249257f3, slug: daasity.com }
+      - { id: lst_1deff7611a374f09274cb3e3, slug: putler.com }
+      - { id: lst_caeee562ca1aaa8c9e50207b, slug: metorik.com }
+      - { id: lst_d8217c804bc6e3421a17db61, slug: lifetimely.io }
+      - { id: lst_263b471679fc5d1a292065a7, slug: metrilo.com }
+  # goshippo.com: multi-carrier shipping software.
+  - action: listing-alternatives-set
+    id: lst_54fd357e7b1710a550a8a1a4
+    slug: goshippo.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_10dd0423d78c009c890cf03d, slug: shipstation.com }
+      - { id: lst_7738979f0c489420004b26d0, slug: shippingeasy.com }
+      - { id: lst_1fb3ed275fbdb3580c87a8f1, slug: easyship.com }
+      - { id: lst_902249117a475eab71d93f96, slug: ordoro.com }
+  # inflowinventory.com: inventory management for small businesses.
+  - action: listing-alternatives-set
+    id: lst_27a5800283b1032187f7e06e
+    slug: inflowinventory.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_dd38fed21052497c5d9bf15e, slug: finaleinventory.com }
+      - { id: lst_66ac6d5550027a4a919958c4, slug: orderhive.com }
+      - { id: lst_fbfbfa56c591c33210b0bcd6, slug: fishbowlinventory.com }
+      - { id: lst_b64a0b2a08c95889592eddb7, slug: linnworks.com }
+  # inriver.com: product information management (PIM).
+  - action: listing-alternatives-set
+    id: lst_83d0d31b119563cac7ba706b
+    slug: inriver.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_82b430f1d7cc8fd95d86fef7, slug: salsify.com }
+      - { id: lst_a0b3d0c30af155da371be91c, slug: saleslayer.com }
+      - { id: lst_9d38faaaeef9e4cd2bd719f3, slug: syndigo.com }
+      - { id: lst_23cace55d3fcbe8d928afef4, slug: plytix.com }
+  # katanamrp.com: inventory and manufacturing management for small manufacturers.
+  - action: listing-alternatives-set
+    id: lst_ba33b0311bee164e747ef6c0
+    slug: katanamrp.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_fbfbfa56c591c33210b0bcd6, slug: fishbowlinventory.com }
+      - { id: lst_66ac6d5550027a4a919958c4, slug: orderhive.com }
+      - { id: lst_27a5800283b1032187f7e06e, slug: inflowinventory.com }
+  # klevu.com: AI site search and product recommendations for online stores.
+  - action: listing-alternatives-set
+    id: lst_41b1190f2301849601ed43f5
+    slug: klevu.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_66b61375ad57b219b13b3b86, slug: searchspring.com }
+      - { id: lst_311304b2dfab23090c6cf3e8, slug: boostcommerce.net }
+      - { id: lst_4acf2320d09ad7d8aa7b2369, slug: nosto.com }
+  # lebesgue.io: Shopify profit, LTV and cohort analytics.
+  - action: listing-alternatives-set
+    id: lst_0ee104b7866c392b95d7c6c6
+    slug: lebesgue.io
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_d8217c804bc6e3421a17db61, slug: lifetimely.io }
+      - { id: lst_72ffd8e5cf8ff1c37524d3eb, slug: glew.io }
+      - { id: lst_1deff7611a374f09274cb3e3, slug: putler.com }
+  # lifetimely.io: Shopify profit, LTV and cohort analytics.
+  - action: listing-alternatives-set
+    id: lst_d8217c804bc6e3421a17db61
+    slug: lifetimely.io
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_0ee104b7866c392b95d7c6c6, slug: lebesgue.io }
+      - { id: lst_1deff7611a374f09274cb3e3, slug: putler.com }
+      - { id: lst_72ffd8e5cf8ff1c37524d3eb, slug: glew.io }
+      - { id: lst_caeee562ca1aaa8c9e50207b, slug: metorik.com }
+  # linnworks.com: multichannel inventory and order management.
+  - action: listing-alternatives-set
+    id: lst_b64a0b2a08c95889592eddb7
+    slug: linnworks.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_6b122b2f0bf7741d5ea5f8f8, slug: brightpearl.com }
+      - { id: lst_66ac6d5550027a4a919958c4, slug: orderhive.com }
+      - { id: lst_dd38fed21052497c5d9bf15e, slug: finaleinventory.com }
+      - { id: lst_0fdf1c362aa279450ed6a168, slug: selleractive.com }
+      - { id: lst_28794b8f972103f315a600c8, slug: sellbrite.com }
+  # metorik.com: store analytics and reports for WooCommerce and Shopify.
+  - action: listing-alternatives-set
+    id: lst_caeee562ca1aaa8c9e50207b
+    slug: metorik.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_1deff7611a374f09274cb3e3, slug: putler.com }
+      - { id: lst_263b471679fc5d1a292065a7, slug: metrilo.com }
+      - { id: lst_72ffd8e5cf8ff1c37524d3eb, slug: glew.io }
+      - { id: lst_d8217c804bc6e3421a17db61, slug: lifetimely.io }
+  # metrilo.com: ecommerce analytics with customer data.
+  - action: listing-alternatives-set
+    id: lst_263b471679fc5d1a292065a7
+    slug: metrilo.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_caeee562ca1aaa8c9e50207b, slug: metorik.com }
+      - { id: lst_1deff7611a374f09274cb3e3, slug: putler.com }
+      - { id: lst_72ffd8e5cf8ff1c37524d3eb, slug: glew.io }
+      - { id: lst_d8217c804bc6e3421a17db61, slug: lifetimely.io }
+  # mirakl.com: marketplace platforms for operators (CS-Cart and Yo!Kart at smaller scale).
+  - action: listing-alternatives-set
+    id: lst_60fa5309b2da35075ce96ce3
+    slug: mirakl.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_1b52b01ff3069870ea494f7d, slug: cs-cart.com }
+      - { id: lst_465658a2f4ec18411d5a8ca9, slug: yo-kart.com }
+  # nosto.com: AI product recommendations and personalization for online stores.
+  - action: listing-alternatives-set
+    id: lst_4acf2320d09ad7d8aa7b2369
+    slug: nosto.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_41b1190f2301849601ed43f5, slug: klevu.com }
+      - { id: lst_66b61375ad57b219b13b3b86, slug: searchspring.com }
+      - { id: lst_fedf294f364afc261cee40bf, slug: rosetta.ai }
+  # orderdesk.com: order management that routes orders from many channels to fulfillment.
+  - action: listing-alternatives-set
+    id: lst_e22a419add242fbd84a9f4a8
+    slug: orderdesk.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_902249117a475eab71d93f96, slug: ordoro.com }
+      - { id: lst_b64a0b2a08c95889592eddb7, slug: linnworks.com }
+      - { id: lst_10dd0423d78c009c890cf03d, slug: shipstation.com }
+  # orderhive.com: the listing is Cin7 (formerly Orderhive): multichannel inventory and order
+  # management.
+  - action: listing-alternatives-set
+    id: lst_66ac6d5550027a4a919958c4
+    slug: orderhive.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_b64a0b2a08c95889592eddb7, slug: linnworks.com }
+      - { id: lst_6b122b2f0bf7741d5ea5f8f8, slug: brightpearl.com }
+      - { id: lst_dd38fed21052497c5d9bf15e, slug: finaleinventory.com }
+      - { id: lst_27a5800283b1032187f7e06e, slug: inflowinventory.com }
+  # ordoro.com: shipping, inventory and dropship order software.
+  - action: listing-alternatives-set
+    id: lst_902249117a475eab71d93f96
+    slug: ordoro.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_10dd0423d78c009c890cf03d, slug: shipstation.com }
+      - { id: lst_7738979f0c489420004b26d0, slug: shippingeasy.com }
+      - { id: lst_dd38fed21052497c5d9bf15e, slug: finaleinventory.com }
+      - { id: lst_54fd357e7b1710a550a8a1a4, slug: goshippo.com }
+      - { id: lst_e22a419add242fbd84a9f4a8, slug: orderdesk.com }
+  # plytix.com: product information management (PIM).
+  - action: listing-alternatives-set
+    id: lst_23cace55d3fcbe8d928afef4
+    slug: plytix.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_a0b3d0c30af155da371be91c, slug: saleslayer.com }
+      - { id: lst_83d0d31b119563cac7ba706b, slug: inriver.com }
+      - { id: lst_82b430f1d7cc8fd95d86fef7, slug: salsify.com }
+      - { id: lst_9d38faaaeef9e4cd2bd719f3, slug: syndigo.com }
+  # putler.com: multichannel ecommerce analytics.
+  - action: listing-alternatives-set
+    id: lst_1deff7611a374f09274cb3e3
+    slug: putler.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_72ffd8e5cf8ff1c37524d3eb, slug: glew.io }
+      - { id: lst_caeee562ca1aaa8c9e50207b, slug: metorik.com }
+      - { id: lst_263b471679fc5d1a292065a7, slug: metrilo.com }
+      - { id: lst_d8217c804bc6e3421a17db61, slug: lifetimely.io }
+  # roketfy.com: AI product-listing copy and SEO for online sellers (no other listing does its Etsy
+  # keyword research).
+  - action: listing-alternatives-set
+    id: lst_c77e8ee3a5a0fa37f15ed0c7
+    slug: roketfy.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_c99e28d15d00be5954f74ecf, slug: ecomtent.ai }
+      - { id: lst_88d2848b3be0a78dcf71dcd7, slug: productify.ai }
+      - { id: lst_0bd747c0bd9d11ad10c25a4e, slug: treebrain.ai }
+  # rosetta.ai: AI product recommendations and personalization for online stores.
+  - action: listing-alternatives-set
+    id: lst_fedf294f364afc261cee40bf
+    slug: rosetta.ai
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_4acf2320d09ad7d8aa7b2369, slug: nosto.com }
+      - { id: lst_41b1190f2301849601ed43f5, slug: klevu.com }
+  # saleslayer.com: product information management (PIM).
+  - action: listing-alternatives-set
+    id: lst_a0b3d0c30af155da371be91c
+    slug: saleslayer.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_23cace55d3fcbe8d928afef4, slug: plytix.com }
+      - { id: lst_83d0d31b119563cac7ba706b, slug: inriver.com }
+      - { id: lst_82b430f1d7cc8fd95d86fef7, slug: salsify.com }
+      - { id: lst_9d38faaaeef9e4cd2bd719f3, slug: syndigo.com }
+  # salsify.com: product content management and syndication to retailers.
+  - action: listing-alternatives-set
+    id: lst_82b430f1d7cc8fd95d86fef7
+    slug: salsify.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_9d38faaaeef9e4cd2bd719f3, slug: syndigo.com }
+      - { id: lst_83d0d31b119563cac7ba706b, slug: inriver.com }
+      - { id: lst_a0b3d0c30af155da371be91c, slug: saleslayer.com }
+      - { id: lst_23cace55d3fcbe8d928afef4, slug: plytix.com }
+  # searchspring.com: AI site search, merchandising and personalization for online stores.
+  - action: listing-alternatives-set
+    id: lst_66b61375ad57b219b13b3b86
+    slug: searchspring.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_41b1190f2301849601ed43f5, slug: klevu.com }
+      - { id: lst_311304b2dfab23090c6cf3e8, slug: boostcommerce.net }
+      - { id: lst_4acf2320d09ad7d8aa7b2369, slug: nosto.com }
+      - { id: lst_ebb3c646d7640f4d990a477f, slug: tagalys.com }
+  # sellbrite.com: multichannel listing and inventory sync for marketplace sellers.
+  - action: listing-alternatives-set
+    id: lst_28794b8f972103f315a600c8
+    slug: sellbrite.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_0fdf1c362aa279450ed6a168, slug: selleractive.com }
+      - { id: lst_b64a0b2a08c95889592eddb7, slug: linnworks.com }
+      - { id: lst_58af207610a862d1a415324e, slug: channeladvisor.com }
+      - { id: lst_0131f646b1f375abf40a3ffc, slug: channelengine.com }
+  # selleractive.com: multichannel listing, pricing and inventory for marketplace sellers.
+  - action: listing-alternatives-set
+    id: lst_0fdf1c362aa279450ed6a168
+    slug: selleractive.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_28794b8f972103f315a600c8, slug: sellbrite.com }
+      - { id: lst_58af207610a862d1a415324e, slug: channeladvisor.com }
+      - { id: lst_b64a0b2a08c95889592eddb7, slug: linnworks.com }
+      - { id: lst_0131f646b1f375abf40a3ffc, slug: channelengine.com }
+  # sharetribe.com: software to launch an online marketplace.
+  - action: listing-alternatives-set
+    id: lst_dce8bafb3ca0f83418d32a36
+    slug: sharetribe.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_465658a2f4ec18411d5a8ca9, slug: yo-kart.com }
+      - { id: lst_1b52b01ff3069870ea494f7d, slug: cs-cart.com }
+      - { id: lst_b54cea55d3a5b8dfad4c290d, slug: dokan.co }
+  # shift4shop.com: online store platforms.
+  - action: listing-alternatives-set
+    id: lst_bd08a9050b30eb82283e0e47
+    slug: shift4shop.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_732248ec046f63b3e8ab89a4, slug: shopify.com }
+      - { id: lst_c621326d40f5e137745fa4fc, slug: bigcommerce.com }
+      - { id: lst_f55c4b031c099c726c684e3c, slug: woocommerce.com }
+      - { id: lst_fdf3ce3e8182c946ffe8f4e5, slug: ecwid.com }
+      - { id: lst_70844fcbb0da94fad1da1dcb, slug: squareup.com }
+      - { id: lst_c15f52c9dcf33b02da879cbf, slug: squarespace.com }
+  # shippingeasy.com: multi-carrier shipping software for online sellers.
+  - action: listing-alternatives-set
+    id: lst_7738979f0c489420004b26d0
+    slug: shippingeasy.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_10dd0423d78c009c890cf03d, slug: shipstation.com }
+      - { id: lst_54fd357e7b1710a550a8a1a4, slug: goshippo.com }
+      - { id: lst_902249117a475eab71d93f96, slug: ordoro.com }
+      - { id: lst_1fb3ed275fbdb3580c87a8f1, slug: easyship.com }
+  # shipstation.com: multi-carrier shipping software for online sellers.
+  - action: listing-alternatives-set
+    id: lst_10dd0423d78c009c890cf03d
+    slug: shipstation.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_7738979f0c489420004b26d0, slug: shippingeasy.com }
+      - { id: lst_54fd357e7b1710a550a8a1a4, slug: goshippo.com }
+      - { id: lst_902249117a475eab71d93f96, slug: ordoro.com }
+      - { id: lst_1fb3ed275fbdb3580c87a8f1, slug: easyship.com }
+  # shopify.com: online store platforms.
+  - action: listing-alternatives-set
+    id: lst_732248ec046f63b3e8ab89a4
+    slug: shopify.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_c621326d40f5e137745fa4fc, slug: bigcommerce.com }
+      - { id: lst_f55c4b031c099c726c684e3c, slug: woocommerce.com }
+      - { id: lst_bd08a9050b30eb82283e0e47, slug: shift4shop.com }
+      - { id: lst_fdf3ce3e8182c946ffe8f4e5, slug: ecwid.com }
+      - { id: lst_70844fcbb0da94fad1da1dcb, slug: squareup.com }
+      - { id: lst_c15f52c9dcf33b02da879cbf, slug: squarespace.com }
+  # syndigo.com: product content management and syndication to retailers.
+  - action: listing-alternatives-set
+    id: lst_9d38faaaeef9e4cd2bd719f3
+    slug: syndigo.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_82b430f1d7cc8fd95d86fef7, slug: salsify.com }
+      - { id: lst_83d0d31b119563cac7ba706b, slug: inriver.com }
+      - { id: lst_a0b3d0c30af155da371be91c, slug: saleslayer.com }
+      - { id: lst_23cace55d3fcbe8d928afef4, slug: plytix.com }
+  # tagalys.com: merchandising and product search for Shopify stores.
+  - action: listing-alternatives-set
+    id: lst_ebb3c646d7640f4d990a477f
+    slug: tagalys.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_311304b2dfab23090c6cf3e8, slug: boostcommerce.net }
+      - { id: lst_66b61375ad57b219b13b3b86, slug: searchspring.com }
+      - { id: lst_41b1190f2301849601ed43f5, slug: klevu.com }
+  # weaverse.io: visual storefront builders for Shopify.
+  - action: listing-alternatives-set
+    id: lst_a97a5eeebeb843b4da3ffd32
+    slug: weaverse.io
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_1a2898df0db0205e5ccfe476, slug: getshogun.com }
+  # woocommerce.com: online store platforms (Ecwid also runs inside WordPress).
+  - action: listing-alternatives-set
+    id: lst_f55c4b031c099c726c684e3c
+    slug: woocommerce.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_732248ec046f63b3e8ab89a4, slug: shopify.com }
+      - { id: lst_fdf3ce3e8182c946ffe8f4e5, slug: ecwid.com }
+      - { id: lst_c621326d40f5e137745fa4fc, slug: bigcommerce.com }
+      - { id: lst_bd08a9050b30eb82283e0e47, slug: shift4shop.com }
+      - { id: lst_c15f52c9dcf33b02da879cbf, slug: squarespace.com }
+  # yo-kart.com: software to launch a multivendor marketplace.
+  - action: listing-alternatives-set
+    id: lst_465658a2f4ec18411d5a8ca9
+    slug: yo-kart.com
+    reason: '#539: hand-picked alternatives (batch A)'
+    expected: []
+    alternatives:
+      - { id: lst_1b52b01ff3069870ea494f7d, slug: cs-cart.com }
+      - { id: lst_dce8bafb3ca0f83418d32a36, slug: sharetribe.com }
+      - { id: lst_b54cea55d3a5b8dfad4c290d, slug: dokan.co }
