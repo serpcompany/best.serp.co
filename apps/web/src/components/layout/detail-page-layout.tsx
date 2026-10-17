@@ -86,10 +86,10 @@ export function DetailPageLayout({
           ) : null}
         </div>
 
-        {/* Phones: pinned under the site header (h-14 and its border) on a band of the page's
-            background, so the content scrolls beneath it. */}
+        {/* Phones: pinned under the site header on a band of the page's background, so the
+            content scrolls beneath it; `globals.css` keeps focus clear of both. */}
         {cta ? (
-          <div className="sticky top-[57px] z-40 -mx-4 -mt-6 -mb-2 flex flex-col bg-background/95 px-4 py-2 backdrop-blur-md md:-mx-6 md:px-6 lg:hidden">
+          <div className="sticky top-(--site-header-height) z-40 -mx-4 -mt-6 -mb-2 flex flex-col bg-background/95 px-4 py-2 backdrop-blur-md md:-mx-6 md:px-6 lg:hidden">
             {cta}
           </div>
         ) : null}
@@ -98,11 +98,13 @@ export function DetailPageLayout({
           {children}
         </div>
 
-        {/* The column: its children join the desktop grid; on tablets two across. */}
+        {/* The column: its children join the desktop grid; on tablets two across, or `end` alone
+            across the row when there is no `sidebar`. */}
         {sidebar || end || cta ? (
           <div
             className={cn(
-              'flex flex-col gap-8 md:grid md:grid-cols-2 md:items-start lg:contents',
+              'flex flex-col gap-8 lg:contents',
+              sidebar && 'md:grid md:grid-cols-2 md:items-start',
               !sidebar && !end && 'max-lg:hidden'
             )}
           >

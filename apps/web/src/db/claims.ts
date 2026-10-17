@@ -355,7 +355,7 @@ export function buildRecordClaimBadgeMissPlans(input: {
  * Completes a confirmed claim: the claimer becomes the owner (`badge_claim` after a passing
  * badge, `paid_claim` after a payment, #68), the claim is `completed`, and every other open
  * claim of the listing is cancelled, in one batch with the catalog publication (the public
- * "Verified owner" badge changes).
+ * "Claimed" badge changes).
  */
 export function buildCompleteClaimPlans(input: {
   claimId: string

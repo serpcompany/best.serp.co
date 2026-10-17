@@ -282,6 +282,14 @@ test.describe('public parity interactions', () => {
     await page.evaluate(() => window.scrollTo(0, 1200))
     await expect(phoneVisit).toBeInViewport()
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+
+    // Nor at 360px, even when the name is one long word: it wraps instead.
+    await page.setViewportSize({ width: 360, height: 780 })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360)
+    await header.getByRole('heading', { level: 1 }).evaluate(heading => {
+      heading.textContent = 'SupercalifragilisticExpialidociousPlagiarismChecker.net'
+    })
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360)
   })
 
   test('the home search sends its query to /search/, by Enter or its button', async ({

@@ -851,7 +851,7 @@ export interface SubmissionReview {
     live: boolean
     publishedAt: string | null
     slug: string
-    /** The live listing has a current owner now, so its page shows "Verified owner". */
+    /** The live listing has a current owner now, so its page shows "Claimed". */
     verifiedOwner: boolean
   } | null
   /** The hosted copy of the submission's social image, if any (#95). */
@@ -907,7 +907,7 @@ export interface RevisionReview {
     name: string
     slug: string
     /**
-     * The listing has a current owner now, so its page shows "Verified owner". A revision proves
+     * The listing has a current owner now, so its page shows "Claimed". A revision proves
      * ownership only when it was started: the owner may since be revoked or replaced.
      */
     verifiedOwner: boolean

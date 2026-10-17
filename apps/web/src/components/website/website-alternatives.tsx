@@ -27,8 +27,8 @@ export function WebsiteAlternatives({ websites }: WebsiteAlternativesProps) {
             <h2 id="alternatives">Alternatives</h2>
           </CardTitle>
         </CardHeader>
-        <CardContent className="px-2">
-          <ul className="flex flex-col">
+        <CardContent>
+          <ul className="-mx-2 flex flex-col">
             {websites.map(website => (
               <li key={website.slug}>
                 <Item

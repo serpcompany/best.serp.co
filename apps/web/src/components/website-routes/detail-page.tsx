@@ -165,7 +165,7 @@ export function WebsiteDetailRoutePage({
           ...(project.isUnofficial ? { isUnofficial: true } : {}),
           ...(project.tags?.length ? { tags: project.tags } : {})
         })}
-        actions={<FavoriteButton slug={project.slug} className="size-9" />}
+        actions={<FavoriteButton slug={project.slug} size="lg" />}
         cta={<WebsiteVisitLink className="w-full" website={visitWebsite} />}
         sidebar={
           project.alternatives.length > 0 ? (

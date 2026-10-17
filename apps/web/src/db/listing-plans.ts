@@ -276,7 +276,7 @@ export function buildSetListingLinkRelPlans(input: {
 }
 
 /**
- * No current owner → owner (claims, #67). The public "Verified owner" badge reads the
+ * No current owner → owner (claims, #67). The public "Claimed" badge reads the
  * current owner row, so ownership changes advance the catalog version.
  */
 export function buildGrantListingOwnerPlans(input: {

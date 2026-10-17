@@ -216,7 +216,7 @@ export interface ListingDetail extends ListingSummary {
    * when it has none. Its three most central score its alternatives.
    */
   tags?: ListingTag[]
-  /** Present when the listing has a current owner (`listing_owners`): the "Verified owner" badge. */
+  /** Present when the listing has a current owner (`listing_owners`): the "Claimed" badge. */
   verifiedOwner?: true
 }
 
