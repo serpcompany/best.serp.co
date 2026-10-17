@@ -27,19 +27,10 @@ runs:
         registry-url: "https://registry.npmjs.org"
         cache: "pnpm"
 
-    - name: Cache dependencies
-      id: cache_dependencies
-      uses: actions/cache@v5
-      with:
-        path: |
-          ~/.pnpm
-          ${{ github.workspace }}/.next/cache
-          ${{ github.workspace }}/apps/*/.next/cache
-        key: ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ hashFiles('**/*.js', '**/*.jsx', '**/*.ts', '**/*.tsx') }}
-        restore-keys: |
-          ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-
-
+    # No `.next/cache` from an earlier run: it holds Turbopack's build cache, and builds restored
+    # from it served a stale globals.css (no `--site-header-height`, so Visit Site stopped sticking
+    # on phones) to e2e. Every CI build, deploys included, compiles the tree it checked out.
+    # setup-node above caches the pnpm store.
     - name: Install dependencies
       shell: bash
-      # if: steps.cache_dependencies.outputs.cache-hit != 'true'
       run: pnpm install
