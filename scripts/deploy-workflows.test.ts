@@ -578,16 +578,6 @@ describe('D1 data stays in Cloudflare', () => {
       action: /^actions\/upload-artifact@/u,
       name: /^staging-smoke-\$\{\{ github\.sha \}\}-\$\{\{ github\.run_attempt \}\}$/u,
       paths: ['apps/web/playwright-report/', 'apps/web/test-results/']
-    },
-    {
-      // The install action's dependency and Next.js build caches.
-      action: /^actions\/cache@/u,
-      name: /^$/u,
-      paths: [
-        '~/.pnpm',
-        `${expression('github.workspace')}/.next/cache`,
-        `${expression('github.workspace')}/apps/*/.next/cache`
-      ]
     }
   ]
   /** Actions a job holding the Cloudflare token may use. */

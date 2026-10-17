@@ -11,9 +11,8 @@ interface InstallAction {
       run?: string
       uses?: string
       with?: {
+        cache?: string
         dest?: string
-        key?: string
-        path?: string
       }
     }>
   }
@@ -23,7 +22,6 @@ function loadYamlFile<T>(path: string): T {
   return yaml.load(readFileSync(resolve(process.cwd(), path), 'utf8')) as T
 }
 
-const githubExpression = (expression: string) => `$${expression}`
 const pnpmAction = 'pnpm/action-setup@v6'
 
 describe('ci workflow install isolation', () => {
@@ -53,23 +51,19 @@ describe('ci workflow install isolation', () => {
     expect(actionUses).not.toContain('pnpm/action-setup@v4')
   })
 
-  it('persists app-level Next caches without caching generated artifacts', () => {
+  it('caches the pnpm store through setup-node', () => {
     const action = loadYamlFile<InstallAction>('.github/actions/install/action.yml')
-    const cacheStep = action.runs.steps.find(step => step.uses === 'actions/cache@v5')
-    const cachePath = cacheStep?.with?.path ?? ''
+    const nodeStep = action.runs.steps.find(step => step.uses?.startsWith('actions/setup-node@'))
 
-    expect(cachePath).toContain('~/.pnpm')
-    expect(cachePath).toContain(`${githubExpression('{{ github.workspace }}')}/apps/*/.next/cache`)
-    expect(cachePath).toContain(`${githubExpression('{{ github.workspace }}')}/.next/cache`)
-    expect(cachePath).not.toContain('apps/*/out')
-    expect(cachePath).not.toContain('dist/sites')
-    expect(cachePath).not.toContain('.next/**')
-    expect(cachePath).not.toContain('.next/server')
-    expect(cachePath).not.toContain('.next/static')
-    expect(cachePath).not.toContain('.next/build')
-    expect(cacheStep?.with?.key).toContain("hashFiles('**/pnpm-lock.yaml')")
-    expect(cacheStep?.with?.key).toContain(
-      "hashFiles('**/*.js', '**/*.jsx', '**/*.ts', '**/*.tsx')"
-    )
+    expect(nodeStep?.with?.cache).toBe('pnpm')
+  })
+
+  it('restores no build cache from an earlier run', () => {
+    const action = loadYamlFile<InstallAction>('.github/actions/install/action.yml')
+
+    // `.next/cache` holds Turbopack's build cache; builds restored from it served a stale
+    // globals.css, so every build compiles the checked-out tree.
+    expect(action.runs.steps.filter(step => step.uses?.startsWith('actions/cache'))).toEqual([])
+    expect(JSON.stringify(action)).not.toContain('.next')
   })
 })
