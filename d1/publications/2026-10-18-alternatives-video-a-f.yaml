@@ -1,0 +1,304 @@
+# serpcompany/best.serp.co#539 (batch B): hand-picked alternatives for the 26 live listings whose
+# primary category is Video and whose slug starts with a to f (avc.ai to flowjin.com), the first
+# part of Video in #539's size order; a later batch takes g to z. The picks lead each page's
+# Alternatives section; the page tops it up to six from similar listings.
+# Picked on 2026-10-18 from staging's live listings (read-only), each also live on production
+# (https://best.serp.co/sitemap-products.xml, read that day), by what each listing and its
+# candidates say they do: a pick does the same job for the same kind of user, best first, and a
+# listing gets fewer than six, or none, when nothing else fits. Picks may come from any category:
+# HeyGen, Tavus and the product-photo tools are filed under Image & Design, Descript under Audio &
+# Music. Flair AI (flair.ai) is filed here but makes product photos, so it gets product-photo picks.
+# Runway has two listings (runway.ml, runwayml.com); picks name runwayml.com only. Every listing and
+# pick is a v1 import listing, with the same id and slug on staging and production. The reason for
+# each listing is the comment above its operation.
+# Two listings have no operation, because nothing in the catalog substitutes for them: Colourlab (AI
+# color grading for colorists) and FineCam (a phone as a webcam). Their pages keep the
+# similar-listings fallback.
+# Each listing-alternatives-set compares and swaps the listing's slug and current picks (none yet),
+# refuses a pick that isn't live with that id and slug, keeps the listing's checksum, and logs an
+# `edited` event. Row-level, so the batch is refused with nothing written if any listing changed.
+# Needs migration 0018_listing_alternatives (#534, release 9). Publish on staging first, then on
+# production after the promotion that carries it.
+version: 1
+id: 2026-10-18-alternatives-video-a-f
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  # avc.ai: AI video upscaling and restoration.
+  - action: listing-alternatives-set
+    id: lst_7229e6b2efff762306abee48
+    slug: avc.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_b9856976c3c0384d249226a7, slug: topaz.ai }
+      - { id: lst_c825b2092f89feb41eefb02c, slug: hitpaw.com }
+      - { id: lst_801402b5de773e803e6921f9, slug: bigmp4.com }
+  # bhuman.ai: personalized AI videos at scale from a recorded or cloned presenter.
+  - action: listing-alternatives-set
+    id: lst_609dfc9c5430eef33f3db59e
+    slug: bhuman.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_de0e597e69412de231b30d06, slug: tavus.io }
+      - { id: lst_1c6851e0c25b20191b7d3105, slug: heygen.com }
+      - { id: lst_2f7d0bc28a05c986f3ae8c48, slug: trymaverick.com }
+      - { id: lst_37008c9b0578ee3bb7f868d8, slug: d-id.com }
+      - { id: lst_fbfc9bdd951c0c5f3ec4a742, slug: twinsync.xyz }
+  # bigmotion.ai: AI text-to-video makers.
+  - action: listing-alternatives-set
+    id: lst_b787af0387f2380c25191aff
+    slug: bigmotion.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_c6663bda539da986a0a89c3e, slug: invideo.io }
+      - { id: lst_f3ffefe5825bb3860e75cc04, slug: pictory.ai }
+      - { id: lst_33534dbd720ff1866cea0957, slug: fliki.ai }
+      - { id: lst_dc0472ad10f386c890c76d02, slug: steve.ai }
+      - { id: lst_c067a708b407fa0bd24ade8e, slug: visla.us }
+      - { id: lst_8e01d0952688ed6f5bf06ebe, slug: revid.ai }
+  # bigmp4.com: AI video upscaling, colorization and enhancement.
+  - action: listing-alternatives-set
+    id: lst_801402b5de773e803e6921f9
+    slug: bigmp4.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_c825b2092f89feb41eefb02c, slug: hitpaw.com }
+      - { id: lst_7229e6b2efff762306abee48, slug: avc.ai }
+      - { id: lst_b9856976c3c0384d249226a7, slug: topaz.ai }
+  # capcut.com: all-purpose video editors for creators.
+  - action: listing-alternatives-set
+    id: lst_2aa45f1e543fb2080e0eb91a
+    slug: capcut.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_ac66bd0505467dbb716b90db, slug: veed.io }
+      - { id: lst_f7286d338ccc6a26b2e18fb8, slug: kapwing.com }
+      - { id: lst_f648989e34fb850123fa2687, slug: videoleapapp.com }
+      - { id: lst_aa561245069f3c2504b4e9c0, slug: media.io }
+      - { id: lst_a3e7bfcf16a51cfa6903e98d, slug: descript.com }
+      - { id: lst_f614201afbf4c642b440559d, slug: captions.ai }
+  # capify.ai: videos for a song: Rotor makes lyric videos, the others music videos from a track.
+  - action: listing-alternatives-set
+    id: lst_50f4799d7582ab534faa9653
+    slug: capify.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_f2a7defb52b0bcf1882b64c6, slug: rotorvideos.com }
+      - { id: lst_ac3c93c815acb6a83bb8af96, slug: neuralframes.com }
+      - { id: lst_df5b1e9461803f3da8aea7a6, slug: plazmapunk.com }
+      - { id: lst_9b367eb8315b889740e8b6d1, slug: wzrd.ai }
+  # captions.ai: AI captions and editing for talking-head creator videos.
+  - action: listing-alternatives-set
+    id: lst_f614201afbf4c642b440559d
+    slug: captions.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_07236be97271e32c58abb224, slug: submagic.co }
+      - { id: lst_2aa45f1e543fb2080e0eb91a, slug: capcut.com }
+      - { id: lst_ac66bd0505467dbb716b90db, slug: veed.io }
+      - { id: lst_83115e11a2bed1031871cf61, slug: zeemo.ai }
+      - { id: lst_a3e7bfcf16a51cfa6903e98d, slug: descript.com }
+      - { id: lst_f7286d338ccc6a26b2e18fb8, slug: kapwing.com }
+  # chapterme.co: AI video chapters.
+  - action: listing-alternatives-set
+    id: lst_15873535c27a39597ca039a9
+    slug: chapterme.co
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_f7d5f25d7e92c469d985dc53, slug: instantchapters.com }
+  # chopcast.io: turning long videos into short social clips (Chopcast now sells this as a done-for-you LinkedIn service).
+  - action: listing-alternatives-set
+    id: lst_64c1b207016d5fd03c8b0bcf
+    slug: chopcast.io
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_f3d2086e97b5c37de64badaf, slug: opus.pro }
+      - { id: lst_b69412cd71a638236b7790f1, slug: vizard.ai }
+      - { id: lst_b59714ead0da10ecad522baf, slug: vidyo.ai }
+      - { id: lst_650c3873aaf7811a09e78101, slug: klap.app }
+  # choppity.com: AI editors that cut long videos into short clips.
+  - action: listing-alternatives-set
+    id: lst_1c31b52c7058468cf4e2c9dc
+    slug: choppity.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_f3d2086e97b5c37de64badaf, slug: opus.pro }
+      - { id: lst_b69412cd71a638236b7790f1, slug: vizard.ai }
+      - { id: lst_650c3873aaf7811a09e78101, slug: klap.app }
+      - { id: lst_b59714ead0da10ecad522baf, slug: vidyo.ai }
+      - { id: lst_52aa51b7aa54966b08dd3a1d, slug: sendshort.ai }
+      - { id: lst_cecc6149eb1b45dba34057f9, slug: latte.social }
+  # clip.fm: turning long videos into short social clips.
+  - action: listing-alternatives-set
+    id: lst_2eb25871f8f476c2d8279d1f
+    slug: clip.fm
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_f3d2086e97b5c37de64badaf, slug: opus.pro }
+      - { id: lst_b69412cd71a638236b7790f1, slug: vizard.ai }
+      - { id: lst_650c3873aaf7811a09e78101, slug: klap.app }
+      - { id: lst_b59714ead0da10ecad522baf, slug: vidyo.ai }
+      - { id: lst_52aa51b7aa54966b08dd3a1d, slug: sendshort.ai }
+      - { id: lst_cecc6149eb1b45dba34057f9, slug: latte.social }
+  # clipfly.ai: AI video generation and editing suites.
+  - action: listing-alternatives-set
+    id: lst_c562db082cccaf7b836c835b
+    slug: clipfly.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_9fdc5c8d2f7d54e4d4c71be7, slug: runwayml.com }
+      - { id: lst_aa561245069f3c2504b4e9c0, slug: media.io }
+      - { id: lst_ac66bd0505467dbb716b90db, slug: veed.io }
+      - { id: lst_9f45f8fb6002dd7830c55608, slug: image2video.ai }
+  # clipmaker.ai: turning YouTube videos into captioned TikTok and Reels clips.
+  - action: listing-alternatives-set
+    id: lst_710dbe6804a4b7c29c4ecbe4
+    slug: clipmaker.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_f3d2086e97b5c37de64badaf, slug: opus.pro }
+      - { id: lst_b59714ead0da10ecad522baf, slug: vidyo.ai }
+      - { id: lst_650c3873aaf7811a09e78101, slug: klap.app }
+      - { id: lst_52aa51b7aa54966b08dd3a1d, slug: sendshort.ai }
+      - { id: lst_cecc6149eb1b45dba34057f9, slug: latte.social }
+      - { id: lst_b69412cd71a638236b7790f1, slug: vizard.ai }
+  # clipsai.com: the listing is an open-source clipping library: hosted apps that cut long videos into clips.
+  - action: listing-alternatives-set
+    id: lst_e06f0c7c5b66c78cd1c8539b
+    slug: clipsai.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_f3d2086e97b5c37de64badaf, slug: opus.pro }
+      - { id: lst_b69412cd71a638236b7790f1, slug: vizard.ai }
+      - { id: lst_650c3873aaf7811a09e78101, slug: klap.app }
+  # colossyan.com: AI avatar videos from text for training and business.
+  - action: listing-alternatives-set
+    id: lst_15c8e81570f4ebad7c3cd600
+    slug: colossyan.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_fe02219bcbe4acfc55255efa, slug: synthesia.io }
+      - { id: lst_1c6851e0c25b20191b7d3105, slug: heygen.com }
+      - { id: lst_077d3e2c315642ae453c2cd0, slug: elai.io }
+      - { id: lst_37008c9b0578ee3bb7f868d8, slug: d-id.com }
+      - { id: lst_517748d31fbac0ea920e462e, slug: synthesys.io }
+  # contentfries.com: turning long videos into short social clips.
+  - action: listing-alternatives-set
+    id: lst_44450b0825f48ed5244751da
+    slug: contentfries.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_f3d2086e97b5c37de64badaf, slug: opus.pro }
+      - { id: lst_b59714ead0da10ecad522baf, slug: vidyo.ai }
+      - { id: lst_b69412cd71a638236b7790f1, slug: vizard.ai }
+      - { id: lst_6eb7571e74ea671e4f5e3582, slug: flowjin.com }
+      - { id: lst_650c3873aaf7811a09e78101, slug: klap.app }
+      - { id: lst_52aa51b7aa54966b08dd3a1d, slug: sendshort.ai }
+  # d-id.com: talking AI avatars and digital humans.
+  - action: listing-alternatives-set
+    id: lst_37008c9b0578ee3bb7f868d8
+    slug: d-id.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_1c6851e0c25b20191b7d3105, slug: heygen.com }
+      - { id: lst_fe02219bcbe4acfc55255efa, slug: synthesia.io }
+      - { id: lst_de0e597e69412de231b30d06, slug: tavus.io }
+      - { id: lst_2d3a569e69a874d8b5dd6c33, slug: yepic.ai }
+      - { id: lst_15c8e81570f4ebad7c3cd600, slug: colossyan.com }
+      - { id: lst_077d3e2c315642ae453c2cd0, slug: elai.io }
+  # ebsynth.com: restyling video footage from painted or generated frames.
+  - action: listing-alternatives-set
+    id: lst_78f54164eab1eaa1bd578d9d
+    slug: ebsynth.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_9fdc5c8d2f7d54e4d4c71be7, slug: runwayml.com }
+  # eklipse.gg: AI clip makers that cut long videos into short highlight clips.
+  - action: listing-alternatives-set
+    id: lst_544f0a513ec17e2e1c63cf1b
+    slug: eklipse.gg
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_f3d2086e97b5c37de64badaf, slug: opus.pro }
+      - { id: lst_650c3873aaf7811a09e78101, slug: klap.app }
+      - { id: lst_b69412cd71a638236b7790f1, slug: vizard.ai }
+  # elai.io: AI avatar videos from text.
+  - action: listing-alternatives-set
+    id: lst_077d3e2c315642ae453c2cd0
+    slug: elai.io
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_fe02219bcbe4acfc55255efa, slug: synthesia.io }
+      - { id: lst_1c6851e0c25b20191b7d3105, slug: heygen.com }
+      - { id: lst_15c8e81570f4ebad7c3cd600, slug: colossyan.com }
+      - { id: lst_37008c9b0578ee3bb7f868d8, slug: d-id.com }
+      - { id: lst_517748d31fbac0ea920e462e, slug: synthesys.io }
+  # flair.ai: the listing is AI product photography, not video: AI product photo generators.
+  - action: listing-alternatives-set
+    id: lst_c0a7c70bd934e32e7d7d5848
+    slug: flair.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_9dbdd663153decd7a8e88ce8, slug: photoroom.com }
+      - { id: lst_56a2feed0951a873b3eb0c27, slug: pixelcut.ai }
+      - { id: lst_5ffc18b6c2518154105655ae, slug: claid.ai }
+      - { id: lst_c49da98017a5c7f43580755c, slug: mokker.ai }
+      - { id: lst_ccf08c29a6759ddbbc8488e3, slug: creatorkit.com }
+      - { id: lst_39dc696bcbba7d45fc85d33d, slug: cliclic.ai }
+  # flawlessai.com: AI lip sync and VFX for film and TV: MARZ makes LipDub AI and Vanity AI.
+  - action: listing-alternatives-set
+    id: lst_b12180a9d4bc307136c74f24
+    slug: flawlessai.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_05e7d661851c131b6ee63c1c, slug: monstersaliensrobotszombies.com }
+  # fliki.ai: AI text-to-video makers with voiceovers.
+  - action: listing-alternatives-set
+    id: lst_33534dbd720ff1866cea0957
+    slug: fliki.ai
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_c6663bda539da986a0a89c3e, slug: invideo.io }
+      - { id: lst_f3ffefe5825bb3860e75cc04, slug: pictory.ai }
+      - { id: lst_dc0472ad10f386c890c76d02, slug: steve.ai }
+      - { id: lst_b787af0387f2380c25191aff, slug: bigmotion.ai }
+      - { id: lst_c067a708b407fa0bd24ade8e, slug: visla.us }
+      - { id: lst_8e01d0952688ed6f5bf06ebe, slug: revid.ai }
+  # flowjin.com: turning long videos into short social clips.
+  - action: listing-alternatives-set
+    id: lst_6eb7571e74ea671e4f5e3582
+    slug: flowjin.com
+    reason: '#539: hand-picked alternatives (batch B)'
+    expected: []
+    alternatives:
+      - { id: lst_f3d2086e97b5c37de64badaf, slug: opus.pro }
+      - { id: lst_b59714ead0da10ecad522baf, slug: vidyo.ai }
+      - { id: lst_b69412cd71a638236b7790f1, slug: vizard.ai }
+      - { id: lst_44450b0825f48ed5244751da, slug: contentfries.com }
+      - { id: lst_650c3873aaf7811a09e78101, slug: klap.app }
+      - { id: lst_52aa51b7aa54966b08dd3a1d, slug: sendshort.ai }
