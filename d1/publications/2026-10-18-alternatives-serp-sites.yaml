@@ -1,0 +1,62 @@
+# serpcompany/best.serp.co#539 (batch 1 of many): hand-picked alternatives for today's five SERP-site
+# listings (#506), the first lead of each page's Alternatives section; the page tops the section up
+# to six from similar listings. PRODUCTION ONLY, like 2026-10-17-serp-sites-fill: the owner put all
+# five on production only (#506), so staging has none of the four SERP sites, and its Zenbu Japanese
+# is another listing with another id. On staging every operation here is refused, leaving the catalog
+# unchanged.
+# Picked on 2026-10-18 from the listings live on production (https://best.serp.co/sitemap-products.xml,
+# read that day) by what each listing and its site say it does: a pick does the same job for the same
+# kind of user, best first, and a listing gets fewer than six, or none, when nothing else fits. Every
+# pick is a v1 import listing, with the same id and slug on staging and production. The reason for
+# each listing is the comment above its operation.
+# SERP Games has no operation: the catalog has no other free browser-game site, and a single AI chess
+# or guessing game is no substitute for 2,500 games, so its page keeps the similar-listings fallback.
+# Each listing-alternatives-set compares and swaps the listing's slug and current picks (none yet),
+# refuses a pick that isn't live with that id and slug, keeps the listing's checksum, and logs an
+# `edited` event. Row-level, so the batch is refused with nothing written if any listing changed.
+# Needs migration 0018_listing_alternatives (#534, release 9). Publish on production after the
+# promotion that carries it.
+version: 1
+id: 2026-10-18-alternatives-serp-sites
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  # tools.serp.co: free online file tools: LightPDF and Scanner Go convert, compress and edit files and PDFs online, Pixlr edits images in the browser.
+  - action: listing-alternatives-set
+    id: lst_e7dc82255f70c7bb508c6d12
+    slug: tools.serp.co
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_4254ca7b9522a4b88217dbfa, slug: lightpdf.com }
+      - { id: lst_0dc1892c0f74b7a5af56255f, slug: scannergo.net }
+      - { id: lst_507b5e0124e9385cd0def1ec, slug: pixlr.com }
+  # serplists.com: checklist software: Process Street runs checklist templates as tracked workflows, Checklist.gg manages reusable checklists.
+  - action: listing-alternatives-set
+    id: lst_760ff525d9033ca34a8beb36
+    slug: serplists.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_4f9e167914c62036ec9ff01e, slug: process.st }
+      - { id: lst_87b88c41426ec1ddaf7265ce, slug: checklist.gg }
+  # keybumps.app: keyboard-first Mac utilities: Raycast is a Mac launcher with clipboard history and extensions, MacWhisper transcribes speech on-device.
+  - action: listing-alternatives-set
+    id: lst_1df3a39aa72def5a12c1b7f1
+    slug: keybumps.app
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_fa4837d350588954da806d7c, slug: raycast.com }
+      - { id: lst_6f056f9165cf45a3354febaa, slug: goodsnooze.gumroad.com }
+  # zenbujapanese.com: understanding Japanese text, photos and speech: OpenL translates text, images and speech, DeepL translates Japanese text and documents.
+  - action: listing-alternatives-set
+    id: lst_a79e1333afdecf3e9ebc4f49
+    slug: zenbujapanese.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_0236c867a2446ab5dd5de924, slug: openl.io }
+      - { id: lst_7576e148a2d09f4bd98da989, slug: deepl.com }

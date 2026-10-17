@@ -1,0 +1,540 @@
+# serpcompany/best.serp.co#539 (batch 1 of many): hand-picked alternatives for the 50 live listings
+# whose primary category is Cloud & Hosting, the smallest category, first in #539's order (categories
+# by size). The picks lead each page's Alternatives section; the page tops it up to six from similar
+# listings.
+# Picked on 2026-10-18 from staging's live listings (read-only), each also live on production
+# (https://best.serp.co/sitemap-products.xml, read that day), by what each listing and its candidates
+# say they do: a pick does the same job for the same kind of user, best first, and a listing gets
+# fewer than six, or none, when nothing else fits. Picks may come from any category: Amazon Polly
+# (aws.amazon.com), NVIDIA Canvas (nvidia.com) and watsonx.ai (ibm.com) are filed here but are a
+# text-to-speech service, a sketch-to-image tool and an AI platform, so they get their own kind. Every
+# listing and pick is a v1 import listing, with the same id and slug on staging and production. The
+# reason for each listing is the comment above its operation.
+# Five listings have no operation, because nothing in the catalog substitutes for them: CyraCom
+# (interpreting services), Linqto (private-company investing), LuxSci (HIPAA-compliant email),
+# Sherweb (a cloud marketplace for MSPs), and TrueVault (privacy compliance software). Their pages keep
+# the similar-listings fallback.
+# Each listing-alternatives-set compares and swaps the listing's slug and current picks (none yet),
+# refuses a pick that isn't live with that id and slug, keeps the listing's checksum, and logs an
+# `edited` event. Row-level, so the batch is refused with nothing written if any listing changed.
+# Needs migration 0018_listing_alternatives (#534, release 9). Publish on staging first, then on
+# production after the promotion that carries it.
+version: 1
+id: 2026-10-18-alternatives-cloud-hosting
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  # aws.amazon.com: the listing is Amazon Polly, a text-to-speech API: other text-to-speech services with APIs.
+  - action: listing-alternatives-set
+    id: lst_31a93dfdd1a9daea71399d95
+    slug: aws.amazon.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_2cb80a795c682957b11959c1, slug: getwoord.com }
+      - { id: lst_58eb4f4e495886d56ca8da1f, slug: speechgen.io }
+      - { id: lst_aa009aa814714d281d96859d, slug: voicemaker.in }
+      - { id: lst_d4a5d72b42f2f330a5df94f0, slug: resemble.ai }
+      - { id: lst_15caf71f765ce253eb674674, slug: murf.ai }
+  # azure.microsoft.com: general-purpose public clouds.
+  - action: listing-alternatives-set
+    id: lst_a590ff5f631d1250224df4e3
+    slug: azure.microsoft.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_f51453f93fc61f394df14b8d, slug: tencentcloud.com }
+      - { id: lst_14c6281f69f0dacb6d778bf1, slug: ovhcloud.com }
+      - { id: lst_801ae8c07b36a4d79b995b9e, slug: linode.com }
+      - { id: lst_722eeba2738dce43e72dafeb, slug: cloudsigma.com }
+      - { id: lst_08e038eaff1ce9f10863aca2, slug: gcore.com }
+  # banana.dev: serverless GPU inference hosting.
+  - action: listing-alternatives-set
+    id: lst_0d20ea83fa90e11524d79382
+    slug: banana.dev
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_ae75e6d9d1e53babb32e9a5e, slug: runpod.io }
+      - { id: lst_20b9297ba604b6d4b976027b, slug: datacrunch.io }
+      - { id: lst_564c3b5203b3edeb6c578751, slug: gpux.ai }
+      - { id: lst_4f5723dbdd28a781c3ffd776, slug: paperspace.com }
+  # bytegrid.com: compliant data center and colocation providers.
+  - action: listing-alternatives-set
+    id: lst_a7e78106154177ad79236c5d
+    slug: bytegrid.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_993b1205a26a9890ce3c76be, slug: lightedge.com }
+      - { id: lst_3ea5780c5f90d731adf503fe, slug: tierpoint.com }
+      - { id: lst_f3fe329066251301efb7dab6, slug: rackspace.com }
+  # catalysttg.com: managed IT and cloud service providers for businesses.
+  - action: listing-alternatives-set
+    id: lst_d9803beb4a1b70fa3aa423ea
+    slug: catalysttg.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_f38b0ca931f1b49abbd846be, slug: rapidscale.net }
+      - { id: lst_f3bd853de9d630e280f11c06, slug: connectria.com }
+      - { id: lst_3ea5780c5f90d731adf503fe, slug: tierpoint.com }
+      - { id: lst_f3fe329066251301efb7dab6, slug: rackspace.com }
+  # cloudalize.com: GPU virtual workstations and GPU servers for graphics work.
+  - action: listing-alternatives-set
+    id: lst_a8744924e0ba8798f7d44805
+    slug: cloudalize.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_4f5723dbdd28a781c3ffd776, slug: paperspace.com }
+      - { id: lst_97190612a6f343c8aabc29d7, slug: gpu-mart.com }
+      - { id: lst_ae29877621236a89ddeda839, slug: leadergpu.com }
+      - { id: lst_2f4f55add995e9cd49551f1b, slug: tensordock.com }
+  # cloudsigma.com: infrastructure-as-a-service clouds.
+  - action: listing-alternatives-set
+    id: lst_722eeba2738dce43e72dafeb
+    slug: cloudsigma.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_14c6281f69f0dacb6d778bf1, slug: ovhcloud.com }
+      - { id: lst_801ae8c07b36a4d79b995b9e, slug: linode.com }
+      - { id: lst_99d9b10c6961f91549938283, slug: contabo.com }
+      - { id: lst_08e038eaff1ce9f10863aca2, slug: gcore.com }
+  # connectria.com: managed hybrid and multi-cloud providers.
+  - action: listing-alternatives-set
+    id: lst_f3bd853de9d630e280f11c06
+    slug: connectria.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_f3fe329066251301efb7dab6, slug: rackspace.com }
+      - { id: lst_3ea5780c5f90d731adf503fe, slug: tierpoint.com }
+      - { id: lst_993b1205a26a9890ce3c76be, slug: lightedge.com }
+      - { id: lst_f38b0ca931f1b49abbd846be, slug: rapidscale.net }
+  # contabo.com: low-cost VPS and dedicated server hosts.
+  - action: listing-alternatives-set
+    id: lst_99d9b10c6961f91549938283
+    slug: contabo.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_801ae8c07b36a4d79b995b9e, slug: linode.com }
+      - { id: lst_14c6281f69f0dacb6d778bf1, slug: ovhcloud.com }
+      - { id: lst_64d01bfeda69a4db37249b02, slug: servermania.com }
+      - { id: lst_309158928b06f61850ba2410, slug: databasemart.com }
+      - { id: lst_752764c40458318859bca9b3, slug: leaseweb.com }
+  # coreweave.com: large-scale GPU clouds for AI training and inference.
+  - action: listing-alternatives-set
+    id: lst_27641d95cb9929a191b17331
+    slug: coreweave.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_7e9736364b5d462013a79498, slug: lambda.ai }
+      - { id: lst_2159eaad5013635863d55d8e, slug: fluidstack.io }
+      - { id: lst_657df46be98f3966ead935b5, slug: hyperstack.cloud }
+      - { id: lst_20b9297ba604b6d4b976027b, slug: datacrunch.io }
+      - { id: lst_ae75e6d9d1e53babb32e9a5e, slug: runpod.io }
+  # cudocompute.com: GPU clouds built on distributed or spare capacity, then other on-demand GPU clouds.
+  - action: listing-alternatives-set
+    id: lst_051a5eaf107b911300d30a8b
+    slug: cudocompute.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_2f4f55add995e9cd49551f1b, slug: tensordock.com }
+      - { id: lst_ae75e6d9d1e53babb32e9a5e, slug: runpod.io }
+      - { id: lst_657df46be98f3966ead935b5, slug: hyperstack.cloud }
+      - { id: lst_20b9297ba604b6d4b976027b, slug: datacrunch.io }
+      - { id: lst_4f5723dbdd28a781c3ffd776, slug: paperspace.com }
+  # databasemart.com: web, VPS and dedicated server hosting.
+  - action: listing-alternatives-set
+    id: lst_309158928b06f61850ba2410
+    slug: databasemart.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_64d01bfeda69a4db37249b02, slug: servermania.com }
+      - { id: lst_99d9b10c6961f91549938283, slug: contabo.com }
+      - { id: lst_66d49dfcd983118b2dcb8619, slug: liquidweb.com }
+      - { id: lst_752764c40458318859bca9b3, slug: leaseweb.com }
+      - { id: lst_14c6281f69f0dacb6d778bf1, slug: ovhcloud.com }
+  # datacrunch.io: GPU clouds for AI, European first.
+  - action: listing-alternatives-set
+    id: lst_20b9297ba604b6d4b976027b
+    slug: datacrunch.io
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_657df46be98f3966ead935b5, slug: hyperstack.cloud }
+      - { id: lst_ae75e6d9d1e53babb32e9a5e, slug: runpod.io }
+      - { id: lst_7e9736364b5d462013a79498, slug: lambda.ai }
+      - { id: lst_2159eaad5013635863d55d8e, slug: fluidstack.io }
+      - { id: lst_27641d95cb9929a191b17331, slug: coreweave.com }
+      - { id: lst_4f5723dbdd28a781c3ffd776, slug: paperspace.com }
+  # fluidstack.io: large-scale GPU clusters for AI.
+  - action: listing-alternatives-set
+    id: lst_2159eaad5013635863d55d8e
+    slug: fluidstack.io
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_27641d95cb9929a191b17331, slug: coreweave.com }
+      - { id: lst_7e9736364b5d462013a79498, slug: lambda.ai }
+      - { id: lst_657df46be98f3966ead935b5, slug: hyperstack.cloud }
+      - { id: lst_20b9297ba604b6d4b976027b, slug: datacrunch.io }
+  # gcore.com: global clouds with gaming and AI infrastructure.
+  - action: listing-alternatives-set
+    id: lst_08e038eaff1ce9f10863aca2
+    slug: gcore.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_f51453f93fc61f394df14b8d, slug: tencentcloud.com }
+      - { id: lst_14c6281f69f0dacb6d778bf1, slug: ovhcloud.com }
+      - { id: lst_3cb5e9fc26078f7ecfeae57d, slug: latitude.sh }
+      - { id: lst_801ae8c07b36a4d79b995b9e, slug: linode.com }
+  # gpu-mart.com: dedicated and rented GPU servers.
+  - action: listing-alternatives-set
+    id: lst_97190612a6f343c8aabc29d7
+    slug: gpu-mart.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_ae29877621236a89ddeda839, slug: leadergpu.com }
+      - { id: lst_2f4f55add995e9cd49551f1b, slug: tensordock.com }
+      - { id: lst_3cb5e9fc26078f7ecfeae57d, slug: latitude.sh }
+      - { id: lst_051a5eaf107b911300d30a8b, slug: cudocompute.com }
+      - { id: lst_ae75e6d9d1e53babb32e9a5e, slug: runpod.io }
+  # gpux.ai: serverless GPU inference.
+  - action: listing-alternatives-set
+    id: lst_564c3b5203b3edeb6c578751
+    slug: gpux.ai
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_ae75e6d9d1e53babb32e9a5e, slug: runpod.io }
+      - { id: lst_0d20ea83fa90e11524d79382, slug: banana.dev }
+      - { id: lst_20b9297ba604b6d4b976027b, slug: datacrunch.io }
+  # greengeeks.com: web hosting for websites and WordPress.
+  - action: listing-alternatives-set
+    id: lst_550deeba4d8724905250b26e
+    slug: greengeeks.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_835f086aec9cbf1fa8a37f94, slug: nexcess.net }
+      - { id: lst_66d49dfcd983118b2dcb8619, slug: liquidweb.com }
+      - { id: lst_309158928b06f61850ba2410, slug: databasemart.com }
+  # healthcareblocks.com: HIPAA-compliant cloud hosting for healthcare.
+  - action: listing-alternatives-set
+    id: lst_05e0a382416b1cd854e2f88b
+    slug: healthcareblocks.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_5feb6ba9a5a2f56731e83c1d, slug: medstack.co }
+      - { id: lst_e7ec160437237670f8d55f33, slug: hipaavault.com }
+      - { id: lst_f3bd853de9d630e280f11c06, slug: connectria.com }
+  # hipaavault.com: HIPAA-compliant managed hosting and security.
+  - action: listing-alternatives-set
+    id: lst_e7ec160437237670f8d55f33
+    slug: hipaavault.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_05e0a382416b1cd854e2f88b, slug: healthcareblocks.com }
+      - { id: lst_5feb6ba9a5a2f56731e83c1d, slug: medstack.co }
+      - { id: lst_f3bd853de9d630e280f11c06, slug: connectria.com }
+  # hyperstack.cloud: GPU-as-a-service clouds, European first.
+  - action: listing-alternatives-set
+    id: lst_657df46be98f3966ead935b5
+    slug: hyperstack.cloud
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_20b9297ba604b6d4b976027b, slug: datacrunch.io }
+      - { id: lst_2159eaad5013635863d55d8e, slug: fluidstack.io }
+      - { id: lst_7e9736364b5d462013a79498, slug: lambda.ai }
+      - { id: lst_27641d95cb9929a191b17331, slug: coreweave.com }
+      - { id: lst_ae75e6d9d1e53babb32e9a5e, slug: runpod.io }
+      - { id: lst_051a5eaf107b911300d30a8b, slug: cudocompute.com }
+  # ibm.com: the listing is watsonx.ai: enterprise platforms to build, tune and deploy AI models.
+  - action: listing-alternatives-set
+    id: lst_a1059399afb4c39fab03d6f6
+    slug: ibm.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_6687a3350a75a97c497ee67d, slug: h2o.ai }
+      - { id: lst_0ab38feeec37331f776f8be0, slug: sambanova.ai }
+      - { id: lst_c87e8c8e7f1bdd4be08b8c7b, slug: forefront.ai }
+      - { id: lst_eb2f253d09d6b4298a44aad8, slug: zbrain.ai }
+  # jarvislabs.ai: on-demand GPU clouds for AI developers.
+  - action: listing-alternatives-set
+    id: lst_262ec4c17384ab3067d285c8
+    slug: jarvislabs.ai
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_ae75e6d9d1e53babb32e9a5e, slug: runpod.io }
+      - { id: lst_4f5723dbdd28a781c3ffd776, slug: paperspace.com }
+      - { id: lst_2f4f55add995e9cd49551f1b, slug: tensordock.com }
+      - { id: lst_7e9736364b5d462013a79498, slug: lambda.ai }
+      - { id: lst_20b9297ba604b6d4b976027b, slug: datacrunch.io }
+  # koyeb.com: serverless container and GPU platforms.
+  - action: listing-alternatives-set
+    id: lst_b979adf02dcfbb11c72c6a76
+    slug: koyeb.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_ae75e6d9d1e53babb32e9a5e, slug: runpod.io }
+      - { id: lst_e46c716e49f17b17301f2fab, slug: takomo.ai }
+  # lambda.ai: GPU clouds for AI training and inference.
+  - action: listing-alternatives-set
+    id: lst_7e9736364b5d462013a79498
+    slug: lambda.ai
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_27641d95cb9929a191b17331, slug: coreweave.com }
+      - { id: lst_ae75e6d9d1e53babb32e9a5e, slug: runpod.io }
+      - { id: lst_4f5723dbdd28a781c3ffd776, slug: paperspace.com }
+      - { id: lst_20b9297ba604b6d4b976027b, slug: datacrunch.io }
+      - { id: lst_657df46be98f3966ead935b5, slug: hyperstack.cloud }
+      - { id: lst_2159eaad5013635863d55d8e, slug: fluidstack.io }
+  # latitude.sh: bare metal and dedicated server providers.
+  - action: listing-alternatives-set
+    id: lst_3cb5e9fc26078f7ecfeae57d
+    slug: latitude.sh
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_752764c40458318859bca9b3, slug: leaseweb.com }
+      - { id: lst_14c6281f69f0dacb6d778bf1, slug: ovhcloud.com }
+      - { id: lst_64d01bfeda69a4db37249b02, slug: servermania.com }
+      - { id: lst_08e038eaff1ce9f10863aca2, slug: gcore.com }
+      - { id: lst_99d9b10c6961f91549938283, slug: contabo.com }
+  # leadergpu.com: dedicated GPU server rental.
+  - action: listing-alternatives-set
+    id: lst_ae29877621236a89ddeda839
+    slug: leadergpu.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_97190612a6f343c8aabc29d7, slug: gpu-mart.com }
+      - { id: lst_2f4f55add995e9cd49551f1b, slug: tensordock.com }
+      - { id: lst_20b9297ba604b6d4b976027b, slug: datacrunch.io }
+      - { id: lst_657df46be98f3966ead935b5, slug: hyperstack.cloud }
+      - { id: lst_051a5eaf107b911300d30a8b, slug: cudocompute.com }
+  # leaseweb.com: dedicated server and hosting providers.
+  - action: listing-alternatives-set
+    id: lst_752764c40458318859bca9b3
+    slug: leaseweb.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_64d01bfeda69a4db37249b02, slug: servermania.com }
+      - { id: lst_14c6281f69f0dacb6d778bf1, slug: ovhcloud.com }
+      - { id: lst_3cb5e9fc26078f7ecfeae57d, slug: latitude.sh }
+      - { id: lst_99d9b10c6961f91549938283, slug: contabo.com }
+      - { id: lst_66d49dfcd983118b2dcb8619, slug: liquidweb.com }
+      - { id: lst_309158928b06f61850ba2410, slug: databasemart.com }
+  # lightedge.com: colocation and managed cloud for regulated businesses.
+  - action: listing-alternatives-set
+    id: lst_993b1205a26a9890ce3c76be
+    slug: lightedge.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_3ea5780c5f90d731adf503fe, slug: tierpoint.com }
+      - { id: lst_a7e78106154177ad79236c5d, slug: bytegrid.com }
+      - { id: lst_f3bd853de9d630e280f11c06, slug: connectria.com }
+      - { id: lst_f3fe329066251301efb7dab6, slug: rackspace.com }
+  # linode.com: developer clouds and VPS hosts.
+  - action: listing-alternatives-set
+    id: lst_801ae8c07b36a4d79b995b9e
+    slug: linode.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_14c6281f69f0dacb6d778bf1, slug: ovhcloud.com }
+      - { id: lst_99d9b10c6961f91549938283, slug: contabo.com }
+      - { id: lst_722eeba2738dce43e72dafeb, slug: cloudsigma.com }
+      - { id: lst_a590ff5f631d1250224df4e3, slug: azure.microsoft.com }
+  # liquidweb.com: managed, VPS and dedicated hosting.
+  - action: listing-alternatives-set
+    id: lst_66d49dfcd983118b2dcb8619
+    slug: liquidweb.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_835f086aec9cbf1fa8a37f94, slug: nexcess.net }
+      - { id: lst_64d01bfeda69a4db37249b02, slug: servermania.com }
+      - { id: lst_309158928b06f61850ba2410, slug: databasemart.com }
+      - { id: lst_752764c40458318859bca9b3, slug: leaseweb.com }
+      - { id: lst_550deeba4d8724905250b26e, slug: greengeeks.com }
+  # medstack.co: HIPAA-compliant cloud platforms for healthcare apps.
+  - action: listing-alternatives-set
+    id: lst_5feb6ba9a5a2f56731e83c1d
+    slug: medstack.co
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_05e0a382416b1cd854e2f88b, slug: healthcareblocks.com }
+      - { id: lst_e7ec160437237670f8d55f33, slug: hipaavault.com }
+  # nexcess.net: managed WordPress and ecommerce hosting.
+  - action: listing-alternatives-set
+    id: lst_835f086aec9cbf1fa8a37f94
+    slug: nexcess.net
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_66d49dfcd983118b2dcb8619, slug: liquidweb.com }
+      - { id: lst_550deeba4d8724905250b26e, slug: greengeeks.com }
+  # nvidia.com: the listing is NVIDIA Canvas: AI tools that turn sketches into realistic images.
+  - action: listing-alternatives-set
+    id: lst_d03084545300d5e43da9b589
+    slug: nvidia.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_02ad7da79d510cfe823ea555, slug: draw3d.online }
+      - { id: lst_4401e1e514305bdbebb1b854, slug: sketchtoimage.com }
+      - { id: lst_c43f3a4c3ecce89737fd465d, slug: iliad.ai }
+      - { id: lst_b557b9c39e0c53aac0563d7d, slug: vizcom.ai }
+  # ovhcloud.com: public cloud and dedicated server providers.
+  - action: listing-alternatives-set
+    id: lst_14c6281f69f0dacb6d778bf1
+    slug: ovhcloud.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_752764c40458318859bca9b3, slug: leaseweb.com }
+      - { id: lst_801ae8c07b36a4d79b995b9e, slug: linode.com }
+      - { id: lst_99d9b10c6961f91549938283, slug: contabo.com }
+      - { id: lst_722eeba2738dce43e72dafeb, slug: cloudsigma.com }
+      - { id: lst_08e038eaff1ce9f10863aca2, slug: gcore.com }
+      - { id: lst_a590ff5f631d1250224df4e3, slug: azure.microsoft.com }
+  # paperspace.com: on-demand GPU clouds for AI developers.
+  - action: listing-alternatives-set
+    id: lst_4f5723dbdd28a781c3ffd776
+    slug: paperspace.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_ae75e6d9d1e53babb32e9a5e, slug: runpod.io }
+      - { id: lst_7e9736364b5d462013a79498, slug: lambda.ai }
+      - { id: lst_262ec4c17384ab3067d285c8, slug: jarvislabs.ai }
+      - { id: lst_20b9297ba604b6d4b976027b, slug: datacrunch.io }
+      - { id: lst_2f4f55add995e9cd49551f1b, slug: tensordock.com }
+  # rackspace.com: managed multi-cloud service providers.
+  - action: listing-alternatives-set
+    id: lst_f3fe329066251301efb7dab6
+    slug: rackspace.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_3ea5780c5f90d731adf503fe, slug: tierpoint.com }
+      - { id: lst_f3bd853de9d630e280f11c06, slug: connectria.com }
+      - { id: lst_f38b0ca931f1b49abbd846be, slug: rapidscale.net }
+      - { id: lst_993b1205a26a9890ce3c76be, slug: lightedge.com }
+  # rapidscale.net: managed cloud service providers.
+  - action: listing-alternatives-set
+    id: lst_f38b0ca931f1b49abbd846be
+    slug: rapidscale.net
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_f3fe329066251301efb7dab6, slug: rackspace.com }
+      - { id: lst_3ea5780c5f90d731adf503fe, slug: tierpoint.com }
+      - { id: lst_f3bd853de9d630e280f11c06, slug: connectria.com }
+      - { id: lst_d9803beb4a1b70fa3aa423ea, slug: catalysttg.com }
+  # runpod.io: GPU clouds with on-demand instances.
+  - action: listing-alternatives-set
+    id: lst_ae75e6d9d1e53babb32e9a5e
+    slug: runpod.io
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_7e9736364b5d462013a79498, slug: lambda.ai }
+      - { id: lst_4f5723dbdd28a781c3ffd776, slug: paperspace.com }
+      - { id: lst_20b9297ba604b6d4b976027b, slug: datacrunch.io }
+      - { id: lst_2f4f55add995e9cd49551f1b, slug: tensordock.com }
+      - { id: lst_262ec4c17384ab3067d285c8, slug: jarvislabs.ai }
+      - { id: lst_657df46be98f3966ead935b5, slug: hyperstack.cloud }
+  # sambanova.ai: enterprise AI platforms and fast model inference.
+  - action: listing-alternatives-set
+    id: lst_0ab38feeec37331f776f8be0
+    slug: sambanova.ai
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_a1059399afb4c39fab03d6f6, slug: ibm.com }
+      - { id: lst_8bc77f73f09943aae425434b, slug: avian.io }
+      - { id: lst_6687a3350a75a97c497ee67d, slug: h2o.ai }
+  # servermania.com: dedicated server and hosting providers.
+  - action: listing-alternatives-set
+    id: lst_64d01bfeda69a4db37249b02
+    slug: servermania.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_752764c40458318859bca9b3, slug: leaseweb.com }
+      - { id: lst_99d9b10c6961f91549938283, slug: contabo.com }
+      - { id: lst_66d49dfcd983118b2dcb8619, slug: liquidweb.com }
+      - { id: lst_14c6281f69f0dacb6d778bf1, slug: ovhcloud.com }
+      - { id: lst_3cb5e9fc26078f7ecfeae57d, slug: latitude.sh }
+      - { id: lst_309158928b06f61850ba2410, slug: databasemart.com }
+  # takomo.ai: serverless AI inference (its site now redirects to Verda, the former DataCrunch, so DataCrunch is left out).
+  - action: listing-alternatives-set
+    id: lst_e46c716e49f17b17301f2fab
+    slug: takomo.ai
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_ae75e6d9d1e53babb32e9a5e, slug: runpod.io }
+      - { id: lst_564c3b5203b3edeb6c578751, slug: gpux.ai }
+      - { id: lst_0d20ea83fa90e11524d79382, slug: banana.dev }
+      - { id: lst_b979adf02dcfbb11c72c6a76, slug: koyeb.com }
+  # tencentcloud.com: global public clouds.
+  - action: listing-alternatives-set
+    id: lst_f51453f93fc61f394df14b8d
+    slug: tencentcloud.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_a590ff5f631d1250224df4e3, slug: azure.microsoft.com }
+      - { id: lst_14c6281f69f0dacb6d778bf1, slug: ovhcloud.com }
+      - { id: lst_08e038eaff1ce9f10863aca2, slug: gcore.com }
+      - { id: lst_801ae8c07b36a4d79b995b9e, slug: linode.com }
+  # tensordock.com: GPU marketplaces and on-demand GPU clouds.
+  - action: listing-alternatives-set
+    id: lst_2f4f55add995e9cd49551f1b
+    slug: tensordock.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_051a5eaf107b911300d30a8b, slug: cudocompute.com }
+      - { id: lst_ae75e6d9d1e53babb32e9a5e, slug: runpod.io }
+      - { id: lst_4f5723dbdd28a781c3ffd776, slug: paperspace.com }
+      - { id: lst_262ec4c17384ab3067d285c8, slug: jarvislabs.ai }
+      - { id: lst_20b9297ba604b6d4b976027b, slug: datacrunch.io }
+      - { id: lst_7e9736364b5d462013a79498, slug: lambda.ai }
+  # tierpoint.com: managed cloud, colocation and disaster recovery providers.
+  - action: listing-alternatives-set
+    id: lst_3ea5780c5f90d731adf503fe
+    slug: tierpoint.com
+    reason: '#539: hand-picked alternatives (batch 1)'
+    expected: []
+    alternatives:
+      - { id: lst_993b1205a26a9890ce3c76be, slug: lightedge.com }
+      - { id: lst_f3fe329066251301efb7dab6, slug: rackspace.com }
+      - { id: lst_f3bd853de9d630e280f11c06, slug: connectria.com }
+      - { id: lst_a7e78106154177ad79236c5d, slug: bytegrid.com }
+      - { id: lst_f38b0ca931f1b49abbd846be, slug: rapidscale.net }
