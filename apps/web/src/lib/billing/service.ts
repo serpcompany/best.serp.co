@@ -2188,9 +2188,11 @@ async function alertPartialRefund(
  * flagged, and a flag set while the provider couldn't say is cleared. Otherwise the money never
  * went back (`flagRefundFailedNow`). A `refunded` order not flagged yet records the refund the
  * report names, so its own email goes even when an older or newer refund's failure emailed under
- * another (#514: a refund cleared that flag since). One flagged already records the newest refund
- * the provider's record says failed (#503), as a `charge.refunded` that flagged it did, so the
- * `refund.failed` of that refund, landing after it, sends no second email. When the provider
+ * another (#514: a refund cleared that flag since). One flagged already keeps the refund it records
+ * when the report names that one, so a report processed again retries its email under the same
+ * key, as the sweep's resend does (#516's review). A report of another refund records the newest
+ * refund the provider's record says failed (#503), as a `charge.refunded` that flagged it did, so
+ * the `refund.failed` of that refund, landing after it, sends no second email. When the provider
  * can't say, the report decides as before: a failure of a refund other than the one the order
  * records (`provider_refund_id`: an earlier one, reported after a newer one succeeded, #485) flags
  * nothing; the error then answers the delivery 500, so the provider's retry checks again. A clear
@@ -2216,10 +2218,13 @@ async function flagRefundFailed(
       log('billing_refund_failed_superseded', { order: current.id })
       return 'refund_failed_superseded'
     }
-    // The refund that failed: the one the report names while the order isn't flagged (#514), else
-    // the provider's record's newest failed one, as the flag recorded it (#503).
+    // The refund that failed: the one the report names while the order isn't flagged, or when it
+    // names the refund the flagged order records (#514), else the provider's record's newest failed
+    // one, as the flag recorded it (#503).
+    const flaggedOther =
+      current.attention === 'refund_failed' && refundId !== current.providerRefundId
     let failedRefundId = refundId
-    if (atProvider.checked && (current.attention === 'refund_failed' || refundId === null)) {
+    if (atProvider.checked && (refundId === null || flaggedOther)) {
       failedRefundId = atProvider.failed?.id ?? refundId
     }
     const outcome = await flagRefundFailedNow(
@@ -2246,10 +2251,10 @@ async function flagRefundFailed(
  * provider couldn't say (#486), a failure of a refund other than the one the order records flags
  * nothing; one with no recorded refund (blanked when a refund outside the site cleared the flag)
  * always flags. `failedRefundId`: the refund that failed (`flagRefundFailed`'s: the one its report
- * names while the order isn't flagged, #514, else the newest failed one in the provider's record;
- * `settleRefundFlag`'s: that newest one), which a `refunded` order then records as its refund, so
- * the admin's email is keyed on that refund (`alertKey`, #503). Three lost writes throw, so the
- * provider's retry runs it again.
+ * names while the order isn't flagged or records that one, #514, else the newest failed one in the
+ * provider's record; `settleRefundFlag`'s: that newest one), which a `refunded` order then records
+ * as its refund, so the admin's email is keyed on that refund (`alertKey`, #503). Three lost writes
+ * throw, so the provider's retry runs it again.
  */
 async function flagRefundFailedNow(
   deps: BillingDependencies,

@@ -4578,7 +4578,8 @@ describe('the refund that sent the money back, and the refund_failed flag (#486)
       'payment-alert:refunded:ord_claim'
     ].sort()
     expect(alerts(f)).toEqual(sent)
-    // A retried report of that failure, and the sweep's resend, send nothing more.
+    // A retried report of that failure keeps the refund the order records, and it and the sweep's
+    // resend send nothing more.
     await webhook(
       f,
       paymentEvent('payment_refund_failed', 'pi_claim', {
@@ -4586,9 +4587,131 @@ describe('the refund that sent the money back, and the refund_failed flag (#486)
         refundId: 're_older'
       })
     )
+    expect(f.row(flag)).toEqual({
+      attention: 'refund_failed',
+      provider_refund_id: 're_older',
+      status: 'refunded'
+    })
     f.clock.now = new Date(NOW.getTime() + 30 * 60 * 1000)
     await runBillingSweep(f.deps, { limit: 10 })
     expect(alerts(f)).toEqual(sent)
+  })
+
+  // #516's review: the same sequence, but the older refund's email fails to send (useSend down) and
+  // marking its report processed fails, so Stripe delivers it again. The flagged order records that
+  // refund already, so the report processed again keeps it: its retry and the sweep's resend send
+  // the email under that refund's key, where recording the newest failed one (the newer, whose
+  // email went out) sent nothing.
+  it('sends an older refund’s failed email when its report is processed again, keyed on the refund the order records (#514)', async () => {
+    const f = fixture()
+    claimedListing(f)
+    const sender = createCapturingEmailSender()
+    const service = createEmailService({
+      ledger: createEmailDeliveryLedger({ client: f.client }),
+      log: () => undefined,
+      policy: resolveEmailPolicy({ D1_RUNTIME_ENV: 'production', SITE_ENVIRONMENT: 'production' }),
+      sender,
+      templates: appEmailTemplates,
+      waitUntil: () => undefined
+    })
+    f.deps.notify = async (template, request) => {
+      await service.deliver(template, request)
+    }
+    const newer = { amountCents: 2450, id: 're_newer', orderId: null }
+    const older = { amountCents: 2450, id: 're_older', orderId: null }
+    const third = { amountCents: 2450, id: 're_third', orderId: null, status: 'succeeded' as const }
+    const flag = 'SELECT status, attention, provider_refund_id FROM orders'
+    f.provider.setRefunds('pi_claim', [
+      { ...newer, status: 'pending' },
+      { ...older, status: 'pending' }
+    ])
+    await webhook(
+      f,
+      paymentEvent('payment_refunded', 'pi_claim', { id: 'evt_refunded', requestKey: 'dash-1' })
+    )
+    f.provider.setRefunds('pi_claim', [
+      { ...newer, status: 'failed' },
+      { ...older, status: 'pending' }
+    ])
+    await webhook(
+      f,
+      paymentEvent('payment_refund_failed', 'pi_claim', {
+        id: 'evt_newer_failed',
+        refundId: 're_newer'
+      })
+    )
+    f.provider.setRefunds('pi_claim', [
+      third,
+      { ...newer, status: 'failed' },
+      { ...older, status: 'pending' }
+    ])
+    await webhook(
+      f,
+      paymentEvent('payment_refunded', 'pi_claim', {
+        id: 'evt_third_refunded',
+        requestKey: 'dash-3'
+      })
+    )
+    expect(f.row(flag)).toEqual({
+      attention: null,
+      provider_refund_id: 're_third',
+      status: 'refunded'
+    })
+    f.provider.setRefunds('pi_claim', [
+      third,
+      { ...newer, status: 'failed' },
+      { ...older, status: 'failed' }
+    ])
+    const olderKey = await refundFailedKey('ord_claim', 're_older')
+    const olderEmail = () =>
+      f.rows(`SELECT status, attempts FROM email_deliveries WHERE event_key='${olderKey}'`)
+    const olderFailed = paymentEvent('payment_refund_failed', 'pi_claim', {
+      id: 'evt_older_failed',
+      refundId: 're_older'
+    })
+    // The first delivery flags the order and its email fails; marking it processed fails too.
+    sender.failNext(new Error('useSend is down'))
+    const finishEvent = f.deps.operations.finishEvent
+    f.deps.operations.finishEvent = async () => {
+      f.deps.operations.finishEvent = finishEvent
+      throw new Error('D1 unavailable')
+    }
+    const first = deliver(f, olderFailed)
+    await expect(first.answer).rejects.toThrow('D1 unavailable')
+    await first.settled()
+    const flaggedOlder = {
+      attention: 'refund_failed',
+      provider_refund_id: 're_older',
+      status: 'refunded'
+    }
+    expect(f.row(flag)).toEqual(flaggedOlder)
+    expect(olderEmail()).toEqual([{ attempts: 1, status: 'failed' }])
+    // Stripe delivers it again: the order keeps that refund, and the retry sends under its key
+    // (useSend still down).
+    sender.failNext(new Error('useSend is down'))
+    await expect(webhook(f, olderFailed)).resolves.toEqual({
+      body: { received: true },
+      status: 200
+    })
+    expect(f.row(flag)).toEqual(flaggedOlder)
+    expect(olderEmail()).toEqual([{ attempts: 2, status: 'failed' }])
+    // The sweep's resend names the same refund and sends it, once.
+    f.clock.now = new Date(NOW.getTime() + 30 * 60 * 1000)
+    await runBillingSweep(f.deps, { limit: 10 })
+    await runBillingSweep(f.deps, { limit: 10 })
+    expect(f.row(flag)).toEqual(flaggedOlder)
+    expect(olderEmail()).toEqual([{ attempts: 3, status: 'sent' }])
+    const adminEmails = f.rows<{ event_key: string; status: string }>(
+      `SELECT event_key, status FROM email_deliveries WHERE template_id='admin-payment-alert'`
+    )
+    expect(adminEmails.map(row => `${row.event_key} ${row.status}`).sort()).toEqual(
+      [
+        `${await refundFailedKey('ord_claim', 're_newer')} sent`,
+        `${olderKey} sent`,
+        'payment-alert:refunded:ord_claim sent'
+      ].sort()
+    )
+    expect(sender.sent.filter(message => message.to === 'devin@serp.co')).toHaveLength(3)
   })
 
   // #503: the sweep sends a failed refund's email again only while the order is flagged. Once a
