@@ -72,6 +72,16 @@ export const seedListings = {
   draft: { name: 'Fixture Draft', slug: 'fixture-draft' }
 } as const
 
+/**
+ * `seedListings.detail`'s hand-picked alternatives (#519), in position order: one in another hub,
+ * one unpublished (its page leaves it out), and one in a third hub. Its page shows the two live
+ * picks, then the listing sharing its tag, then the rest of its hub.
+ */
+export const seedAlternatives = {
+  listing: seedListings.detail,
+  picks: [seedListings.owned, seedListings.unlisted, seedListings.submitted]
+} as const
+
 /** `seedListings.detail`'s resource links, in order; each opens in a new tab. */
 export const seedResourceLinks = [
   { label: 'Documentation', url: 'https://docs.fixture-studio.test/' },

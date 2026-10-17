@@ -57,14 +57,16 @@ summaries are then read by id.
 Each read keeps a reviewed SQL shape, explained where it is built in
 `apps/web/src/db/catalog.ts`: the shell counts come from one pass over public memberships (the
 totals sum primary memberships, which the baseline triggers keep at exactly one per published
-listing), related listings from one statement whose plan depends on the listing's tags or
-categories, and previous/next from one `COALESCE` over three keyset branches.
+listing), and a listing's alternatives from one statement whose plan depends on its tags and its
+hub's size.
 
-A listing page's detail, related listings and previous/next are one D1 batch of four statements,
-each finding the listing by its slug, so an uncached listing page waits on D1 once after the
-catalog epoch (#378). The related statement picks its plan itself, counting the hub's public
-members (as the shell counts do) up to the member-scan limit, instead of reading the shell counts
-first; the page reads the shell counts and the best index alongside the listing.
+A listing page's detail and its alternatives are one D1 batch of two statements, each finding the
+listing by its slug, so an uncached listing page waits on D1 once after the catalog epoch (#378).
+The detail carries the listing's hand-picked alternatives; the alternatives statement picks its
+plan itself, counting the hub's public members (as the shell counts do) up to the member-scan
+limit, instead of reading the shell counts first; the page reads the shell counts and the best
+index alongside the listing. #519 dropped the previous and next listings (and their two
+statements) with the page's "Browse more".
 
 The taxonomy (#341) reads only active tags, active best pages whose tag and category are active,
 and public listings:
@@ -77,13 +79,20 @@ and public listings:
   first `min(listSize, poolSize)` entries: pins by position, then tag centrality, listings with a
   hosted logo, then name and slug. Nothing a Creator pays for ranks a listing. Each entry carries
   its three most central active tags, for its chips (#346).
-- **Related listings** of a listing with tags are ranked by how many of its three most central
-  tags they share, with ties broken from the listing's own name onward, so listings that share
-  tags link to different neighbours. When its tags give fewer than four, its hub fills the rest
-  in the same name order, in the same statement. A listing without tags in one category takes
-  the members after its own name, wrapping round to the start, so two listings of one large
-  category link to different neighbours (#331, #347); one in several
-  categories is ranked by shared categories, as before.
+- **Alternatives** (#519) are the listing page's Alternatives section: up to six other public
+  listings, never the listing itself, none twice. First its hand picks (`listing_alternatives`,
+  set by [`listing-alternatives-set`](./listing-operations.md#alternatives)), the public ones in
+  their order; a pick that is unpublished or not yet due is skipped while it stays so. Then
+  similar listings filed under its hub (its primary category), scored 3 for each of its three most
+  central tags they share and 2 for being pinned on an active best page that pins it too, with
+  ties broken from the listing's own name onward, so listings that share tags link to different
+  neighbours. Then its hub fills the rest in the same name order: a listing without tags or best
+  pages takes the members after its own name, wrapping round to the start, so two listings of one
+  large category link to different neighbours (#331, #347). Keeping the similar listings to the
+  hub spreads the links: on staging's catalog the most links any one listing would receive fell
+  from 47 to 25. The removed-listing page's alternatives are its category's first live listings
+  ([URLs](./urls.md#the-404-page-and-the-removed-listing-page), #53); moving it to this rule is a
+  follow-up.
 - **"Featured in"** on a listing page names up to three best pages that show the listing
   (`featuredInBestPages`, #347), from the cached best index and the detail's pins and exclusions,
   so it adds no statement: a page that pins it within the entries it shows, or one whose rule

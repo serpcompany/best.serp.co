@@ -1,7 +1,8 @@
 # Listing operations
 
 The publisher's row-level operations that write one listing: its name, short description, and
-website, its long description, a new listing, its resource links, and its feature flag. Like every
+website, its long description, a new listing, its resource links, its hand-picked alternatives,
+and its feature flag. Like every
 row-level operation, each fits staging and production; the order and the publisher's guards are in
 [Catalog publication](./catalog-publication.md).
 
@@ -105,6 +106,50 @@ or admin edit read before it is refused as stale instead of putting the old link
 `edited` event, which `/admin` shows as "Details edited: links". An unpublished listing stays
 unpublished. `pnpm catalog:downloader-links` writes #376's manifest from the link checks recorded in
 `d1/hygiene/2026-10-11-downloader-links.yaml`.
+
+## Alternatives
+
+`listing-alternatives-set` (#519) replaces a listing's hand-picked alternatives, which lead its
+page's Alternatives section in their order; the page tops them up to six from similar listings
+([Public catalog](./public-catalog.md#reads)). It is row-level. It names the listing's `id` and
+`slug`, a `reason` for the activity log, `expected` (every current pick, `{id, slug}`, in order,
+unpublished ones too), and `alternatives` (the whole new list, in order, each `{id, slug}`; at most
+six, the most the section shows; it may be empty).
+
+```yaml
+- action: listing-alternatives-set
+  id: lst_...
+  slug: cursor.com
+  reason: Hand-picked alternatives (#525)
+  expected: []
+  alternatives:
+    - { id: lst_..., slug: tabnine.com }
+    - { id: lst_..., slug: codeium.com }
+```
+
+The batch is refused, with nothing written, when:
+
+- the slug or any pick isn't exactly `expected`, in the same order, or the listing isn't approved
+  (`bad JSON path: 'listing-alternatives-set cursor.com: the listing is not approved, or its slug
+  or alternatives changed since the manifest'`);
+- a new pick isn't a live listing (approved, active, published by now) with that id and slug
+  (`… the alternative tabnine.com is not this live listing`);
+- by the end of the batch a pick is no longer live, for example because a later operation in the
+  same manifest unpublishes it (`… by the end of the batch, the alternative tabnine.com is no
+  longer live`).
+
+The manifest itself is refused when `alternatives` equals `expected`, names the listing itself (by
+id or slug), repeats a listing, or holds more than six, or when a manifest names the listing in two
+`listing-alternatives-set` operations. It may sit beside another operation on the same listing, so
+a manifest can create a listing and then pick its alternatives.
+
+Picks aren't content that owner revisions and admin edits compare, so, like `listing-tags-set`, it
+keeps the listing's checksum and allows a listing whose own submission is in review; it takes
+approved listings, live or unpublished. It sets `updated_at` (the sitemap `lastmod`) and logs an
+`edited` event, which `/admin` shows as "Details edited: alternatives". A pick unpublished later
+keeps its row and drops out of the section until it is live again: every unpublish advances the
+catalog version, so the cached page turns over. It needs migration `0018_listing_alternatives`, so
+it is published on each environment only after the deploy that applied it.
 
 ## Feature listings
 

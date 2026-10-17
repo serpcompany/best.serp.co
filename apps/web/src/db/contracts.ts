@@ -22,6 +22,10 @@ export type CatalogOperation =
   | 'unpublished-listing-status'
 
 export type CatalogQueryShape =
+  | 'alternatives-hub-members'
+  | 'alternatives-hub-seek'
+  | 'alternatives-no-fill'
+  | 'alternatives-shared-tags'
   | 'best-index'
   | 'best-page-items'
   | 'canonical-redirect'
@@ -31,14 +35,8 @@ export type CatalogQueryShape =
   | 'listing-detail'
   | 'listing-name-order'
   | 'listing-name-page-items'
-  | 'navigation-next'
-  | 'navigation-previous'
   | 'publication-version'
   | 'published-summaries'
-  | 'related-shared-categories'
-  | 'related-shared-tags'
-  | 'related-single-category-members'
-  | 'related-single-category-seek'
   | 'search-summaries'
   | 'shell-stats'
   | 'tag-name-order'
@@ -157,13 +155,7 @@ export interface ListingSummary {
   website: string
 }
 
-export interface ListingNavigation {
-  media?: ListingLogoMedia
-  name: string
-  slug: string
-  website: string
-}
-
+/** One of the listings a listing page's Alternatives section shows (#519). */
 export interface RelatedListing {
   description: string
   isUnofficial?: boolean
@@ -206,14 +198,16 @@ export interface ListingDetail extends ListingSummary {
   /** Rendered on the outbound "Visit Site" link; imported and admin listings are `follow`. */
   linkRel: ListingLinkRel
   media?: ListingMedia
-  nextWebsite: ListingNavigation | null
-  previousWebsite: ListingNavigation | null
   priority?: 'high' | 'medium' | 'low'
+  /**
+   * Its Alternatives section (#519): up to six public listings, its hand picks first, then
+   * similar listings in its hub, then the rest of its hub (`alternativesStatement`).
+   */
   relatedWebsites: RelatedListing[]
   resourceLinks?: ListingResourceLink[]
   /**
    * Its active tags (#341), the most central first (`listing_tags.sort_order`, then slug); absent
-   * when it has none. A listing with tags takes its related listings from them.
+   * when it has none. Its three most central score its alternatives.
    */
   tags?: ListingTag[]
   /** Present when the listing has a current owner (`listing_owners`): the "Verified owner" badge. */

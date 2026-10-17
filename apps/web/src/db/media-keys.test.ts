@@ -106,8 +106,6 @@ describe('media keys', () => {
     const detail = resolveListingDetailMedia(
       {
         media: { images: [logoKey.replace('/logo/', '/image/'), '/x.png'], logo: logoKey },
-        nextWebsite: { media: { logo: logoKey } },
-        previousWebsite: null,
         relatedWebsites: [{ media: { logo: logoKey } }, {}]
       },
       'https://cdn.serp.co'
@@ -116,7 +114,6 @@ describe('media keys', () => {
       `https://cdn.serp.co/${logoKey.replace('/logo/', '/image/')}`,
       '/x.png'
     ])
-    expect(detail.nextWebsite?.media?.logo).toBe(`https://cdn.serp.co/${logoKey}`)
     expect(detail.relatedWebsites).toEqual([
       { media: { logo: `https://cdn.serp.co/${logoKey}` } },
       {}

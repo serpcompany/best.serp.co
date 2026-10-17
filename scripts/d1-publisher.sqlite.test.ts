@@ -2792,6 +2792,405 @@ describe('listing-content-set in a row-level manifest (#523: thin listings)', ()
   })
 })
 
+describe('listing-alternatives-set in a row-level manifest (#519: hand-picked alternatives)', () => {
+  const live = { checksum: beforeChecksum, version: 4 }
+  const rows = (operations: Record<string, unknown>[], id = 'alternatives') =>
+    manifestSchema.parse({
+      version: 1,
+      id,
+      concurrency: 'rows',
+      provenance: { actor: 'test@example.com', workflow: 'test/sqlite' },
+      operations
+    })
+  const ref = (slug: string) => ({ id: `lst_alt_${slug.replace(/\W/gu, '_')}`, slug })
+  const set = (alternatives: string[], extra: Record<string, unknown> = {}) => ({
+    action: 'listing-alternatives-set',
+    id: 'lst_sqlite_test',
+    slug: 'old-slug',
+    reason: 'Hand-picked for #525',
+    expected: [],
+    alternatives: alternatives.map(ref),
+    ...extra
+  })
+  const changedSince =
+    'the listing is not approved, or its slug or alternatives changed since the manifest'
+  /** The test listing and six live listings to pick from, plus an unpublished and a future one. */
+  function alternativesDatabase(): DatabaseSync {
+    const db = database()
+    const insert = (slug: string, publishedAt: string, active = 1) =>
+      db.exec(`INSERT INTO listings (id,slug,name,description,website,status,published_at,source_kind,source_identity,checksum)
+          VALUES ('${ref(slug).id}','${slug}','${slug}','d','https://${slug}','draft','${publishedAt}','test','fixture','${'e'.repeat(64)}');
+        INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary) VALUES ('${ref(slug).id}',1,0,1);
+        UPDATE listings SET status='approved', is_active=${active} WHERE id='${ref(slug).id}';`)
+    for (const slug of [
+      'one.example',
+      'two.example',
+      'three.example',
+      'four.example',
+      'five.example',
+      'six.example',
+      'seven.example'
+    ])
+      insert(slug, now)
+    insert('gone.example', now, 0)
+    insert('later.example', '2099-01-01T00:00:00.000Z')
+    return db
+  }
+  const picks = (db: DatabaseSync) =>
+    (
+      db
+        .prepare(
+          "SELECT l.slug FROM listing_alternatives a JOIN listings l ON l.id=a.alternative_id WHERE a.listing_id='lst_sqlite_test' ORDER BY a.position"
+        )
+        .all() as Array<{ slug: string }>
+    ).map(row => row.slug)
+  const state = (db: DatabaseSync) => ({
+    listing: db
+      .prepare(
+        "SELECT slug,status,is_active,checksum,updated_at FROM listings WHERE id='lst_sqlite_test'"
+      )
+      .get(),
+    picks: db
+      .prepare('SELECT listing_id,alternative_id,position FROM listing_alternatives ORDER BY 1,3')
+      .all()
+  })
+  const publish = (db: DatabaseSync, operations: Record<string, unknown>[], id?: string) => {
+    const published = db.prepare('SELECT version,checksum FROM publication_state WHERE id=1').get()
+    executeInTestTransaction(
+      db,
+      buildPublicationPlan(
+        rows(operations, id),
+        id ?? 'alternatives',
+        now,
+        published as { checksum: string; version: number }
+      )
+    )
+  }
+  /** Asserts the batch was refused whole: the picks, the listing, the version, and the log. */
+  const expectRefused = (db: DatabaseSync, before: ReturnType<typeof state>) => {
+    expect(state(db)).toEqual(before)
+    expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
+      version: 4
+    })
+    expect(db.prepare('SELECT COUNT(*) AS count FROM listing_events').get()).toEqual({ count: 0 })
+  }
+
+  it('sets a listing’s picks in order, at any version, keeps its checksum, and logs the edit', () => {
+    const db = alternativesDatabase()
+    const before = state(db)
+    db.prepare('UPDATE publication_state SET version=9').run()
+    const publication = buildPublicationPlan(
+      rows([set(['three.example', 'one.example'])]),
+      'alternatives',
+      now,
+      { ...live, version: 9 }
+    )
+    expect(
+      publication.statements.flatMap(item => item.bindings).filter(b => typeof b === 'boolean')
+    ).toEqual([])
+    expect(publication.statements.flatMap(item => d1CompatViolations(item.query))).toEqual([])
+    executeInTestTransaction(db, publication)
+    expect(picks(db)).toEqual(['three.example', 'one.example'])
+    expect(
+      db
+        .prepare(
+          "SELECT position FROM listing_alternatives WHERE listing_id='lst_sqlite_test' ORDER BY 1"
+        )
+        .all()
+    ).toEqual([{ position: 1 }, { position: 2 }])
+    // The page changed (lastmod), but not the content a revision or paid approval compares.
+    const after = state(db).listing as Record<string, unknown>
+    expect(after).toMatchObject({
+      slug: 'old-slug',
+      status: 'approved',
+      is_active: 1,
+      updated_at: now
+    })
+    expect(after.checksum).toBe((before.listing as Record<string, unknown>).checksum)
+    expect(
+      db.prepare('SELECT listing_id,event_type,detail,actor FROM listing_events').all()
+    ).toEqual([
+      {
+        listing_id: 'lst_sqlite_test',
+        event_type: 'edited',
+        detail: JSON.stringify({
+          fields: ['alternatives'],
+          manifest: 'alternatives',
+          reason: 'Hand-picked for #525',
+          from: [],
+          to: ['three.example', 'one.example']
+        }),
+        actor: 'test@example.com'
+      }
+    ])
+    expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
+      version: 10
+    })
+    expect(publication.affectedRoutes.split('\n')).toContain('/products/old-slug/')
+    // Applied once: the picks are no longer none, so the same manifest is refused.
+    const applied = state(db)
+    expect(() => publish(db, [set(['three.example', 'one.example'])], 'again')).toThrow(
+      `listing-alternatives-set old-slug: ${changedSince}`
+    )
+    expect(state(db)).toEqual(applied)
+    // A follow-up names the picks it replaces, unpublished ones too, and may clear them.
+    db.exec(`UPDATE listings SET is_active=0 WHERE id='${ref('three.example').id}'`)
+    publish(
+      db,
+      [
+        set(
+          [
+            'six.example',
+            'five.example',
+            'four.example',
+            'two.example',
+            'one.example',
+            'seven.example'
+          ],
+          {
+            expected: [ref('three.example'), ref('one.example')]
+          }
+        )
+      ],
+      'six'
+    )
+    expect(picks(db)).toEqual([
+      'six.example',
+      'five.example',
+      'four.example',
+      'two.example',
+      'one.example',
+      'seven.example'
+    ])
+    publish(
+      db,
+      [
+        set([], {
+          expected: [
+            'six.example',
+            'five.example',
+            'four.example',
+            'two.example',
+            'one.example',
+            'seven.example'
+          ].map(ref)
+        })
+      ],
+      'cleared'
+    )
+    expect(picks(db)).toEqual([])
+  })
+
+  it('refuses the whole batch when the picks or slug changed since generation', () => {
+    const second = 'lst_sqlite_second'
+    for (const changed of [
+      { expected: [ref('two.example')] },
+      { slug: 'new-slug' },
+      { id: 'lst_sqlite_missing' }
+    ]) {
+      const db = alternativesDatabase()
+      // A second listing's picks in the same batch roll back with it.
+      db.exec(`INSERT INTO listings (id,slug,name,description,website,status,published_at,source_kind,source_identity,checksum)
+        VALUES ('${second}','second','Second','d','https://second.example','draft','${now}','test','fixture','${'d'.repeat(64)}');
+        INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary) VALUES ('${second}',1,0,1);
+        UPDATE listings SET status='approved' WHERE id='${second}';`)
+      const before = state(db)
+      expect(
+        () =>
+          publish(db, [
+            set(['two.example'], { id: second, slug: 'second' }),
+            set(['one.example'], changed)
+          ]),
+        JSON.stringify(changed)
+      ).toThrow(
+        `listing-alternatives-set ${'slug' in changed ? changed.slug : 'old-slug'}: ${changedSince}`
+      )
+      expectRefused(db, before)
+    }
+    // Picks in another order are other picks.
+    const ordered = alternativesDatabase()
+    publish(ordered, [set(['one.example', 'two.example'])], 'first')
+    const before = state(ordered)
+    expect(() =>
+      publish(
+        ordered,
+        [set(['three.example'], { expected: [ref('two.example'), ref('one.example')] })],
+        'reordered'
+      )
+    ).toThrow(`listing-alternatives-set old-slug: ${changedSince}`)
+    expect(state(ordered)).toEqual(before)
+  })
+
+  it.each([
+    ['unpublished', 'gone.example'],
+    ['not published yet', 'later.example'],
+    ['missing', 'missing.example']
+  ])('refuses a pick that is %s', (_, slug) => {
+    const db = alternativesDatabase()
+    const before = state(db)
+    expect(() => publish(db, [set(['one.example', slug])])).toThrow(
+      `listing-alternatives-set old-slug: the alternative ${slug} is not this live listing`
+    )
+    expectRefused(db, before)
+  })
+
+  it('refuses a pick under another slug, and a listing that is not approved', () => {
+    const db = alternativesDatabase()
+    const before = state(db)
+    expect(() =>
+      publish(db, [set([], { alternatives: [{ id: ref('one.example').id, slug: 'two.example' }] })])
+    ).toThrow(
+      'listing-alternatives-set old-slug: the alternative two.example is not this live listing'
+    )
+    expectRefused(db, before)
+    for (const status of ['draft', 'review', 'rejected']) {
+      const pending = alternativesDatabase()
+      pending.exec(`UPDATE listings SET status='${status}' WHERE id='lst_sqlite_test'`)
+      const pendingBefore = state(pending)
+      expect(() => publish(pending, [set(['one.example'])]), status).toThrow(
+        `listing-alternatives-set old-slug: ${changedSince}`
+      )
+      expectRefused(pending, pendingBefore)
+    }
+  })
+
+  it('refuses a pick the same batch unpublishes, before or after it', () => {
+    const unpublish = {
+      action: 'listing-unpublish',
+      id: ref('one.example').id,
+      slug: 'one.example',
+      categories: ['seo'],
+      reason: 'Gone',
+      expected: { website: 'https://one.example' }
+    }
+    for (const [operations, message] of [
+      [[unpublish, set(['one.example'])], 'the alternative one.example is not this live listing'],
+      [
+        [set(['one.example']), unpublish],
+        'by the end of the batch, the alternative one.example is no longer live'
+      ]
+    ] as const) {
+      const db = alternativesDatabase()
+      const before = state(db)
+      expect(() => publish(db, [...operations])).toThrow(
+        `listing-alternatives-set old-slug: ${message}`
+      )
+      expectRefused(db, before)
+      expect(
+        db.prepare(`SELECT is_active FROM listings WHERE id='${ref('one.example').id}'`).get()
+      ).toEqual({
+        is_active: 1
+      })
+    }
+  })
+
+  it('sets the picks of an unpublished listing, and of one whose submission is in review', () => {
+    const db = alternativesDatabase()
+    db.exec("UPDATE listings SET is_active=0 WHERE id='lst_sqlite_test'")
+    publish(db, [set(['one.example'])])
+    expect(picks(db)).toEqual(['one.example'])
+    expect(state(db).listing).toMatchObject({ is_active: 0 })
+    const queued = alternativesDatabase()
+    queued.exec(`INSERT INTO listing_submissions (id,slug,name,description,website,content,
+        category_slug,logo_url,status,plan,paid_at,listing_id,published_checksum)
+      VALUES ('sub','example.com','Old','d','https://example.com/','c','seo','l',
+        'paid_pending_review','paid','${now}','lst_sqlite_test',
+        (SELECT checksum FROM listings WHERE id='lst_sqlite_test'))`)
+    publish(queued, [set(['one.example'])])
+    // The checksum the paid approval needs is the one it had.
+    expect(
+      queued
+        .prepare(
+          "SELECT (SELECT checksum FROM listings WHERE id='lst_sqlite_test') = published_checksum AS same FROM listing_submissions"
+        )
+        .get()
+    ).toEqual({ same: 1 })
+  })
+
+  it('picks the alternatives of a listing the same manifest creates', () => {
+    const db = alternativesDatabase()
+    publish(db, [
+      {
+        action: 'listing-create',
+        listing: {
+          id: 'lst_created_alt',
+          slug: 'created.example',
+          name: 'Created',
+          description: 'A new listing.',
+          website: 'https://created.example/',
+          publishedAt: now,
+          categories: ['seo']
+        }
+      },
+      set(['one.example', 'two.example'], { id: 'lst_created_alt', slug: 'created.example' })
+    ])
+    expect(
+      db
+        .prepare(
+          "SELECT alternative_id FROM listing_alternatives WHERE listing_id='lst_created_alt' ORDER BY position"
+        )
+        .all()
+    ).toEqual([
+      { alternative_id: ref('one.example').id },
+      { alternative_id: ref('two.example').id }
+    ])
+  })
+
+  it('refuses no change, itself, a repeat, more than six, and a listing named twice', () => {
+    expect(() => rows([set(['one.example'], { expected: [ref('one.example')] })])).toThrow(
+      /already has exactly these alternatives/u
+    )
+    expect(() => rows([set([], { expected: [] })])).toThrow(
+      /already has exactly these alternatives/u
+    )
+    expect(() =>
+      rows([
+        set([], { alternatives: [ref('one.example'), { id: 'lst_sqlite_test', slug: 'other' }] })
+      ])
+    ).toThrow(/cannot be its own alternative/u)
+    expect(() =>
+      rows([set([], { alternatives: [{ id: 'lst_other_one', slug: 'old-slug' }] })])
+    ).toThrow(/cannot be its own alternative/u)
+    expect(() => rows([set(['one.example', 'one.example'])])).toThrow(/Duplicate alternative/u)
+    expect(() =>
+      rows([
+        set([], {
+          alternatives: [ref('one.example'), { id: ref('two.example').id, slug: 'one.example' }]
+        })
+      ])
+    ).toThrow(/Duplicate alternative/u)
+    expect(() =>
+      rows([
+        set([
+          'one.example',
+          'two.example',
+          'three.example',
+          'four.example',
+          'five.example',
+          'six.example',
+          'seven.example'
+        ])
+      ])
+    ).toThrow(/6 alternatives at most/u)
+    expect(() => rows([set(['one.example'], { reason: undefined })])).toThrow()
+    expect(() => rows([set(['one.example'], { expected: undefined })])).toThrow()
+    expect(() => rows([set(['one.example']), set(['two.example'])])).toThrow(
+      /Duplicate listing-alternatives-set listing/u
+    )
+    // A publication manifest may hold it too; a row-level one names no base.
+    expect(() =>
+      manifestSchema.parse({
+        version: 1,
+        id: 'alternatives-base',
+        concurrency: 'rows',
+        basePublicationVersion: 4,
+        provenance: { actor: 'test@example.com', workflow: 'test/sqlite' },
+        operations: [set(['one.example'])]
+      })
+    ).toThrow(/names no base version/u)
+  })
+})
+
 describe('listing-feature-listing-set in a row-level manifest (#409: features of larger sites)', () => {
   const live = { checksum: beforeChecksum, version: 4 }
   const rows = (operations: Record<string, unknown>[], id = 'features') =>

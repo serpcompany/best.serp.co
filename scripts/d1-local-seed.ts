@@ -13,6 +13,7 @@ import {
 import {
   SEED_ID,
   SEED_NOW,
+  seedAlternatives,
   seedBestPages,
   seedCategories,
   seedFacts,
@@ -426,6 +427,15 @@ export function seedFactViolations(
       page.excluded.map(listing => listing.slug)
     )
   }
+  expect(
+    `${seedAlternatives.listing.slug} hand-picked alternatives`,
+    list(
+      `SELECT l.slug FROM listing_alternatives a JOIN listings l ON l.id=a.alternative_id
+        WHERE a.listing_id=(SELECT id FROM listings WHERE slug=?) ORDER BY a.position`,
+      [seedAlternatives.listing.slug]
+    ),
+    seedAlternatives.picks.map(pick => pick.slug)
+  )
   expect(
     'taxonomy redirects',
     list(

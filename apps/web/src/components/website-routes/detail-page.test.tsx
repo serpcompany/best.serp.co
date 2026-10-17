@@ -43,8 +43,6 @@ describe('the listing detail page (#334)', () => {
       contentTree,
       description: 'A fixture listing.',
       name: 'Fixture',
-      nextWebsite: null,
-      previousWebsite: null,
       publishedAt: '2026-07-04T00:00:00.000Z',
       relatedWebsites: [],
       slug: 'fixture.test',
@@ -61,8 +59,6 @@ describe('the listing detail page (#334)', () => {
       category: 'fixture-tools',
       description: 'A fixture listing.',
       name: 'Fixture',
-      nextWebsite: null,
-      previousWebsite: null,
       publishedAt: '2026-07-04T00:00:00.000Z',
       relatedWebsites: [],
       slug: 'fixture.test',
@@ -77,13 +73,51 @@ describe('the listing detail page (#334)', () => {
     expect(block?.props.website).toEqual({ slug: 'fixture.test' })
   })
 
+  it('ends with the Alternatives section, with no "Browse more" (#519)', () => {
+    const related = {
+      description: 'Another.',
+      name: 'Other',
+      slug: 'other.test',
+      website: 'https://other.test/'
+    }
+    const page = WebsiteDetailRoutePage({
+      project: {
+        category: 'fixture-tools',
+        description: 'A fixture listing.',
+        name: 'Fixture',
+        publishedAt: '2026-07-04T00:00:00.000Z',
+        relatedWebsites: [related],
+        slug: 'fixture.test',
+        website: 'https://fixture.test/'
+      }
+    })
+    const titles: unknown[] = []
+    const collect = (node: ReactNode): void => {
+      if (Array.isArray(node)) {
+        for (const child of node) collect(child)
+        return
+      }
+      if (!isValidElement(node)) return
+      const props = node.props as Record<string, ReactNode>
+      if ('title' in props) titles.push(props.title)
+      for (const value of Object.values(props)) collect(value)
+    }
+    collect(page)
+    expect(titles).not.toContain('Browse more')
+    // The layout's body column: the listing's own blocks, then the Alternatives section last.
+    const body = findElement(page, DetailPageLayout)?.props.children as
+      | { props: { children: ReactNode[] } }
+      | undefined
+    const last = (body?.props.children ?? []).filter(isValidElement).at(-1)
+    expect(last?.type).toBe(WebsiteRelatedProjects)
+    expect(last?.props).toEqual({ websites: [related] })
+  })
+
   it('renders a listing with nothing related, without the related section (#378 review)', () => {
     const project: WebsiteDetailMetadata = {
       category: 'fixture-tools',
       description: 'A fixture listing alone in its category.',
       name: 'Fixture',
-      nextWebsite: null,
-      previousWebsite: null,
       publishedAt: '2026-07-04T00:00:00.000Z',
       relatedWebsites: [],
       slug: 'fixture.test',
@@ -113,8 +147,6 @@ describe('the listing page in the taxonomy (#347)', () => {
     category: 'writing-tools',
     description: 'A fixture listing.',
     name: 'Fixture',
-    nextWebsite: null,
-    previousWebsite: null,
     publishedAt: '2026-07-04T00:00:00.000Z',
     relatedWebsites: [],
     slug: 'fixture.test',
@@ -173,8 +205,6 @@ describe('a listing names its hub as D1 does (#416)', () => {
     // Short enough that the meta description is padded with its category.
     description: 'Music.',
     name: 'Tunes',
-    nextWebsite: null,
-    previousWebsite: null,
     publishedAt: '2026-07-04T00:00:00.000Z',
     relatedWebsites: [],
     slug: 'fixture-tunes.test',

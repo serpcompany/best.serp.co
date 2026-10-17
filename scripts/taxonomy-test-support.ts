@@ -384,9 +384,10 @@ export function withCatalogIds(db: DatabaseSync): void {
     const columns = all<{ name: string }>(db, `PRAGMA table_info(${name})`).map(
       column => column.name
     )
-    if (columns.includes('listing_id'))
+    // `alternative_id` names a listing too (#519: `listing_alternatives`).
+    for (const column of ['listing_id', 'alternative_id'].filter(item => columns.includes(item)))
       db.exec(
-        `UPDATE ${name} SET listing_id=${rename.replace('%', 'listing_id')} WHERE listing_id LIKE '${prefix}%'`
+        `UPDATE ${name} SET ${column}=${rename.replace('%', column)} WHERE ${column} LIKE '${prefix}%'`
       )
   }
   db.exec(`UPDATE listings SET id=${rename.replace('%', 'id')} WHERE id LIKE '${prefix}%'`)

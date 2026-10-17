@@ -127,6 +127,13 @@
       "when": 1792125438042,
       "tag": "0017_order_partial_refunds",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1792239221202,
+      "tag": "0018_listing_alternatives",
+      "breakpoints": true
     }
   ]
 }

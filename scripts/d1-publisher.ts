@@ -21,7 +21,11 @@ import {
   type StatementPlan
 } from '../apps/web/src/db/plan-support'
 import { validatePublicHttpUrl } from '../apps/web/src/db/public-url'
-import { BEST_PAGE_LIST_SIZE, taxonomyRedirectSourceKinds } from '../apps/web/src/db/schema'
+import {
+  BEST_PAGE_LIST_SIZE,
+  LISTING_ALTERNATIVES_SHOWN,
+  taxonomyRedirectSourceKinds
+} from '../apps/web/src/db/schema'
 import {
   bestPageColumns,
   categoryCreateStatement,
@@ -523,6 +527,34 @@ const operation = z.discriminatedUnion('action', [
     })
     .strict(),
   /**
+   * Replaces a listing's hand-picked alternatives (#519), in order: the first leads its page's
+   * Alternatives section, which shows the live ones and tops up from similar listings. Compared and
+   * swapped on its slug and every current pick in order (`expected`, each `{id, slug}`, unpublished
+   * ones too), so it is row-level like `listing-resources-set`. Every new pick must be another
+   * listing, named once, live with that id and slug when its statements run and still at the end
+   * of the batch. At most `LISTING_ALTERNATIVES_SHOWN`, the most the section shows; `alternatives`
+   * may be empty. Picks aren't content that revisions and admin edits compare, so, like
+   * `listing-tags-set`, it keeps the listing's checksum and allows a listing whose own submission
+   * is in review. Refused when the listing isn't approved.
+   */
+  z
+    .object({
+      action: z.literal('listing-alternatives-set'),
+      id: listingId,
+      slug: existingSlug,
+      reason: z.string().trim().min(1).max(200),
+      expected: z.array(listingRef),
+      alternatives: z
+        .array(listingRef)
+        .max(
+          LISTING_ALTERNATIVES_SHOWN,
+          `A listing page shows ${LISTING_ALTERNATIVES_SHOWN} alternatives at most.`
+        )
+        .superRefine(unique('Duplicate alternative.', value => value.id))
+        .superRefine(unique('Duplicate alternative.', value => value.slug))
+    })
+    .strict(),
+  /**
    * Marks a listing as naming one feature, add-on, model, or sub-tool of a larger site, or clears
    * the mark (#409: #349's `featureListings`, which a best page never pins), compared and swapped
    * on its slug and current flag (`expected`), so it is row-level. The flag changes no public page
@@ -856,7 +888,9 @@ export const manifestConcurrency = ['publication', 'rows'] as const
  * (#340: `expected`), a listing's resource links (#376: `expected`, every link in order), its long
  * description (#523: `expected.content`), its feature-of-a-larger-site flag (#409: `expected`), a
  * new listing (#506: its id and slug unused, and its website no other listing's, no submission's
- * in flight, and not blocked), and every taxonomy operation (#344: each compares the tag, best page, listing, or redirect it changes).
+ * in flight, and not blocked), its hand-picked alternatives (#519: `expected`, every pick in order;
+ * each new one live, also at the end of the batch), and every taxonomy operation (#344: each
+ * compares the tag, best page, listing, or redirect it changes).
  */
 const rowLevelActions = new Set<string>([
   'listing-create',
@@ -867,6 +901,7 @@ const rowLevelActions = new Set<string>([
   'listing-details-set',
   'listing-resources-set',
   'listing-content-set',
+  'listing-alternatives-set',
   'listing-feature-listing-set',
   'listing-content-remove-suffix',
   'listing-unpublish',
@@ -905,7 +940,7 @@ export const manifestSchema = z
           context.addIssue({
             code: z.ZodIssueCode.custom,
             message:
-              'A row-level manifest holds only listing-create, listing-media-update, listing-categories-add/-remove/-set, listing-details-set, listing-resources-set, listing-content-set, listing-feature-listing-set, listing-content-remove-suffix, listing-unpublish, listing-claim-hold-add/-clear, listing-slug-redirect, category-create/-unpublish, and taxonomy (tag-*, listing-tags-set, best-page-*, taxonomy-redirect-set) operations.',
+              'A row-level manifest holds only listing-create, listing-media-update, listing-categories-add/-remove/-set, listing-details-set, listing-resources-set, listing-content-set, listing-alternatives-set, listing-feature-listing-set, listing-content-remove-suffix, listing-unpublish, listing-claim-hold-add/-clear, listing-slug-redirect, category-create/-unpublish, and taxonomy (tag-*, listing-tags-set, best-page-*, taxonomy-redirect-set) operations.',
             path: ['operations', index, 'action']
           })
         }
@@ -929,7 +964,25 @@ export const manifestSchema = z
       })
     }
     const taxonomyClaims = new Set<string>()
+    const alternativeClaims = new Set<string>()
     value.operations.forEach((op, index) => {
+      if (op.action === 'listing-alternatives-set') {
+        const issue = (message: string, path: string) =>
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message,
+            path: ['operations', index, path]
+          })
+        // Claimed apart from the listing's other operations, as its tags are: a manifest may
+        // create a listing and then pick its alternatives.
+        if (alternativeClaims.has(op.id)) issue('Duplicate listing-alternatives-set listing.', 'id')
+        alternativeClaims.add(op.id)
+        if (op.alternatives.some(pick => pick.id === op.id || pick.slug === op.slug))
+          issue('A listing cannot be its own alternative.', 'alternatives')
+        if (JSON.stringify(op.alternatives) === JSON.stringify(op.expected))
+          issue('The listing already has exactly these alternatives.', 'alternatives')
+        return
+      }
       if (isTaxonomyOperation(op)) {
         refineTaxonomyOperation(op, taxonomyClaims, (message, path = []) =>
           context.addIssue({
@@ -1372,6 +1425,16 @@ export const CURRENT_MEDIA_JSON = `(SELECT json_group_array(json_array(kind,url,
  * per listing (`listing_resource_links_listing_order_unique`), so the order is total.
  */
 const CURRENT_RESOURCES_JSON = `(SELECT json_group_array(json_array(label,url)) FROM (SELECT label,url FROM listing_resource_links WHERE listing_id=? ORDER BY sort_order))`
+
+/**
+ * A listing's hand-picked alternatives as one JSON array of `[id, slug]`, by position: what a
+ * `listing-alternatives-set` compares and swaps on (`?` is the listing id). `position` is unique
+ * per listing (`listing_alternatives_listing_position_unique`), so the order is total.
+ */
+const CURRENT_ALTERNATIVES_JSON = `(SELECT json_group_array(json_array(id,slug)) FROM (SELECT l.id,l.slug FROM listing_alternatives a JOIN listings l ON l.id=a.alternative_id WHERE a.listing_id=? ORDER BY a.position))`
+/** Live: approved, active and published by `?` (the publication time), as the catalog reads it. */
+const LIVE_LISTING =
+  "status='approved' AND is_active=1 AND published_at IS NOT NULL AND published_at<=?"
 
 /** The JSON a listing's `expected` rows must equal (`CURRENT_MEDIA_JSON`). */
 export function expectedMediaJson(rows: ExpectedMediaRow[]): string {
@@ -1927,6 +1990,56 @@ export function buildPublicationPlan(
       )
       routes.add(listingRoute(op.slug))
     }
+    if (op.action === 'listing-alternatives-set') {
+      const label = `listing-alternatives-set ${op.slug}`
+      statements.push(
+        // Approved, live or unpublished, as for its tags; compared and swapped on every pick.
+        statement(
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=? AND status='approved') AND ${CURRENT_ALTERNATIVES_JSON}=? THEN 1 ELSE ${REASONED_GUARD_FAILURE} END`,
+          op.id,
+          op.slug,
+          op.id,
+          JSON.stringify(op.expected.map(pick => [pick.id, pick.slug])),
+          `${label}: the listing is not approved, or its slug or alternatives changed since the manifest`
+        ),
+        // Each pick names a live listing by its id and slug, as the page would link it.
+        ...op.alternatives.map(pick =>
+          statement(
+            `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=? AND ${LIVE_LISTING}) THEN 1 ELSE ${REASONED_GUARD_FAILURE} END`,
+            pick.id,
+            pick.slug,
+            now,
+            `${label}: the alternative ${pick.slug} is not this live listing`
+          )
+        ),
+        statement('DELETE FROM listing_alternatives WHERE listing_id=?', op.id),
+        ...op.alternatives.map((pick, order) =>
+          statement(
+            'INSERT INTO listing_alternatives (listing_id,alternative_id,position) VALUES (?,?,?)',
+            op.id,
+            pick.id,
+            order + 1
+          )
+        ),
+        // The page shows its alternatives: sitemap lastmod (#218). The checksum stays, so a
+        // revision or a paid submission read before this still applies, as for its tags.
+        statement('UPDATE listings SET updated_at=? WHERE id=?', now, op.id),
+        // The admin panel's activity record for an edit (#64): "Details edited: alternatives".
+        statement(
+          "INSERT INTO listing_events (listing_id,event_type,detail,actor) VALUES (?,'edited',?,?)",
+          op.id,
+          JSON.stringify({
+            fields: ['alternatives'],
+            manifest: manifest.id,
+            reason: op.reason,
+            from: op.expected.map(pick => pick.slug),
+            to: op.alternatives.map(pick => pick.slug)
+          }),
+          manifest.provenance.actor
+        )
+      )
+      routes.add(listingRoute(op.slug))
+    }
     if (op.action === 'listing-feature-listing-set') {
       statements.push(
         // Compared and swapped on the slug and the flag. No public page changes, so neither the
@@ -2114,6 +2227,22 @@ export function buildPublicationPlan(
         `${redirectLabel(op)}: by the end of the batch, its source is no longer unpublished outside retired categories, or its target is no longer live`
       )
     )
+  }
+  // #519: every pick is still live once every operation of the batch ran, so a later unpublish,
+  // or a `listing-update` that moves a pick's `published_at` into the future, refuses the batch
+  // instead of leaving a pick the page skips, whatever the order of the operations.
+  for (const op of manifest.operations) {
+    if (op.action !== 'listing-alternatives-set') continue
+    for (const pick of op.alternatives)
+      statements.push(
+        statement(
+          `SELECT CASE WHEN EXISTS (SELECT 1 FROM listings WHERE id=? AND slug=? AND ${LIVE_LISTING}) THEN 1 ELSE ${REASONED_GUARD_FAILURE} END`,
+          pick.id,
+          pick.slug,
+          now,
+          `listing-alternatives-set ${op.slug}: by the end of the batch, the alternative ${pick.slug} is no longer live`
+        )
+      )
   }
   const affectedRoutes = [
     ...new Set([

@@ -699,6 +699,37 @@ export const listingFaqs = sqliteTable(
   table => [unique('listing_faqs_listing_order_unique').on(table.listingId, table.sortOrder)]
 )
 
+/** How many alternatives a listing page shows (#519), and so how many a listing may hand-pick. */
+export const LISTING_ALTERNATIVES_SHOWN = 6
+
+/**
+ * A listing's hand-picked alternatives (serpcompany/best.serp.co#519), in order (`position` 1
+ * first), written by reviewed manifests (`listing-alternatives-set`). Its page's Alternatives
+ * section shows the live ones first, then tops up from similar listings
+ * (`apps/web/src/db/catalog.ts`); an unpublished alternative keeps its row and drops out of the
+ * section until it is live again.
+ */
+export const listingAlternatives = sqliteTable(
+  'listing_alternatives',
+  {
+    listingId: text('listing_id')
+      .notNull()
+      .references(() => listings.id, { onDelete: 'cascade' }),
+    alternativeId: text('alternative_id')
+      .notNull()
+      .references(() => listings.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull()
+  },
+  table => [
+    primaryKey({ columns: [table.listingId, table.alternativeId] }),
+    unique('listing_alternatives_listing_position_unique').on(table.listingId, table.position),
+    check('listing_alternatives_not_self', sql`${table.alternativeId} != ${table.listingId}`),
+    check('listing_alternatives_position_positive', sql`${table.position} >= 1`),
+    // The child index a foreign key needs: deleting a listing finds the rows naming it here.
+    index('listing_alternatives_alternative_idx').on(table.alternativeId)
+  ]
+)
+
 export const publicationState = sqliteTable(
   'publication_state',
   {

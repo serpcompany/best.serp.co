@@ -398,8 +398,6 @@ export function buildSubmissionReviewPreview(
     // A preview has never been public, so it last changed when it was created.
     modifiedAt: toInstant(createdAt) ?? `${publishedAt}T00:00:00.000Z`,
     name: requiredTrimmedText(row.name, 'name'),
-    nextWebsite: null,
-    previousWebsite: null,
     publishedAt,
     relatedWebsites: [],
     resourceLinks,

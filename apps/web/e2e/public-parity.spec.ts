@@ -224,18 +224,23 @@ test.describe('public parity interactions', () => {
       await badgeBlock.evaluate(element => element.getBoundingClientRect().top)
     ).toBeGreaterThan(contentTop)
 
-    // The previous and next listings sit side by side, and nothing scrolls sideways on phones.
-    const browse = page.locator('section[aria-labelledby="browse-more-heading"] ul')
+    // The Alternatives section ends the page in the listing grid's columns (#519), with no
+    // "Browse more" (previous and next), and nothing scrolls sideways on phones.
+    await expect(page.getByRole('heading', { name: 'Browse more' })).toHaveCount(0)
+    const alternatives = page.getByRole('region', { name: 'Alternatives' })
+    const cards = alternatives.locator('[data-slot="card-grid"] > li')
+    expect(await cards.count()).toBeGreaterThan(0)
+    expect(await cards.count()).toBeLessThanOrEqual(6)
     for (const [width, expected] of [
-      [1440, 2],
+      [1440, 3],
       [390, 1]
     ] as const) {
       await page.setViewportSize({ width, height: 900 })
       await expect
         .poll(() =>
-          browse.evaluate(
-            element => getComputedStyle(element).gridTemplateColumns.split(' ').length
-          )
+          alternatives
+            .locator('[data-slot="card-grid"]')
+            .evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length)
         )
         .toBe(expected)
     }

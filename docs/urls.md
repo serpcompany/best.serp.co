@@ -153,7 +153,7 @@ publisher's affected routes) build their URLs from it.
 
   Without tags or best pages there is no hub grid, tag chip, "Best {hub} lists", "Featured in" or
   "Best" link. These change on every page all the same: a listing's breadcrumb gains its hub, its
-  hub badge and category names come from D1, an untagged listing's related listings start after
+  hub badge and category names come from D1, an untagged listing's alternatives start after
   its own name ([Public catalog](./public-catalog.md#reads)), the 410 page links the hub instead
   of `/products/?category=`, and the nav gains "Best" once a best page exists.
 - **Reserved slugs.** No listing may take `categories` or `tags` (`reservedListingSlugs`, derived

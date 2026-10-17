@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { createDatabase } from './client'
 import type { CatalogCacheEvent, CatalogDataCache, CatalogQueryEvent } from './contracts'
 import {
+  insertPublishedListing,
   MemoryCatalogCache,
   SqliteD1,
   seedContractFixture,
@@ -118,10 +119,10 @@ describe('taxonomy reads (#345)', () => {
         'secondary'
       ])
       expect([...cache.values.keys()].filter(key => key.includes('secondary')).sort()).toEqual([
-        `catalog-name-order:v9:${epoch}:c:secondary`,
-        `catalog-name-order:v9:${epoch}:t:secondary`,
-        `catalog-name-page:v9:${epoch}:c:secondary:48:1`,
-        `catalog-name-page:v9:${epoch}:t:secondary:48:1`
+        `catalog-name-order:v10:${epoch}:c:secondary`,
+        `catalog-name-order:v10:${epoch}:t:secondary`,
+        `catalog-name-page:v10:${epoch}:c:secondary:48:1`,
+        `catalog-name-page:v10:${epoch}:t:secondary:48:1`
       ])
       // Warm: both come from the cache, still apart.
       const warm = operations(cache)
@@ -259,7 +260,7 @@ describe('taxonomy reads (#345)', () => {
     const cold = operations(cache)
     const items = await cold.operations.getBestPageItems('best-primary')
     expect(items).toHaveLength(4)
-    expect([...cache.values.keys()]).toContain(`catalog-best-items:v9:${epoch}:best-primary`)
+    expect([...cache.values.keys()]).toContain(`catalog-best-items:v10:${epoch}:best-primary`)
     const warm = operations(cache)
     expect(await warm.operations.getBestPageItems('best-primary')).toEqual(items)
     expect(queries(warm.events)).toEqual(['publication-version'])
@@ -271,7 +272,7 @@ describe('taxonomy reads (#345)', () => {
 
     // An entry cached before items carried their tags is read again from D1 (#346).
     const untagged = new MemoryCatalogCache()
-    untagged.values.set(`catalog-best-items:v9:${epoch}:best-primary`, {
+    untagged.values.set(`catalog-best-items:v10:${epoch}:best-primary`, {
       items: items.map(({ tags: _tags, ...item }) => item),
       publicationVersion: 1
     })
@@ -281,8 +282,8 @@ describe('taxonomy reads (#345)', () => {
 
     // A corrupt entry is read again from D1.
     const corrupt = new MemoryCatalogCache()
-    corrupt.values.set(`catalog-best-items:v9:${epoch}:best-primary`, { items: 'wrong' })
-    corrupt.values.set(`catalog-best-index:v9:${epoch}`, { pages: [{ slug: 'x' }] })
+    corrupt.values.set(`catalog-best-items:v10:${epoch}:best-primary`, { items: 'wrong' })
+    corrupt.values.set(`catalog-best-index:v10:${epoch}`, { pages: [{ slug: 'x' }] })
     const recovered = operations(corrupt)
     expect(await recovered.operations.getBestPageItems('best-primary')).toEqual(items)
     expect(recovered.events).toContainEqual({
@@ -349,13 +350,13 @@ describe('taxonomy reads (#345)', () => {
     expect(queries(events.slice(start))).toEqual(['taxonomy-redirect'])
   })
 
-  it('carries active tags on the detail and ranks related listings by shared tags', async () => {
+  it('carries active tags on the detail and ranks alternatives by shared tags', async () => {
     const { events, operations: catalog } = operations()
     const start = sqlite.statements.length
     const roundTrips = sqlite.roundTrips.length
     const bravo = await catalog.getListingBySlug('bravo')
-    // Epoch, detail, related, previous, next: the last four in one batch (#378).
-    expect(sqlite.statements.length - start).toBe(5)
+    // Epoch, detail, alternatives: the last two in one batch (#378, #519).
+    expect(sqlite.statements.length - start).toBe(3)
     expect(sqlite.roundTrips.slice(roundTrips).map(trip => trip.kind)).toEqual([
       'statement',
       'batch'
@@ -367,15 +368,16 @@ describe('taxonomy reads (#345)', () => {
     ])
     // alpha and charlie share both tags, delta and echo one (delta's retired tag doesn't
     // count); within a score, the names after bravo's come first, then the wrap to the start.
+    // bravo is the only listing its best page pins, so that page adds no one.
     expect(bravo?.relatedWebsites.map(item => item.slug)).toEqual([
       'charlie',
       'alpha',
       'delta',
       'echo'
     ])
-    expect(queries(events)).toContain('related-shared-tags')
+    expect(queries(events)).toContain('alternatives-shared-tags')
     // From echo, every candidate sorts before it, so the order wraps to the start. Its one tag
-    // yields three, so its hub (`primary`) fills the fourth slot in the same statement, after them.
+    // yields three; delta, pinned beside it on `best-writers`, scores for that page, after them.
     expect(
       (await catalog.getListingBySlug('echo'))?.relatedWebsites.map(item => item.slug)
     ).toEqual(['alpha', 'bravo', 'charlie', 'delta'])
@@ -397,8 +399,8 @@ describe('taxonomy reads (#345)', () => {
       { page: 'best-editors-in-secondary', position: 1 },
       { page: 'best-primary', position: null }
     ])
-    // Epoch, detail, related, previous, next: the marks add no statement.
-    expect(sqlite.statements.length - start).toBe(5)
+    // Epoch, detail, alternatives: the marks add no statement.
+    expect(sqlite.statements.length - start).toBe(3)
     expect((await catalog.getListingBySlug('delta'))?.bestPageMarks).toEqual([
       { page: 'best-writers', position: 1 }
     ])
@@ -424,7 +426,7 @@ describe('taxonomy reads (#345)', () => {
     }
   })
 
-  it('scores related listings on the three most central tags only, and fills from the hub', async () => {
+  it('scores alternatives on the three most central tags only, and fills from the hub', async () => {
     // bravo's active tags, most central first: editors and writers (0), fringe-a (5), fringe-b (9).
     // delta shares writers, fringe-a and fringe-b; fringe-b is bravo's fourth, so it doesn't count.
     sqlite.database.exec(`
@@ -450,7 +452,8 @@ describe('taxonomy reads (#345)', () => {
         (await catalog.getListingBySlug('bravo'))?.relatedWebsites.map(item => item.slug)
       ).toEqual(['charlie', 'delta', 'alpha', 'echo'])
 
-      // A tag no other public listing has: all four come from the hub, after its own name first.
+      // A tag no other public listing has, and excluded from its best page: all four come from the
+      // hub, after its own name first.
       sqlite.database.exec(`
         DELETE FROM listing_tags WHERE listing_id = 'serp-charlie';
         INSERT INTO listing_tags (listing_id, tag_id) SELECT 'serp-charlie', id FROM tags
@@ -466,8 +469,8 @@ describe('taxonomy reads (#345)', () => {
         'alpha',
         'bravo'
       ])
-      expect(sqlite.statements.length - start).toBe(5)
-      expect(queries(fresh.events)).toContain('related-shared-tags')
+      expect(sqlite.statements.length - start).toBe(3)
+      expect(queries(fresh.events)).toContain('alternatives-shared-tags')
     } finally {
       sqlite.database.exec(`
         DELETE FROM listing_tags WHERE listing_id = 'serp-charlie';
@@ -492,5 +495,219 @@ describe('taxonomy reads (#345)', () => {
     expect(await slugs('writers secondary')).toEqual(['alpha', 'charlie'])
     expect(await slugs('retired')).toEqual([])
     expect(await slugs('idle')).toEqual([])
+  })
+})
+
+/**
+ * A listing's Alternatives section (#519): its public hand picks by position, then similar
+ * listings in its hub (3 points per shared scored tag, 2 for a shared best page), then the rest of
+ * its hub onward from its own name; never itself, never twice, at most six.
+ */
+describe('listing alternatives (#519)', () => {
+  let sqlite: SqliteD1
+  const id = (name: string) => `alt-${name.toLowerCase()}`
+
+  beforeAll(() => {
+    sqlite = new SqliteD1()
+    const { database } = sqlite
+    database.exec(`
+      INSERT INTO publication_state (id, version, checksum, published_at)
+        VALUES (1, 1, 'fixture', '2026-07-01T00:00:00.000Z');
+      INSERT INTO categories (slug, name, sort_order) VALUES ('design', 'Design', 0), ('audio', 'Audio', 1);
+    `)
+    const categories = new Map(
+      (
+        database.prepare('SELECT id, slug FROM categories').all() as Array<{
+          id: number
+          slug: string
+        }>
+      ).map(row => [row.slug, row.id])
+    )
+    const listing = (name: string, category: string, publishedAt = '2026-07-01T00:00:00.000Z') =>
+      insertPublishedListing(database, {
+        categoryIds: [categories.get(category) as number],
+        content: null,
+        description: `${name} description`,
+        displayOrder: 0,
+        id: id(name),
+        isFeatured: false,
+        name,
+        publishedAt,
+        slug: name.toLowerCase(),
+        website: `https://${name.toLowerCase()}.example.com`
+      })
+    for (const name of [
+      'Mango',
+      'Kiwi',
+      'Gone',
+      'Apple',
+      'Banana',
+      'Pear',
+      'Olive',
+      'Nectarine',
+      'Cherry'
+    ])
+      listing(name, 'design')
+    listing('Zebra', 'audio')
+    // Shares mango's tags but is filed under another hub: not one of its similar listings.
+    listing('Quince', 'audio')
+    listing('Later', 'design', '2027-01-01T00:00:00.000Z')
+    database.exec(`
+      UPDATE listings SET is_active = 0 WHERE id = '${id('Gone')}';
+      INSERT INTO tags (slug, name, category_id)
+        SELECT 'paint', 'Paint', id FROM categories WHERE slug = 'design';
+      INSERT INTO tags (slug, name, category_id)
+        SELECT 'sketch', 'Sketch', id FROM categories WHERE slug = 'design';
+      INSERT INTO listing_tags (listing_id, tag_id, sort_order)
+        SELECT m.listing_id, t.id, m.sort_order FROM (
+          SELECT '${id('Mango')}' AS listing_id, 'paint' AS tag, 0 AS sort_order
+          UNION ALL SELECT '${id('Mango')}', 'sketch', 1
+          UNION ALL SELECT '${id('Kiwi')}', 'paint', 0
+          UNION ALL SELECT '${id('Apple')}', 'paint', 0
+          UNION ALL SELECT '${id('Apple')}', 'sketch', 1
+          UNION ALL SELECT '${id('Banana')}', 'paint', 0
+          UNION ALL SELECT '${id('Quince')}', 'paint', 0
+          UNION ALL SELECT '${id('Quince')}', 'sketch', 1
+        ) m JOIN tags t ON t.slug = m.tag;
+      INSERT INTO best_pages (slug, keyword, title, heading, intro, category_id)
+        SELECT 'best-design', 'design', 'Best Design', 'Best design', '', id FROM categories
+        WHERE slug = 'design';
+      INSERT INTO best_page_listings (best_page_id, listing_id, position)
+        SELECT b.id, p.listing_id, p.position FROM (
+          SELECT '${id('Mango')}' AS listing_id, 1 AS position
+          UNION ALL SELECT '${id('Banana')}', 2
+          UNION ALL SELECT '${id('Olive')}', 3
+        ) p CROSS JOIN best_pages b WHERE b.slug = 'best-design';
+    `)
+    const pick = database.prepare(
+      'INSERT INTO listing_alternatives (listing_id, alternative_id, position) VALUES (?, ?, ?)'
+    )
+    // Mango's picks: one in another hub, one that shares its tags too, one unpublished, and one
+    // not public yet, at positions with gaps.
+    for (const [position, name] of [
+      [2, 'Zebra'],
+      [4, 'Kiwi'],
+      [5, 'Gone'],
+      [7, 'Later']
+    ] as const)
+      pick.run(id('Mango'), id(name), position)
+    for (const [position, name] of ['Zebra', 'Apple', 'Cherry', 'Nectarine'].entries())
+      pick.run(id('Olive'), id(name), position + 1)
+  })
+
+  function operations(cache: CatalogDataCache = new MemoryCatalogCache()) {
+    const events: Array<CatalogCacheEvent | CatalogQueryEvent> = []
+    return {
+      events,
+      operations: createCatalogOperations({
+        cache,
+        client: createDatabase(sqlite.asD1Database()),
+        clock: now,
+        observe: event => events.push(event)
+      })
+    }
+  }
+  const queries = (events: Array<CatalogCacheEvent | CatalogQueryEvent>) =>
+    events.flatMap(event => (event.event === 'd1_query' ? [event.queryShape] : []))
+  const alternativesOf = async (slug: string, cache?: CatalogDataCache) =>
+    (await operations(cache).operations.getListingBySlug(slug))?.relatedWebsites.map(
+      item => item.slug
+    )
+
+  it('leads with the public hand picks, then similar listings in its hub, then the hub', async () => {
+    const { events, operations: catalog } = operations()
+    const mango = await catalog.getListingBySlug('mango')
+    // Zebra and Kiwi by position (Gone is unpublished, Later not public yet); then Apple (both
+    // tags, 6), Banana (paint and the best page, 5) and Olive (the best page, 2), never Kiwi again
+    // or Quince (another hub); then the hub onward from mango's name: Nectarine.
+    expect(mango?.relatedWebsites.map(item => item.slug)).toEqual([
+      'zebra',
+      'kiwi',
+      'apple',
+      'banana',
+      'olive',
+      'nectarine'
+    ])
+    expect(mango?.relatedWebsites[0]).toEqual({
+      description: 'Zebra description',
+      name: 'Zebra',
+      slug: 'zebra',
+      website: 'https://zebra.example.com'
+    })
+    expect(
+      events.flatMap(event =>
+        event.event === 'd1_query' && event.operation === 'listing-detail'
+          ? [[event.queryShape, event.resultRows]]
+          : []
+      )
+    ).toEqual([
+      ['listing-detail', 1],
+      ['alternatives-shared-tags', 4]
+    ])
+  })
+
+  it('tops up from its best page and hub without hand picks, wrapping round its hub', async () => {
+    // Banana: Mango shares paint and its best page (5); Kiwi and Apple share paint (3), Kiwi first
+    // as it sorts after banana's name; Olive shares the best page (2). The hub fills the last two
+    // slots onward from banana's name: Cherry and Nectarine.
+    expect(await alternativesOf('banana')).toEqual([
+      'mango',
+      'kiwi',
+      'apple',
+      'olive',
+      'cherry',
+      'nectarine'
+    ])
+    // Untagged and on no best page: its hub, onward from its own name (no name follows pear's
+    // there), then from the start.
+    expect(await alternativesOf('pear')).toEqual([
+      'apple',
+      'banana',
+      'cherry',
+      'kiwi',
+      'mango',
+      'nectarine'
+    ])
+  })
+
+  it('needs no fill when the hand picks and best page give six', async () => {
+    const { events, operations: catalog } = operations()
+    const olive = await catalog.getListingBySlug('olive')
+    // Its four picks, then the two listings its best page pins, by name (both before olive's).
+    expect(olive?.relatedWebsites.map(item => item.slug)).toEqual([
+      'zebra',
+      'apple',
+      'cherry',
+      'nectarine',
+      'banana',
+      'mango'
+    ])
+    expect(queries(events)).toContain('alternatives-no-fill')
+  })
+
+  it('drops an alternative unpublished since, once the publication turns the cache over', async () => {
+    const cache = new MemoryCatalogCache()
+    expect(await alternativesOf('mango', cache)).toContain('kiwi')
+    sqlite.database.exec(`UPDATE listings SET is_active = 0 WHERE id = '${id('Kiwi')}'`)
+    try {
+      // The cached page stands until a publication advances the catalog version, as every
+      // unpublish does (the admin panel's and the publisher's alike).
+      expect(await alternativesOf('mango', cache)).toContain('kiwi')
+      sqlite.database.exec('UPDATE publication_state SET version = version + 1')
+      // Kiwi drops out of both steps, and the hub fills the gap onward from mango's name.
+      expect(await alternativesOf('mango', cache)).toEqual([
+        'zebra',
+        'apple',
+        'banana',
+        'olive',
+        'nectarine',
+        'pear'
+      ])
+    } finally {
+      sqlite.database.exec(`
+        UPDATE listings SET is_active = 1 WHERE id = '${id('Kiwi')}';
+        UPDATE publication_state SET version = 1;
+      `)
+    }
   })
 })

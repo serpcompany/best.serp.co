@@ -22,8 +22,10 @@ from the real catalog (#311), and user data is never copied from staging or prod
 Column meanings and constraints are commented in `schema.ts`. By area:
 
 - **Catalog**: categories (broad topic hubs), listings, their ordered category memberships
-  (exactly one primary), media, resource links, FAQs, and slug redirects. What makes a listing public and the states
-  it can be in: [Public catalog](./public-catalog.md). Logos and images are hosted in R2,
+  (exactly one primary), media, resource links, FAQs, slug redirects, and each listing's ordered
+  hand-picked alternatives (`listing_alternatives`, #519: other listings, each once, never
+  itself; [Public catalog](./public-catalog.md#reads) says how its page tops them up). What
+  makes a listing public and the states it can be in: [Public catalog](./public-catalog.md). Logos and images are hosted in R2,
   never hotlinked, and approvals and admin edits host a logo or queue it, never store its URL
   ([Listing media](./media.md)).
 - **Taxonomy** (#341): `tags` are finer groupings, each under one category (its hub), and

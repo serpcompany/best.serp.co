@@ -158,7 +158,15 @@ export interface ScaleTaxonomyRedirect {
   targetSlug: string | null
 }
 
+/** A listing's hand-picked alternative (#519), at `position` (1 first). */
+export interface ScaleAlternative {
+  alternativeId: string
+  listingId: string
+  position: number
+}
+
 export interface ScaleCatalog {
+  alternatives: ScaleAlternative[]
   bestPageEntries: ScaleBestPageEntry[]
   bestPages: ScaleBestPage[]
   categories: ScaleCategory[]
@@ -224,6 +232,11 @@ const RESOURCE_LISTINGS = 337
  * 10 or more, 28 of 3 to 9, 2 below 3), and 2 retired tags that keep their memberships.
  */
 const TAXONOMY_SEED_OFFSET = 341
+/**
+ * The hand picks (#519) come from their own stream, so adding them changed none of the rows the
+ * other budgets were measured on.
+ */
+const ALTERNATIVES_SEED_OFFSET = 519
 const HEADROOM_TAG_SIZE = 335
 const LARGE_TAGS = 96
 const MEDIUM_TAG_SIZES = Array.from({ length: 28 }, (_, index) => 3 + (index % 7))
@@ -1230,8 +1243,29 @@ export function generateScaleCatalog(seed: number = SCALE_CATALOG_SEED): ScaleCa
     plans
   )
 
+  // Hand-picked alternatives (#519) on every 40th public listing: one to eight picks from the
+  // approved listings, unpublished and retired ones too, at positions with gaps, so the reads
+  // skip the ones that aren't public and stop at six.
+  const picking = new Random(seed + ALTERNATIVES_SEED_OFFSET)
+  const approved = listings.filter(listing => listing.status === 'approved')
+  const alternatives: ScaleAlternative[] = []
+  for (const [index, listing] of live.entries()) {
+    if (index % 40 !== 0) continue
+    const picks = picking
+      .shuffle(approved.filter(other => other.id !== listing.id))
+      .slice(0, picking.int(1, 8))
+    for (const [order, other] of picks.entries()) {
+      alternatives.push({
+        alternativeId: other.id,
+        listingId: listing.id,
+        position: order * 2 + picking.int(1, 2)
+      })
+    }
+  }
+
   return {
     ...taxonomy,
+    alternatives,
     categories,
     faqs,
     listings,
@@ -1439,6 +1473,11 @@ export function scaleCatalogStatements(catalog: ScaleCatalog): SqlStatement[] {
       'listing_resource_links',
       ['listing_id', 'label', 'url', 'sort_order'],
       catalog.resources.map(link => [link.listingId, link.label, link.url, link.sortOrder])
+    ),
+    ...insertRows(
+      'listing_alternatives',
+      ['listing_id', 'alternative_id', 'position'],
+      catalog.alternatives.map(pick => [pick.listingId, pick.alternativeId, pick.position])
     ),
     ...insertRows(
       'listing_slug_redirects',

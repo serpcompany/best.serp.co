@@ -61,13 +61,6 @@ export interface WebsiteBrowseCardMetadata extends WebsiteRelatedCardMetadata {
   featured?: boolean
 }
 
-export interface WebsiteNavigationMetadata {
-  slug: string
-  name: string
-  website: string
-  media?: Pick<WebsiteMedia, 'logo'>
-}
-
 export interface GuideMetadata {
   slug: string
   title: string
@@ -165,9 +158,8 @@ export interface WebsiteDetailMetadata extends WebsiteMetadata {
    * (`lib/markdown/listing-content.ts`, #334); absent without a body.
    */
   contentTree?: ListingContentTree
+  /** Its Alternatives section (#519): its hand picks first, then similar listings, up to six. */
   relatedWebsites: WebsiteRelatedCardMetadata[]
-  previousWebsite: WebsiteNavigationMetadata | null
-  nextWebsite: WebsiteNavigationMetadata | null
 }
 
 export interface WebsiteLookupIndex {
@@ -250,27 +242,6 @@ export function toWebsiteBrowseCardMetadata(website: WebsiteMetadata): WebsiteBr
   return browseCard
 }
 
-function toNavigationMetadata(
-  website: WebsiteMetadata | undefined
-): WebsiteNavigationMetadata | null {
-  if (!website) {
-    return null
-  }
-
-  const navigationMetadata: WebsiteNavigationMetadata = {
-    slug: website.slug,
-    name: website.name,
-    website: website.website
-  }
-  const media = toLogoOnlyMedia(website.media)
-
-  if (media) {
-    navigationMetadata.media = media
-  }
-
-  return navigationMetadata
-}
-
 export function resolveWebsiteBySlugFromIndex(
   index: WebsiteLookupIndex,
   slug: string
@@ -293,8 +264,6 @@ export function resolveWebsiteBySlugFromIndex(
     return null
   }
 
-  const previousWebsite = toNavigationMetadata(websites[currentIndex - 1])
-  const nextWebsite = toNavigationMetadata(websites[currentIndex + 1])
   const websiteCategorySlugs = new Set(getListingCategories(website))
   const relatedWebsites = websites
     .map(site => ({
@@ -317,9 +286,7 @@ export function resolveWebsiteBySlugFromIndex(
   return {
     ...website,
     content: website.content || website._meta?.content || '',
-    relatedWebsites,
-    previousWebsite,
-    nextWebsite
+    relatedWebsites
   }
 }
 

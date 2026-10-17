@@ -15,8 +15,6 @@ const listing: ListingDetail = {
   },
   modifiedAt: '2026-10-09T00:00:00.000Z',
   name: 'Staged Tool',
-  nextWebsite: null,
-  previousWebsite: null,
   publishedAt: '2026-10-09',
   relatedWebsites: [],
   faqs: [{ answer: 'Yes, every plan includes it.', question: 'Is there a free plan?' }],

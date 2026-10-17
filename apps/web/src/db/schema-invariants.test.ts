@@ -78,6 +78,43 @@ describe('listing columns', () => {
     )
     expect(() => db.exec(fileUnderAdult)).toThrow(/must not be filed under a retired category/u)
   })
+
+  it('keeps hand-picked alternatives other listings, each once, at unique positions (#519)', () => {
+    const db = database()
+    seedLiveListing(db, 'lst_b')
+    seedLiveListing(db, 'lst_c')
+    const pick = (listing: string, alternative: string, position: number) =>
+      db
+        .prepare(
+          'INSERT INTO listing_alternatives (listing_id, alternative_id, position) VALUES (?, ?, ?)'
+        )
+        .run(listing, alternative, position)
+    expect(() => pick('lst_a', 'lst_a', 1)).toThrow(/listing_alternatives_not_self/u)
+    expect(() => pick('lst_a', 'lst_b', 0)).toThrow(/listing_alternatives_position_positive/u)
+    expect(() => pick('lst_a', 'lst_missing', 1)).toThrow(/FOREIGN KEY constraint failed/u)
+    pick('lst_a', 'lst_b', 1)
+    expect(() => pick('lst_a', 'lst_b', 2)).toThrow(
+      /UNIQUE constraint failed: listing_alternatives.listing_id, listing_alternatives.alternative_id/u
+    )
+    expect(() => pick('lst_a', 'lst_c', 1)).toThrow(
+      /UNIQUE constraint failed: listing_alternatives.listing_id, listing_alternatives.position/u
+    )
+    expect(() =>
+      db.prepare("INSERT INTO listing_alternatives VALUES ('lst_a', 'lst_c', 'second')").run()
+    ).toThrow(/cannot store TEXT value in INTEGER column/u)
+    pick('lst_a', 'lst_c', 2)
+    pick('lst_b', 'lst_a', 1)
+    // Deleting a listing removes the rows that name it, on either side.
+    db.exec(
+      "UPDATE listings SET is_active = 0 WHERE id = 'lst_c'; DELETE FROM listings WHERE id = 'lst_c'"
+    )
+    expect(
+      db.prepare('SELECT listing_id, alternative_id FROM listing_alternatives ORDER BY 1').all()
+    ).toEqual([
+      { alternative_id: 'lst_b', listing_id: 'lst_a' },
+      { alternative_id: 'lst_a', listing_id: 'lst_b' }
+    ])
+  })
 })
 
 describe('the #341 taxonomy: tags, best pages, and taxonomy redirects', () => {

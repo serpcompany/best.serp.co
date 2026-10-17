@@ -221,81 +221,29 @@ describe('representative D1 query benchmark', () => {
       ) FROM categories c WHERE c.is_active = 1`
     )
 
-    // Multi-category detail: related listings and both neighbours, batched with the detail row.
+    // Detail of a listing in two categories, with no tag, hand pick or best page: its
+    // alternatives come from its hub (`primary`, over 128 members) by walking the public name
+    // index, batched with the detail row (#519 dropped the previous and next listings).
     const catalog = operations()
-    const currentId = 'serp-bench-160'
     const currentSlug = 'bench-160'
     const statementStart = sqlite.statements.length
     const detail = await catalog.getListingBySlug(currentSlug)
     const detailStatements = sqlite.statements.slice(statementStart)
     expect(detail?.slug).toBe(currentSlug)
-
-    const optimizedPrevious = detailStatements.find(statement =>
-      statement.sql.includes('l.slug < (SELECT slug FROM current_listing)')
+    const optimizedAlternatives = detailStatements.find(statement =>
+      statement.sql.includes('alternative.score')
     )
-    const optimizedNext = detailStatements.find(statement =>
-      statement.sql.includes('l.slug > (SELECT slug FROM current_listing)')
-    )
-    const optimizedRelated = detailStatements.find(statement =>
-      statement.sql.includes('related.score')
-    )
-    if (!optimizedPrevious || !optimizedNext || !optimizedRelated)
-      throw new Error('Missing optimized benchmark statements.')
-
-    const legacyAdjacent = scan(
-      databasePath,
-      `WITH ordered AS (
-        SELECT id, slug,
-          LAG(id) OVER (ORDER BY published_at DESC, display_order ASC, slug ASC) AS previous_id,
-          LEAD(id) OVER (ORDER BY published_at DESC, display_order ASC, slug ASC) AS next_id
-        FROM listings l
-        WHERE l.status = 'approved' AND l.is_active = 1
-          AND l.published_at IS NOT NULL
-          AND datetime(l.published_at) <= datetime('2026-07-30T00:00:00.000Z')
-      )
-      SELECT previous_id, next_id FROM ordered WHERE slug = '${currentSlug}'`
-    )
-    const optimizedAdjacent = scanStatements([optimizedPrevious, optimizedNext])
-    const optimizedAdjacentRows = totalRows(optimizedAdjacent)
-
-    const legacyRelated = scan(
-      databasePath,
-      `SELECT l.id
-       FROM listings l
-       JOIN listing_categories candidate ON candidate.listing_id = l.id
-       JOIN listing_categories current
-         ON current.category_id = candidate.category_id AND current.listing_id = '${currentId}'
-       WHERE l.status = 'approved' AND l.is_active = 1
-         AND l.published_at IS NOT NULL
-         AND datetime(l.published_at) <= datetime('2026-07-30T00:00:00.000Z')
-         AND l.id != '${currentId}'
-       GROUP BY l.id
-       ORDER BY COUNT(*) DESC, l.name
-       LIMIT 4`
-    )
-    const optimizedRelatedEvidence = scanStatements([optimizedRelated])
-    const optimizedRelatedRows = totalRows(optimizedRelatedEvidence)
-    // The shared-category plan visits each membership of the listing's categories once in
-    // the category index and once for the candidate row, so this bounds its cost.
-    const sharedMemberships = Number(
-      (
-        sqlite.database
-          .prepare(
-            `SELECT COUNT(*) AS total FROM listing_categories current
-             JOIN listing_categories shared ON shared.category_id = current.category_id
-             WHERE current.listing_id = ?`
-          )
-          .get(currentId) as { total: number }
-      ).total
-    )
+    if (!optimizedAlternatives) throw new Error('Missing alternatives benchmark statement.')
+    const optimizedAlternativesEvidence = scanStatements([optimizedAlternatives])
+    const optimizedAlternativesRows = totalRows(optimizedAlternativesEvidence)
 
     // Single-category detail in a dense category: the public name index seek, onward from its own
-    // name (#331): the four names after it, not the category's first four.
+    // name (#331): the six names after it (#519), not the category's first six.
     const singleCategoryStart = sqlite.statements.length
     const single = await catalog.getListingBySlug('bench-161')
     const singleCategoryStatements = sqlite.statements
       .slice(singleCategoryStart)
-      .filter(statement => statement.sql.includes('related.score'))
+      .filter(statement => statement.sql.includes('alternative.score'))
     const singleCategoryEvidence = scanStatements(singleCategoryStatements)
     const singleCategoryRows = totalRows(singleCategoryEvidence)
     const expectedSingleRelated = (
@@ -306,19 +254,21 @@ describe('representative D1 query benchmark', () => {
            WHERE lc.category_id = ? AND l.status = 'approved'
              AND l.published_at <= '2026-07-30T00:00:00.000Z'
              AND (l.name, l.slug) > (SELECT name, slug FROM listings WHERE slug = 'bench-161')
-           ORDER BY l.name, l.slug LIMIT 4`
+           ORDER BY l.name, l.slug LIMIT 6`
         )
         .all(fixtureCategoryIds(sqlite.database).get('primary') ?? -1) as Array<{ slug: string }>
     ).map(row => row.slug)
 
-    // Tagged detail (#345): related listings by shared tags. bench-250 has only the tag every
-    // tagged listing has, so every candidate ties, and the keyset from its own name picks the
-    // next four names; bench-313, near the end, wraps round to the first tagged names.
+    // Tagged detail (#345): alternatives by shared tags. bench-250 has only the tag every tagged
+    // listing has, so every candidate ties, and the keyset from its own name picks the next six
+    // names; bench-313, near the end, wraps round to the first tagged names.
     const taggedStart = sqlite.statements.length
     const tagged = await operations().getListingBySlug('bench-250')
     const taggedStatements = sqlite.statements.slice(taggedStart)
-    const taggedRelated = taggedStatements.find(statement => statement.sql.includes('related.wrap'))
-    if (!taggedRelated) throw new Error('Missing related-by-tags benchmark statement.')
+    const taggedRelated = taggedStatements.find(statement =>
+      statement.sql.includes('alternative.wrap')
+    )
+    if (!taggedRelated) throw new Error('Missing alternatives-by-tags benchmark statement.')
     const taggedEvidence = scanStatements([taggedRelated])
     const taggedRows = totalRows(taggedEvidence)
     const sharedTagMemberships = Number(
@@ -333,12 +283,12 @@ describe('representative D1 query benchmark', () => {
       ).total
     )
     const wrapped = await catalog.getListingBySlug('bench-313')
-    // A tag no other listing has: the hub (`primary`, over 128 members) fills all four by walking
+    // A tag no other listing has: the hub (`primary`, over 128 members) fills all six by walking
     // the public name index from bench-120's own name, in the same statement.
     const soloStart = sqlite.statements.length
     const solo = await operations().getListingBySlug('bench-120')
     const soloStatements = sqlite.statements.slice(soloStart)
-    const soloRelated = soloStatements.find(statement => statement.sql.includes('related.wrap'))
+    const soloRelated = soloStatements.find(statement => statement.sql.includes('alternative.wrap'))
     if (!soloRelated) throw new Error('Missing hub-fill benchmark statement.')
     const soloEvidence = scanStatements([soloRelated])
     const soloRows = totalRows(soloEvidence)
@@ -349,23 +299,17 @@ describe('representative D1 query benchmark', () => {
         eligibleListings: 320,
         taggedListings: 315 - FIRST_TAGGED
       },
-      navigation: {
-        legacyScanRows: legacyAdjacent.rows,
-        optimizedScanRows: optimizedAdjacentRows,
-        statementCount: detailStatements.length
-      },
-      related: {
-        legacyScanRows: legacyRelated.rows,
+      alternatives: {
         optimizedPlan: [
           ...new Set(
-            optimizedRelatedEvidence
+            optimizedAlternativesEvidence
               .flatMap(evidence => evidence.plan)
               .filter(line => !line.includes('loops='))
           )
         ],
-        optimizedScanRows: optimizedRelatedRows,
-        sharedMemberships,
-        singleCategoryOptimizedScanRows: singleCategoryRows
+        optimizedScanRows: optimizedAlternativesRows,
+        singleCategoryOptimizedScanRows: singleCategoryRows,
+        statementCount: detailStatements.length
       },
       relatedByTags: {
         optimizedPlan: [
@@ -392,11 +336,8 @@ describe('representative D1 query benchmark', () => {
     console.info(`DATA_OPS_BENCHMARK ${JSON.stringify(report)}`)
 
     expect(single?.relatedWebsites.map(related => related.slug)).toEqual(expectedSingleRelated)
-    expect(optimizedAdjacent.flatMap(evidence => evidence.plan).join('\n')).toContain(
-      'listings_publication_idx'
-    )
-    expect(optimizedRelatedEvidence.flatMap(evidence => evidence.plan).join('\n')).toContain(
-      'listing_categories_category_idx'
+    expect(optimizedAlternativesEvidence.flatMap(evidence => evidence.plan).join('\n')).toContain(
+      'listings_related_name_idx'
     )
     expect(singleCategoryEvidence.flatMap(evidence => evidence.plan).join('\n')).toContain(
       'listings_related_name_idx'
@@ -405,13 +346,17 @@ describe('representative D1 query benchmark', () => {
       'bench-251',
       'bench-252',
       'bench-253',
-      'bench-254'
+      'bench-254',
+      'bench-255',
+      'bench-256'
     ])
     expect(wrapped?.relatedWebsites.map(related => related.slug)).toEqual([
       'bench-314',
       'bench-200',
       'bench-201',
-      'bench-202'
+      'bench-202',
+      'bench-203',
+      'bench-204'
     ])
     expect(taggedEvidence.flatMap(evidence => evidence.plan).join('\n')).toContain(
       'listing_tags_tag_idx'
@@ -420,18 +365,21 @@ describe('representative D1 query benchmark', () => {
       'bench-121',
       'bench-122',
       'bench-123',
-      'bench-124'
+      'bench-124',
+      'bench-125',
+      'bench-126'
     ])
     expect(soloEvidence.flatMap(evidence => evidence.plan).join('\n')).toContain(
       'listings_related_name_idx'
     )
     if (scanStatsAvailable) {
-      expect(legacyAdjacent.rows).not.toBeNull()
-      expect(optimizedAdjacentRows).not.toBeNull()
-      expect(legacyAdjacent.rows as number).toBeGreaterThan(optimizedAdjacentRows as number)
-      expect(optimizedAdjacentRows as number).toBeLessThanOrEqual(100)
-      expect(optimizedRelatedRows as number).toBeLessThanOrEqual(2 * sharedMemberships + 50)
-      expect(taggedRows as number).toBeLessThanOrEqual(2 * sharedTagMemberships + 50)
+      // The hub-size probe and the walk, as for the single-category seek below.
+      expect(optimizedAlternativesRows as number).toBeLessThanOrEqual(2 * 129 + 100)
+      // Each shared membership's index entry and its grouped row, then each candidate (here one
+      // per membership, the worst case) read back, checked against the hub and read, and about 50
+      // for the rest: 623 here (#519). Grouping first reads a listing that shares several tags
+      // once, and the hub check skips the rows of those filed elsewhere.
+      expect(taggedRows as number).toBeLessThanOrEqual(5 * sharedTagMemberships + 100)
       // The hub-size probe counts at most 129 public members, each a category index entry and its
       // listing row (#378 review: public members, as the shell statistics count them); the walk is
       // bounded like the single-category seek above.
@@ -443,20 +391,18 @@ describe('representative D1 query benchmark', () => {
       expect(oneColdPlus99WarmAverage as number).toBeLessThanOrEqual(25)
     } else {
       expect([
-        legacyAdjacent.rows,
-        optimizedAdjacentRows,
-        optimizedRelatedRows,
+        optimizedAlternativesRows,
         singleCategoryRows,
         taggedRows,
         soloRows,
         coldShellRows,
         oneColdPlus99WarmAverage
-      ]).toEqual(Array(8).fill(null))
+      ]).toEqual(Array(6).fill(null))
     }
-    // Epoch probe, detail row, related listings, previous, next.
-    expect(detailStatements.length).toBeLessThanOrEqual(5)
-    expect(taggedStatements.length).toBeLessThanOrEqual(5)
-    expect(soloStatements.length).toBeLessThanOrEqual(5)
+    // Epoch probe, detail row (with its hand picks), the rest of its alternatives.
+    expect(detailStatements.length).toBeLessThanOrEqual(3)
+    expect(taggedStatements.length).toBeLessThanOrEqual(3)
+    expect(soloStatements.length).toBeLessThanOrEqual(3)
     expect(events.every(event => event.success)).toBe(true)
   })
 })

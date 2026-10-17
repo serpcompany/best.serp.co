@@ -46,6 +46,8 @@ export const requiredIndexNames = [
   'taxonomy_redirects_target_tag_idx',
   'taxonomy_redirects_target_best_page_idx',
   'listing_faqs_listing_order_unique',
+  'listing_alternatives_listing_position_unique',
+  'listing_alternatives_alternative_idx',
   'listing_media_listing_kind_order_unique',
   'listing_resource_links_listing_order_unique',
   'listing_slug_redirects_listing_idx',

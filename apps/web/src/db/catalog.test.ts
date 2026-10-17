@@ -82,15 +82,13 @@ describe('shared catalog data operations', () => {
     expect(statements.some(statement => statement.sql.includes("m.kind = 'logo'"))).toBe(true)
   })
 
-  it('loads one detail projection with deterministic related and boundary navigation', async () => {
+  it('loads one detail projection with its alternatives', async () => {
     const catalog = operations().operations
     const detail = await catalog.getListingBySlug('charlie')
-    expect(detail).toMatchObject({
-      slug: 'charlie',
-      content: 'charlie detail content',
-      previousWebsite: { slug: 'bravo' },
-      nextWebsite: { slug: 'delta' }
-    })
+    expect(detail).toMatchObject({ slug: 'charlie', content: 'charlie detail content' })
+    // #519 dropped the previous and next listings with the page's "Browse more".
+    expect(detail).not.toHaveProperty('previousWebsite')
+    expect(detail).not.toHaveProperty('nextWebsite')
     expect(detail?.resourceLinks).toEqual([
       { label: 'Documentation', url: 'https://docs.example/serp-charlie' }
     ])
@@ -99,28 +97,28 @@ describe('shared catalog data operations', () => {
       { answer: 'Answer for serp-charlie', question: 'Question for serp-charlie' }
     ])
     expect(detail?.media?.images).toEqual(['https://assets.example/serp-charlie-image.png'])
+    // No tags, hand picks or best pages: its hub, onward from its own name, wrapping round (#519).
+    // Before #519 a listing in several categories ranked by shared categories (alpha, echo first).
     expect(detail?.relatedWebsites.map(item => item.slug)).toEqual([
-      'alpha',
+      'delta',
       'echo',
-      'bravo',
-      'delta'
+      'alpha',
+      'bravo'
     ])
-    expect((await catalog.getListingBySlug('alpha'))?.previousWebsite).toBeNull()
-    expect((await catalog.getListingBySlug('echo'))?.nextWebsite).toBeNull()
     expect(await catalog.getListingBySlug('future')).toBeNull()
   })
 
   it('reads an uncached listing in one round trip after the epoch, and a missing one too (#378)', async () => {
-    // A cold data cache: the epoch, then the detail, related listings and both neighbours in one
-    // batch. charlie ranks related listings by shared categories, bravo through its category's
-    // members; `future` is not public yet and `nothing` doesn't exist.
+    // A cold data cache: the epoch, then the detail (with its hand picks) and the rest of its
+    // alternatives in one batch, both read through their category's members; `future` is not
+    // public yet and `nothing` doesn't exist.
     for (const slug of ['charlie', 'bravo', 'future', 'nothing']) {
       const start = sqlite.roundTrips.length
       const { events, operations: catalog } = operations()
       const detail = await catalog.getListingBySlug(slug)
       expect(sqlite.roundTrips.slice(start), slug).toEqual([
         { kind: 'statement', sql: expect.stringContaining('FROM publication_state ps') },
-        { kind: 'batch', size: 4 }
+        { kind: 'batch', size: 2 }
       ])
       const queries = events.filter(
         (event): event is CatalogQueryEvent =>
@@ -129,14 +127,7 @@ describe('shared catalog data operations', () => {
       // Each statement reports its own shape and rows, all with the batch's wall time; a slug
       // that names no public listing reports the batch as one event.
       expect(queries.map(event => event.queryShape)).toEqual(
-        detail
-          ? [
-              'listing-detail',
-              slug === 'charlie' ? 'related-shared-categories' : 'related-single-category-members',
-              'navigation-previous',
-              'navigation-next'
-            ]
-          : ['listing-detail']
+        detail ? ['listing-detail', 'alternatives-hub-members'] : ['listing-detail']
       )
       expect(new Set(queries.map(event => event.wallDurationMs)).size).toBe(1)
       expect(queries.every(event => event.success)).toBe(true)
@@ -150,8 +141,8 @@ describe('shared catalog data operations', () => {
       observe: () => undefined,
       reuseEpoch: () => ({ effectiveAt: '2026-07-05T00:00:00.000Z', version: 1 })
     })
-    expect((await reused.getListingBySlug('charlie'))?.nextWebsite?.slug).toBe('delta')
-    expect(sqlite.roundTrips.slice(start)).toEqual([{ kind: 'batch', size: 4 }])
+    expect((await reused.getListingBySlug('charlie'))?.relatedWebsites[0]?.slug).toBe('delta')
+    expect(sqlite.roundTrips.slice(start)).toEqual([{ kind: 'batch', size: 2 }])
   })
 
   it('reports the batch before refusing a listing without a primary category, with that error', async () => {
@@ -166,9 +157,9 @@ describe('shared catalog data operations', () => {
         >
         const detail = results[0]?.results[0]
         if (detail) detail.category = null
-        const related = results[1]
-        if (related) {
-          related.results = [{ fill_plan: null, id: null, kind: 'hub' }]
+        const alternatives = results[1]
+        if (alternatives) {
+          alternatives.results = [{ fill_plan: null, id: null, kind: 'hub' }]
         }
         return results
       }
@@ -187,11 +178,7 @@ describe('shared catalog data operations', () => {
           ? [[event.queryShape, event.success]]
           : []
       )
-    ).toEqual([
-      ['listing-detail', true],
-      ['navigation-previous', true],
-      ['navigation-next', true]
-    ])
+    ).toEqual([['listing-detail', true]])
   })
 
   it('reports a failed listing batch once, as its detail, without its SQL', async () => {
@@ -221,35 +208,7 @@ describe('shared catalog data operations', () => {
     ])
   })
 
-  it('links every public listing to its neighbours in publication order, at every boundary', async () => {
-    // The older-date branch of `next` has no `asOf` bound of its own since #314 (the current
-    // listing is public, so older ones are too). Each branch, both directions: across a
-    // publication date, to the next display order on one date, the slug tie on one date and
-    // display order, and both ends. With the clock before alpha's date, alpha is not public yet,
-    // and `future` never is.
-    const orders: Record<string, string[]> = {
-      '2026-07-30T00:00:00.000Z': ['alpha', 'bravo', 'charlie', 'delta', 'echo'],
-      '2026-07-04T12:00:00.000Z': ['bravo', 'charlie', 'delta', 'echo']
-    }
-    for (const [clock, order] of Object.entries(orders)) {
-      const catalog = createCatalogOperations({
-        cache: new MemoryCatalogCache(),
-        client: createDatabase(sqlite.asD1Database()),
-        clock: () => new Date(clock),
-        observe: () => undefined
-      })
-      expect((await catalog.getPublishedListings()).map(item => item.slug)).toEqual(order)
-      for (const [index, slug] of order.entries()) {
-        const detail = await catalog.getListingBySlug(slug)
-        expect(
-          [detail?.previousWebsite?.slug ?? null, detail?.nextWebsite?.slug ?? null],
-          `${clock} ${slug}`
-        ).toEqual([order[index - 1] ?? null, order[index + 1] ?? null])
-      }
-    }
-  })
-
-  it('ranks single-category related listings from the category members', async () => {
+  it('fills alternatives from the category members', async () => {
     const { events, operations: catalog } = operations()
     const detail = await catalog.getListingBySlug('bravo')
     // Onward from its own name, wrapping round to the start (#331).
@@ -264,8 +223,7 @@ describe('shared catalog data operations', () => {
     )
     expect(
       events.some(
-        event =>
-          event.event === 'd1_query' && event.queryShape === 'related-single-category-members'
+        event => event.event === 'd1_query' && event.queryShape === 'alternatives-hub-members'
       )
     ).toBe(true)
   })
@@ -346,7 +304,7 @@ describe('shared catalog data operations', () => {
     expect(after.listingCount).toBe(6)
     expect(after.publicationVersion).toBe(before.publicationVersion)
     expect((await later.getListingNamePage()).items.map(item => item.slug)).toContain('future')
-    expect([...cache.values.keys()]).toContain('catalog-shell:v9:1.2027-01-01T00:00:00.000Z')
+    expect([...cache.values.keys()]).toContain('catalog-shell:v10:1.2027-01-01T00:00:00.000Z')
   })
 
   it('reads the catalog epoch for the Worker edge cache with query telemetry', async () => {
@@ -583,14 +541,14 @@ describe('shared catalog data operations', () => {
       )
     ).toHaveLength(1)
     expect([...cache.values.keys()].sort()).toEqual([
-      `catalog-shell:v9:${epoch(1)}`,
-      `catalog-shell:v9:${epoch(2)}`
+      `catalog-shell:v10:${epoch(1)}`,
+      `catalog-shell:v10:${epoch(2)}`
     ])
   })
 
   it('falls back to live D1 when cached shell data is corrupt or unavailable', async () => {
     const corrupt = new MemoryCatalogCache()
-    corrupt.values.set(`catalog-shell:v9:${epoch(1)}`, { featuredCount: 'wrong' })
+    corrupt.values.set(`catalog-shell:v10:${epoch(1)}`, { featuredCount: 'wrong' })
     const corruptCatalog = operations(corrupt)
     expect((await corruptCatalog.operations.getShellStats()).featuredCount).toBe(2)
     expect(corruptCatalog.events).toContainEqual({
@@ -629,10 +587,10 @@ describe('shared catalog data operations', () => {
 
     expect(listings).toHaveLength(5)
     expect(detail?.relatedWebsites.map(item => item.slug)).toEqual([
-      'alpha',
+      'delta',
       'echo',
-      'bravo',
-      'delta'
+      'alpha',
+      'bravo'
     ])
     expect([...cache.ttlSeconds.values()]).toEqual([86400, 86400])
     expect(
@@ -696,8 +654,8 @@ describe('shared catalog data operations', () => {
     ).toHaveLength(2)
 
     const corrupt = new MemoryCatalogCache()
-    corrupt.values.set(`catalog-published:v9:${epoch(2)}`, { items: 'wrong' })
-    corrupt.values.set(`catalog-detail:v9:${epoch(2)}:charlie`, { detail: 'wrong' })
+    corrupt.values.set(`catalog-published:v10:${epoch(2)}`, { items: 'wrong' })
+    corrupt.values.set(`catalog-detail:v10:${epoch(2)}:charlie`, { detail: 'wrong' })
     const recovered = operations(corrupt)
     expect(await recovered.operations.getPublishedListings()).toHaveLength(5)
     expect((await recovered.operations.getListingBySlug('charlie'))?.slug).toBe('charlie')
@@ -734,11 +692,11 @@ describe('shared catalog data operations', () => {
     expect(
       cold.events.filter(event => event.event === 'd1_query').map(event => event.queryShape)
     ).toEqual(['publication-version'])
-    expect(cache.values.get(`catalog-listing-content:v9:${epoch(1)}:f1:charlie`)).toEqual({
+    expect(cache.values.get(`catalog-listing-content:v10:${epoch(1)}:f1:charlie`)).toEqual({
       publicationVersion: 1,
       value: { body: 'tree 1' }
     })
-    expect(cache.ttlSeconds.get(`catalog-listing-content:v9:${epoch(1)}:f1:charlie`)).toBe(86400)
+    expect(cache.ttlSeconds.get(`catalog-listing-content:v10:${epoch(1)}:f1:charlie`)).toBe(86400)
 
     const warm = operations(cache)
     expect(await warm.operations.getDerivedValue(derivation())).toEqual({ body: 'tree 1' })
@@ -757,7 +715,7 @@ describe('shared catalog data operations', () => {
     expect(await operations(cache).operations.getDerivedValue(derivation())).toEqual({
       body: 'tree 3'
     })
-    cache.values.set(`catalog-listing-content:v9:${epoch(2)}:f1:charlie`, {
+    cache.values.set(`catalog-listing-content:v10:${epoch(2)}:f1:charlie`, {
       publicationVersion: 2,
       value: { body: 7 }
     })
@@ -1043,7 +1001,7 @@ describe('when a public listing last changed (#218)', () => {
   })
 })
 
-describe('related listings of untagged listings in one category (#331)', () => {
+describe('alternatives of untagged listings in one category (#331, #519)', () => {
   /** `count` untagged listings named "<prefix> 000", "<prefix> 001", … in a category of their own. */
   function seedCategory(sqlite: SqliteD1, slug: string, count: number) {
     sqlite.database
@@ -1092,16 +1050,16 @@ describe('related listings of untagged listings in one category (#331)', () => {
     const relatedOf = async (slug: string) =>
       (await catalog.getListingBySlug(slug))?.relatedWebsites.map(item => item.slug)
 
-    // Before #331 every listing in `other` linked the category's first four names.
-    expect(await relatedOf('other-010')).toEqual(related('other', [11, 12, 13, 14]))
-    expect(await relatedOf('other-070')).toEqual(related('other', [71, 72, 73, 74]))
+    // Before #331 every listing in `other` linked the category's first names; six since #519.
+    expect(await relatedOf('other-010')).toEqual(related('other', [11, 12, 13, 14, 15, 16]))
+    expect(await relatedOf('other-070')).toEqual(related('other', [71, 72, 73, 74, 75, 76]))
     // The last names wrap round to the start, for only as many as the walk lacked.
-    expect(await relatedOf('other-138')).toEqual(related('other', [139, 0, 1, 2]))
-    expect(await relatedOf('other-139')).toEqual(related('other', [0, 1, 2, 3]))
-    expect(await relatedOf('small-001')).toEqual(related('small', [2, 3, 4, 5]))
-    expect(await relatedOf('small-004')).toEqual(related('small', [5, 0, 1, 2]))
-    // Alone in its category: nothing related. The statement's one placeholder row carries the
-    // plan and no listing, which is no related listing and no result row (#378 review).
+    expect(await relatedOf('other-136')).toEqual(related('other', [137, 138, 139, 0, 1, 2]))
+    expect(await relatedOf('other-139')).toEqual(related('other', [0, 1, 2, 3, 4, 5]))
+    expect(await relatedOf('small-001')).toEqual(related('small', [2, 3, 4, 5, 0]))
+    expect(await relatedOf('small-004')).toEqual(related('small', [5, 0, 1, 2, 3]))
+    // Alone in its category: no alternative. The statement's one placeholder row carries the
+    // plan and no listing, which is no alternative and no result row (#378 review).
     seedCategory(sqlite, 'alone', 1)
     const before = events.length
     expect(await catalog.getListingBySlug('alone-000')).toMatchObject({
@@ -1113,20 +1071,20 @@ describe('related listings of untagged listings in one category (#331)', () => {
         .slice(before)
         .filter(
           (event): event is CatalogQueryEvent =>
-            event.event === 'd1_query' && event.queryShape.startsWith('related-')
+            event.event === 'd1_query' && event.queryShape.startsWith('alternatives-')
         )
         .map(event => [event.queryShape, event.resultRows])
-    ).toEqual([['related-single-category-members', 0]])
+    ).toEqual([['alternatives-hub-members', 0]])
 
     const shapes = new Set(
       events.flatMap(event => (event.event === 'd1_query' ? [event.queryShape] : []))
     )
-    expect(shapes).toContain('related-single-category-seek')
-    expect(shapes).toContain('related-single-category-members')
+    expect(shapes).toContain('alternatives-hub-seek')
+    expect(shapes).toContain('alternatives-hub-members')
     // The walk's plan comes from the statement itself, not the shell statistics (#378): one batch.
     const start = sqlite.roundTrips.length
     await catalog.getListingBySlug('other-020')
-    expect(sqlite.roundTrips.slice(start)).toEqual([{ kind: 'batch', size: 4 }])
+    expect(sqlite.roundTrips.slice(start)).toEqual([{ kind: 'batch', size: 2 }])
     expect(
       events.some(event => event.event === 'd1_query' && event.queryShape === 'shell-stats')
     ).toBe(false)

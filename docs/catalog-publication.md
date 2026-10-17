@@ -119,7 +119,8 @@ page answers 308 instead of 410. It names `from` and `to`, each a listing's `id`
 
 The row-level operations that write one listing's copy, links, or flags, and `listing-create`, are
 in [Listing operations](./listing-operations.md): `listing-details-set`, `listing-content-set`,
-`listing-create`, `listing-resources-set`, and `listing-feature-listing-set`.
+`listing-create`, `listing-resources-set`, `listing-alternatives-set`, and
+`listing-feature-listing-set`.
 
 ## Taxonomy operations
 
