@@ -21,7 +21,8 @@ import {
   seedVerifiedSubmission,
   signIn,
   signInAsNewAdmin,
-  unique
+  unique,
+  uniqueIp
 } from './admin-fixture'
 import { expectedResponse, test } from './test'
 
@@ -215,8 +216,13 @@ test.describe('admin gate', () => {
     const origin = new URL(baseURL ?? '').origin
     const anonymous = await playwrightRequest.newContext({ baseURL })
     try {
+      // A page goes to sign-in and back (#488); the API answers 401.
       for (const path of ADMIN_PAGES) {
-        expect((await anonymous.get(path, { maxRedirects: 0 })).status(), path).toBe(401)
+        const response = await anonymous.get(path, { maxRedirects: 0 })
+        expect(response.status(), path).toBe(303)
+        expect(response.headers().location, path).toBe(
+          `/login/?callbackUrl=${encodeURIComponent(path)}`
+        )
       }
       for (const [method, path] of ADMIN_ACTIONS) {
         const response = await anonymous.fetch(path, {
@@ -244,6 +250,48 @@ test.describe('admin gate', () => {
       expect(response.status(), `${method} ${path}`).toBe(403)
       expect(await response.json()).toMatchObject({ error: 'admin_required' })
     }
+  })
+
+  test('sends a signed-out admin to sign-in and back to the page, also with a stale session (#488)', async ({
+    baseURL,
+    page
+  }) => {
+    test.setTimeout(120_000)
+    const email = `${ADMIN_EMAIL_PREFIXES.adminPanel}-${unique()}@example.com`
+    localD1(`INSERT INTO admin_allowlist (email, added_by) VALUES (${q(email)}, 'e2e')`)
+    admins.push(email)
+    await page.context().setExtraHTTPHeaders({ 'cf-connecting-ip': uniqueIp() })
+    const signInFor = (path: string) => (url: URL) =>
+      url.pathname === '/login/' && url.searchParams.get('callbackUrl') === path
+
+    // The link in a "ready for review" email, opened without a session cookie.
+    const target = '/admin/listings/?size=20'
+    await page.goto(target)
+    await page.waitForURL(signInFor(target))
+    await page.getByLabel('Email').fill(email)
+    await page.getByRole('button', { name: 'Email me a code' }).click()
+    await expect(page.getByRole('heading', { name: 'Check your email' })).toBeVisible()
+    const outbox = await page.request.get(
+      `/api/auth/dev/otp-outbox?email=${encodeURIComponent(email)}`
+    )
+    const { otp } = (await outbox.json()) as { otp: string | null }
+    expect(otp).toMatch(/^\d{6}$/u)
+    await page.locator('#code').fill(otp ?? '')
+    await page.waitForURL(url => `${url.pathname}${url.search}` === target)
+    await expect(page.getByRole('heading', { name: 'Listings', exact: true })).toBeVisible()
+
+    // A session cookie the gate lets through but that names no session: `requireAdmin()`.
+    await page.context().clearCookies()
+    await page
+      .context()
+      .addCookies([{ name: 'better-auth.session_token', url: baseURL, value: 'stale' }])
+    const stale = await page.request.get('/admin/submissions/', { maxRedirects: 0 })
+    expect(stale.status()).toBe(307)
+    expect(stale.headers().location).toBe(
+      `/login/?callbackUrl=${encodeURIComponent('/admin/submissions/')}`
+    )
+    await page.goto('/admin/submissions/')
+    await page.waitForURL(signInFor('/admin/submissions/'))
   })
 
   test('requires this site’s Origin on every admin write', async ({ baseURL, request }) => {
