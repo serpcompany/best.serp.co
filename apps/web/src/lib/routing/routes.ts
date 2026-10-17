@@ -1,5 +1,5 @@
 import { siteConfig } from '../site/site-config'
-import { taxonomyRoutePaths } from '../site/site-routes'
+import { htmlSitemapPaths, taxonomyRoutePaths } from '../site/site-routes'
 
 function normalizeBasePath(basePath: string): string {
   return basePath.replace(/^\/+|\/+$/g, '')
@@ -107,6 +107,12 @@ export const routes = {
   dmca: '/legal/dmca/',
   projects: buildNetworkRoute(),
   search: '/search/',
+  // The HTML sitemap (#53), from the route registry.
+  sitemap: {
+    index: htmlSitemapPaths.index,
+    listings: htmlSitemapPaths.listings,
+    listingsPage: htmlSitemapPaths.listingsPage
+  },
   login: '/login/',
   sponsor: '/sponsor/',
   submit: '/submit/',
@@ -148,6 +154,8 @@ type StaticRoutes =
   | 'login'
   | 'projects'
   | 'search'
+  | 'sitemap.index'
+  | 'sitemap.listings'
   | 'submit'
   | 'sponsor'
   | 'terms'
@@ -163,6 +171,7 @@ type DynamicRoutes =
   | 'category.page'
   | 'tag.page'
   | 'best.page'
+  | 'sitemap.listingsPage'
 
 type Routes = StaticRoutes | DynamicRoutes
 
@@ -176,6 +185,7 @@ type DynamicRouteParams = {
   'category.page': { category: string }
   'tag.page': { tag: string }
   'best.page': { keyword: string }
+  'sitemap.listingsPage': { page: string }
 }
 
 export function getRoute<T extends Routes>(

@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { PublishedBestPage } from '@/db/contracts'
+import type { PublishedBestPage, PublishedCategory } from '@/db/contracts'
 
 vi.mock('server-only', () => ({}))
 const getBestPages = vi.fn<() => Promise<PublishedBestPage[]>>()
-vi.mock('./repository', () => ({ getBestPages: () => getBestPages() }))
+const getActiveCategories = vi.fn<() => Promise<PublishedCategory[]>>()
+vi.mock('./repository', () => ({
+  getActiveCategories: () => getActiveCategories(),
+  getBestPages: () => getBestPages()
+}))
 
-const { linksBestIndex } = await import('./site-nav')
+const { linksBestIndex, notFoundLinkTargets } = await import('./site-nav')
 
 const page = (poolSize: number): PublishedBestPage => ({
   category: null,
@@ -42,5 +46,38 @@ describe('whether the header links the best-page index (#347)', () => {
   it('leaves it out, instead of failing the page, when the read fails', async () => {
     getBestPages.mockRejectedValue(new Error('D1 unavailable'))
     expect(await linksBestIndex()).toBe(false)
+  })
+})
+
+const category = (slug: string, name: string, count: number): PublishedCategory => ({
+  count,
+  description: '',
+  name,
+  order: 0,
+  slug
+})
+
+describe('what the 404 page links (#53)', () => {
+  beforeEach(() => {
+    getBestPages.mockReset()
+    getActiveCategories.mockReset()
+  })
+
+  it('reads the categories with a public listing, by name, and the best pages that render', async () => {
+    getActiveCategories.mockResolvedValue([
+      category('writing', 'Writing Tools', 49),
+      category('audio', 'Audio Tools', 0),
+      category('design', 'Design Tools', 3)
+    ])
+    getBestPages.mockResolvedValue([page(0), page(3)])
+    const targets = await notFoundLinkTargets()
+    expect(targets.categories.map(item => item.slug)).toEqual(['design', 'writing'])
+    expect(targets.bestPages).toEqual([page(3)])
+  })
+
+  it('leaves out what a failed read would have linked, instead of failing the 404', async () => {
+    getActiveCategories.mockRejectedValue(new Error('D1 unavailable'))
+    getBestPages.mockRejectedValue(new Error('D1 unavailable'))
+    expect(await notFoundLinkTargets()).toEqual({ bestPages: [], categories: [] })
   })
 })

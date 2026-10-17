@@ -133,6 +133,7 @@ const PUBLIC_SEGMENTS = [
   'products',
   'rss.xml',
   'search',
+  'sitemap',
   'sitemap-best.xml',
   'sitemap-categories.xml',
   'sitemap-index.xml',

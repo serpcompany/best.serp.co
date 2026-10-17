@@ -9,7 +9,8 @@ const { getCloudflareContext } = vi.hoisted(() => ({ getCloudflareContext: vi.fn
 vi.mock('server-only', () => ({}))
 vi.mock('@opennextjs/cloudflare', () => ({ getCloudflareContext }))
 
-const { getListingBySlug } = await import('./repository')
+const { getCategoryListings, getListingBySlug, getSitemapListingPage, getSitemapListingPageCount } =
+  await import('./repository')
 
 /** A Workers Cache API stand-in: entries by request URL, kept as the JSON the data cache writes. */
 class MemoryCache {
@@ -157,4 +158,67 @@ describe('the catalog adapter’s data cache scope (#397)', () => {
       expect(logs.filter(log => log.event === 'catalog_cache')).toEqual([])
     }
   )
+})
+
+describe('the catalog adapter’s HTML sitemap and alternatives reads (#53)', () => {
+  let cache: MemoryCache
+  const logs: Array<Record<string, unknown>> = []
+
+  beforeEach(() => {
+    const sqlite = new SqliteD1()
+    seedContractFixture(sqlite)
+    getCloudflareContext.mockResolvedValue({
+      env: { D1_RUNTIME_ENV: 'local', DB: sqlite.asD1Database(), MEDIA_BASE_URL: '/_media' }
+    })
+    cache = new MemoryCache()
+    vi.stubGlobal('caches', { open: async () => cache })
+    logs.length = 0
+    vi.spyOn(console, 'info').mockImplementation((line: unknown) => {
+      logs.push(JSON.parse(String(line)))
+    })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  const cacheStates = (operation: string) =>
+    logs
+      .filter(log => log.event === 'catalog_cache' && log.operation === operation)
+      .map(log => log.state)
+
+  it('lists every public listing oldest first, from the products sitemap’s cached list', async () => {
+    expect(await getSitemapListingPage(1)).toEqual({
+      // Publication order reversed; `future` is not public yet.
+      items: ['echo', 'delta', 'charlie', 'bravo', 'alpha'].map(slug => ({
+        name: `${slug} listing`,
+        slug
+      })),
+      page: 1,
+      pageCount: 1,
+      total: 5
+    })
+    expect(await getSitemapListingPageCount()).toBe(1)
+    expect(cacheStates('published-summaries')).toEqual(['miss', 'written', 'hit'])
+  })
+
+  it('has no page past the last', async () => {
+    expect(await getSitemapListingPage(2)).toBeNull()
+    expect(await getSitemapListingPage(0)).toBeNull()
+  })
+
+  it('reads a category’s first listings in directory order, cached like a list page', async () => {
+    const alternatives = await getCategoryListings('secondary', 2)
+    expect(alternatives.map(listing => listing.slug)).toEqual(['alpha', 'charlie'])
+    expect((await getCategoryListings('primary', 6)).map(listing => listing.slug)).toEqual([
+      'alpha',
+      'bravo',
+      'charlie',
+      'delta',
+      'echo'
+    ])
+    expect(cacheStates('listing-name-page')).toEqual(['miss', 'written', 'miss', 'written'])
+    expect(await getCategoryListings('empty', 6)).toEqual([])
+  })
 })

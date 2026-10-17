@@ -6,9 +6,11 @@ import {
 } from '@/lib/site'
 import {
   bestPageEntryCount,
+  categoryBestPages,
   isBestPageIndexable,
   isTagIndexable,
   isTagLinked,
+  linkedCategories,
   renderingCategory
 } from './taxonomy-indexing'
 
@@ -74,5 +76,36 @@ describe('whether a category page renders (#347 review)', () => {
     expect(renderingCategory(categories, 'audio')).toBeNull()
     expect(renderingCategory(categories, 'retired')).toBeNull()
     expect(renderingCategory(categories, null)).toBeNull()
+  })
+})
+
+describe('what the 404 page, the 410 page and the HTML sitemap link (#53)', () => {
+  it('links the categories whose pages render, by name', () => {
+    const linked = linkedCategories([
+      { count: 3, name: 'Writing Tools', slug: 'writing' },
+      { count: 0, name: 'Audio Tools', slug: 'audio' },
+      { count: 1, name: 'Design Tools', slug: 'design' }
+    ])
+    expect(linked.map(category => category.slug)).toEqual(['design', 'writing'])
+  })
+
+  it('links every best page of a hub that has an entry, in the index’s order', () => {
+    const page = (slug: string, hub: string, poolSize = 3) => ({
+      hub,
+      listSize: 10,
+      poolSize,
+      slug
+    })
+    const pages = [
+      page('writing-tag', 'writing'),
+      page('empty-writing', 'writing', 0),
+      page('writing-app', 'writing'),
+      page('design-app', 'design')
+    ]
+    expect(categoryBestPages(pages, 'writing').map(bestPage => bestPage.slug)).toEqual([
+      'writing-tag',
+      'writing-app'
+    ])
+    expect(categoryBestPages(pages, 'audio')).toEqual([])
   })
 })

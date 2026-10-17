@@ -146,7 +146,9 @@ publisher's affected routes) build their URLs from it.
     shows its hub badge and its other categories named from D1, then its tag chips, and "Featured
     in" names up to three best pages that show it ([Public catalog](./public-catalog.md#reads)).
   - The 410 page links the listing's hub while the hub's page renders (`renderingCategory`), else
-    the directory.
+    the directory, and beside it every best page of the hub that renders (`categoryBestPages`,
+    #53). Below, it shows up to 6 of the hub's live listings as alternatives, or the 404 page's
+    links when there are none ([The 404 page](#the-404-page-and-the-removed-listing-page)).
 
   Without tags or best pages there is no hub grid, tag chip, "Best {hub} lists", "Featured in" or
   "Best" link. These change on every page all the same: a listing's breadcrumb gains its hub, its
@@ -187,7 +189,43 @@ JSON-LD describes the whole category on every page.
 `apps/web/src/components/directory/listing-pagination.tsx` owns the parameter, links, and metadata;
 `getListingNamePage` in `apps/web/src/db` reads one page (ids in name order are cached
 per epoch, then only that page's summaries are read). Routes never load the full catalog
-for display; only the sitemaps and the JSON feed read every listing.
+for display; only the XML and HTML sitemaps and the JSON feed read every listing.
+
+## The HTML sitemap
+
+The sitemap page for people (#53; serp `docs/engineering/standards/web-stack/html-sitemap.md`).
+Every page of it is indexable, canonical to itself, and in `sitemap-pages.xml`; the route registry
+names its paths (`htmlSitemapPaths`), and every page's footer links `/sitemap/` as "Sitemap".
+
+| Path | Page |
+| --- | --- |
+| `/sitemap/` | Pages (the pages sitemap's static pages, named as the nav names them), Categories (each with a public listing), Best (each indexable best page), then a link to each numbered listings page |
+| `/sitemap/listings/` | Listings page 1 |
+| `/sitemap/listings/<n>/` | Listings page `n` from 2; `/sitemap/listings/1/` answers one 308 to `/sitemap/listings/`, and a page past the last, or a segment that is not a number from 2 without leading zeros, is a 404 |
+
+- **The same data as the XML sitemaps.** The listings pages read `getSitemapListings`, the products
+  sitemap's cached list, oldest first (its publication order reversed), 200 a page
+  (`apps/web/src/lib/seo/html-sitemap.ts`), so a new listing lands on the last page. Categories and
+  best pages use the predicates their sitemaps use (`linkedCategories`, `isBestPageIndexable`).
+  Tag pages are left out, and brands have no pages of their own, so only the Brands index is
+  listed. `e2e/not-found-and-sitemap.spec.ts` checks the HTML sitemap against the XML sitemaps.
+
+## The 404 page and the removed-listing page
+
+Per serp's `docs/engineering/standards/web-stack/404-pages.md` (#53):
+
+- **A URL with no page answers 404** with the 404 page, never a redirect. The page carries one
+  robots tag, the `noindex` Next.js writes on a not-found response: `notFoundMetadata` sets no
+  robots directive of its own.
+- **What it links.** Its message, the site's search (a GET form to `/search/`), "Go to the
+  homepage", then every index page (the Products menu's Categories, Best while the best index lists
+  a page, and Brands), the HTML sitemap, and every category with a public listing
+  (`NotFoundLinks`). The categories and the best index come from the cached shell stats and best
+  index (`notFoundLinkTargets`); a failed read leaves those links out rather than fail the 404.
+  The tag index stays unlinked (#425). The dashboards' 404 shows the same without the site chrome.
+- **A removed listing** answers 410 as before ([Taxonomy pages](#taxonomy-pages)), with its hub's
+  first 6 listings in directory order (`getCategoryListings`) as alternatives, or the 404 page's
+  links when its hub has none.
 
 ## What pages publish for search engines
 
@@ -196,7 +234,8 @@ for display; only the sitemaps and the JSON feed read every listing.
   its own sitemap index; see [Environments and hosts](./architecture.md#environments-and-hosts)).
   The index lists the five root-level sitemaps (pages, products, categories, tags and best
   pages, the last two empty until the taxonomy is published); the older sitemap URLs answer one
-  308. The route registry
+  308. The pages sitemap also lists the HTML sitemap's numbered pages
+  ([The HTML sitemap](#the-html-sitemap)). The route registry
   (`apps/web/src/lib/site/site-routes.ts`) sets each static page's indexability and sitemap for
   the sitemaps, robots.txt, page metadata, and footer. A listing's `lastmod` is its later
   `updated_at` or `published_at`; a collection's is its newest listing's.

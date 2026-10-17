@@ -35,6 +35,17 @@ export const taxonomyRoutePaths = {
 
 export const SITEMAP_INDEX_PATH = '/sitemap-index.xml'
 
+/**
+ * The HTML sitemap (#53; serp web-stack/html-sitemap.md): the page for people, and the numbered
+ * pages that list every listing. `/sitemap/listings/1/` redirects to the bare listings page
+ * (`redirects.ts`), and a page past the last answers 404.
+ */
+export const htmlSitemapPaths = {
+  index: '/sitemap/',
+  listings: '/sitemap/listings/',
+  listingsPage: '/sitemap/listings/[page]/'
+} as const
+
 export type SiteRoute = {
   /** The canonical path. */
   path: string
@@ -79,6 +90,11 @@ export const siteRoutes = [
   // Indexed at `TAG_INDEX_MIN_LISTINGS` listings, unless a best page ranks it (`isTagIndexable`).
   { indexable: true, path: taxonomyRoutePaths.tagPage, sitemapGroup: 'tags' },
   { disallow: true, indexable: false, path: '/search/', sitemapGroup: null },
+  // The HTML sitemap (#53): every page of it is indexable and canonical to itself, so crawlers
+  // walk all of them. The pages sitemap lists each numbered page (`getPageEntries`).
+  { indexable: true, path: htmlSitemapPaths.index, sitemapGroup: 'pages' },
+  { indexable: true, path: htmlSitemapPaths.listings, sitemapGroup: 'pages' },
+  { indexable: true, path: htmlSitemapPaths.listingsPage, sitemapGroup: 'pages' },
   { indexable: true, path: '/sponsor/', sitemapGroup: 'pages' },
   { disallow: true, indexable: false, path: '/submit/', sitemapGroup: null }
 ] as const satisfies readonly SiteRoute[]

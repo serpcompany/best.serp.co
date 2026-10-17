@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { headerItems, isCurrentPage, isMenuActive } from './site-links'
+import { htmlSitemapPaths, sitemapRoutePaths } from '@/lib/site'
+import {
+  footerGroups,
+  headerItems,
+  isCurrentPage,
+  isMenuActive,
+  sitemapPageLinks
+} from './site-links'
 
 function productsMenu(bestIndexListed: boolean) {
   const menu = headerItems({ bestIndexListed }).find(item => item.kind === 'menu')
@@ -45,5 +52,27 @@ describe('the Products menu (#347)', () => {
 
   it('leaves Best out while the index lists none, so it never links a heading alone', () => {
     expect(productsMenu(false).links.map(link => link.label)).not.toContain('Best')
+  })
+})
+
+describe('the HTML sitemap’s links (#53)', () => {
+  it('puts a plain "Sitemap" link to /sitemap/ in the footer', () => {
+    const links = footerGroups().flatMap(group => group.links)
+    expect(links).toContainEqual({ href: '/sitemap/', label: 'Sitemap' })
+  })
+
+  it('lists exactly the pages sitemap’s static pages but its own, named as the nav names them', () => {
+    const own = new Set<string>([htmlSitemapPaths.index, htmlSitemapPaths.listings])
+    const listed = sitemapRoutePaths('pages').filter(path => !own.has(path))
+    const links = sitemapPageLinks({ bestIndexListed: true })
+    expect(links.map(link => link.href).sort()).toEqual([...listed].sort())
+    expect(links[0]).toEqual({ href: '/', label: 'All products' })
+    expect(links.every(link => link.label.length > 0)).toBe(true)
+  })
+
+  it('leaves the best index out while it lists nothing, as the pages sitemap does', () => {
+    const hrefs = sitemapPageLinks({ bestIndexListed: false }).map(link => link.href)
+    expect(hrefs).not.toContain(htmlSitemapPaths.index)
+    expect(hrefs).not.toContain('/best/')
   })
 })

@@ -30,6 +30,12 @@ import {
   LISTING_CONTENT_FORMAT,
   type ListingContentTree
 } from '@/lib/markdown/listing-content'
+import {
+  type HtmlSitemapLink,
+  type HtmlSitemapPage,
+  htmlSitemapPage,
+  htmlSitemapPageCount
+} from '@/lib/seo/html-sitemap'
 import { CodedError } from '@/lib/telemetry/coded-error'
 
 export type {
@@ -170,6 +176,18 @@ const readListingNamePage = cache(
   }
 )
 
+/**
+ * The first `limit` listings of a category in directory order, the first cards its page shows,
+ * with media URLs: a removed listing's alternatives (#53). Cached per epoch like a list page.
+ */
+export const getCategoryListings = cache(
+  async (category: string, limit: number): Promise<WebsiteMetadata[]> => {
+    const operations = await getOperations()
+    const result = await operations.getListingNamePage({ category, page: 1, pageSize: limit })
+    return withMediaUrls(result.items)
+  }
+)
+
 export async function getListingNamePage(
   query: Omit<ListingNamePageQuery, 'pageSize'>
 ): Promise<ListingNamePage> {
@@ -285,4 +303,28 @@ export async function getPublicationVersion(): Promise<number> {
 
 export async function getSitemapListings(): Promise<WebsiteMetadata[]> {
   return withMediaUrls(await (await getOperations()).getSitemapListings())
+}
+
+/**
+ * Every public listing's name and slug for the HTML sitemap's numbered pages (#53): the products
+ * sitemap's list (`getSitemapListings`, cached per epoch), so the two never disagree, oldest
+ * first, so a new listing lands on the last page instead of moving the others.
+ */
+const readSitemapListingLinks = cache(
+  async (): Promise<HtmlSitemapLink[]> =>
+    (await (await getOperations()).getSitemapListings())
+      .map(({ name, slug }) => ({ name, slug }))
+      .reverse()
+)
+
+/** Numbered page `page` of the HTML sitemap's listings, or null past the last page (a 404). */
+export async function getSitemapListingPage(
+  page: number
+): Promise<HtmlSitemapPage<HtmlSitemapLink> | null> {
+  return htmlSitemapPage(await readSitemapListingLinks(), page)
+}
+
+/** How many numbered pages the HTML sitemap's listings fill. */
+export async function getSitemapListingPageCount(): Promise<number> {
+  return htmlSitemapPageCount((await readSitemapListingLinks()).length)
 }

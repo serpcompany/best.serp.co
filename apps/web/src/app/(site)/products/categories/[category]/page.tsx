@@ -21,7 +21,7 @@ import {
 } from '@/lib/catalog/repository'
 import { getRoute } from '@/lib/routing/routes'
 import { type PageSearchParams, redirectMovedTaxonomyPage } from '@/lib/routing/taxonomy-redirect'
-import { linkedTags, listedBestPages, renderingCategory } from '@/lib/seo/taxonomy-indexing'
+import { categoryBestPages, linkedTags, renderingCategory } from '@/lib/seo/taxonomy-indexing'
 
 interface CategoryPageProps {
   params: Promise<{ category: string }>
@@ -92,7 +92,7 @@ export default async function CategoryPage({ params, searchParams }: CategoryPag
   const hubTags = linkedTags(tags.filter(tag => tag.category === category.slug)).sort(
     (left, right) => right.count - left.count || left.name.localeCompare(right.name)
   )
-  const hubBestPages = listedBestPages(bestPages.filter(bestPage => bestPage.hub === category.slug))
+  const hubBestPages = categoryBestPages(bestPages, category.slug)
   const route = CategoryRoutePage({
     beforeListings: hubBestPages.length ? (
       <BestPagesSection
