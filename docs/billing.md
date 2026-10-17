@@ -247,10 +247,11 @@ access to Products and Prices as well.
 Events: `checkout.session.completed`, `checkout.session.expired`,
 `checkout.session.async_payment_succeeded`, `checkout.session.async_payment_failed`. The code
 also handles `charge.refunded`, `charge.dispute.created`, `charge.dispute.closed` and
-`refund.failed` (#473), but they stay dormant until the owner ticks those four events on both
-endpoints (test and live) in the "SERP Directories" account; agents have no access to it. No Stripe
-Tax: billing refuses to start while `site.submissions.automaticTax` is on, since a taxed charge
-wouldn't match its order.
+`refund.failed` (#473); the owner subscribed both endpoints (test and live) to those four events on
+2026-10-17 (#156), in the "SERP Directories" account, to which agents have no access. Both
+endpoints also send `charge.refund.updated`, `refund.created` and `refund.updated`, which the code
+ignores. No Stripe Tax: billing refuses to start while `site.submissions.automaticTax` is on, since
+a taxed charge wouldn't match its order.
 
 `features.orders` is `true` since #133: the staging Worker has its test-mode secrets and
 webhook, and the production Worker its live ones (#249). A Worker with orders on but without
