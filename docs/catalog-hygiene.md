@@ -105,8 +105,8 @@ review, and a test keeps the committed manifest identical to what the report gen
 The manifest is row-level (`concurrency: rows`, as #97 introduced): it names no base version,
 and each operation's own guards (`expected.website`, categories, live, no submission in review)
 decide whether it applies, so one file fits staging and production whatever else each published
-(admin decisions, #98's and #105's manifests) and publishes in any order relative to them. A row-level
-`listing-unpublish` must carry `expected.website`. It is applied like any publication: on
+(admin decisions, #98's and #105's manifests) and publishes in any order relative to them. A
+row-level `listing-unpublish` must carry `expected.website`. It is applied like any publication: on
 staging first (the staging publish path is #97), then on production after promotion. If an
 environment refuses it (a listing changed there), nothing is written: drop or fix that listing
 in a new report and manifest under a new date.
@@ -128,7 +128,9 @@ when Other retires (#351), so it answers 404 and can't be relisted; others are t
   `ashemaletube-downloader`, which no keyword caught). They were found by the category, by
   `ADULT_TERMS` (`scripts/migration/legacy-media.ts`, in `.archive/` since #315) and a broader
   word list over every listing's text, FAQs, resource links, and media URLs, and by reading every
-  downloader listing outside Adult. `kept` records the four fan-site downloaders and the keyword matches that stay, and why.
+  downloader listing outside Adult. `kept` records the four fan-site downloaders and the keyword
+  matches that stay, and why. OnlyFans Bulk Downloader's own page is gone, so #546 redirects its
+  URL (308) to OnlyFans Downloader, a kept, live listing for the same fan-site downloader.
 - **The manifests.** `2026-10-09-adult-category.yaml` gives `ashemaletube-downloader` the Adult
   category (as #98 did), then `2026-10-09-adult-removal.yaml` takes Adult off the kept fan-site
   downloaders (`listing-categories-remove`, never a primary category), unpublishes the 272
