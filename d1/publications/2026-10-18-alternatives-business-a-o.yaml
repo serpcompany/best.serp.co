@@ -16,11 +16,11 @@
 # Marketing & SEO; Colibri.ai and Grain AI under Productivity; and Nureply, OutboundFlow.ai, Pipl.ai
 # and SmartWriter under Writing. Every listing and pick is a v1 import listing, with the same id and
 # slug on staging and production. The reason for each listing is the comment above its operation.
-# Thirty-one listings have no operation. Twenty-three because nothing in the catalog substitutes for
-# them on 2026-10-18: Babelstreet (threat, identity and vendor-risk intelligence from public data
-# for government and enterprise analysts), CaliberAI (flagging defamation and other legal risk in
-# news copy before it is published), Catchlight (growth and prospecting for financial advisors and
-# wealth firms), ChainGPT (an AI model and toolkit for crypto and Web3: a chatbot, a smart-contract
+# Thirty listings have no operation. Twenty-one because nothing in the catalog substitutes for them
+# on 2026-10-18: Babelstreet (threat, identity and vendor-risk intelligence from public data for
+# government and enterprise analysts), CaliberAI (flagging defamation and other legal risk in news
+# copy before it is published), Catchlight (growth and prospecting for financial advisors and wealth
+# firms), ChainGPT (an AI model and toolkit for crypto and Web3: a chatbot, a smart-contract
 # generator and auditor, and an NFT generator), Darrow AI (finding new class-action cases for
 # plaintiffs' law firms), Devi (watching Facebook groups, Reddit, LinkedIn and X for buying signals
 # and replying to them), Dispute AI (do-it-yourself credit repair dispute letters), DoNotPay
@@ -31,19 +31,18 @@
 # that plans, designs and builds early products for startups), GovDash (finding, pricing and writing
 # US government contract bids), IFS (enterprise ERP, asset management and field service software for
 # industrial companies), Industrial Data Labs (quoting RFQs for pipe, valve and fittings
-# distributors), Insightmonk (deep-tech market research reports and statistics), Kai (analysing
-# pharma reps' conversations with healthcare professionals), Legalese Decoder (explaining legal
-# documents in plain English for consumers), Legalyze (medical-record chronologies, billing
-# summaries and demand letters for personal-injury law firms), MetricStream (enterprise governance,
+# distributors), Insightmonk (deep-tech market research reports and statistics), Legalese Decoder
+# (explaining legal documents in plain English for consumers), MetricStream (enterprise governance,
 # risk and compliance management), Monarch money (household budgeting and spending tracking across
-# accounts) and Moody's (credit ratings, research and risk data for capital markets). Eight because
+# accounts) and Moody's (credit ratings, research and risk data for capital markets). Nine because
 # their sites don't offer the listed product on 2026-10-18, so they are retirement candidates and no
 # listing picks them: B (b-cube.ai, now only a token unstaking portal), Chariotai (chariotai.com,
-# now an AI website builder), Drippi.ai (drippi.ai, shut down), Epique AI (epique.cloud, an
-# agents-only portal, with its AI "coming soon"), Jackrabbit Ops (jackrabbitops.com, now an
-# investigative research operation), Kili (kili.so, no longer worked on), Mails.ai (mails.ai, now an
-# email API for AI agents) and Mest (mest.io, the site doesn't load). Their pages keep the
-# similar-listings fallback.
+# now an AI website builder), Amy by Crypto.com (crypto.com: Amy is discontinued, crypto.com/en/amy
+# answers 404, and the homepage sells the Crypto.com app and exchange without mentioning Amy),
+# Drippi.ai (drippi.ai, shut down), Epique AI (epique.cloud, an agents-only portal, with its AI
+# "coming soon"), Jackrabbit Ops (jackrabbitops.com, now an investigative research operation), Kili
+# (kili.so, no longer worked on), Mails.ai (mails.ai, now an email API for AI agents) and Mest
+# (mest.io, the site doesn't load). Their pages keep the similar-listings fallback.
 # Each listing-alternatives-set compares and swaps the listing's slug and current picks (none yet),
 # refuses a pick that isn't live with that id and slug, keeps the listing's checksum, and logs an
 # `edited` event. Row-level, so the batch is refused with nothing written if any listing changed.
@@ -132,7 +131,6 @@ operations:
     alternatives:
       - { id: lst_41f235142924a22b0fc9f54d, slug: public.com }
       - { id: lst_8810e556bfcf3e32b18dc352, slug: kvants.ai }
-      - { id: lst_5ed9cf97c424d5a130beceff, slug: tradeui.com }
   # conversica.com: AI agents that hold sales conversations with leads and book meetings.
   - action: listing-alternatives-set
     id: lst_91fc615e3112e13d701d69cb
@@ -143,7 +141,6 @@ operations:
       - { id: lst_af191693037073d75ca7e30a, slug: runday.ai }
       - { id: lst_2ee64ddfca2d5162ce08809e, slug: regie.ai }
       - { id: lst_211842541b976fb7ee9279fb, slug: gista.co }
-      - { id: lst_142e53f947597c506195595c, slug: presbot.com }
       - { id: lst_7c63dff03c5ee090d5eaab7d, slug: salesforge.ai }
   # credo.ai: AI governance and risk management.
   - action: listing-alternatives-set
@@ -153,14 +150,6 @@ operations:
     expected: []
     alternatives:
       - { id: lst_73eb1d72ac189f760088315b, slug: monitaur.ai }
-  # crypto.com: AI chat assistants for crypto users.
-  - action: listing-alternatives-set
-    id: lst_2a8f0aaa0448a30066b73b47
-    slug: crypto.com
-    reason: '#539: hand-picked alternatives (batch H)'
-    expected: []
-    alternatives:
-      - { id: lst_73233e59b4e223ce71b09545, slug: chaingpt.org }
   # dealcode.ai: finding buying-ready companies and their contacts and pushing them into the CRM;
   # dealcode now does this rather than write messages (re-describe, below).
   - action: listing-alternatives-set
@@ -219,6 +208,7 @@ operations:
     reason: '#539: hand-picked alternatives (batch H)'
     expected: []
     alternatives:
+      - { id: lst_b16b5f9f2e7fd39b6059aac7, slug: scrupp.com }
       - { id: lst_b0ad06f8b0935ab00a5cbb65, slug: nioleads.com }
       - { id: lst_0f7f350b788af63882dd0cd9, slug: finalscout.com }
       - { id: lst_2970bd2d905fb052d3e17947, slug: seamless.ai }
@@ -240,6 +230,7 @@ operations:
     expected: []
     alternatives:
       - { id: lst_b0ad06f8b0935ab00a5cbb65, slug: nioleads.com }
+      - { id: lst_b16b5f9f2e7fd39b6059aac7, slug: scrupp.com }
       - { id: lst_2970bd2d905fb052d3e17947, slug: seamless.ai }
       - { id: lst_a0b115154aae6a3d3a715b9a, slug: leadiq.com }
       - { id: lst_7c550c15c0a44902da5c5d6c, slug: exportapollo.com }
@@ -398,13 +389,14 @@ operations:
       - { id: lst_592c70a595cc6b027928f68a, slug: getvoiceline.com }
       - { id: lst_82c64921e846d0837d0ab3cc, slug: sybill.ai }
       - { id: lst_c0583a51f285108792a22d69, slug: momentum.io }
-  # hippo.com: home insurance bought online.
+  # hippo.com: comparing home insurance quotes and buying a policy online.
   - action: listing-alternatives-set
     id: lst_229d5628818cb097802eb6b0
     slug: hippo.com
     reason: '#539: hand-picked alternatives (batch H)'
     expected: []
     alternatives:
+      - { id: lst_76b294415a620cac12fe3ac2, slug: insurify.com }
       - { id: lst_369e9a150988d001fbc28a2b, slug: lemonade.com }
   # hotreachai.com: AI-personalised first lines and cold emails.
   - action: listing-alternatives-set
@@ -424,6 +416,7 @@ operations:
     reason: '#539: hand-picked alternatives (batch H)'
     expected: []
     alternatives:
+      - { id: lst_7c0f4f9476352d691203519f, slug: vizologi.com }
       - { id: lst_fa9b23141c5184df6394ff57, slug: rebecc.ai }
       - { id: lst_7d8b95dfeaa879b6710f6b50, slug: sturppy.com }
       - { id: lst_ac2c8eb10aec0ffa9cf4c484, slug: validatorai.com }
@@ -482,6 +475,15 @@ operations:
     alternatives:
       - { id: lst_8a96d78a261abfb6e69c025a, slug: secondnature.ai }
       - { id: lst_5dffa5282bc25f1491fdca3f, slug: wonderway.io }
+  # kaiconversations.com: AI that prepares pharma field reps before and debriefs them after their
+  # conversations with healthcare professionals.
+  - action: listing-alternatives-set
+    id: lst_9c9c23ff634aafb43ca22249
+    slug: kaiconversations.com
+    reason: '#539: hand-picked alternatives (batch H)'
+    expected: []
+    alternatives:
+      - { id: lst_135f43a3a5341bc2e3fafb33, slug: quantified.ai }
   # kaizan.ai: customer intelligence that flags account risk and growth for client teams.
   - action: listing-alternatives-set
     id: lst_c4e83dab0cba241d963dc08f
@@ -499,7 +501,6 @@ operations:
     alternatives:
       - { id: lst_1ed137bd1939e9f6ba6e7985, slug: composer.trade }
       - { id: lst_41f235142924a22b0fc9f54d, slug: public.com }
-      - { id: lst_5ed9cf97c424d5a130beceff, slug: tradeui.com }
   # leadiq.com: B2B prospecting tools that find decision makers and their verified contact details.
   - action: listing-alternatives-set
     id: lst_a0b115154aae6a3d3a715b9a
@@ -519,6 +520,16 @@ operations:
     expected: []
     alternatives:
       - { id: lst_3873fa07bf494370b8f8bd69, slug: decisionmentor.app }
+  # legalyze.ai: medical chronologies, medical billing summaries and demand letters from case
+  # records for personal-injury law firms.
+  - action: listing-alternatives-set
+    id: lst_68f3cf1ac3fbe4bffb77a47b
+    slug: legalyze.ai
+    reason: '#539: hand-picked alternatives (batch H)'
+    expected: []
+    alternatives:
+      - { id: lst_88dbf4be1e79f00968cc8cea, slug: paxton.ai }
+      - { id: lst_9f188525ab3b05d6bfba38ed, slug: casetext.com }
   # lemonade.com: home and car insurance bought online.
   - action: listing-alternatives-set
     id: lst_369e9a150988d001fbc28a2b
@@ -666,6 +677,7 @@ operations:
     reason: '#539: hand-picked alternatives (batch H)'
     expected: []
     alternatives:
+      - { id: lst_b16b5f9f2e7fd39b6059aac7, slug: scrupp.com }
       - { id: lst_7c550c15c0a44902da5c5d6c, slug: exportapollo.com }
       - { id: lst_0f7f350b788af63882dd0cd9, slug: finalscout.com }
       - { id: lst_2970bd2d905fb052d3e17947, slug: seamless.ai }
