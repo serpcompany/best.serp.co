@@ -68,3 +68,10 @@ export function absoluteUrl(path: string, origin: string = site.publicUrl): stri
 export function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
+
+/** Each robots meta tag's `content`, in document order (a 404 has exactly one: `noindex`). */
+export function robotsMetas(html: string): string[] {
+  return [...html.matchAll(/<meta\s+name="robots"\s+content="([^"]*)"/gu)].map(
+    match => match[1] ?? ''
+  )
+}

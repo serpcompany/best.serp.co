@@ -76,3 +76,25 @@ export function renderingCategory<T extends Pick<PublishedCategory, 'count' | 's
   const category = categories.find(candidate => candidate.slug === slug)
   return category && category.count > 0 ? category : null
 }
+
+/**
+ * The categories whose pages render, by name: the categories index, the 404 page and the HTML
+ * sitemap list these (#53).
+ */
+export function linkedCategories<T extends Pick<PublishedCategory, 'count' | 'name'>>(
+  categories: readonly T[]
+): T[] {
+  return categories
+    .filter(category => category.count > 0)
+    .sort((left, right) => left.name.localeCompare(right.name))
+}
+
+/**
+ * A hub's best pages that render, in the best index's order: the hub page's "Best {hub} lists",
+ * and the ones the 410 page links beside the listing's category (#53).
+ */
+export function categoryBestPages<
+  T extends Pick<PublishedBestPage, 'hub' | 'listSize' | 'poolSize'>
+>(bestPages: readonly T[], category: string): T[] {
+  return listedBestPages(bestPages.filter(page => page.hub === category))
+}

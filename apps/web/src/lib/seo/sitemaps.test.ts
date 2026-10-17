@@ -211,6 +211,8 @@ describe('sitemaps and absolute URLs', () => {
     expect(pages[origin]).toBe('2026-09-30T12:00:00.000Z')
     expect(pages[`${origin}/products/categories/`]).toBe('2026-09-30T12:00:00.000Z')
     expect(pages[`${origin}/best/`]).toBe('2026-09-07T00:00:00.000Z')
+    expect(pages[`${origin}/sitemap/`]).toBe('2026-09-30T12:00:00.000Z')
+    expect(pages[`${origin}/sitemap/listings/`]).toBe('2026-09-30T12:00:00.000Z')
     expect(pages[`${origin}/about/`]).toBeUndefined()
     // Each index entry carries its newest child.
     expect(entries(await (await createSitemapIndexResponse(loaders)).text())).toEqual({
@@ -220,6 +222,31 @@ describe('sitemaps and absolute URLs', () => {
       [`${origin}/sitemap-products.xml`]: '2026-09-30T12:00:00.000Z',
       [`${origin}/sitemap-tags.xml`]: '2026-09-04T00:00:00.000Z'
     })
+  })
+
+  it('lists the HTML sitemap and each of its numbered listing pages (#53)', async () => {
+    const few = locations(await (await createPagesSitemapResponse(loaders)).text())
+    expect(few).toEqual(
+      expect.arrayContaining([`${origin}/sitemap/`, `${origin}/sitemap/listings/`])
+    )
+    expect(few.filter(location => location.startsWith(`${origin}/sitemap/listings/`))).toEqual([
+      `${origin}/sitemap/listings/`
+    ])
+    // 401 listings fill three pages of 200: page 1 is the bare URL, then 2 and 3, in order.
+    const many = Array.from({ length: 401 }, (_, index) => ({
+      category: 'writing',
+      publishedAt: '2026-05-18',
+      slug: `listing-${index}`
+    }))
+    const pages = locations(
+      await (await createPagesSitemapResponse({ ...loaders, getWebsites: () => many })).text()
+    )
+    expect(pages.filter(location => location.startsWith(`${origin}/sitemap/`))).toEqual([
+      `${origin}/sitemap/`,
+      `${origin}/sitemap/listings/`,
+      `${origin}/sitemap/listings/2/`,
+      `${origin}/sitemap/listings/3/`
+    ])
   })
 
   it('writes the homepage as the bare origin in structured data', () => {

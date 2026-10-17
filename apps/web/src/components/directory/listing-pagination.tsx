@@ -124,6 +124,8 @@ interface ListingPaginationProps extends ListingPageInfo {
   /** Optional in-page anchor appended to page links (for example the directory list). */
   fragment?: string
   label?: string
+  /** A page's URL, for a list paged by path (the HTML sitemap, #53) instead of `?page=N`. */
+  pageHref?: (page: number) => string
 }
 
 export function ListingPagination({
@@ -131,10 +133,11 @@ export function ListingPagination({
   fragment,
   label = 'Directory pages',
   page,
-  pageCount
+  pageCount,
+  pageHref
 }: ListingPaginationProps): ReactElement | null {
   if (pageCount <= 1) return null
-  const href = (target: number) => listingPageHref(basePath, target, fragment)
+  const href = pageHref ?? ((target: number) => listingPageHref(basePath, target, fragment))
 
   return (
     <Pagination aria-label={label} className="mt-8">

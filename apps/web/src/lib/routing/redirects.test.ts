@@ -123,6 +123,17 @@ describe('moved-URL redirects', () => {
     }
   })
 
+  it('send the HTML sitemap’s numbered page 1 to the bare listings page (#53)', () => {
+    expect(rules.find(rule => rule.source === '/sitemap/listings/1')).toMatchObject({
+      destination: getRoute('sitemap.listings'),
+      permanent: true
+    })
+    // Only page 1: later pages are the numbered route's.
+    expect(patterns.some(pattern => pattern.test('/sitemap/listings/1/'))).toBe(true)
+    expect(patterns.some(pattern => pattern.test('/sitemap/listings/2/'))).toBe(false)
+    expect(patterns.some(pattern => pattern.test('/sitemap/listings/'))).toBe(false)
+  })
+
   it('send the old /products/best index to the best-page index, and its old pages to categories (#341)', () => {
     expect(rules.find(rule => rule.source === '/products/best')).toMatchObject({
       destination: getRoute('best.index'),

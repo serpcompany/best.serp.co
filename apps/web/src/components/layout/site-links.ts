@@ -11,7 +11,7 @@ import {
 } from '@icons-pack/react-simple-icons'
 import { Linkedin } from 'lucide-react'
 import type { ComponentType } from 'react'
-import { siteRoutes } from '@/lib/site'
+import { htmlSitemapPaths, sitemapRoutePaths, siteRoutes } from '@/lib/site'
 import { withDubVia } from '../../lib/analytics/dub-via'
 import { getRoute } from '../../lib/routing/routes'
 import { hasConfiguredPublicSocialLinks, siteConfig } from '../../lib/site/site-config'
@@ -130,7 +130,9 @@ function resourceLinks(): SiteLink[] {
     ...(showGuides || hasStaticPagePath('/posts')
       ? [{ href: getRoute('guides.list'), label: 'Posts' }]
       : []),
-    ...(hasStaticPagePath('/sponsor') ? [{ href: getRoute('sponsor'), label: 'Sponsor' }] : [])
+    ...(hasStaticPagePath('/sponsor') ? [{ href: getRoute('sponsor'), label: 'Sponsor' }] : []),
+    // Every page's footer links the HTML sitemap (#53; serp web-stack/html-sitemap.md).
+    { href: getRoute('sitemap.index'), label: 'Sitemap' }
   ]
 }
 
@@ -151,6 +153,31 @@ export function footerGroups(): FooterGroup[] {
     { title: 'Directory', links: directoryLinks() },
     { title: 'Resources', links: resourceLinks() }
   ].filter(group => group.links.length > 0)
+}
+
+/**
+ * The HTML sitemap's "Pages" (#53): the indexable static pages the pages sitemap lists, named as
+ * the header and footer name them (the homepage as "Home", as #53's design names it), in the
+ * header's order, then the footer's. The sitemap's own pages are left out, and the best index is
+ * in only while it lists a best page, as in the pages sitemap.
+ */
+export function sitemapPageLinks(options: SiteLinkOptions): SiteLink[] {
+  const listed = new Set<string>(sitemapRoutePaths('pages'))
+  for (const path of [htmlSitemapPaths.index, htmlSitemapPaths.listings]) listed.delete(path)
+  const headerLinks = headerItems(options).flatMap(item =>
+    item.kind === 'menu' ? item.links : [item.link]
+  )
+  const links = new Map<string, SiteLink>()
+  for (const link of [
+    { href: getRoute('home'), label: 'Home' },
+    ...headerLinks,
+    ...directoryLinks(),
+    ...resourceLinks(),
+    ...legalLinks()
+  ]) {
+    if (listed.has(link.href) && !links.has(link.href)) links.set(link.href, link)
+  }
+  return [...links.values()]
 }
 
 function socialIcon(href: string): SocialLink['icon'] | null {

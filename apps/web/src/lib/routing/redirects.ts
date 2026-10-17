@@ -13,7 +13,12 @@ import type { Redirect } from 'next/dist/lib/load-custom-routes'
 // Relative module paths: next.config.ts loads this file, and its loader resolves neither `@/`
 // nor directory imports.
 import { site } from '../site/site'
-import { SITEMAP_INDEX_PATH, sitemapPaths, taxonomyRoutePaths } from '../site/site-routes'
+import {
+  htmlSitemapPaths,
+  SITEMAP_INDEX_PATH,
+  sitemapPaths,
+  taxonomyRoutePaths
+} from '../site/site-routes'
 
 /** The canonical legal pages; `getRoute('privacy')` and `getRoute('terms')` name the same. */
 export const LEGAL_CANONICAL = {
@@ -87,6 +92,13 @@ export function movedUrlRedirects(): Redirect[] {
         ['/sitemaps/categories/1.xml', sitemapPaths.categories]
       ] as const
     ).map(([source, destination]) => ({ source, destination, permanent: true })),
+    // The HTML sitemap's first listings page is the bare URL (#53; serp
+    // web-stack/html-sitemap.md), so its numbered form redirects there.
+    {
+      source: `${htmlSitemapPaths.listings}1`,
+      destination: htmlSitemapPaths.listings,
+      permanent: true
+    },
     ...aliasRedirects('website', listingBasePath),
     ...aliasRedirects('websites', listingBasePath),
     ...aliasRedirects('docs', site.routes.docsBasePath),

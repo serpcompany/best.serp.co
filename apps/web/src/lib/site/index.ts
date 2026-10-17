@@ -3,6 +3,7 @@ export { site } from './site'
 export {
   crawlRules,
   disallowedPaths,
+  htmlSitemapPaths,
   isReservedListingSlug,
   reservedListingSlugs,
   SITEMAP_INDEX_PATH,

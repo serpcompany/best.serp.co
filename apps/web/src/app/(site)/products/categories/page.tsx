@@ -6,6 +6,7 @@ import { SiteBreadcrumb } from '@/components/layout/site-breadcrumb'
 import { getActiveCategories } from '@/lib/catalog/repository'
 import { getRoute } from '@/lib/routing/routes'
 import { generateBaseMetadata, SITE_NAME, siteOrigin } from '@/lib/seo/seo-config'
+import { linkedCategories } from '@/lib/seo/taxonomy-indexing'
 import { siteCopy } from '@/lib/site/site-copy'
 
 const categoriesPath = getRoute('category.index')
@@ -21,9 +22,7 @@ export function generateMetadata(): Metadata {
 
 /** The categories index (#268): a `PageHero`, then each category as a `ListCard` in the grid. */
 export default async function CategoriesPage() {
-  const categories = (await getActiveCategories())
-    .filter(category => category.count > 0)
-    .sort((left, right) => left.name.localeCompare(right.name))
+  const categories = linkedCategories(await getActiveCategories())
 
   return (
     <>

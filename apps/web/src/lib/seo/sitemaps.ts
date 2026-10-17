@@ -26,6 +26,7 @@ import {
 import { getRoute } from '../routing/routes'
 import { siteConfig } from '../site/site-config'
 import { absoluteUrl } from './canonical-url'
+import { htmlSitemapListingsPath, htmlSitemapPageCount } from './html-sitemap'
 import { siteOrigin } from './seo-config'
 import { isBestPageIndexable, isTagIndexable, listedBestPages } from './taxonomy-indexing'
 
@@ -139,7 +140,12 @@ function toXmlResponse(xml: string): Response {
 }
 
 /** The static pages that show the catalog, so they change when a listing does. */
-const CATALOG_PAGE_PATHS = new Set(['/', getRoute('category.index')])
+const CATALOG_PAGE_PATHS = new Set([
+  '/',
+  getRoute('category.index'),
+  getRoute('sitemap.index'),
+  getRoute('sitemap.listings')
+])
 
 function listingLastmod(website: WebsiteSitemapEntry): string {
   return website.modifiedAt ?? new Date(website.publishedAt).toISOString()
@@ -220,6 +226,15 @@ function taxonomyIndexLastmods({
   ])
 }
 
+/**
+ * The HTML sitemap's numbered listing pages after its first (#53), which list the same listings
+ * as the products sitemap (`getSitemapListingPage`), so the pages sitemap lists each of them.
+ */
+function numberedSitemapPaths(websites: readonly WebsiteSitemapEntry[]): string[] {
+  const pageCount = htmlSitemapPageCount(websites.length)
+  return Array.from({ length: pageCount - 1 }, (_, index) => htmlSitemapListingsPath(index + 2))
+}
+
 function getPageEntries(content: Pick<SitemapContent, 'bestPages' | 'websites'>): SitemapEntry[] {
   const catalogLastmod = newest(content.websites.map(listingLastmod))
   const indexes = taxonomyIndexLastmods(content)
@@ -231,7 +246,15 @@ function getPageEntries(content: Pick<SitemapContent, 'bestPages' | 'websites'>)
       : CATALOG_PAGE_PATHS.has(path)
         ? catalogLastmod
         : undefined
-    return [{ lastmod, loc: toAbsoluteUrl(path) }]
+    const entry = { lastmod, loc: toAbsoluteUrl(path) }
+    if (path !== getRoute('sitemap.listings')) return [entry]
+    return [
+      entry,
+      ...numberedSitemapPaths(content.websites).map(numbered => ({
+        lastmod: catalogLastmod,
+        loc: toAbsoluteUrl(numbered)
+      }))
+    ]
   })
 }
 
