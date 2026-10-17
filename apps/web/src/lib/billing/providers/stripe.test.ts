@@ -281,6 +281,46 @@ describe('Stripe provider', () => {
     await expect(stripe.refund(request)).rejects.toMatchObject({ code: 'resource_missing' })
   })
 
+  it('reads a payment’s refunds, the site’s by the order they name (#486)', async () => {
+    const { calls, fetcher } = recorder([
+      {
+        body: {
+          data: [
+            { amount: 4900, id: 're_dashboard', metadata: {}, status: 'requires_action' },
+            { amount: 4900, id: 're_site', metadata: { order_id: 'order-1' }, status: 'failed' },
+            { amount: 1000, id: 're_part', status: 'canceled' },
+            { id: 're_no_amount', status: 'succeeded' }
+          ],
+          object: 'list'
+        }
+      },
+      { body: { error: { type: 'api_error' } }, status: 503 }
+    ])
+    const stripe = createStripeProvider({
+      fetcher,
+      live: false,
+      prices: PRICES,
+      secretKey: 'sk_test_x',
+      webhookSecret: SECRET
+    })
+    await expect(stripe.paymentRefunds('pi_1')).resolves.toEqual([
+      // One that still needs the buyer's action may yet send the money back.
+      { amountCents: 4900, id: 're_dashboard', orderId: null, status: 'pending' },
+      { amountCents: 4900, id: 're_site', orderId: 'order-1', status: 'failed' },
+      { amountCents: 1000, id: 're_part', orderId: null, status: 'canceled' }
+    ])
+    // The Refunds read, filtered by the PaymentIntent.
+    expect(calls[0]).toMatchObject({
+      method: 'GET',
+      url: 'https://api.stripe.com/v1/refunds?limit=100&payment_intent=pi_1'
+    })
+    // Stripe down: the provider's error, so the webhook answers 500 and is delivered again.
+    await expect(stripe.paymentRefunds('pi_1')).rejects.toBeInstanceOf(BillingProviderError)
+    // Anything but a PaymentIntent id is never sent.
+    await expect(stripe.paymentRefunds('cs_test_1')).resolves.toEqual([])
+    expect(calls).toHaveLength(2)
+  })
+
   it('verifies the signature over the raw body, within the tolerance', async () => {
     const body = '{"id":"evt_1"}'
     const ok = await signed(body)

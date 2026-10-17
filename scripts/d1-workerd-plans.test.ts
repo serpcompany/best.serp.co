@@ -1366,12 +1366,22 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
       })
     )
     expect(await order('ord-2')).toMatchObject({ refund_attempts: 1 })
-    await run(B.buildFinishRefundPlans({ now: NOW, orderId: 'ord-2', refundId: 're_2' }))
+    // Credited to a refund made outside the site that sent the money back meanwhile (#486).
+    await run(
+      B.buildFinishRefundPlans({
+        now: NOW,
+        orderId: 'ord-2',
+        refundedBy: B.PROVIDER_ACTOR,
+        refundId: 're_2'
+      })
+    )
     expect(await order('ord-2')).toMatchObject({
       attention: 'amount_mismatch',
       charged_cents: 5390,
       outcome: 'unapplied',
+      provider_refund_id: 're_2',
       refund_reason: 'unapplied',
+      refunded_by: 'provider',
       status: 'refunded'
     })
     // An applied order is claimed only with the outcome it was read with.
@@ -1592,6 +1602,15 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
       attention: null,
       provider_refund_id: null,
       status: 'refunded'
+    })
+    // When the provider says which refund sent the money back, the clear records it (#486).
+    await db.prepare(`UPDATE orders SET attention='refund_failed' WHERE id='ord-dispute'`).run()
+    await run(
+      B.buildClearRefundFailedPlans({ now: NOW, orderId: 'ord-dispute', refundId: 're_dash' })
+    )
+    expect(await order('ord-dispute')).toMatchObject({
+      attention: null,
+      provider_refund_id: 're_dash'
     })
     // The alerts the sweep sends again come from the events' outcomes.
     const event = {

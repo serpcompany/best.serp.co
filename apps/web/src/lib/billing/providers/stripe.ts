@@ -349,6 +349,35 @@ export function createStripeProvider(config: StripeConfig): BillingProvider {
       return checkout.paymentId === paymentId ? checkout : null
     },
 
+    async paymentRefunds(paymentId) {
+      if (!/^pi_[A-Za-z0-9_]+$/u.test(paymentId)) return []
+      // The Refunds read that the Refunds write a restricted key needs already includes (#486).
+      const list = await call(
+        'GET',
+        `/v1/refunds?${form({ limit: 100, payment_intent: paymentId })}`
+      )
+      const data = Array.isArray(list.data) ? (list.data as StripeObject[]) : []
+      return data.flatMap(refund => {
+        const id = text(refund.id)
+        const amountCents = cents(refund.amount)
+        if (!id || amountCents === null) return []
+        const metadata = (refund.metadata ?? {}) as Record<string, unknown>
+        const status = refund.status
+        return [
+          {
+            amountCents,
+            id,
+            orderId: text(metadata.order_id),
+            // `requires_action` (and anything newer) may still send the money back.
+            status:
+              status === 'succeeded' || status === 'failed' || status === 'canceled'
+                ? status
+                : 'pending'
+          }
+        ]
+      })
+    },
+
     dashboardUrl(reference) {
       const mode = config.live ? '' : '/test'
       if (/^pi_[A-Za-z0-9_]+$/u.test(reference)) {
@@ -389,7 +418,8 @@ export function createStripeProvider(config: StripeConfig): BillingProvider {
         }
         return { refundId: text(refund.id) }
       } catch (error) {
-        // Refunded already (by an earlier attempt whose idempotency key has expired).
+        // Refunded already: by an earlier attempt whose idempotency key has expired, or outside
+        // the site; the service asks `paymentRefunds` which (#486).
         if (error instanceof BillingProviderError && error.code === 'charge_already_refunded') {
           return { refundId: null }
         }

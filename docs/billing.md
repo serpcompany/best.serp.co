@@ -19,8 +19,8 @@ and the webhook answer 404, `/admin/orders/` is a 404, and the sweep does nothin
   advantage is temporary, and its policy fit for selling listings is unclear (serp's submissions
   [decisions](https://github.com/serpcompany/serp/blob/main/docs/engineering/websites/features/submissions/decisions.md)).
   Stripe sits behind `BillingProvider` because SERP's Lago is the planned replacement.
-- **No Stripe SDK** (owner decision on #156, 2026-10-15). The provider calls four Stripe
-  endpoints with the Worker's `fetch` at a pinned API version, and checks webhook signatures with
+- **No Stripe SDK** (owner decision on #156, 2026-10-15). The provider calls Stripe's Checkout
+  Sessions and Refunds endpoints with the Worker's `fetch` at a pinned API version, and checks webhook signatures with
   Web Crypto. The standard expects the SDK, a three-operation interface and
   `/api/webhooks/<provider>`; serpcompany/serp#1494 proposes it accept this shape. The webhook
   stays at `/api/billing/webhook/`: moving it means registering both Stripe endpoints again and
@@ -67,8 +67,9 @@ the target (submission, listing, or claim), amount and currency, provider and it
 (checkout, payment, refund), what was actually charged, `status` (`pending` → `paid` →
 `refunding` → `refunded`, or `failed`), `outcome` once applied (`published`, `held`,
 `upgraded`, `relisted`, `claimed`, `unapplied`), the refund reason (`rejected`, `admin`,
-`unapplied`; `admin` with the actor `provider` is a refund made in Stripe's dashboard, #473),
-actor, note, and an admin refund's listing decision and badge check, `attention`
+`unapplied`; `admin` with the actor `provider` is a refund made in Stripe's dashboard, #473, and
+any reason's actor is `provider` when a dashboard refund sent the money back while the site's was
+claimed, #486), actor, note, and an admin refund's listing decision and badge check, `attention`
 (`amount_mismatch`, `refund_failed`), refund attempts and their backoff, a dispute's
 `dispute_status` (`open`, `won`, `lost`) and `disputed_at` (`0016_order_disputes`), what a partial
 refund outside the site sent back so far (`partial_refund_cents`, `0017_order_partial_refunds`),
@@ -181,7 +182,9 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
   dialog replaced, one over an hour old, or a decision that no longer holds answers 409 and the
   dialog previews again, so a refund never does other than the button said. A listing that went
   down meanwhile is refunded as it is. An order refunded outside the site answers 409, never
-  reported as the admin's refund (#484). No email: #70 has none for it.
+  reported as the admin's refund (#484), and so does one a dashboard refund beat while the admin's
+  ran: it is recorded as refunded outside the site (#486,
+  [details](./billing-disputes.md#refunds)). No email: #70 has none for it.
 - **Sweep.** The hourly cron (`billing-sweep` in `lib/worker/scheduled.ts`) works most urgent first,
   with at most 20 Stripe calls a run: paid orders left unapplied (ten minutes after payment; usually
   by a webhook fulfilment that failed or outlived `waitUntil`, else by a Worker stopped before
@@ -209,7 +212,8 @@ never set or read these values.
 | `STRIPE_WEBHOOK_SECRET` | the staging endpoint's `whsec_…` | the production endpoint's `whsec_…` |
 
 The Worker refuses a live key outside production and a test key in production. A restricted
-key needs write access to Checkout Sessions and Refunds, and read access to Products and Prices. Webhook endpoints (trailing slash
+key needs write access to Checkout Sessions and Refunds (which includes the read that lists a
+payment's refunds, #486), and read access to Products and Prices. Webhook endpoints (trailing slash
 included; Stripe does not follow redirects):
 
 - `https://best.serp.co/api/billing/webhook/` (live mode)

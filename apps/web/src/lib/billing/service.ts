@@ -50,7 +50,8 @@ import {
   type BillingProvider,
   BillingWebhookError,
   type CheckoutState,
-  type PaymentChange
+  type PaymentChange,
+  type ProviderRefund
 } from './provider'
 
 /**
@@ -1078,15 +1079,77 @@ async function claimRefund(
 }
 
 /**
+ * The refund that sent a claimed refund's money back (#486): its provider id when known, and
+ * whether it was made outside the site (the provider's dashboard), so the order credits it.
+ */
+interface ReturnedRefund {
+  outside: boolean
+  refundId: string | null
+}
+
+/** The site's own refund, as today: credited to the claim's actor. */
+const SITE_REFUND: ReturnedRefund = { outside: false, refundId: null }
+
+/**
+ * What the provider records of an order's payment now (#486): whether its refunds that haven't
+ * failed send all of it back (`returned`), and the one that sends the money back (the site's own,
+ * by the order it names, else the newest), or the provider's error when it couldn't say.
+ */
+type RefundsAtProvider =
+  | { checked: true; refund: ProviderRefund | null; returned: boolean }
+  | { checked: false; error: unknown }
+
+async function refundsAtProvider(
+  deps: BillingDependencies,
+  order: OrderRecord
+): Promise<RefundsAtProvider> {
+  const charged = order.chargedCents ?? order.amountCents
+  if (!order.providerPaymentId || charged === 0) return { checked: false, error: null }
+  let refunds: ProviderRefund[]
+  try {
+    refunds = await deps.provider.paymentRefunds(order.providerPaymentId)
+  } catch (error) {
+    logError('billing_refunds_unchecked', error, { order: order.id })
+    return { checked: false, error }
+  }
+  const sending = refunds.filter(
+    refund => refund.status === 'pending' || refund.status === 'succeeded'
+  )
+  return {
+    checked: true,
+    refund: sending.find(refund => refund.orderId === order.id) ?? sending[0] ?? null,
+    returned: sending.reduce((sum, refund) => sum + refund.amountCents, 0) >= charged
+  }
+}
+
+/**
+ * The refund that sent back a payment the provider says was refunded already, by the provider's
+ * record (`refundsAtProvider`): the site's own (an earlier attempt whose idempotency key expired)
+ * or one made outside the site, perhaps while the site's ran (#486). `otherwise` decides when the
+ * provider can't say.
+ */
+async function returnedRefund(
+  deps: BillingDependencies,
+  order: OrderRecord,
+  otherwise: ReturnedRefund
+): Promise<ReturnedRefund> {
+  const atProvider = await refundsAtProvider(deps, order)
+  if (!atProvider.checked || !atProvider.refund) return otherwise
+  return { outside: atProvider.refund.orderId !== order.id, refundId: atProvider.refund.id }
+}
+
+/**
  * The provider refund of exactly what was charged, under the order's refund key. A 100%-off
- * order charged nothing, so there is nothing to send back (#250).
+ * order charged nothing, so there is nothing to send back (#250). A payment refunded already is
+ * credited to the refund that sent the money back (#486); when the provider can't say which, to
+ * the claim, as before.
  */
 async function providerRefund(
   deps: BillingDependencies,
   order: OrderRecord
-): Promise<string | null> {
+): Promise<ReturnedRefund> {
   const charged = order.chargedCents ?? order.amountCents
-  if (charged === 0) return null
+  if (charged === 0) return SITE_REFUND
   if (!order.providerPaymentId) {
     throw new CodedError('refund_payment_missing', `Order ${order.id} has no payment to refund.`)
   }
@@ -1096,15 +1159,21 @@ async function providerRefund(
     orderId: order.id,
     paymentId: order.providerPaymentId
   })
-  return refundId
+  if (refundId !== null) return { outside: false, refundId }
+  return returnedRefund(deps, order, SITE_REFUND)
 }
 
 function finishPlans(
   deps: BillingDependencies,
   order: OrderRecord,
-  refundId: string | null
+  refund: ReturnedRefund
 ): StatementPlan[] {
-  return buildFinishRefundPlans({ now: nowIso(deps), orderId: order.id, refundId })
+  return buildFinishRefundPlans({
+    now: nowIso(deps),
+    orderId: order.id,
+    refundedBy: refund.outside ? PROVIDER_ACTOR : null,
+    refundId: refund.refundId
+  })
 }
 
 /**
@@ -1181,9 +1250,9 @@ async function finishRefund(deps: BillingDependencies, orderId: string): Promise
   if (claimed.status !== 'refunding') {
     throw new CodedError('refund_not_claimed', `Order ${orderId} has no claimed refund.`)
   }
-  let refundId: string | null
+  let refund: ReturnedRefund
   try {
-    refundId = await providerRefund(deps, claimed)
+    refund = await providerRefund(deps, claimed)
   } catch (error) {
     // Backed off (1, 2, 4, 8 hours…); the last allowed failure flags it for an admin.
     const delay = RECONCILE_AFTER_MS * 6 * 2 ** Math.min(claimed.refundAttempts, 5)
@@ -1197,19 +1266,37 @@ async function finishRefund(deps: BillingDependencies, orderId: string): Promise
     )
     throw error
   }
-  return recordClaimedRefund(deps, orderId, refundId, true)
+  const listing = await recordClaimedRefund(deps, orderId, refund, true)
+  if (refund.outside) await alertRefundedOutside(deps, orderId)
+  return listing
+}
+
+/**
+ * The admin's "refunded outside the site" alert for a claimed refund an outside refund finished
+ * (#486), once that is what the order records. A failed send is logged: the refund is recorded.
+ */
+async function alertRefundedOutside(deps: BillingDependencies, orderId: string): Promise<void> {
+  const order = await deps.operations.order(orderId)
+  if (order?.refundedBy !== PROVIDER_ACTOR) return
+  log('billing_order_refunded_at_provider', { claimed: order.refundReason, order: order.id })
+  try {
+    await alertAdmin(deps, order, 'refunded')
+  } catch (error) {
+    logError('billing_payment_alert_failed', error, { order: order.id })
+  }
 }
 
 /**
  * Records a claimed refund the provider made, in one batch: the rejection's or the admin's
- * recorded listing change, and `refunded`. `withRejection` false records a rejection's refund
- * on the order alone: its own refund (`refundRejectedSubmission`, which the sweep retries) then
- * records it on the submission and emails the owner.
+ * recorded listing change, and `refunded`, credited to the refund that sent the money back
+ * (#486). `withRejection` false records a rejection's refund on the order alone: its own refund
+ * (`refundRejectedSubmission`, which the sweep retries) then records it on the submission and
+ * emails the owner.
  */
 async function recordClaimedRefund(
   deps: BillingDependencies,
   orderId: string,
-  refundId: string | null,
+  refund: ReturnedRefund,
   withRejection: boolean
 ): Promise<RefundListing> {
   for (let attempt = 0; attempt < PUBLICATION_ATTEMPTS; attempt += 1) {
@@ -1232,8 +1319,12 @@ async function recordClaimedRefund(
     } else if (order.refundReason === 'admin') {
       ;({ plans, result } = await adminListingPlans(deps, order))
     }
-    if (await deps.operations.apply([...plans, ...finishPlans(deps, order, refundId)])) {
-      log('billing_order_refunded', { order: order.id, reason: order.refundReason })
+    if (await deps.operations.apply([...plans, ...finishPlans(deps, order, refund)])) {
+      log('billing_order_refunded', {
+        order: order.id,
+        outside: refund.outside,
+        reason: order.refundReason
+      })
       return result
     }
   }
@@ -1532,9 +1623,7 @@ export async function refundOrder(
   if (order.status === 'refunded') {
     return { listing: await finishRefund(deps, order.id), ok: true, replayed: true }
   }
-  if (order.status === 'refunding') {
-    return { listing: await finishRefund(deps, order.id), ok: true, replayed: false }
-  }
+  if (order.status === 'refunding') return finishAdminRefund(deps, order.id, false)
   if (order.status !== 'paid') {
     return failure(409, 'not_refundable', 'Only a paid order can be refunded.')
   }
@@ -1554,7 +1643,7 @@ export async function refundOrder(
     })
     // A dispute opened since the check above: nothing was refunded, and the dispute decides.
     if (refunded === 'disputed') return DISPUTED
-    return { listing: 'unchanged', ok: true, replayed: false }
+    return refundedOutside(deps, order.id, { listing: 'unchanged', ok: true, replayed: false })
   }
   const claimed = await claimRefund(deps, order, {
     actor: input.actor,
@@ -1575,7 +1664,31 @@ export async function refundOrder(
       )
     }
   }
-  return { listing: await finishRefund(deps, order.id), ok: true, replayed: !claimed }
+  return finishAdminRefund(deps, order.id, !claimed)
+}
+
+/** Finishes an admin's claimed refund and answers it (`refundedOutside`). */
+async function finishAdminRefund(
+  deps: BillingDependencies,
+  orderId: string,
+  replayed: boolean
+): Promise<RefundOrderResult> {
+  const listing = await finishRefund(deps, orderId)
+  return refundedOutside(deps, orderId, { listing, ok: true, replayed })
+}
+
+/**
+ * An admin's refund that a refund made outside the site beat while it ran (#486): that refund
+ * sent the money back, so the admin's answers 409 (`refunded_outside`), never success. The
+ * listing change the admin chose still applied.
+ */
+async function refundedOutside(
+  deps: BillingDependencies,
+  orderId: string,
+  answer: RefundOrderResult
+): Promise<RefundOrderResult> {
+  const order = await deps.operations.order(orderId)
+  return order?.refundedBy === PROVIDER_ACTOR ? REFUNDED_OUTSIDE : answer
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1599,7 +1712,9 @@ const PAYMENT_ALERTS: Readonly<Record<string, PaymentAlertKind>> = {
  * dispute records its outcome only (a lost one never reported open is opened first): nothing
  * republishes the listing, the admin decides. The site's own refund was claimed (`refunding`)
  * before the provider was asked, so its report is answered as the order stands; one the site's
- * refund failed to make is recorded as that refund. Returns the event's outcome.
+ * refund failed to make is recorded as that refund. A refunded order's `refund_failed` flag then
+ * follows the provider's record of the payment's refunds (`settleRefundFlag`, #486). Returns the
+ * event's outcome.
  */
 async function actOnPayment(
   deps: BillingDependencies,
@@ -1612,10 +1727,13 @@ async function actOnPayment(
       return recordPaymentChange(deps, order, 'disputed')
     case 'dispute_closed':
       return payment.disputeOutcome ? closeDispute(deps, order, payment.disputeOutcome) : 'ignored'
-    case 'payment_refunded':
-      return payment.partial
-        ? alertPartialRefund(deps, order, payment)
-        : recordPaymentChange(deps, order, 'refunded', payment.requestKey ?? null)
+    case 'payment_refunded': {
+      if (payment.partial) return alertPartialRefund(deps, order, payment)
+      const requestKey = payment.requestKey ?? null
+      const outcome = await recordPaymentChange(deps, order, 'refunded', requestKey)
+      await settleRefundFlag(deps, order.id, requestKey)
+      return outcome
+    }
     case 'payment_refund_failed':
       return flagRefundFailed(deps, order, payment.refundId ?? null)
   }
@@ -1740,22 +1858,6 @@ async function recordPaymentChange(
   for (let attempt = 0; attempt < PUBLICATION_ATTEMPTS; attempt += 1) {
     const current = attempt === 0 ? order : await deps.operations.order(order.id)
     if (!current) return 'unknown_order'
-    // A later refund of the whole payment succeeded after one that failed (refunded again in the
-    // provider's dashboard, #485): the money went back, so the flag no longer decides a dispute's
-    // takedown. The clear blanks the recorded refund, so that refund's own failure flags again.
-    // The site's own refund's report (its request key) is the refund that failed, delivered late,
-    // so it clears nothing.
-    if (
-      change === 'refunded' &&
-      current.status === 'refunded' &&
-      current.attention === 'refund_failed' &&
-      requestKey !== `refund:${current.id}`
-    ) {
-      await deps.operations.apply(
-        buildClearRefundFailedPlans({ now: nowIso(deps), orderId: current.id })
-      )
-      log('billing_refund_failed_cleared', { order: current.id })
-    }
     const recorded =
       change === 'disputed'
         ? current.disputeStatus === 'open'
@@ -1838,22 +1940,69 @@ function siteRefundRunning(deps: BillingDependencies, order: OrderRecord): boole
 /**
  * The whole payment refunded at the provider while the site's own refund of it had failed
  * (`refunding`, retrying or `refund_failed`): the money is back, so the claimed refund is
- * recorded as the site's would be (its listing change, then `refunded`), and the admin is told.
- * The site's retry would only be refused (the charge is refunded already). `siteRefund`: the
- * report is of the site's own refund (its request key), made by a call whose answer never came
- * back (a timeout after the provider refunded): recorded the same way, as the site's refund, with
- * no "refunded outside the site" alert (#484). The report carries no refund id, so none is kept.
+ * recorded as the site's would be (its listing change, then `refunded`), credited to the refund
+ * that sent the money back (#486): one made outside the site is recorded as that
+ * (`PROVIDER_ACTOR`), and the admin is told. The site's retry would only be refused (the charge
+ * is refunded already). The provider's record of the payment's refunds says which refund it was;
+ * when it can't, the report's request key does: the site's own (`siteRefund`) is a call whose
+ * answer never came back (a timeout after the provider refunded), recorded as the site's refund
+ * with no "refunded outside the site" alert (#484).
  */
 async function finishRefundAtProvider(
   deps: BillingDependencies,
   order: OrderRecord,
   siteRefund: boolean
 ): Promise<string> {
-  await recordClaimedRefund(deps, order.id, null, false)
-  if (siteRefund) return 'refunded'
+  const refund = await returnedRefund(deps, order, { outside: !siteRefund, refundId: null })
+  await recordClaimedRefund(deps, order.id, refund, false)
+  if (!refund.outside) return 'refunded'
   log('billing_order_refunded_at_provider', { claimed: order.refundReason, order: order.id })
   await alertAdmin(deps, order, 'refunded')
   return 'refunded_at_provider'
+}
+
+/**
+ * A `refunded` order's `refund_failed` flag, after a report of the whole payment refunded: the
+ * flag follows the provider's record of the payment's refunds (#486), whatever order their
+ * events arrive in. Its refunds that haven't failed send it all back: a flag clears (a later
+ * refund, in the provider's dashboard say, sent the money back, #485) and records that refund.
+ * They don't: the refund that sent it back has failed since, so the order is flagged as its
+ * `refund.failed` would (a retried report landing after its failure never clears it). When the
+ * provider can't say, the report decides as before: any but the site's own refund's (its
+ * request key, the refund that failed, delivered late) clears the flag; the error then answers the
+ * delivery 500, so the provider's retry checks again.
+ */
+async function settleRefundFlag(
+  deps: BillingDependencies,
+  orderId: string,
+  requestKey: string | null
+): Promise<void> {
+  const order = await deps.operations.order(orderId)
+  if (order?.status !== 'refunded') return
+  const flagged = order.attention === 'refund_failed'
+  const atProvider = await refundsAtProvider(deps, order)
+  if (atProvider.checked) {
+    if (atProvider.returned && flagged) {
+      await clearRefundFailed(deps, order, atProvider.refund?.id ?? null)
+    } else if (!atProvider.returned && !flagged) {
+      await flagRefundFailedNow(deps, order, null)
+    }
+    return
+  }
+  if (flagged && requestKey !== `refund:${order.id}`) await clearRefundFailed(deps, order, null)
+  if (atProvider.error) throw atProvider.error
+}
+
+/** Clears a `refunded` order's flag: the money went back, by `refundId` when known (#485, #486). */
+async function clearRefundFailed(
+  deps: BillingDependencies,
+  order: OrderRecord,
+  refundId: string | null
+): Promise<void> {
+  await deps.operations.apply(
+    buildClearRefundFailedPlans({ now: nowIso(deps), orderId: order.id, refundId })
+  )
+  log('billing_refund_failed_cleared', { order: order.id })
 }
 
 /**
@@ -1915,15 +2064,14 @@ async function alertPartialRefund(
 }
 
 /**
- * A refund that failed after the provider accepted it: the money never went back. A refund the
- * site made is flagged `refund_failed` (the sweep stops retrying it); the admin is told either
- * way. On a `refunded` order whose dispute is open or lost (it arrived while the refund looked
- * done), the listing comes down now, by the dispute's rules (`takedownPlans`, #484), in the same
- * batch; one with no such dispute is flagged only if none was recorded meanwhile, so the
- * dispute's own takedown reads the flag. A failure of a refund other than the one the order
- * records (`provider_refund_id`) flags nothing; one with no recorded refund (blanked when a refund
- * outside the site cleared the flag) always flags. Three lost writes throw, so the provider's
- * retry runs it again.
+ * A refund that failed after the provider accepted it. The provider's record of the payment's
+ * refunds decides (#486), whatever order their events arrive in: when its refunds that haven't
+ * failed still send all of it back (a later refund did, its report delivered first), nothing is
+ * flagged, and a flag set while the provider couldn't say is cleared. Otherwise the money never
+ * went back (`flagRefundFailedNow`). When the provider can't say, the report decides as before:
+ * a failure of a refund other than the one the order records (`provider_refund_id`: an earlier
+ * one, reported after a newer one succeeded, #485) flags nothing; the error then answers the
+ * delivery 500, so the provider's retry checks again.
  */
 async function flagRefundFailed(
   deps: BillingDependencies,
@@ -1931,15 +2079,43 @@ async function flagRefundFailed(
   /** The refund that failed (`PaymentChange.refundId`), when the provider reports it. */
   refundId: string | null
 ): Promise<string> {
+  const atProvider = await refundsAtProvider(deps, order)
+  if (atProvider.checked && atProvider.returned) {
+    if (order.status === 'refunded' && order.attention === 'refund_failed') {
+      await clearRefundFailed(deps, order, atProvider.refund?.id ?? null)
+    }
+    log('billing_refund_failed_superseded', { order: order.id })
+    return 'refund_failed_superseded'
+  }
+  const outcome = await flagRefundFailedNow(deps, order, atProvider.checked ? null : refundId)
+  if (!atProvider.checked && atProvider.error) throw atProvider.error
+  return outcome
+}
+
+/**
+ * Flags a refund the site made `refund_failed`: the money never went back (the sweep stops
+ * retrying it); the admin is told either way. On a `refunded` order whose dispute is open or lost
+ * (it arrived while the refund looked done), the listing comes down now, by the dispute's rules
+ * (`takedownPlans`, #484), in the same batch; one with no such dispute is flagged only if none was
+ * recorded meanwhile, so the dispute's own takedown reads the flag. `unlessSupersededBy`: when the
+ * provider couldn't say (#486), a failure of a refund other than the one the order records flags
+ * nothing; one with no recorded refund (blanked when a refund outside the site cleared the flag)
+ * always flags. Three lost writes throw, so the provider's retry runs it again.
+ */
+async function flagRefundFailedNow(
+  deps: BillingDependencies,
+  order: OrderRecord,
+  unlessSupersededBy: string | null
+): Promise<string> {
   for (let attempt = 0; attempt < PUBLICATION_ATTEMPTS; attempt += 1) {
     const current = attempt === 0 ? order : await deps.operations.order(order.id)
     if (!current) return 'unknown_order'
     // An earlier refund's failure, reported after a newer one (the site's retry once its request
     // key expired) succeeded and was recorded (#485): the money went back, so it flags nothing.
     if (
-      refundId !== null &&
+      unlessSupersededBy !== null &&
       current.providerRefundId !== null &&
-      refundId !== current.providerRefundId
+      unlessSupersededBy !== current.providerRefundId
     ) {
       log('billing_refund_failed_superseded', { order: current.id })
       return 'refund_failed_superseded'
