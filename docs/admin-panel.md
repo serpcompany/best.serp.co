@@ -148,6 +148,9 @@ nothing. The contract:
 - The hook runs after the batch, again on every replay of the rejection, and from the billing
   sweep of pending rows, so it is idempotent (the provider idempotency key `refund:<order>`). It records the refund and sends `submission-rejected-refunded`;
   the rejection email is not sent for these.
+- A replay runs the hook after the refund is recorded too (#499): it refunds nothing then and
+  sends the same email under the same event key, so a "rejected and refunded" whose send failed
+  goes out once on the retry, and the decision answers its `email` as above.
 - When the hook throws, the rejection stands, the decision answers
   `{ok: true, refundPending: true}`, and the refund stays pending for the next replay or sweep.
 - A payment whose dispute is open or lost is not refunded (the provider refuses, #483): the hook

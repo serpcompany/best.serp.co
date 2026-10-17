@@ -9,8 +9,13 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createAdminReadOperations } from '@/db/admin-queries'
 import { createDatabase } from '@/db/client'
+import { createEmailDeliveryLedger } from '@/db/email-deliveries'
 import { insertPublishedListing, SqliteD1 } from '@/db/test-support'
 import { BillingProviderError } from '../billing/provider'
+import { resolveEmailPolicy } from '../email/config'
+import { appEmailTemplates } from '../email/registry'
+import { createCapturingEmailSender } from '../email/senders'
+import { createEmailService } from '../email/service'
 import {
   type AdminContext,
   type AdminRefunds,
@@ -30,7 +35,7 @@ import {
   unpublishListing,
   updateListingDetails
 } from './decisions'
-import { submissionView } from './review-view'
+import { decisionEmailNote, submissionView } from './review-view'
 
 const NOW = new Date('2026-10-06T12:00:00.000Z')
 
@@ -502,18 +507,27 @@ describe('submission decisions', () => {
       notify: expect.any(Function),
       submissionId: 'sub_paid'
     })
-    // Once #68 records the refund, a replay leaves it alone.
+    // Once #68 records the refund, a replay still runs the hook, which then refunds nothing and
+    // only resends a failed email (#499); a failure there leaves the refund recorded, not pending.
     db.exec(
       "UPDATE listing_submissions SET refunded_at = '2026-10-06T12:01:00.000Z' WHERE id='sub_paid'"
     )
-    expect(await reject()).toEqual({
-      email: null,
-      ok: true,
-      refundPending: false,
-      refunded: true,
-      replayed: true
-    })
-    expect(refundRejectedSubmission).toHaveBeenCalledTimes(2)
+    const refunded = { email: null, ok: true, refundPending: false, refunded: true, replayed: true }
+    expect(await reject()).toEqual(refunded)
+    expect(refundRejectedSubmission).toHaveBeenCalledTimes(3)
+    refundRejectedSubmission.mockRejectedValueOnce(new Error('D1 is unreachable.'))
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(await reject()).toEqual(refunded)
+    quiet.mockRestore()
+    // With orders off there is no hook to run: the recorded refund is answered as it is.
+    expect(
+      await rejectSubmission(context(), {
+        category: 'other',
+        reason: 'Duplicate of another listing.',
+        submissionId: 'sub_paid'
+      })
+    ).toEqual(refunded)
+    expect(refundRejectedSubmission).toHaveBeenCalledTimes(4)
   })
 
   it('approves a live paid submission and keeps it live', async () => {
@@ -624,6 +638,127 @@ describe('decision emails (#490)', () => {
         { category: 'other', reason: 'Duplicate.', submissionId: 'sub_paid' }
       )
     ).toMatchObject({ email: { outcome: 'failed', to: maya }, refunded: true })
+  })
+
+  it('resends a refunded rejection’s failed email when the rejection is retried, once (#499)', async () => {
+    const { context, db, paidLive, row } = fixture()
+    paidLive('sub_paid')
+    // The email service as production wires it, on the same D1 ledger.
+    const sender = createCapturingEmailSender()
+    const service = createEmailService({
+      ledger: createEmailDeliveryLedger({ client: context().client }),
+      log: () => undefined,
+      policy: resolveEmailPolicy({ D1_RUNTIME_ENV: 'production', SITE_ENVIRONMENT: 'production' }),
+      sender,
+      templates: appEmailTemplates,
+      waitUntil: () => undefined
+    })
+    const refundedAt = () =>
+      row("SELECT refunded_at FROM listing_submissions WHERE id='sub_paid'")?.refunded_at
+    // #68's hook as `AdminRefunds` describes it: it records the refund while it is pending, and
+    // sends "rejected and refunded" under the rejection's event key every time it runs.
+    const refundRejectedSubmission = vi.fn<AdminRefunds['refundRejectedSubmission']>(
+      async input => {
+        if (refundedAt() === null) {
+          db.exec(
+            "UPDATE listing_submissions SET refunded_at = '2026-10-06T12:00:01.000Z' WHERE id='sub_paid'"
+          )
+        }
+        await input.notify('submission-rejected-refunded', {
+          eventKey: 'submission-rejected:sub_paid',
+          input: {
+            reason: 'Duplicate.',
+            refundedCents: 4900,
+            submissionId: 'sub_paid',
+            submissionName: 'Name sub_paid'
+          },
+          to: maya
+        })
+        return 'refunded'
+      }
+    )
+    const reject = () =>
+      rejectSubmission(
+        context({
+          notify: (templateId, request) => service.deliver(templateId, request),
+          refunds: { refundRejectedSubmission }
+        }),
+        { category: 'other', reason: 'Duplicate.', submissionId: 'sub_paid' }
+      )
+
+    // useSend is down: the refund is recorded, the email fails, and the toast says so.
+    sender.failNext(Object.assign(new Error('provider down'), { code: 'E_UNAVAILABLE' }))
+    const first = await reject()
+    expect(first).toEqual({
+      email: { outcome: 'failed', to: maya },
+      ok: true,
+      refundPending: false,
+      refunded: true,
+      replayed: false
+    })
+    expect(refundedAt()).toBe('2026-10-06T12:00:01.000Z')
+    expect(sender.sent).toEqual([])
+    // Retrying the rejection resends it, and the toast says it went out.
+    const retry = await reject()
+    expect(retry).toEqual({
+      email: { outcome: 'sent', to: maya },
+      ok: true,
+      refundPending: false,
+      refunded: true,
+      replayed: true
+    })
+    expect(retry.ok && decisionEmailNote(retry.email)).toEqual({
+      text: `Email sent to ${maya}`,
+      warn: false
+    })
+    expect(sender.sent.map(message => message.to)).toEqual([maya])
+    // Another retry sends nothing more: the ledger answers that it went out.
+    expect(await reject()).toMatchObject({ email: { outcome: 'sent', to: maya }, replayed: true })
+    expect(sender.sent).toHaveLength(1)
+    expect(refundRejectedSubmission).toHaveBeenCalledTimes(3)
+    expect(
+      row(
+        "SELECT status, attempts FROM email_deliveries WHERE event_key = 'submission-rejected:sub_paid'"
+      )
+    ).toEqual({ attempts: 2, status: 'sent' })
+  })
+
+  it('runs the refund hook when the payment was refunded before the rejection (#499)', async () => {
+    const { context, db, submission } = fixture()
+    // Held for review with no listing yet, and refunded at the provider meanwhile (#473).
+    submission('sub_held', 'held.example', 'verified')
+    db.exec(`UPDATE listing_submissions SET plan = 'paid', paid_at = '2026-10-06T08:00:00.000Z',
+      refunded_at = '2026-10-06T09:00:00.000Z' WHERE id = 'sub_held'`)
+    const refundRejectedSubmission = vi.fn<AdminRefunds['refundRejectedSubmission']>(
+      async input => {
+        await input.notify('submission-rejected-refunded', {
+          eventKey: 'submission-rejected:sub_held',
+          input: {
+            reason: 'Duplicate.',
+            refundedCents: 4900,
+            submissionId: 'sub_held',
+            submissionName: 'Name sub_held'
+          },
+          to: maya
+        })
+        return 'refunded'
+      }
+    )
+    // The hook refunds nothing for a recorded refund, and tells the submitter of the rejection.
+    expect(
+      await rejectSubmission(context({ refunds: { refundRejectedSubmission } }), {
+        category: 'other',
+        reason: 'Duplicate.',
+        submissionId: 'sub_held'
+      })
+    ).toEqual({
+      email: { outcome: 'sent', to: maya },
+      ok: true,
+      refundPending: false,
+      refunded: true,
+      replayed: false
+    })
+    expect(refundRejectedSubmission).toHaveBeenCalledOnce()
   })
 
   it('lists a submission’s decision emails from the ledger, with their delivery', async () => {
