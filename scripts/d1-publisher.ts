@@ -35,6 +35,7 @@ import {
 } from '../apps/web/src/db/taxonomy-plans'
 import { hasFileExtension } from '../apps/web/src/lib/seo/canonical-url'
 import { isReservedListingSlug } from '../apps/web/src/lib/site'
+import { SUBMISSION_FIELD_LIMITS } from '../apps/web/src/lib/submissions/contract'
 import { assertD1Compatible } from './d1-compat'
 import { validateCanonicalLocalConfig } from './d1-local-config'
 import {
@@ -498,9 +499,11 @@ const operation = z.discriminatedUnion('action', [
   /**
    * Replaces a listing's long description, the Markdown its page renders (#523: listings created
    * without one, whose pages were thin), compared and swapped on its slug and current description
-   * (`expected.content`, null for none), so it is row-level like `listing-details-set`. As the
-   * admin panel's edits do (#64), it refuses a listing that isn't approved or whose own submission
-   * is in review or was rejected.
+   * (`expected.content`, null for none), so it is row-level like `listing-details-set`. The new
+   * description is trimmed and capped as the submission intake and owner revisions take it
+   * (`SUBMISSION_FIELD_LIMITS.content`, #527 review), so a claimed listing's owner can still save a
+   * revision. As the admin panel's edits do (#64), it refuses a listing that isn't approved or
+   * whose own submission is in review or was rejected.
    */
   z
     .object({
@@ -509,7 +512,14 @@ const operation = z.discriminatedUnion('action', [
       slug: existingSlug,
       reason: z.string().trim().min(1).max(200),
       expected: z.object({ content: z.string().nullable() }).strict(),
-      content: pageText
+      content: z
+        .string()
+        .trim()
+        .min(1, 'Must not be blank.')
+        .max(
+          SUBMISSION_FIELD_LIMITS.content,
+          `Keep the long description to ${SUBMISSION_FIELD_LIMITS.content} characters or fewer.`
+        )
     })
     .strict(),
   /**

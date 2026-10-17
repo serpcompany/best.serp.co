@@ -40,6 +40,9 @@ listing stays unpublished, its categories stay, and the long description is left
 for a listing created without one or whose description needs rewriting. It is row-level. It names
 the listing's `id` and `slug`, a `reason` for the activity log, `expected.content` (its current
 description exactly as stored, or `null` for none), and `content` (the new one, never blank).
+`content` is trimmed and at most 5,000 characters after trimming, the submission intake's and owner
+revisions' limit (`SUBMISSION_FIELD_LIMITS.content`), so a claimed listing's owner can still save a
+revision; the manifest is refused when it is longer.
 
 The batch is refused, with nothing written, when the slug or description isn't exactly `expected`
 (compared with `IS`, so `null` matches a listing with none), the listing isn't approved, or its own

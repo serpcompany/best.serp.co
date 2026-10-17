@@ -2753,6 +2753,19 @@ describe('listing-content-set in a row-level manifest (#523: thin listings)', ()
     expect(state(db)).toMatchObject({ status: 'approved', is_active: 0, content: written })
   })
 
+  it('trims the description and refuses one over 5,000 characters after trimming', () => {
+    // The submission intake's and owner revisions' rule, so a claimed listing's owner can still
+    // save a revision (#527 review).
+    const db = database()
+    publish(db, [set(`\n  ${written}\n\n`)])
+    expect(state(db)).toMatchObject({ content: written })
+    const longest = 'a'.repeat(5000)
+    expect(rows([set(` ${longest}\n`)]).operations[0]).toMatchObject({ content: longest })
+    expect(() => rows([set(`${longest}a`)])).toThrow(
+      /Keep the long description to 5000 characters or fewer/u
+    )
+  })
+
   it('refuses no change, a blank description, and a second operation on the listing', () => {
     expect(() => rows([set(written, { expected: { content: written } })])).toThrow(
       /already has this description/u
