@@ -1,0 +1,693 @@
+# serpcompany/best.serp.co#539 (batch I): hand-picked alternatives for the 80 live listings whose
+# primary category is Business & Finance and whose slug starts with p to z (paddle.com to zuva.ai),
+# the second half of Business & Finance after batch H took a to o. The picks lead each page's
+# Alternatives section; the page tops it up to six from similar listings.
+# Picked on 2026-10-18 from staging's live listings (read-only), each also live on production
+# (https://best.serp.co/sitemap-products.xml, read that day), by what each listing and its
+# candidates say they do: a pick does the same job for the same kind of user, best first, and a
+# listing gets fewer than six, or none, when nothing else fits. That day each listing's site and
+# each pick's site was read to confirm it still offers the product its listing describes; sites that
+# answer scripts with a bot check, a redirect or an empty page were read in a browser or through a
+# page reader (among them Quadency, STRATxAI, Broadcast, Reply.io, Yodlee, Schwarzthal, Stratup.ai,
+# Swyft, Write.Homes, SellScale, Bebop, FinChat, Onfido, Casetext and Insightmonk).
+# Picks may come from any category: Presbot is filed under Chatbots & Agents; Chargebee, FastSpring,
+# Lago, LogiSense, Metronome and m3ter under Data & Analytics; Shopify under Ecommerce; DecorAI,
+# IACrea, InteriorAI and REimagine Home under Image & Design; ChatSpot (HubSpot) under Marketing &
+# SEO; Colibri.ai and Grain AI under Productivity; BHuman under Video; and Pipl.ai and Video script
+# generator (Sendspark) under Writing. Every listing and pick is a v1 import listing, with the same
+# id and slug on staging and production. The reason for each listing is the comment above its
+# operation.
+# Nineteen listings have no operation. Thirteen because nothing in the catalog substitutes for them
+# on 2026-10-18: Parsers VC (startup and venture-fund discovery data with founder contacts),
+# Parthean (an AI financial-planning workspace for financial advisors), PharmaTrace (pharmaceutical
+# serialization and track-and-trace for drug supply-chain compliance), Qwaiting (queue management
+# for walk-in customers), Ramp (corporate cards, spend management and accounts payable for
+# businesses), Soon app (automated crypto investing on your own exchange account: scheduled buying
+# and selling, reinvesting and tax tracking), SplitMyExpenses (splitting shared bills with friends
+# and settling up), Starcycle (dissolving a company: the filings, cancellations and deadlines),
+# STRATxAI (a white-label platform for asset managers to build and deliver model portfolios),
+# Tonkean InvoicesGPT (AI intake and orchestration of procurement and legal requests in large
+# companies), Wolfia (answering security questionnaires and RFPs and running a trust center), Xebra
+# BizTech (an invoicing, accounting, GST and payroll suite for Indian small businesses) and ZeroTax
+# Al (free AI answers to US federal tax questions). Six because their sites don't offer the listed
+# product on 2026-10-18, so they are retirement candidates and no listing picks them: Raizer
+# (raizer.app, paused), Spryngtime (spryngtime.com, now a free e-signature tool), Wisdomise
+# (wisdomise.com, now a software studio), Broadcast (withbroadcast.com, the site doesn't load), Pod
+# (workwithpod.com, joined Backstory) and Abe AI (yodlee.com, no longer offers Abe AI). Their pages
+# keep the similar-listings fallback.
+# Each listing-alternatives-set compares and swaps the listing's slug and current picks (none yet),
+# refuses a pick that isn't live with that id and slug, keeps the listing's checksum, and logs an
+# `edited` event. Row-level, so the batch is refused with nothing written if any listing changed.
+# Needs migration 0018_listing_alternatives (#534, release 9). Publish on staging first, then on
+# production after the promotion that carries it.
+version: 1
+id: 2026-10-18-alternatives-business-p-z
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  # paddle.com: payments, subscriptions and sales-tax handling for software and app companies.
+  - action: listing-alternatives-set
+    id: lst_bc729b21fb0407dffb944ce7
+    slug: paddle.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_982edeef0a0b3aef9e2bf712, slug: fastspring.com }
+      - { id: lst_cdab88dff63eda52fb445aa4, slug: stripe.com }
+      - { id: lst_9077c08e86b6c36e167cb1b0, slug: chargebee.com }
+  # patentpal.com: AI drafting of patent applications.
+  - action: listing-alternatives-set
+    id: lst_9a7888eb795ab5c90097fd10
+    slug: patentpal.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_10d42364b880e5c22da3da14, slug: solveintelligence.com }
+  # paxton.ai: AI legal assistants for litigators: research, document analysis, medical chronologies
+  # and drafting.
+  - action: listing-alternatives-set
+    id: lst_88dbf4be1e79f00968cc8cea
+    slug: paxton.ai
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_9f188525ab3b05d6bfba38ed, slug: casetext.com }
+      - { id: lst_68f3cf1ac3fbe4bffb77a47b, slug: legalyze.ai }
+  # paymefy.com: AI-run collection of unpaid bills and debts.
+  - action: listing-alternatives-set
+    id: lst_b78a4f34be31bf813a3b08e5
+    slug: paymefy.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_e2a2fb343188a17660c9528a, slug: uselayerup.com }
+  # paypal.com: accepting payments online for a business.
+  - action: listing-alternatives-set
+    id: lst_007fbdfa730e1c1f70985053
+    slug: paypal.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_cdab88dff63eda52fb445aa4, slug: stripe.com }
+      - { id: lst_70844fcbb0da94fad1da1dcb, slug: squareup.com }
+  # people.ai: revenue intelligence that captures sales activity and answers pipeline and deal
+  # questions; People.ai is now Backstory (re-describe, below).
+  - action: listing-alternatives-set
+    id: lst_1dcc8a529a25f1859987f603
+    slug: people.ai
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_7e4dfc81c43d49a2e9d17db1, slug: gong.io }
+      - { id: lst_c0583a51f285108792a22d69, slug: momentum.io }
+      - { id: lst_82c64921e846d0837d0ab3cc, slug: sybill.ai }
+      - { id: lst_488b042285b49e1f7637172d, slug: swyftai.com }
+  # persana.ai: finding and enriching B2B prospects and personalising outbound with AI agents.
+  - action: listing-alternatives-set
+    id: lst_87716e6b38ef166de2633ad8
+    slug: persana.ai
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_2970bd2d905fb052d3e17947, slug: seamless.ai }
+      - { id: lst_a0b115154aae6a3d3a715b9a, slug: leadiq.com }
+      - { id: lst_678b2e869e9c9e38973e290d, slug: getcargo.io }
+      - { id: lst_2ee64ddfca2d5162ce08809e, slug: regie.ai }
+      - { id: lst_b16b5f9f2e7fd39b6059aac7, slug: scrupp.com }
+      - { id: lst_b0ad06f8b0935ab00a5cbb65, slug: nioleads.com }
+  # pinklion.xyz: tracking and analysing an investment portfolio for retail investors.
+  - action: listing-alternatives-set
+    id: lst_859fa69f6b1e266f41e39000
+    slug: pinklion.xyz
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_2378896fb4d7d1c1decad566, slug: portfoliopilot.com }
+  # portfoliopilot.com: AI guidance on tracking and managing your investments.
+  - action: listing-alternatives-set
+    id: lst_2378896fb4d7d1c1decad566
+    slug: portfoliopilot.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_859fa69f6b1e266f41e39000, slug: pinklion.xyz }
+      - { id: lst_3a38d4afc4db59eb234e8189, slug: wealthfront.com }
+      - { id: lst_41f235142924a22b0fc9f54d, slug: public.com }
+  # propertysimple.com: AI marketing and lead follow-up for real estate agents.
+  - action: listing-alternatives-set
+    id: lst_28dde9296071caadb147cd77
+    slug: propertysimple.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_42d06798f44bb70022037328, slug: write.homes }
+      - { id: lst_722c5861c32f7680cd7d3997, slug: listingai.co }
+  # public.com: AI investment research inside an investing app.
+  - action: listing-alternatives-set
+    id: lst_41f235142924a22b0fc9f54d
+    slug: public.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_9348a9265576728265df6fa8, slug: finchat.io }
+      - { id: lst_2378896fb4d7d1c1decad566, slug: portfoliopilot.com }
+      - { id: lst_1ed137bd1939e9f6ba6e7985, slug: composer.trade }
+  # quadency.com: crypto trading with automated bots across exchanges; Quadency is now Quad Terminal
+  # (re-describe, below).
+  - action: listing-alternatives-set
+    id: lst_c765a8419293540b2e6fcd41
+    slug: quadency.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_ab3a0dac2bac66567cc55c2e, slug: soon.app }
+  # quandri.io: AI that automates the operations work of insurance agencies and brokerages.
+  - action: listing-alternatives-set
+    id: lst_fee99b6c39dff1950f522160
+    slug: quandri.io
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_e2a2fb343188a17660c9528a, slug: uselayerup.com }
+  # quantified.ai: AI role-play practice and coaching for sales reps.
+  - action: listing-alternatives-set
+    id: lst_135f43a3a5341bc2e3fafb33
+    slug: quantified.ai
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_8a96d78a261abfb6e69c025a, slug: secondnature.ai }
+      - { id: lst_4a9bbab525472dc60b30ce06, slug: iwish.ai }
+      - { id: lst_5dffa5282bc25f1491fdca3f, slug: wonderway.io }
+  # reachout.ai: personalised prospecting videos sent at scale.
+  - action: listing-alternatives-set
+    id: lst_3e80f9642d8b7391b5c1478d
+    slug: reachout.ai
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_e8d309df7d1d34d9b9a99ec9, slug: sendspark.com }
+      - { id: lst_609dfc9c5430eef33f3db59e, slug: bhuman.ai }
+  # rebecc.ai: AI evaluation and validation of startup and business ideas, with a business plan.
+  - action: listing-alternatives-set
+    id: lst_fa9b23141c5184df6394ff57
+    slug: rebecc.ai
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_ac2c8eb10aec0ffa9cf4c484, slug: validatorai.com }
+      - { id: lst_f1004e0a740cec2b78c7fc92, slug: dimeadozen.ai }
+      - { id: lst_f46562eb71c19a5130303148, slug: venturusai.com }
+      - { id: lst_7c0f4f9476352d691203519f, slug: vizologi.com }
+      - { id: lst_c92a3d54beefb7e0383f3e77, slug: ideabuddy.com }
+  # receipt-ai.com: capturing receipts by text or upload and syncing them, coded, to accounting
+  # software.
+  - action: listing-alternatives-set
+    id: lst_45a54384854ce37c4e759238
+    slug: receipt-ai.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_cfc6843fa78166a0812b8e69, slug: receiptor.ai }
+      - { id: lst_c4f0abebb483718b84cd21f5, slug: ramp.com }
+  # receiptor.ai: collecting receipts and invoices automatically and filing them into accounting
+  # software.
+  - action: listing-alternatives-set
+    id: lst_cfc6843fa78166a0812b8e69
+    slug: receiptor.ai
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_45a54384854ce37c4e759238, slug: receipt-ai.com }
+      - { id: lst_51efc650bab8ef51b21eda2e, slug: booke.ai }
+  # regie.ai: AI sales agents that source, enrich, dial and email prospects.
+  - action: listing-alternatives-set
+    id: lst_2ee64ddfca2d5162ce08809e
+    slug: regie.ai
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_983550c8865b039039fb04bb, slug: reply.io }
+      - { id: lst_7c63dff03c5ee090d5eaab7d, slug: salesforge.ai }
+      - { id: lst_38c872446d6bb798daa3037a, slug: outplayhq.com }
+      - { id: lst_0a635967f635a6ade31e1494, slug: instantly.ai }
+      - { id: lst_256959cf82f720cc9c288def, slug: sales-mind.ai }
+      - { id: lst_87716e6b38ef166de2633ad8, slug: persana.ai }
+  # reply.io: multichannel sales engagement that runs email and LinkedIn sequences at scale, with AI
+  # SDR agents.
+  - action: listing-alternatives-set
+    id: lst_983550c8865b039039fb04bb
+    slug: reply.io
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_38c872446d6bb798daa3037a, slug: outplayhq.com }
+      - { id: lst_7c63dff03c5ee090d5eaab7d, slug: salesforge.ai }
+      - { id: lst_0a635967f635a6ade31e1494, slug: instantly.ai }
+      - { id: lst_2ee64ddfca2d5162ce08809e, slug: regie.ai }
+      - { id: lst_256959cf82f720cc9c288def, slug: sales-mind.ai }
+      - { id: lst_e30c6b57d0ea23721a2c8a63, slug: pipl.ai }
+  # runday.ai: AI agents that talk to inbound visitors and leads and book meetings.
+  - action: listing-alternatives-set
+    id: lst_af191693037073d75ca7e30a
+    slug: runday.ai
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_91fc615e3112e13d701d69cb, slug: conversica.com }
+      - { id: lst_211842541b976fb7ee9279fb, slug: gista.co }
+      - { id: lst_142e53f947597c506195595c, slug: presbot.com }
+  # salee.pro: automated LinkedIn outreach with AI-personalised messages; Salee is now Linxa
+  # (re-describe, below).
+  - action: listing-alternatives-set
+    id: lst_eef6d66877148932d1b099c4
+    slug: salee.pro
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_1fbcc301b89d6cc85af443f8, slug: dux-soup.com }
+      - { id: lst_256959cf82f720cc9c288def, slug: sales-mind.ai }
+      - { id: lst_7c63dff03c5ee090d5eaab7d, slug: salesforge.ai }
+      - { id: lst_983550c8865b039039fb04bb, slug: reply.io }
+  # sales-mind.ai: AI sales agents that prospect on LinkedIn and email, qualify leads and book
+  # meetings.
+  - action: listing-alternatives-set
+    id: lst_256959cf82f720cc9c288def
+    slug: sales-mind.ai
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_7c63dff03c5ee090d5eaab7d, slug: salesforge.ai }
+      - { id: lst_983550c8865b039039fb04bb, slug: reply.io }
+      - { id: lst_eef6d66877148932d1b099c4, slug: salee.pro }
+      - { id: lst_1fbcc301b89d6cc85af443f8, slug: dux-soup.com }
+      - { id: lst_2ee64ddfca2d5162ce08809e, slug: regie.ai }
+      - { id: lst_558bbe0809d9f93599032167, slug: sellscale.com }
+  # salesforce.com: CRMs with built-in generative AI; Einstein GPT is now Agentforce (re-describe,
+  # below).
+  - action: listing-alternatives-set
+    id: lst_85e33fc0ffe8c02ec4145c19
+    slug: salesforce.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_1f31337a943b53a5948269d1, slug: hubspot.com }
+      - { id: lst_e20a14748cea7b2247f1216b, slug: vtiger.com }
+  # salesforge.ai: multichannel sales engagement that runs email and LinkedIn sequences at scale, with
+  # AI SDR agents.
+  - action: listing-alternatives-set
+    id: lst_7c63dff03c5ee090d5eaab7d
+    slug: salesforge.ai
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_0a635967f635a6ade31e1494, slug: instantly.ai }
+      - { id: lst_983550c8865b039039fb04bb, slug: reply.io }
+      - { id: lst_e30c6b57d0ea23721a2c8a63, slug: pipl.ai }
+      - { id: lst_256959cf82f720cc9c288def, slug: sales-mind.ai }
+      - { id: lst_38c872446d6bb798daa3037a, slug: outplayhq.com }
+      - { id: lst_558bbe0809d9f93599032167, slug: sellscale.com }
+  # salesstack.ai: AI agents that find leads, run outreach and book meetings; Sales Stack now runs
+  # them from WhatsApp (re-describe, below).
+  - action: listing-alternatives-set
+    id: lst_cf4fa3d5cd97e8cf4c1a7485
+    slug: salesstack.ai
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_256959cf82f720cc9c288def, slug: sales-mind.ai }
+      - { id: lst_7c63dff03c5ee090d5eaab7d, slug: salesforge.ai }
+      - { id: lst_558bbe0809d9f93599032167, slug: sellscale.com }
+      - { id: lst_2ee64ddfca2d5162ce08809e, slug: regie.ai }
+  # schwarzthal.tech: financial-crime intelligence for compliance and investigation teams.
+  - action: listing-alternatives-set
+    id: lst_5c32fb1707c851af8564520b
+    slug: schwarzthal.tech
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_a4c5c3718af1a67ca3930a9f, slug: greenlite.ai }
+      - { id: lst_c1b72ede2519603af723dcf9, slug: babelstreet.com }
+  # scrupp.com: scraping LinkedIn and Sales Navigator leads into lists with verified emails.
+  - action: listing-alternatives-set
+    id: lst_b16b5f9f2e7fd39b6059aac7
+    slug: scrupp.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_b0ad06f8b0935ab00a5cbb65, slug: nioleads.com }
+      - { id: lst_7c550c15c0a44902da5c5d6c, slug: exportapollo.com }
+      - { id: lst_0f7f350b788af63882dd0cd9, slug: finalscout.com }
+      - { id: lst_a0b115154aae6a3d3a715b9a, slug: leadiq.com }
+      - { id: lst_2970bd2d905fb052d3e17947, slug: seamless.ai }
+      - { id: lst_8e9604d14ed803559c88a601, slug: mailmentor.io }
+  # seamless.ai: B2B contact data and AI prospecting for finding decision makers and their verified
+  # emails and phone numbers.
+  - action: listing-alternatives-set
+    id: lst_2970bd2d905fb052d3e17947
+    slug: seamless.ai
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_a0b115154aae6a3d3a715b9a, slug: leadiq.com }
+      - { id: lst_87716e6b38ef166de2633ad8, slug: persana.ai }
+      - { id: lst_b16b5f9f2e7fd39b6059aac7, slug: scrupp.com }
+      - { id: lst_0f7f350b788af63882dd0cd9, slug: finalscout.com }
+      - { id: lst_b0ad06f8b0935ab00a5cbb65, slug: nioleads.com }
+      - { id: lst_7ba980111cac2e9724f1f926, slug: bebop.ai }
+  # secondnature.ai: AI role-play practice and coaching for sales reps.
+  - action: listing-alternatives-set
+    id: lst_8a96d78a261abfb6e69c025a
+    slug: secondnature.ai
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_135f43a3a5341bc2e3fafb33, slug: quantified.ai }
+      - { id: lst_4a9bbab525472dc60b30ce06, slug: iwish.ai }
+      - { id: lst_5dffa5282bc25f1491fdca3f, slug: wonderway.io }
+  # sellscale.com: AI agents that build the list, write and send outbound and handle replies;
+  # SellScale's product is now Selix (re-describe, below).
+  - action: listing-alternatives-set
+    id: lst_558bbe0809d9f93599032167
+    slug: sellscale.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_7c63dff03c5ee090d5eaab7d, slug: salesforge.ai }
+      - { id: lst_2ee64ddfca2d5162ce08809e, slug: regie.ai }
+      - { id: lst_256959cf82f720cc9c288def, slug: sales-mind.ai }
+      - { id: lst_983550c8865b039039fb04bb, slug: reply.io }
+      - { id: lst_0a635967f635a6ade31e1494, slug: instantly.ai }
+      - { id: lst_87716e6b38ef166de2633ad8, slug: persana.ai }
+  # shuftipro.com: online identity verification (documents and biometrics) for onboarding customers.
+  - action: listing-alternatives-set
+    id: lst_814a6a2fef12c926cbd56935
+    slug: shuftipro.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_0e109f5e49896a9c6da59377, slug: sumsub.com }
+      - { id: lst_57545c241a8ea171fdb6c8e2, slug: veriff.com }
+      - { id: lst_4d7740fba3e7632b615ca97a, slug: onfido.com }
+      - { id: lst_e97aad98fda1c0c2580d5dda, slug: bluecheck.me }
+  # solveintelligence.com: AI drafting of patent applications and prosecution work.
+  - action: listing-alternatives-set
+    id: lst_10d42364b880e5c22da3da14
+    slug: solveintelligence.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_9a7888eb795ab5c90097fd10, slug: patentpal.com }
+  # spellbook.legal: AI contract review and drafting for lawyers.
+  - action: listing-alternatives-set
+    id: lst_9f8c0cf86792cdc9b3d70f21
+    slug: spellbook.legal
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_c6547f699af3ede643cf9427, slug: ivo.ai }
+      - { id: lst_309b2cfc6aff3767b829292c, slug: goheather.io }
+      - { id: lst_053360a37fe585e2f05ca2fa, slug: maigon.io }
+      - { id: lst_9f188525ab3b05d6bfba38ed, slug: casetext.com }
+      - { id: lst_35593f6c25b348eadfbf27f1, slug: zuva.ai }
+  # squareup.com: card payments and point-of-sale for shops, restaurants and other merchants.
+  - action: listing-alternatives-set
+    id: lst_70844fcbb0da94fad1da1dcb
+    slug: squareup.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_732248ec046f63b3e8ab89a4, slug: shopify.com }
+      - { id: lst_cdab88dff63eda52fb445aa4, slug: stripe.com }
+      - { id: lst_007fbdfa730e1c1f70985053, slug: paypal.com }
+  # stratup.ai: AI-generated startup ideas.
+  - action: listing-alternatives-set
+    id: lst_5766915eece63e8bfce70c14
+    slug: stratup.ai
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_d1948564970b62216bfa5f75, slug: bizideas.ai }
+      - { id: lst_ac2c8eb10aec0ffa9cf4c484, slug: validatorai.com }
+      - { id: lst_fa9b23141c5184df6394ff57, slug: rebecc.ai }
+      - { id: lst_f1004e0a740cec2b78c7fc92, slug: dimeadozen.ai }
+  # stride.la: building email lead lists from social media profiles.
+  - action: listing-alternatives-set
+    id: lst_4c93394305e7fe5f0f242a7e
+    slug: stride.la
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_b16b5f9f2e7fd39b6059aac7, slug: scrupp.com }
+      - { id: lst_0f7f350b788af63882dd0cd9, slug: finalscout.com }
+      - { id: lst_b0ad06f8b0935ab00a5cbb65, slug: nioleads.com }
+  # stripe.com: accepting online payments and running billing for a business.
+  - action: listing-alternatives-set
+    id: lst_cdab88dff63eda52fb445aa4
+    slug: stripe.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_007fbdfa730e1c1f70985053, slug: paypal.com }
+      - { id: lst_70844fcbb0da94fad1da1dcb, slug: squareup.com }
+      - { id: lst_bc729b21fb0407dffb944ce7, slug: paddle.com }
+      - { id: lst_982edeef0a0b3aef9e2bf712, slug: fastspring.com }
+  # sturppy.com: building a startup's financial model and plan without spreadsheets.
+  - action: listing-alternatives-set
+    id: lst_7d8b95dfeaa879b6710f6b50
+    slug: sturppy.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_c92a3d54beefb7e0383f3e77, slug: ideabuddy.com }
+  # sumsub.com: online identity verification (documents and biometrics) for onboarding customers.
+  - action: listing-alternatives-set
+    id: lst_0e109f5e49896a9c6da59377
+    slug: sumsub.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_57545c241a8ea171fdb6c8e2, slug: veriff.com }
+      - { id: lst_4d7740fba3e7632b615ca97a, slug: onfido.com }
+      - { id: lst_814a6a2fef12c926cbd56935, slug: shuftipro.com }
+      - { id: lst_e97aad98fda1c0c2580d5dda, slug: bluecheck.me }
+  # swyftai.com: AI agents that run revenue-operations workflows and capture customer data across
+  # systems.
+  - action: listing-alternatives-set
+    id: lst_488b042285b49e1f7637172d
+    slug: swyftai.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_678b2e869e9c9e38973e290d, slug: getcargo.io }
+      - { id: lst_c0583a51f285108792a22d69, slug: momentum.io }
+      - { id: lst_1dcc8a529a25f1859987f603, slug: people.ai }
+      - { id: lst_82c64921e846d0837d0ab3cc, slug: sybill.ai }
+  # sybill.ai: AI that records and analyses sales calls and syncs the notes and deal insight to the
+  # CRM.
+  - action: listing-alternatives-set
+    id: lst_82c64921e846d0837d0ab3cc
+    slug: sybill.ai
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_c0583a51f285108792a22d69, slug: momentum.io }
+      - { id: lst_7e4dfc81c43d49a2e9d17db1, slug: gong.io }
+      - { id: lst_9a0fbd5ef5ff853afce4f195, slug: traq.ai }
+      - { id: lst_66cf58c836fdacddb5cf7140, slug: colibri.ai }
+      - { id: lst_672960460d8d1f47f7b025f0, slug: grain.com }
+      - { id: lst_67c972162e4c39eb1e889db9, slug: hints.so }
+  # tradeui.com: options flow and AI market analysis for stock and options traders.
+  - action: listing-alternatives-set
+    id: lst_5ed9cf97c424d5a130beceff
+    slug: tradeui.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_db9d1c787613baa2a4a8134a, slug: tradytics.com }
+  # tradytics.com: options flow and AI market analysis for stock and options traders.
+  - action: listing-alternatives-set
+    id: lst_db9d1c787613baa2a4a8134a
+    slug: tradytics.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_5ed9cf97c424d5a130beceff, slug: tradeui.com }
+  # traq.ai: AI that records and analyses sales calls and syncs the notes and deal insight to the CRM.
+  - action: listing-alternatives-set
+    id: lst_9a0fbd5ef5ff853afce4f195
+    slug: traq.ai
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_7e4dfc81c43d49a2e9d17db1, slug: gong.io }
+      - { id: lst_82c64921e846d0837d0ab3cc, slug: sybill.ai }
+      - { id: lst_66cf58c836fdacddb5cf7140, slug: colibri.ai }
+      - { id: lst_c0583a51f285108792a22d69, slug: momentum.io }
+      - { id: lst_672960460d8d1f47f7b025f0, slug: grain.com }
+  # trellus.ai: AI dialers for sales reps.
+  - action: listing-alternatives-set
+    id: lst_3992fc28f6bc0e05c3ad2e7c
+    slug: trellus.ai
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_2ee64ddfca2d5162ce08809e, slug: regie.ai }
+      - { id: lst_38c872446d6bb798daa3037a, slug: outplayhq.com }
+  # trendhunter.ai: trend and market research for innovation and strategy teams.
+  - action: listing-alternatives-set
+    id: lst_9423b084db62236da219606c
+    slug: trendhunter.ai
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_d68666b9abfb0cb95be442b2, slug: insightmonk.com }
+  # truewind.ai: AI bookkeeping that turns financial data into ledger entries and closes the books.
+  - action: listing-alternatives-set
+    id: lst_d6edb90c808c61987d0f5bf1
+    slug: truewind.ai
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_51efc650bab8ef51b21eda2e, slug: booke.ai }
+  # turbotax.com: filing taxes online.
+  - action: listing-alternatives-set
+    id: lst_1acc8bdf0855440c862b231e
+    slug: turbotax.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_45c09f7daf5b93996432adcf, slug: flyfin.tax }
+  # uselayerup.com: AI agents for financial-services back-office work, collections among it; Layerup
+  # now covers insurance and lending operations too (re-describe, below).
+  - action: listing-alternatives-set
+    id: lst_e2a2fb343188a17660c9528a
+    slug: uselayerup.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_b78a4f34be31bf813a3b08e5, slug: paymefy.com }
+      - { id: lst_fee99b6c39dff1950f522160, slug: quandri.io }
+  # validatorai.com: generating and validating startup and business ideas with an AI advisor.
+  - action: listing-alternatives-set
+    id: lst_ac2c8eb10aec0ffa9cf4c484
+    slug: validatorai.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_f1004e0a740cec2b78c7fc92, slug: dimeadozen.ai }
+      - { id: lst_fa9b23141c5184df6394ff57, slug: rebecc.ai }
+      - { id: lst_f46562eb71c19a5130303148, slug: venturusai.com }
+      - { id: lst_d1948564970b62216bfa5f75, slug: bizideas.ai }
+      - { id: lst_5766915eece63e8bfce70c14, slug: stratup.ai }
+      - { id: lst_7c0f4f9476352d691203519f, slug: vizologi.com }
+  # venturusai.com: AI analysis of a business idea and its strategy.
+  - action: listing-alternatives-set
+    id: lst_f46562eb71c19a5130303148
+    slug: venturusai.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_7c0f4f9476352d691203519f, slug: vizologi.com }
+      - { id: lst_ac2c8eb10aec0ffa9cf4c484, slug: validatorai.com }
+      - { id: lst_f1004e0a740cec2b78c7fc92, slug: dimeadozen.ai }
+      - { id: lst_fa9b23141c5184df6394ff57, slug: rebecc.ai }
+      - { id: lst_c92a3d54beefb7e0383f3e77, slug: ideabuddy.com }
+  # veriff.com: online identity verification (documents and biometrics) for onboarding customers.
+  - action: listing-alternatives-set
+    id: lst_57545c241a8ea171fdb6c8e2
+    slug: veriff.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_0e109f5e49896a9c6da59377, slug: sumsub.com }
+      - { id: lst_4d7740fba3e7632b615ca97a, slug: onfido.com }
+      - { id: lst_814a6a2fef12c926cbd56935, slug: shuftipro.com }
+      - { id: lst_e97aad98fda1c0c2580d5dda, slug: bluecheck.me }
+  # virtualstagingai.app: AI virtual staging that furnishes photos of empty rooms for real estate
+  # listings.
+  - action: listing-alternatives-set
+    id: lst_48752f1c275623bae9e933ac
+    slug: virtualstagingai.app
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_b03f9d71b9057b67cc5e10d9, slug: interiorai.com }
+      - { id: lst_0d9b4c06f5f51d23cf67eb83, slug: reimaginehome.ai }
+      - { id: lst_204df554761e10ced212d2e4, slug: iacrea.com }
+      - { id: lst_73c6a18568ae6850b5071b74, slug: decorai.io }
+  # vizologi.com: AI business planning: validating ideas, analysing competitors and building strategy.
+  - action: listing-alternatives-set
+    id: lst_7c0f4f9476352d691203519f
+    slug: vizologi.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_f46562eb71c19a5130303148, slug: venturusai.com }
+      - { id: lst_c92a3d54beefb7e0383f3e77, slug: ideabuddy.com }
+      - { id: lst_ac2c8eb10aec0ffa9cf4c484, slug: validatorai.com }
+      - { id: lst_f1004e0a740cec2b78c7fc92, slug: dimeadozen.ai }
+      - { id: lst_fa9b23141c5184df6394ff57, slug: rebecc.ai }
+  # vtiger.com: CRMs with built-in generative AI.
+  - action: listing-alternatives-set
+    id: lst_e20a14748cea7b2247f1216b
+    slug: vtiger.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_85e33fc0ffe8c02ec4145c19, slug: salesforce.com }
+      - { id: lst_1f31337a943b53a5948269d1, slug: hubspot.com }
+  # wealthfront.com: investing money in automated portfolios.
+  - action: listing-alternatives-set
+    id: lst_3a38d4afc4db59eb234e8189
+    slug: wealthfront.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_41f235142924a22b0fc9f54d, slug: public.com }
+      - { id: lst_2378896fb4d7d1c1decad566, slug: portfoliopilot.com }
+  # withorb.com: usage-based and subscription billing for software companies.
+  - action: listing-alternatives-set
+    id: lst_c284c0a1b8460c8abb24af5a
+    slug: withorb.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_5e4b2b4d5e822fd4cf24d2f8, slug: metronome.com }
+      - { id: lst_c4cebfd6b9579da3a901a11d, slug: getlago.com }
+      - { id: lst_d12c544696133d00f8631089, slug: m3ter.com }
+      - { id: lst_9077c08e86b6c36e167cb1b0, slug: chargebee.com }
+      - { id: lst_b90eb4eb86330f2335c341fd, slug: logisense.com }
+  # wonderway.io: sales training and onboarding programmes for sales teams.
+  - action: listing-alternatives-set
+    id: lst_5dffa5282bc25f1491fdca3f
+    slug: wonderway.io
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_8a96d78a261abfb6e69c025a, slug: secondnature.ai }
+      - { id: lst_135f43a3a5341bc2e3fafb33, slug: quantified.ai }
+      - { id: lst_4a9bbab525472dc60b30ce06, slug: iwish.ai }
+  # write.homes: AI writers of real estate listing descriptions and marketing.
+  - action: listing-alternatives-set
+    id: lst_42d06798f44bb70022037328
+    slug: write.homes
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_722c5861c32f7680cd7d3997, slug: listingai.co }
+      - { id: lst_8e527afa2d5053dab6c10413, slug: listingcopy.ai }
+      - { id: lst_66045cc31810fb4e31a26f43, slug: myrealestatelisting.app }
+      - { id: lst_28dde9296071caadb147cd77, slug: propertysimple.com }
+  # zuva.ai: AI contract analysis and review.
+  - action: listing-alternatives-set
+    id: lst_35593f6c25b348eadfbf27f1
+    slug: zuva.ai
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_9f8c0cf86792cdc9b3d70f21, slug: spellbook.legal }
+      - { id: lst_c6547f699af3ede643cf9427, slug: ivo.ai }
+      - { id: lst_053360a37fe585e2f05ca2fa, slug: maigon.io }

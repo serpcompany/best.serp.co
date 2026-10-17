@@ -1,0 +1,202 @@
+# serpcompany/best.serp.co#539 (batch I): hand-picked alternatives for the 17 live listings whose
+# primary category is Marketing & SEO and whose slug starts with a to b (b2metric.com to buzzli.in;
+# none starts with a), the next category in #539's size order after Business & Finance. The picks
+# lead each page's Alternatives section; the page tops it up to six from similar listings.
+# Picked on 2026-10-18 from staging's live listings (read-only), each also live on production
+# (https://best.serp.co/sitemap-products.xml, read that day), by what each listing and its
+# candidates say they do: a pick does the same job for the same kind of user, best first, and a
+# listing gets fewer than six, or none, when nothing else fits. That day each listing's site and
+# each pick's site was read to confirm it still offers the product its listing describes; Publer,
+# whose site answers scripts with a cookie page, was read through a page reader.
+# Picks may come from any category: Twilio is filed under Developer Tools. Every listing and pick is
+# a v1 import listing, with the same id and slug on staging and production. The reason for each
+# listing is the comment above its operation.
+# One listing has no operation, because nothing in the catalog substitutes for it on 2026-10-18:
+# Business Rocket Solutions (websites and client portals built for home-service trades in Northern
+# Virginia). Its page keeps the similar-listings fallback.
+# Each listing-alternatives-set compares and swaps the listing's slug and current picks (none yet),
+# refuses a pick that isn't live with that id and slug, keeps the listing's checksum, and logs an
+# `edited` event. Row-level, so the batch is refused with nothing written if any listing changed.
+# Needs migration 0018_listing_alternatives (#534, release 9). Publish on staging first, then on
+# production after the promotion that carries it.
+version: 1
+id: 2026-10-18-alternatives-marketing-a-b
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  # b2metric.com: customer data platforms with AI that predict customer behaviour and drive marketing
+  # campaigns.
+  - action: listing-alternatives-set
+    id: lst_17e478acd793f1b5d31bce8a
+    slug: b2metric.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_e8b5f37fdca3820d3386409e, slug: optimove.com }
+      - { id: lst_460e234a2dd92e61732945a6, slug: ortto.com }
+  # backlinkgpt.com: getting backlinks to a site without running the outreach yourself.
+  - action: listing-alternatives-set
+    id: lst_277b6af1102d4c586214dc7c
+    slug: backlinkgpt.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_42338f2a89dc7eb98061ac50, slug: rhinorank.io }
+      - { id: lst_2d70e3e3d3ecc5b632d7b708, slug: loganix.com }
+      - { id: lst_e4490fa20f80afb158e372c1, slug: uklinkology.co.uk }
+  # backlinks.com: buying backlinks.
+  - action: listing-alternatives-set
+    id: lst_965f251c23237d988c39b4c1
+    slug: backlinks.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_5ccb1702e68b39098c4e3e0a, slug: linkdaddy.com }
+      - { id: lst_42338f2a89dc7eb98061ac50, slug: rhinorank.io }
+      - { id: lst_2d70e3e3d3ecc5b632d7b708, slug: loganix.com }
+      - { id: lst_e4490fa20f80afb158e372c1, slug: uklinkology.co.uk }
+  # bazaarvoice.com: ratings, reviews and other customer content for ecommerce brands; the listing
+  # describes Affable.ai, which Bazaarvoice now sells as part of its UGC platform (re-describe,
+  # below).
+  - action: listing-alternatives-set
+    id: lst_cd4f6534709518e512eb802d
+    slug: bazaarvoice.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_ebb0f78d4057325bee01a84b, slug: yotpo.com }
+      - { id: lst_7311f297caf5e804cbc6af7f, slug: taggbox.com }
+      - { id: lst_1c8aadcfec58c0405d78edbb, slug: embedsocial.com }
+      - { id: lst_15cec3983201a04dbd6fea45, slug: influencermarketing.ai }
+  # benchmarkemail.com: email marketing platforms with automation, sign-up forms and newsletters.
+  - action: listing-alternatives-set
+    id: lst_485f9a943788eca56efa484c
+    slug: benchmarkemail.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_6272934b1a2e55b696c67d58, slug: mailchimp.com }
+      - { id: lst_c2f4ee07d518fe1d4ea33eb6, slug: brevo.com }
+      - { id: lst_7f921f0cb7297df7b518e61a, slug: getresponse.com }
+      - { id: lst_6cf5411302e14b0228b4f4a8, slug: gozen.io }
+  # bird.com: APIs and tools for sending email, SMS, WhatsApp and voice messages; MessageBird is now
+  # Bird (re-describe, below).
+  - action: listing-alternatives-set
+    id: lst_2eee16bafaa94c3114479589
+    slug: bird.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_20b1882d52bf96d971b1847f, slug: twilio.com }
+      - { id: lst_c2f4ee07d518fe1d4ea33eb6, slug: brevo.com }
+  # birdeye.com: getting and managing customer reviews and the local online presence of a business,
+  # for multi-location brands.
+  - action: listing-alternatives-set
+    id: lst_da7c9076ef1b0f3cebd73314
+    slug: birdeye.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_1c8aadcfec58c0405d78edbb, slug: embedsocial.com }
+      - { id: lst_46d04eadede67ebea7e5a27e, slug: nicejob.com }
+      - { id: lst_94e8a873f4b81e025c09f3e6, slug: brightlocal.com }
+      - { id: lst_ff7ddb5b9b41513cb06a1cf9, slug: flamel.ai }
+      - { id: lst_42bc0a06e88321ca84d2d4c2, slug: hifivestar.com }
+      - { id: lst_6bc032d3b0d415cf98acc47c, slug: brandmate.ai }
+  # blogtweet.xyz: turning blog posts and other content into posts and threads for X.
+  - action: listing-alternatives-set
+    id: lst_2c4eab21cfe1a1e8db800523
+    slug: blogtweet.xyz
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_97869abdca3f1345192eb337, slug: tweetify.it }
+      - { id: lst_b2c18d0ef61e56de326a3f40, slug: tweethunter.io }
+  # brandbastion.com: moderating and answering comments on a brand's social media pages.
+  - action: listing-alternatives-set
+    id: lst_72eb6a046566b20988764657
+    slug: brandbastion.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_b05b863e694054204ba81f1f, slug: brandwise.ai }
+  # brandmate.ai: getting and managing customer reviews and the local online presence of a business,
+  # for small businesses.
+  - action: listing-alternatives-set
+    id: lst_6bc032d3b0d415cf98acc47c
+    slug: brandmate.ai
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_da7c9076ef1b0f3cebd73314, slug: birdeye.com }
+      - { id: lst_46d04eadede67ebea7e5a27e, slug: nicejob.com }
+      - { id: lst_4841974092636855c74b0680, slug: localo.com }
+      - { id: lst_42bc0a06e88321ca84d2d4c2, slug: hifivestar.com }
+      - { id: lst_94e8a873f4b81e025c09f3e6, slug: brightlocal.com }
+      - { id: lst_cd92f01e543f64ddd625bf22, slug: reviewly.ai }
+  # brandwise.ai: moderating and answering comments on a brand's social media pages.
+  - action: listing-alternatives-set
+    id: lst_b05b863e694054204ba81f1f
+    slug: brandwise.ai
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_72eb6a046566b20988764657, slug: brandbastion.com }
+  # brevo.com: email marketing platforms with automation, sign-up forms and newsletters, plus SMS, CRM
+  # and transactional email.
+  - action: listing-alternatives-set
+    id: lst_c2f4ee07d518fe1d4ea33eb6
+    slug: brevo.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_6272934b1a2e55b696c67d58, slug: mailchimp.com }
+      - { id: lst_633089b8449e9fc1ac17dd11, slug: klaviyo.com }
+      - { id: lst_7f921f0cb7297df7b518e61a, slug: getresponse.com }
+      - { id: lst_485f9a943788eca56efa484c, slug: benchmarkemail.com }
+      - { id: lst_460e234a2dd92e61732945a6, slug: ortto.com }
+  # brightbid.com: AI that runs and optimises Google Ads campaigns.
+  - action: listing-alternatives-set
+    id: lst_39dab527ff77145e6ab8a4fd
+    slug: brightbid.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_33d5b066b2d45c62c4e35220, slug: fresho.dev }
+  # brightlocal.com: local SEO: Google Business Profile management, local rank tracking and citations.
+  - action: listing-alternatives-set
+    id: lst_94e8a873f4b81e025c09f3e6
+    slug: brightlocal.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_4841974092636855c74b0680, slug: localo.com }
+      - { id: lst_3ce9d522d9284f61957b6bbb, slug: localranking.com }
+      - { id: lst_04611d6b0dddd36da8b2a7fb, slug: localfalcon.com }
+      - { id: lst_1b35c2b534791f674aacdd54, slug: merchynt.com }
+      - { id: lst_895a38943ee254e52a52b19f, slug: gmbcrush.com }
+      - { id: lst_da7c9076ef1b0f3cebd73314, slug: birdeye.com }
+  # buffer.com: scheduling and publishing posts across social networks, with analytics.
+  - action: listing-alternatives-set
+    id: lst_43ae562ab2420b083b4a2cd1
+    slug: buffer.com
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_250dd8cad4fef884026bec1b, slug: hootsuite.com }
+      - { id: lst_b0479abd8b81aefc09017251, slug: socialbee.com }
+      - { id: lst_73bf82550ee28af8413dea7d, slug: publer.io }
+      - { id: lst_129f5e4e1778079ac087d9d3, slug: feedhive.com }
+      - { id: lst_b819f25be12ec3c8e4d5ee04, slug: socialbu.com }
+      - { id: lst_c29c832e45f836888edde3db, slug: postly.ai }
+  # buzzli.in: AI that writes and schedules LinkedIn posts in your voice.
+  - action: listing-alternatives-set
+    id: lst_ce4cb6e8bc05d1b3dd88dafc
+    slug: buzzli.in
+    reason: '#539: hand-picked alternatives (batch I)'
+    expected: []
+    alternatives:
+      - { id: lst_a7bf6f40afb0f965ea1b204e, slug: taplio.com }
+      - { id: lst_837845d43a835bc6bf319c2d, slug: contentin.io }
