@@ -8,25 +8,30 @@
 # listing gets fewer than six, or none, when nothing else fits. That day each listing's site and
 # each pick's site was read to confirm it still offers the product its listing describes; four that
 # block scripts (Melody Studio, Tapesearch, TTSMaker and Vocal Remover at vocalremover.org) were
-# read in a browser.
+# read in a browser, as was async.com's "Formerly Podcastle" label.
 # Picks may come from any category: Imentiv is filed under Developer Tools, Soundraw under Image &
-# Design, Otter.ai, Suki and fireflies.ai under Productivity, and Dubverse and Rask.ai under
-# Writing. Every listing and pick is a v1 import listing, with the same id and slug on staging and
-# production. The reason for each listing is the comment above its operation.
-# Sixteen listings have no operation. Four because nothing in the catalog substitutes for them on
+# Design, Otter.ai, Suki, Nabla, ScribeBerry and fireflies.ai under Productivity, and Dubverse and
+# Rask.ai under Writing. Every listing and pick is a v1 import listing, with the same id and slug on
+# staging and production. The reason for each listing is the comment above its operation.
+# Three listings whose sites moved to a new name but still offer the listed product get picks and
+# are to be re-described in #546: Podcastle (podcastle.ai, now Async, "Formerly Podcastle"),
+# Supertone (supertone.ai, now Antinode Audio, where Supertone Shift continues as Antinode Shift)
+# and TranscribeMe (transcribeme.app, now TranscribeGo, which still runs the TranscribeMe WhatsApp
+# and Telegram bots).
+# Thirteen listings have no operation. Four because nothing in the catalog substitutes for them on
 # 2026-10-18: Playlistnameai (naming playlists; the playlist tools build playlists, not names),
 # Sonify (data sonification, turning data into sound), Tapesearch (searching podcast transcripts and
 # alerting on mentions; the podcast apps summarize episodes for listeners) and TTSLabs (text-to-
-# speech that reads Twitch viewers' messages aloud live on stream). Twelve because their sites don't
+# speech that reads Twitch viewers' messages aloud live on stream). Eight because their sites don't
 # offer the listed product on 2026-10-18, so they are retirement candidates and no listing picks
 # them: Koe Recast (koe.ai, a blank page), Listener.fm (listener.fm, redirects to Listener, campaign
 # reporting for podcast networks), Live Captions (live-captions.com, a parked domain), Muzaic.studio
-# (muzaic.studio, redirects to an unrelated deals site), Orb Producer (orbplugins.com, redirects to
-# LANDR Composer), Podcastle (podcastle.ai, redirects to Async, an AI video editor), Splashmusic
-# (splashmusic.com, now a Roblox music game), Supertone (supertone.ai, redirects to Antinode Audio),
-# TranscribeMe (transcribeme.app, redirects to TranscribeGo), Transcribethis (transcribethis.io,
-# Cloudflare error 526), Voiceful.io (voiceful.io, the domain does not resolve) and Wavtool
-# (wavtool.com, gone offline). Their pages keep the similar-listings fallback.
+# (muzaic.studio, redirects to an unrelated deals site), Splashmusic (splashmusic.com, now a Roblox
+# music game), Transcribethis (transcribethis.io, Cloudflare error 526), Voiceful.io (voiceful.io,
+# the domain does not resolve) and Wavtool (wavtool.com, gone offline). One, Orb Producer
+# (orbplugins.com), because it redirects to LANDR Composer, now part of LANDR, which has its own
+# listing; it is to be redirected to /products/landr.com/ in #546, so no listing picks it. Their
+# pages keep the similar-listings fallback.
 # Each listing-alternatives-set compares and swaps the listing's slug and current picks (none yet),
 # refuses a pick that isn't live with that id and slug, keeps the listing's checksum, and logs an
 # `edited` event. Row-level, so the batch is refused with nothing written if any listing changed.
@@ -65,6 +70,7 @@ operations:
     expected: []
     alternatives:
       - { id: lst_a3e7bfcf16a51cfa6903e98d, slug: descript.com }
+      - { id: lst_ab4d1ad0830429e80449a8e6, slug: podcastle.ai }
       - { id: lst_e052e709aa8800710cb67e35, slug: cleanvoice.ai }
       - { id: lst_00700d96f8d85e30213dc9ef, slug: riverside.fm }
       - { id: lst_508f62751b28598b3f0b7aeb, slug: podsqueeze.com }
@@ -150,6 +156,8 @@ operations:
     expected: []
     alternatives:
       - { id: lst_458fc079274781fb3e415bc8, slug: suki.ai }
+      - { id: lst_32ece2577a0a35c4a2d8c7a4, slug: nabla.com }
+      - { id: lst_2eb78bc58a55301bd66eee9a, slug: scribeberry.com }
   # melodystudio.net: AI songwriting help that turns ideas or lyrics into melodies.
   - action: listing-alternatives-set
     id: lst_6fa64e9ef4023ed8b9e9ce9e
@@ -316,6 +324,19 @@ operations:
     alternatives:
       - { id: lst_024cbabf21db19b937c13d83, slug: speechify.com }
       - { id: lst_b60aad2072dd2df6d31c2283, slug: naturalreaders.com }
+  # podcastle.ai: recording, editing and cleaning up podcasts with AI. The site is now Async
+  # (async.com, "Formerly Podcastle"), which still records, edits and cleans audio with Magic Dust;
+  # the listing is to be re-described in #546.
+  - action: listing-alternatives-set
+    id: lst_ab4d1ad0830429e80449a8e6
+    slug: podcastle.ai
+    reason: '#539: hand-picked alternatives (batch F)'
+    expected: []
+    alternatives:
+      - { id: lst_a3e7bfcf16a51cfa6903e98d, slug: descript.com }
+      - { id: lst_00700d96f8d85e30213dc9ef, slug: riverside.fm }
+      - { id: lst_e052e709aa8800710cb67e35, slug: cleanvoice.ai }
+      - { id: lst_32641bc4a5574caae327bf71, slug: koolio.ai }
   # podsift.com: AI summaries of podcast episodes.
   - action: listing-alternatives-set
     id: lst_1a18691f3bc231789b7b7463
@@ -550,6 +571,19 @@ operations:
     alternatives:
       - { id: lst_6aca9e098b542f8c87e536a1, slug: snipd.com }
       - { id: lst_1a18691f3bc231789b7b7463, slug: podsift.com }
+  # supertone.ai: real-time voice changers for streams, games and calls. The site now redirects to
+  # Antinode Audio (antinodeaudio.com), where Supertone Shift continues as Antinode Shift; the
+  # listing is to be re-described in #546.
+  - action: listing-alternatives-set
+    id: lst_b3f118d27e8f58e6f8ee2dd6
+    slug: supertone.ai
+    reason: '#539: hand-picked alternatives (batch F)'
+    expected: []
+    alternatives:
+      - { id: lst_f0ff6b492499a0f559ce0c51, slug: voicemod.net }
+      - { id: lst_9ccacd678c8e704e056a95b1, slug: voice.ai }
+      - { id: lst_95e091b76768b181809911e7, slug: screamingbee.com }
+      - { id: lst_cf663339eccb41dc9b1494b3, slug: dubbingai.io }
   # swellai.com: AI that repurposes audio and video into written content.
   - action: listing-alternatives-set
     id: lst_31b4cea66ad2ad40f00b290b
@@ -619,6 +653,17 @@ operations:
       - { id: lst_8e44ddee9cbd28b3801b3a83, slug: mubert.com }
       - { id: lst_bb89a7ee7c28890a4986187c, slug: loudly.com }
       - { id: lst_8acf5384c3a85a5c2122a116, slug: beatoven.ai }
+  # transcribeme.app: transcribing voice messages inside WhatsApp and Telegram. The site now
+  # redirects to TranscribeGo (transcribego.com), which still offers the TranscribeMe WhatsApp bot
+  # and TranscribeME_bot on Telegram; the listing is to be re-described in #546.
+  - action: listing-alternatives-set
+    id: lst_2dc27298f9c7e28e4e2e31c1
+    slug: transcribeme.app
+    reason: '#539: hand-picked alternatives (batch F)'
+    expected: []
+    alternatives:
+      - { id: lst_ad7dff75614092b30cd019ba, slug: whisperize.me }
+      - { id: lst_0ccc4088a4106465ce9ae4c8, slug: echofox.pro }
   # transkribieren.xyz: AI transcription of audio, video and YouTube links.
   - action: listing-alternatives-set
     id: lst_5e219e55a6383ed91d0a6b84
@@ -800,6 +845,7 @@ operations:
     expected: []
     alternatives:
       - { id: lst_0ccc4088a4106465ce9ae4c8, slug: echofox.pro }
+      - { id: lst_2dc27298f9c7e28e4e2e31c1, slug: transcribeme.app }
   # wondercraft.ai: producing podcasts and voiceovers from a script with AI voices.
   - action: listing-alternatives-set
     id: lst_181a49c2c679b84a72d6183f

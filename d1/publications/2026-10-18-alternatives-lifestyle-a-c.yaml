@@ -7,8 +7,10 @@
 # (https://best.serp.co/sitemap-products.xml, read that day), by what each listing and its
 # candidates say they do: a pick does the same job for the same kind of user, best first, and a
 # listing gets fewer than six, or none, when nothing else fits. That day each listing's site and
-# each pick's site was read to confirm it still offers the product its listing describes; BarGPT,
-# which blocks scripts, was read in a browser.
+# each pick's site was read to confirm it still offers the product its listing describes; BarGPT
+# and Layla (layla.ai), which block scripts, were read in a browser. ScrappyChef (scrappychef.ai,
+# outside this range) is not picked: its site says it "is now offline", so it is a retirement
+# candidate in #546.
 # Every listing and pick is a v1 import listing, with the same id and slug on staging and
 # production. The reason for each listing is the comment above its operation.
 # Six listings have no operation. Five because nothing in the catalog substitutes for them on
@@ -98,7 +100,7 @@ operations:
     expected: []
     alternatives:
       - { id: lst_c5d360500e966d245acfdebd, slug: what-the-chef.com }
-      - { id: lst_78efca4ab27660c359e33ce4, slug: scrappychef.ai }
+      - { id: lst_f0f93b3746a8a0d24a036d12, slug: yougotcooking.com }
       - { id: lst_02764b81a4579c713ec42dd8, slug: dishgen.com }
       - { id: lst_ddab070eba92ebf32b67edbd, slug: cookaifood.com }
       - { id: lst_0c67097a483a157faf374524, slug: mealsai.com }
@@ -130,8 +132,11 @@ operations:
       - { id: lst_02764b81a4579c713ec42dd8, slug: dishgen.com }
       - { id: lst_0c67097a483a157faf374524, slug: mealsai.com }
       - { id: lst_c5d360500e966d245acfdebd, slug: what-the-chef.com }
-      - { id: lst_78efca4ab27660c359e33ce4, slug: scrappychef.ai }
-  # copilot2trip.com: AI travel planners that build itineraries.
+      - { id: lst_f0f93b3746a8a0d24a036d12, slug: yougotcooking.com }
+  # copilot2trip.com: AI travel planners that build itineraries. Layla (roamaround.io) redirects to
+  # layla.ai, the same AI trip planner; Travelplan (travelplan-ai.com) is now GuideGo, an AI
+  # itinerary planner, to be re-described in #546. PlanTripAI is left out: it now sells paid travel
+  # guides that writers review within 24 hours, not instant AI planning.
   - action: listing-alternatives-set
     id: lst_16307c329eee19586e5b2c0e
     slug: copilot2trip.com
@@ -139,7 +144,8 @@ operations:
     expected: []
     alternatives:
       - { id: lst_e48c7df481c37405e7f05554, slug: mindtrip.ai }
+      - { id: lst_146e9c03725e7d0989d9ecff, slug: roamaround.io }
       - { id: lst_7a4b25f8935ab2b6acd7036a, slug: tripplanner.ai }
+      - { id: lst_0a88d592b99e8562ede91d9d, slug: travelplan-ai.com }
       - { id: lst_1e0941a261d67f48c38fdec2, slug: nowy.io }
       - { id: lst_b5995f85a96384b731b9d043, slug: usevacay.com }
-      - { id: lst_c6f976a06f20b03afae07efd, slug: plantripai.com }
