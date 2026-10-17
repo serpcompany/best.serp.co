@@ -130,7 +130,6 @@ function resourceLinks(): SiteLink[] {
     ...(showGuides || hasStaticPagePath('/posts')
       ? [{ href: getRoute('guides.list'), label: 'Posts' }]
       : []),
-    ...(hasStaticPagePath('/sponsor') ? [{ href: getRoute('sponsor'), label: 'Sponsor' }] : []),
     // Every page's footer links the HTML sitemap (#53; serp web-stack/html-sitemap.md).
     { href: getRoute('sitemap.index'), label: 'Sitemap' }
   ]

@@ -34,8 +34,8 @@ one of these extensions (`chart.js`), and a test checks the committed import.
   own slash redirect off: it differs between Next.js and OpenNext and has no `/api`
   exception. OpenNext Node middleware is not used (it is experimental on Cloudflare).
 - **Moved URLs.** `apps/web/src/lib/routing/redirects.ts` lists them and `next.config.ts`
-  applies them (`movedUrlRedirects`): the pre-D1 URL scheme and the old sitemap paths
-  redirect permanently this way.
+  applies them (`movedUrlRedirects`): the pre-D1 URL scheme, the old sitemap paths and the
+  retired `/sponsor/` page (to `/pricing/`, #531) redirect permanently this way.
   Next.js matches each source with or without a slash and every destination is canonical, so
   the Worker leaves any request a moved-URL rule matches to OpenNext (it reads the same compiled
   patterns from `.next/routes-manifest.json`), and the request reaches its page in one hop. Add

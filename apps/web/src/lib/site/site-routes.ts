@@ -95,7 +95,6 @@ export const siteRoutes = [
   { indexable: true, path: htmlSitemapPaths.index, sitemapGroup: 'pages' },
   { indexable: true, path: htmlSitemapPaths.listings, sitemapGroup: 'pages' },
   { indexable: true, path: htmlSitemapPaths.listingsPage, sitemapGroup: 'pages' },
-  { indexable: true, path: '/sponsor/', sitemapGroup: 'pages' },
   { disallow: true, indexable: false, path: '/submit/', sitemapGroup: null }
 ] as const satisfies readonly SiteRoute[]
 

@@ -109,6 +109,21 @@ describe('moved-URL redirects', () => {
     })
   })
 
+  it('send the retired sponsor page to Pricing (#531)', () => {
+    expect(rules.find(rule => rule.source === '/sponsor')).toMatchObject({
+      destination: getRoute('pricing'),
+      permanent: true
+    })
+    for (const path of ['/sponsor', '/sponsor/']) {
+      expect(
+        patterns.some(pattern => pattern.test(path)),
+        path
+      ).toBe(true)
+    }
+    // Only the page itself: Pricing is never captured.
+    expect(patterns.some(pattern => pattern.test('/pricing/'))).toBe(false)
+  })
+
   it('send the old sitemap URLs to the root-level files (#167)', () => {
     for (const [source, destination] of [
       ['/sitemap.xml', '/sitemap-index.xml'],

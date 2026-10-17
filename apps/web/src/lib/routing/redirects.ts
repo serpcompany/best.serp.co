@@ -83,6 +83,9 @@ export function movedUrlRedirects(): Redirect[] {
         ['/legal/terms', LEGAL_CANONICAL.terms]
       ] as const
     ).map(([source, destination]) => ({ source, destination, permanent: true })),
+    // The retired sponsor page (#531): Pricing is the page about what the site sells.
+    // `getRoute('pricing')` names the same URL.
+    { source: '/sponsor', destination: '/pricing/', permanent: true },
     // Sitemaps moved to root-level files (#167; serp websites/features/xml-sitemaps.md).
     ...(
       [
