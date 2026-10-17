@@ -6,45 +6,48 @@
 # (https://best.serp.co/sitemap-products.xml, read that day), by what each listing and its
 # candidates say they do: a pick does the same job for the same kind of user, best first, and a
 # listing gets fewer than six, or none, when nothing else fits. That day each listing's site and
-# each pick's site was read to confirm it still offers the product its listing describes; nine were
-# read in a browser (Dream Interpreter, DreamStory, Layla, Skoot, Gatherly, Noom, ixigo, FaceApp's
-# hairstyle filters and Velo.ai's product page).
-# Picks may come from any category: Consensus is filed under Education, FaceApp and Meshy under
-# Image & Design, and Nabla and Suki under Productivity. Every listing and pick is a v1 import
-# listing, with the same id and slug on staging and production. The reason for each listing is the
-# comment above its operation.
-# Forty-five listings have no operation. Thirty-eight because nothing in the catalog substitutes for
-# them on 2026-10-18: DREAM.page (a community and events platform for curated communities), Pod AI
-# by Eightsleep (a smart bed cover that cools and heats each side of the bed), ElfMessages
-# (personalised audio messages from a Christmas elf), Endurance (structured group workouts for
-# running, cycling and swimming teams), Flora incognita (identifying plants from a photo), Face
-# Shape AI (detecting your face shape from a photo), Getactyv (AI-guided physiotherapy at home),
-# HeardThat (a phone app that makes speech clearer in noisy places for people with hearing aids),
-# Jeffrey Célavie (an AI astrologer chat), Rhubarb (smart backyard gardens with growing coaching),
-# Josh.ai (AI voice control for the smart home), Keeper (matchmaking for people who want to marry,
-# with human matchmakers), Lion Browser (safer browsing and parental-control apps for families),
-# LitRPG Adventures (AI generators of tabletop RPG content), Medgic (checking skin problems from a
-# photo), MeowTalk (translating cat meows), Mighty Travels (a membership that emails airfare and
-# hotel deals and error fares), Moveme (movie picks by the mood you want), OnePanel (reading manga
-# one panel at a time), Onoco AI (a parenting app that tracks and shares a baby's care and
-# milestones), Ask Poppy (a baby registry), PMcardio (AI ECG interpretation for heart care), proudP
-# (measuring urine flow and prostate symptoms at home), RPS AI (playing rock paper scissors against
-# an AI), Safewaters (shark-risk and surf forecasts), Sens.ai (neurofeedback brain training at
-# home), Siwalu (identifying animals and breeds from a photo), Soharhealth (insurance checks and
-# patient intake for healthcare providers), AI Sports Prediction (AI football predictions for
-# betting), StarByFace (finding which celebrity you look like), Stitch Fix (personal styling with
-# clothes shipped to your door), Write A Thank You (writing thank-you notes), This Word Does Not
-# Exist (inventing new English words with AI), TTcare (AI health checks for pets from photos),
+# each pick's site was fetched to check it still offers the product its listing describes, but the
+# first pass missed ScrappyChef's notice that it is offline and picked it. Review then read every
+# homepage (in a browser where a script got only a title, a bot check or an empty page), so
+# ScrappyChef is now a retirement candidate and every pick left is confirmed; Eleven Labs and
+# Gatherly, added in review, were read too. When picking, nine were read in a browser (Dream
+# Interpreter, DreamStory, Layla, Skoot, Gatherly, Noom, ixigo, FaceApp's hairstyle filters and
+# Velo.ai's product page).
+# Picks may come from any category: Consensus is filed under Education, Eleven Labs under Audio &
+# Music, FaceApp and Meshy under Image & Design, and Nabla and Suki under Productivity. Every
+# listing and pick is a v1 import listing, with the same id and slug on staging and production. The
+# reason for each listing is the comment above its operation.
+# Forty-five listings have no operation. Thirty-seven because nothing in the catalog substitutes for
+# them on 2026-10-18: Pod AI by Eightsleep (a smart bed cover that cools and heats each side of the
+# bed), ElfMessages (personalised audio messages from a Christmas elf), Endurance (structured group
+# workouts for running, cycling and swimming teams), Flora incognita (identifying plants from a
+# photo), Face Shape AI (detecting your face shape from a photo), Getactyv (AI-guided physiotherapy
+# at home), HeardThat (a phone app that makes speech clearer in noisy places for people with hearing
+# aids), Jeffrey Célavie (an AI astrologer chat), Rhubarb (smart backyard gardens with growing
+# coaching), Josh.ai (AI voice control for the smart home), Keeper (matchmaking for people who want
+# to marry, with human matchmakers), Lion Browser (safer browsing and parental-control apps for
+# families), LitRPG Adventures (AI generators of tabletop RPG content), Medgic (checking skin
+# problems from a photo), MeowTalk (translating cat meows), Mighty Travels (a membership that emails
+# airfare and hotel deals and error fares), Moveme (movie picks by the mood you want), OnePanel
+# (reading manga one panel at a time), Onoco AI (a parenting app that tracks and shares a baby's
+# care and milestones), Ask Poppy (a baby registry), PMcardio (AI ECG interpretation for heart
+# care), proudP (measuring urine flow and prostate symptoms at home), RPS AI (playing rock paper
+# scissors against an AI), Safewaters (shark-risk and surf forecasts), Sens.ai (neurofeedback brain
+# training at home), Siwalu (identifying animals and breeds from a photo), Soharhealth (insurance
+# checks and patient intake for healthcare providers), AI Sports Prediction (AI football predictions
+# for betting), StarByFace (finding which celebrity you look like), Stitch Fix (personal styling
+# with clothes shipped to your door), Write A Thank You (writing thank-you notes), This Word Does
+# Not Exist (inventing new English words with AI), TTcare (AI health checks for pets from photos),
 # Unlearn (digital twins of patients for clinical trials), Unpromptedgame (a game of guessing the
 # words behind AI images), Velo.ai (a bike radar camera that warns of cars from behind) and
-# Video2Recipe (turning cooking videos into written recipes). Seven because their sites don't offer
+# Video2Recipe (turning cooking videos into written recipes). Eight because their sites don't offer
 # the listed product on 2026-10-18, so they are retirement candidates and no listing picks them: The
 # Simulation (fablesimulation.com, a 2023 placeholder pointing to Showrunner), FashionAdvisorAI
 # (fashionadvisorai.com, now a gambling site), JourneyPlan (journeyplan.co, answers 410 Gone),
 # Kinetix (kinetix.tech, now a motion-AI research lab), Nutrition AI (nutrition.ai, only a "stay
-# tuned" mailing list), Skoot (skoothere.com, redirects to ad links) and Woebot Health
-# (woebothealth.com, the app was retired on 2025-06-30). Their pages keep the similar-listings
-# fallback.
+# tuned" mailing list), ScrappyChef (scrappychef.ai, a "Sunset" notice says it is now offline),
+# Skoot (skoothere.com, redirects to ad links) and Woebot Health (woebothealth.com, the app was
+# retired on 2025-06-30). Their pages keep the similar-listings fallback.
 # Each listing-alternatives-set compares and swaps the listing's slug and current picks (none yet),
 # refuses a pick that isn't live with that id and slug, keeps the listing's checksum, and logs an
 # `edited` event. Row-level, so the batch is refused with nothing written if any listing changed.
@@ -69,7 +72,6 @@ operations:
       - { id: lst_0c67097a483a157faf374524, slug: mealsai.com }
       - { id: lst_ddab070eba92ebf32b67edbd, slug: cookaifood.com }
       - { id: lst_c5d360500e966d245acfdebd, slug: what-the-chef.com }
-      - { id: lst_78efca4ab27660c359e33ce4, slug: scrappychef.ai }
       - { id: lst_f0f93b3746a8a0d24a036d12, slug: yougotcooking.com }
   # docus.ai: AI health assistants and symptom checkers for consumers.
   - action: listing-alternatives-set
@@ -106,6 +108,16 @@ operations:
       - { id: lst_54bb53ed43490319ad545a05, slug: gymbuddy.ai }
       - { id: lst_7e98432eaf369bbe2e07c163, slug: burnbacon.com }
       - { id: lst_45cd9f6e2d4e9be94a628c5f, slug: strongrfastr.com }
+  # dream.page: community and events management for curated communities; Gatherly hosts
+  # communities' networking events and member sessions online, and nothing in the catalog runs the
+  # community side.
+  - action: listing-alternatives-set
+    id: lst_0a5948b6d70bf5a28eb23751
+    slug: dream.page
+    reason: '#539: hand-picked alternatives (batch G)'
+    expected: []
+    alternatives:
+      - { id: lst_03c5c245805a41c5e6ad28a4, slug: gatherly.io }
   # dreamdecoder.me: AI dream interpreters and dream journals.
   - action: listing-alternatives-set
     id: lst_11d69feb99f1c38017be1b4b
@@ -265,13 +277,15 @@ operations:
     expected: []
     alternatives:
       - { id: lst_6422d979e3793b44dfb339a1, slug: qventus.com }
-  # inworld.ai: conversational AI characters for games and virtual worlds.
+  # inworld.ai: realtime voice models (text to speech, speech to text) for consumer apps, with games
+  # one use; Eleven Labs sells the same voice models, Convai conversational characters for games.
   - action: listing-alternatives-set
     id: lst_f4f8d704eb1b2220cd20bc03
     slug: inworld.ai
     reason: '#539: hand-picked alternatives (batch G)'
     expected: []
     alternatives:
+      - { id: lst_23509d85df29e3b7df8551a8, slug: elevenlabs.io }
       - { id: lst_b8c35630648444f297255106, slug: convai.com }
   # ixigo.com: booking travel and planning trips with AI.
   - action: listing-alternatives-set
@@ -404,7 +418,6 @@ operations:
       - { id: lst_fa92720f8ceb06bd69ce6eac, slug: chefgpt.xyz }
       - { id: lst_ddab070eba92ebf32b67edbd, slug: cookaifood.com }
       - { id: lst_c5d360500e966d245acfdebd, slug: what-the-chef.com }
-      - { id: lst_78efca4ab27660c359e33ce4, slug: scrappychef.ai }
       - { id: lst_f0f93b3746a8a0d24a036d12, slug: yougotcooking.com }
   # medisearch.io: AI answers to medical questions from scientific sources.
   - action: listing-alternatives-set
@@ -556,19 +569,6 @@ operations:
     alternatives:
       - { id: lst_adf0de610d6a2d30ba69aaf6, slug: ludo.ai }
       - { id: lst_40172f1aa644fec36147b9a9, slug: meshy.ai }
-  # scrappychef.ai: AI recipes from leftovers and the ingredients you have.
-  - action: listing-alternatives-set
-    id: lst_78efca4ab27660c359e33ce4
-    slug: scrappychef.ai
-    reason: '#539: hand-picked alternatives (batch G)'
-    expected: []
-    alternatives:
-      - { id: lst_c5d360500e966d245acfdebd, slug: what-the-chef.com }
-      - { id: lst_fa92720f8ceb06bd69ce6eac, slug: chefgpt.xyz }
-      - { id: lst_f0f93b3746a8a0d24a036d12, slug: yougotcooking.com }
-      - { id: lst_02764b81a4579c713ec42dd8, slug: dishgen.com }
-      - { id: lst_ddab070eba92ebf32b67edbd, slug: cookaifood.com }
-      - { id: lst_0c67097a483a157faf374524, slug: mealsai.com }
   # sillyrobotcards.com: AI personalised greeting cards and wishes.
   - action: listing-alternatives-set
     id: lst_1500c5e53bd8dfd39a656582
@@ -696,7 +696,6 @@ operations:
     expected: []
     alternatives:
       - { id: lst_fa92720f8ceb06bd69ce6eac, slug: chefgpt.xyz }
-      - { id: lst_78efca4ab27660c359e33ce4, slug: scrappychef.ai }
       - { id: lst_f0f93b3746a8a0d24a036d12, slug: yougotcooking.com }
       - { id: lst_02764b81a4579c713ec42dd8, slug: dishgen.com }
       - { id: lst_ddab070eba92ebf32b67edbd, slug: cookaifood.com }
@@ -726,7 +725,6 @@ operations:
     expected: []
     alternatives:
       - { id: lst_c5d360500e966d245acfdebd, slug: what-the-chef.com }
-      - { id: lst_78efca4ab27660c359e33ce4, slug: scrappychef.ai }
       - { id: lst_fa92720f8ceb06bd69ce6eac, slug: chefgpt.xyz }
       - { id: lst_02764b81a4579c713ec42dd8, slug: dishgen.com }
       - { id: lst_ddab070eba92ebf32b67edbd, slug: cookaifood.com }
