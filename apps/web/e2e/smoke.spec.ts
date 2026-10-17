@@ -655,6 +655,26 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     }
   })
 
+  test("shows the verified DR badge in every public page's footer (#537)", async ({
+    baseURL,
+    request
+  }) => {
+    // The owner's snippet, as rendered: lazy and async, its 200x50 box reserved.
+    const link = escapeRegExp(
+      '<a href="https://dr.serp.co/sites/best.serp.co" target="_blank" rel="noopener noreferrer"'
+    )
+    const image = escapeRegExp(
+      '<img src="https://dr.serp.co/badge/best.serp.co?style=serp-dr-v3" alt="Verified DR 78 for best.serp.co" width="200" height="50" loading="lazy" decoding="async" class="h-[50px]"'
+    )
+    const badge = new RegExp(`${link}[^>]*>${image}[^>]*/></a>`, 'gu')
+    const { listing } = await catalogSample(request, baseURL)
+    for (const path of ['/', '/about/', listing.path, '/a-page-that-does-not-exist/']) {
+      const html = await (await request.get(path)).text()
+      const footer = /<footer[\s>][\s\S]*<\/footer>/u.exec(html)?.[0] ?? ''
+      expect(footer.match(badge), path).toHaveLength(1)
+    }
+  })
+
   test('tags every serp.ly link with the Dub partner ID', async ({ baseURL, page, request }) => {
     // The footer's social links on every page, and a listing's "Visit Site" button and resource
     // links when they are serp.ly links (#169); a body-text link is the Markdown components'
