@@ -27,11 +27,17 @@ describe("the review page's submitted URL (#492)", () => {
     expect(markup('http://example.com/path')).toContain('href="http://example.com/path"')
   })
 
+  it('lowercases the scheme and host of an uppercase https URL', () => {
+    expect(markup('HTTPS://Example.com')).toContain('href="https://example.com/"')
+  })
+
   it.each([
     'javascript:alert(1)',
     'ftp://example.com/file',
     'www.launchnests.com',
-    ' javascript:alert(1)'
+    ' javascript:alert(1)',
+    'JavaScript:alert(1)',
+    'data:text/html,<b>x</b>'
   ])('keeps %j as plain text', value => {
     const html = markup(value)
     expect(html).not.toContain('<a')
