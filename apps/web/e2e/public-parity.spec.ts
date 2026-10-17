@@ -201,10 +201,28 @@ test.describe('public parity interactions', () => {
     const visit = header.getByRole('link', { name: 'Visit Site' })
     await expect(visit).toHaveAttribute('target', '_blank')
     await expect(visit).toHaveAttribute('rel', /\bnoopener\b/u)
-    // The panel beside the header holds the badge embed.
-    await expect(
-      page.getByRole('complementary').getByRole('button', { name: 'Copy light badge embed code' })
-    ).toBeVisible()
+    // The header holds only the product; the badge embed and the claim sit under the content
+    // in a small block named by its heading (#491).
+    await expect(header.getByRole('button', { name: /badge embed code$/u })).toHaveCount(0)
+    await expect(header.getByRole('button', { name: 'Claim this listing' })).toHaveCount(0)
+    const badgeBlock = page.getByRole('complementary', { name: /^Add a badge to your website\b/u })
+    for (const theme of ['light', 'dark']) {
+      await expect(
+        badgeBlock.getByRole('button', { name: `Copy ${theme} badge embed code` })
+      ).toBeVisible()
+    }
+    // A click still copies that badge's embed code, linking to the listing.
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+    await badgeBlock.getByRole('button', { name: 'Copy light badge embed code' }).click()
+    await expect(badgeBlock.getByText('Copied light badge')).toBeVisible()
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(listing.path)
+    const headerBottom = await header.evaluate(element => element.getBoundingClientRect().bottom)
+    const content = page.locator('[data-slot="detail-page"] > [data-slot="separator"]')
+    const contentTop = await content.evaluate(element => element.getBoundingClientRect().top)
+    expect(contentTop).toBeGreaterThan(headerBottom)
+    expect(
+      await badgeBlock.evaluate(element => element.getBoundingClientRect().top)
+    ).toBeGreaterThan(contentTop)
 
     // The previous and next listings sit side by side, and nothing scrolls sideways on phones.
     const browse = page.locator('section[aria-labelledby="browse-more-heading"] ul')

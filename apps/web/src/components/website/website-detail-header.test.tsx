@@ -1,4 +1,4 @@
-import React, { isValidElement, type ReactNode } from 'react'
+import React, { isValidElement, type ReactElement, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { siteConfig } from '../../lib/site/site-config'
 import {
@@ -159,6 +159,15 @@ describe('the product page header', () => {
       light: 'https://best.serp.co/badge/featured-on-serp.co-light.svg'
     })
     expect(collectStringProp(aside, 'siteName')).toContain('SERP Best')
+  })
+
+  it('is an aside named by its badge heading (#491)', () => {
+    const aside = WebsiteDetailAside({ website: { slug: 'launchbuzz.io' } })
+    const element = (aside.props as { render: ReactElement<Record<string, unknown>> }).render
+
+    expect(element.type).toBe('aside')
+    expect(element.props['aria-labelledby']).toBe('badge-embed-heading')
+    expect(collectStringProp(aside, 'headingId')).toEqual(['badge-embed-heading'])
   })
 
   it('offers the claim only on a listing without an owner', () => {

@@ -10,9 +10,9 @@ payment (#68), and become its owner. The flow lives in `apps/web/src/lib/claims/
 
 Claims run only while `features.claims` (`apps/web/src/lib/features.ts`) is on. **It is on** since
 #130 (the owner's launch decision, 2026-10-07): every listing page without a current owner shows
-"Work at …? Claim this listing" in the panel beside its header (#70 screen 9a, #273), which opens
-the claim dialog (`apps/web/src/components/claims/claim-listing.tsx`, #70 screen 8; a drawer on a
-phone). A visitor signs in first and comes back to `#claim`. Held listings and listings whose
+"Work at …? Claim this listing" beside the listing's badge, under its content (#70 screen 9a,
+#491), which opens the claim dialog (`apps/web/src/components/claims/claim-listing.tsx`, #70
+screen 8; a drawer on a phone). A visitor signs in first and comes back to `#claim`. Held listings and listings whose
 slug and landing disagree still show the link, and the dialog answers "This URL can’t be claimed." with
 "Message us" (the contact path, `/contact/` while #73 is off). The dialog's badge card and
 success alert say the badge is checked weekly because the [badge program](./badge-program.md)

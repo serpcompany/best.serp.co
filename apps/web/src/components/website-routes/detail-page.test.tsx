@@ -7,6 +7,8 @@ import { DetailPageLayout } from '../layout/detail-page-layout'
 import { JsonLd } from '../seo/json-ld'
 import { BestPageCards } from '../taxonomy/best-page'
 import { WebsiteContentSection } from '../website/website-content-section'
+import { WebsiteDetailAside } from '../website/website-detail-header'
+import { WebsiteFaqsSection } from '../website/website-faqs-section'
 import { WebsiteRelatedProjects } from '../website/website-related-projects'
 import {
   generateWebsiteDetailRouteMetadata,
@@ -51,6 +53,28 @@ describe('the listing detail page (#334)', () => {
     const section = findElement(WebsiteDetailRoutePage({ project }), WebsiteContentSection)
     expect(section?.props.contentTree).toBe(contentTree)
     expect(section?.props.website).toBe(project)
+  })
+
+  it('keeps the badge and the claim out of the header, under the content (#491)', () => {
+    const claim = <button type="button">Claim this listing</button>
+    const project: WebsiteDetailMetadata = {
+      category: 'fixture-tools',
+      description: 'A fixture listing.',
+      name: 'Fixture',
+      nextWebsite: null,
+      previousWebsite: null,
+      publishedAt: '2026-07-04T00:00:00.000Z',
+      relatedWebsites: [],
+      slug: 'fixture.test',
+      website: 'https://fixture.test/'
+    }
+    const layout = findElement(WebsiteDetailRoutePage({ claim, project }), DetailPageLayout)
+    expect(layout?.props.aside).toBeUndefined()
+    const content = layout?.props.children as ReactNode
+    expect(findElement(content, WebsiteFaqsSection)).not.toBeNull()
+    const block = findElement(content, WebsiteDetailAside)
+    expect(block?.props.claim).toBe(claim)
+    expect(block?.props.website).toEqual({ slug: 'fixture.test' })
   })
 
   it('renders a listing with nothing related, without the related section (#378 review)', () => {
