@@ -166,7 +166,7 @@ operations:
     expected:
       content: null
     content: |-
-      Zenbu Japanese is an offline-first Japanese dictionary, image-text reader, and translator for iPhone. It helps learners understand the Japanese they meet, whether it is typed, photographed, handwritten, or heard in a video. Its dictionary is also free on the web, alongside free kana, kanji, and vocabulary tools that run in the browser.
+      Zenbu Japanese is an offline-first Japanese dictionary, image-text reader, and translator for iPhone. It helps learners understand the Japanese they meet, whether it is typed, photographed, handwritten, or heard in a video. Its dictionary is also free on the web, along with free kana charts, kanji lists, and word frequency lists.
 
       ## Zenbu Japanese Overview
 
@@ -198,4 +198,4 @@ operations:
 
       The web dictionary has the same entries as the app's search, free in your browser with no download. Every word has its own page with readings, pitch accent, conjugations, kanji, and example sentences, and you can browse words by hiragana, katakana, kanji school grade, JLPT level from N5 to N1, frequency list, and part of speech. Image Search, handwriting, Translate, and Player are only in the app.
 
-      The site also offers free tools built on the same dictionary: hiragana and katakana charts, kanji lists by school grade, JLPT level, and jinmeiyō, frequency lists, and converters for hiragana to katakana, romaji to kana, and kanji to furigana. Printable reference guides include a kana chart, a verb conjugation sheet, and the JLPT N5 kanji, and short video courses teach phrases from real clips, with every word linked to the dictionary. A browser extension for looking up Japanese on any web page is listed as coming soon.
+      The site also offers free tools built on the same dictionary: hiragana and katakana charts with common words for every kana, kanji lists by school grade, JLPT level, and jinmeiyō, and frequency lists of the most common words, from JLPT N5 to YouTube and anime.
