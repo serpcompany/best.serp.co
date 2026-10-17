@@ -6,7 +6,8 @@
 # Each description uses only what the listing's own website said when read on 2026-10-17 (its home,
 # about, pricing, feature, and sample tool or game pages): no ratings, reviews, or outside claims.
 # SERP Tools also lists downloaders for adult sites; its description leaves them out (#260: no
-# adult content on best.serp.co).
+# adult content on best.serp.co). SERP Games' Brands page links to such downloaders too, so its
+# description doesn't mention or point to that page.
 # No tags: every active tag is for AI tools, and none of the five sites describes itself that way.
 # Categories stay as #506 filed them.
 # Each listing-content-set compares and swaps the listing's slug and current description (none:
@@ -69,7 +70,7 @@ operations:
 
       ## SERP Games Overview
 
-      The home page opens on the whole library, with quick filters for game types such as Arcade, Maze, Logic, Brain Teaser, Skill, Jumping, Obstacle Course, Puzzle, Simulation, Driving, Exploration, and Vehicles. Games can also be browsed by category and by tag, and a Brands page links to the other sites in the SERP network.
+      The home page opens on the whole library, with quick filters for game types such as Arcade, Maze, Logic, Brain Teaser, Skill, Jumping, Obstacle Course, Puzzle, Simulation, Driving, Exploration, and Vehicles. Games can also be browsed by category and by tag.
 
       The site is available in six languages: English, German, Spanish, French, Portuguese, and Japanese.
 
