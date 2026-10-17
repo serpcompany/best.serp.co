@@ -35,6 +35,9 @@
   --color-warning-foreground: var(--warning-foreground);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
+  /* The listing page's Visit Site (#535): blue, its text at WCAG AA in both themes. */
+  --color-cta: var(--cta);
+  --color-cta-foreground: var(--cta-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -80,6 +83,8 @@
   --warning-foreground: oklch(0.985 0 0);
   --info: oklch(0.5 0.118 242.209);
   --info-foreground: oklch(0.985 0 0);
+  --cta: oklch(0.52 0.2 260);
+  --cta-foreground: oklch(1 0 0);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -121,6 +126,8 @@
   --warning-foreground: oklch(0.205 0 0);
   --info: oklch(0.758 0.137 231.601);
   --info-foreground: oklch(0.205 0 0);
+  --cta: oklch(0.72 0.13 252);
+  --cta-foreground: oklch(0.205 0 0);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);

@@ -3,25 +3,26 @@ import { getCanonicalListingListRoute } from '../../lib/routing/routes'
 import { Section } from '../layout/section'
 import { LLMGrid } from '../llm/llm-grid'
 
-export type WebsiteRelatedProjectsProps = {
+export type WebsiteRelatedProps = {
   websites: WebsiteRelatedCardMetadata[]
 }
 
 /**
- * A listing page's Alternatives section (#519), in the look "Related Entries" had: every
- * alternative the catalog read returns (at most six), its hand picks first, then similar listings.
+ * A listing page's Related section (#535), under its article in the look the Alternatives
+ * section had (#519): up to six more listings in its hub, none of them in its Alternatives.
+ * Nothing when its hub has none left to show.
  */
-export function WebsiteRelatedProjects({ websites }: WebsiteRelatedProjectsProps) {
+export function WebsiteRelated({ websites }: WebsiteRelatedProps) {
   if (websites.length === 0) {
     return null
   }
 
   return (
     <Section
-      title="Alternatives"
+      title="Related"
       viewAllHref={getCanonicalListingListRoute()}
       viewAllText="Browse the directory"
-      titleId="alternatives"
+      titleId="related"
     >
       <LLMGrid items={websites} analyticsSource="related-projects" />
     </Section>

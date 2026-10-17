@@ -87,6 +87,10 @@ const ROWS_READ_BUDGET: Record<CatalogQueryShape, number> = {
   'listing-name-page-items': 1_200, // 100 ids: ~900
   'publication-version': 5, // 2 index seeks
   'published-summaries': 35_000, // 28,203, cached per epoch for sitemaps and the feed
+  // A listing page's Related section (#535): its hub's memberships in index order from its own id
+  // until twelve public members, and their logos: 280 at worst, on the sparse-hub test's hub (133
+  // memberships, 3 public, all read).
+  'related-hub-members': 400,
   // worst: a term in the catch-all's name (`other`, `the`): 10,826; 15,520 before #345's
   // uncorrelated category and tag subqueries. The widest searches have their own budget below.
   'search-summaries': 17_000,
@@ -325,6 +329,24 @@ function expectedAlternatives(listing: ScaleListing): string[] {
     .slice(0, 6 - picks.length)
   const fill = inHub.filter(other => !similar.includes(other)).sort(byKeyset)
   return [...picks, ...similar, ...fill].slice(0, 6).map(other => other.slug)
+}
+/**
+ * A listing's Related section by the contract (#535): its hub's public members in id order after
+ * its own id, wrapping round to the start, twelve at most, less the listing's alternatives; six.
+ */
+function expectedRelated(listing: ScaleListing): string[] {
+  const hub = listing.categories[0] as string
+  const members = live
+    .filter(other => other.id !== listing.id && other.categories.includes(hub))
+    .sort((left, right) => binary(left.id, right.id))
+  const onward = members.filter(other => binary(other.id, listing.id) > 0)
+  const wrapped = members.filter(other => binary(other.id, listing.id) < 0)
+  const alternatives = new Set(expectedAlternatives(listing))
+  return [...onward, ...wrapped]
+    .slice(0, 12)
+    .map(other => other.slug)
+    .filter(slug => !alternatives.has(slug))
+    .slice(0, 6)
 }
 /** Tagged listings whose scored tags yield fewer than six: their hubs fill the rest (#362). */
 const thinTagged = live.filter(
@@ -636,9 +658,13 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
       // A fresh operations object, so no detail read earlier in this test is reused.
       const detail = await catalog().getListingBySlug(listing.slug)
       expect(
-        detail?.relatedWebsites.map(item => item.slug),
+        detail?.alternatives.map(item => item.slug),
         listing.slug
       ).toEqual(expectedAlternatives(listing))
+      expect(
+        detail?.related.map(item => item.slug),
+        listing.slug
+      ).toEqual(expectedRelated(listing))
     }
     expect(await ops.getListingBySlug(unpublished.slug)).toBeNull()
     expect(await ops.getUnpublishedListing(widest.slug)).toBeNull()
@@ -917,11 +943,16 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
       thinInLargeHub,
       ...tagged.filter((_, index) => index % 40 === 0)
     ]) {
-      const related = (await catalog().getListingBySlug(listing.slug))?.relatedWebsites
+      const detail = await catalog().getListingBySlug(listing.slug)
       expect(
-        related?.map(item => item.slug),
+        detail?.alternatives.map(item => item.slug),
         listing.slug
       ).toEqual(expectedAlternatives(listing))
+      // Never the listing, one of its alternatives, or one twice (#535).
+      expect(
+        detail?.related.map(item => item.slug),
+        listing.slug
+      ).toEqual(expectedRelated(listing))
     }
     // A small hub (at most 128 memberships) fills through its members: tag the small category's
     // listing with a tag no other listing has, then put the catalog back.
@@ -941,7 +972,7 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
     try {
       const solo = await catalog().getListingBySlug(small.listing.slug)
       expect(solo?.tags).toEqual([{ name: 'Workerd Solo', slug: 'workerd-solo' }])
-      expect(solo?.relatedWebsites.map(item => item.slug)).toEqual(
+      expect(solo?.alternatives.map(item => item.slug)).toEqual(
         expectedAlternatives({ ...small.listing, tags: [] })
       )
     } finally {
@@ -973,11 +1004,16 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
       lastIn(sparse.slug),
       ...singleUntagged.filter((_, index) => index % 25 === 0)
     ]) {
-      const related = (await catalog().getListingBySlug(listing.slug))?.relatedWebsites
+      const detail = await catalog().getListingBySlug(listing.slug)
       expect(
-        related?.map(item => item.slug),
+        detail?.alternatives.map(item => item.slug),
         listing.slug
       ).toEqual(expectedAlternatives(listing))
+      // Never the listing, one of its alternatives, or one twice (#535).
+      expect(
+        detail?.related.map(item => item.slug),
+        listing.slug
+      ).toEqual(expectedRelated(listing))
     }
     // Six public hand picks leave no gap: no probe, no fill. Pick for the small category's
     // untagged listing, then put the catalog back.
@@ -1003,9 +1039,7 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
           if (event.event === 'd1_query') seen.push(event)
         }
       }).getListingBySlug(small.listing.slug)
-      expect(picked?.relatedWebsites.map(item => item.slug)).toEqual(
-        sixPicks.map(other => other.slug)
-      )
+      expect(picked?.alternatives.map(item => item.slug)).toEqual(sixPicks.map(other => other.slug))
       expect(seen.map(event => [event.queryShape, event.resultRows])).toContainEqual([
         'alternatives-no-fill',
         0
@@ -1069,7 +1103,7 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
         }).getListingBySlug(listing.slug)
         // The other two, onward from its own name, wrapping round to the start.
         expect(
-          detail?.relatedWebsites.map(item => item.slug),
+          detail?.alternatives.map(item => item.slug),
           listing.slug
         ).toEqual([...byName.slice(index + 1), ...byName.slice(0, index)].map(other => other.slug))
         const related = seen.find(event => event.queryShape === 'alternatives-hub-members')

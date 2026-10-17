@@ -3,13 +3,16 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import type { PublishedBestPage } from '@/db/contracts'
 import type { WebsiteDetailMetadata } from '../../lib/directory/content-query'
 import { listingContentTree } from '../../lib/markdown/listing-content-tree'
+import { FavoriteButton } from '../favorites/favorite-button'
 import { DetailPageLayout } from '../layout/detail-page-layout'
 import { JsonLd } from '../seo/json-ld'
 import { BestPageCards } from '../taxonomy/best-page'
+import { ClaimedBadge } from '../website/claimed-badge'
+import { WebsiteAlternatives } from '../website/website-alternatives'
 import { WebsiteContentSection } from '../website/website-content-section'
-import { WebsiteDetailAside } from '../website/website-detail-header'
+import { WebsiteDetailAside, WebsiteVisitLink } from '../website/website-detail-header'
 import { WebsiteFaqsSection } from '../website/website-faqs-section'
-import { WebsiteRelatedProjects } from '../website/website-related-projects'
+import { WebsiteRelated } from '../website/website-related'
 import {
   generateWebsiteDetailRouteMetadata,
   listingCategoryNames,
@@ -44,7 +47,8 @@ describe('the listing detail page (#334)', () => {
       description: 'A fixture listing.',
       name: 'Fixture',
       publishedAt: '2026-07-04T00:00:00.000Z',
-      relatedWebsites: [],
+      alternatives: [],
+      related: [],
       slug: 'fixture.test',
       website: 'https://fixture.test/'
     }
@@ -53,40 +57,64 @@ describe('the listing detail page (#334)', () => {
     expect(section?.props.website).toBe(project)
   })
 
-  it('keeps the badge and the claim out of the header, under the content (#491)', () => {
+  it('lays out Design 2: the header, the column, the badge card at its foot (#491, #535)', () => {
     const claim = <button type="button">Claim this listing</button>
     const project: WebsiteDetailMetadata = {
       category: 'fixture-tools',
       description: 'A fixture listing.',
+      linkRel: 'sponsored',
       name: 'Fixture',
       publishedAt: '2026-07-04T00:00:00.000Z',
-      relatedWebsites: [],
+      alternatives: [],
+      related: [],
       slug: 'fixture.test',
       website: 'https://fixture.test/'
     }
     const layout = findElement(WebsiteDetailRoutePage({ claim, project }), DetailPageLayout)
-    expect(layout?.props.aside).toBeUndefined()
+    // The header holds the product and the save button; no badge without an owner.
+    expect(layout?.props.title).toBe('Fixture')
+    expect(layout?.props.badge).toBeNull()
+    expect(findElement(layout?.props.actions as ReactNode, FavoriteButton)?.props.slug).toBe(
+      'fixture.test'
+    )
+    // Visit Site leads the column (and the phone page), with the listing's rel setting.
+    expect(findElement(layout?.props.cta as ReactNode, WebsiteVisitLink)?.props.website).toEqual({
+      linkRel: 'sponsored',
+      website: 'https://fixture.test/'
+    })
+    // The listing's own content in the main column; the badge card and the claim at the foot.
     const content = layout?.props.children as ReactNode
     expect(findElement(content, WebsiteFaqsSection)).not.toBeNull()
-    const block = findElement(content, WebsiteDetailAside)
+    expect(findElement(content, WebsiteDetailAside)).toBeNull()
+    const block = findElement(layout?.props.end as ReactNode, WebsiteDetailAside)
     expect(block?.props.claim).toBe(claim)
     expect(block?.props.website).toEqual({ slug: 'fixture.test' })
+    // Nothing to list: no Alternatives, no lower sections.
+    expect(layout?.props.sidebar).toBeNull()
+    expect(layout?.props.lower).toBeNull()
+
+    const owned = findElement(
+      WebsiteDetailRoutePage({ claim, project: { ...project, verifiedOwner: true } }),
+      DetailPageLayout
+    )
+    expect(findElement(owned?.props.badge as ReactNode, ClaimedBadge)).not.toBeNull()
   })
 
-  it('ends with the Alternatives section, with no "Browse more" (#519)', () => {
-    const related = {
+  it('lists Alternatives in the column and Related under the article, with no "Browse more"', () => {
+    const listing = (slug: string) => ({
       description: 'Another.',
-      name: 'Other',
-      slug: 'other.test',
-      website: 'https://other.test/'
-    }
+      name: slug,
+      slug,
+      website: `https://${slug}/`
+    })
     const page = WebsiteDetailRoutePage({
       project: {
         category: 'fixture-tools',
         description: 'A fixture listing.',
         name: 'Fixture',
         publishedAt: '2026-07-04T00:00:00.000Z',
-        relatedWebsites: [related],
+        alternatives: [listing('picked.test')],
+        related: [listing('related.test')],
         slug: 'fixture.test',
         website: 'https://fixture.test/'
       }
@@ -104,40 +132,14 @@ describe('the listing detail page (#334)', () => {
     }
     collect(page)
     expect(titles).not.toContain('Browse more')
-    // The layout's body column: the listing's own blocks, then the Alternatives section last.
-    const body = findElement(page, DetailPageLayout)?.props.children as
-      | { props: { children: ReactNode[] } }
-      | undefined
-    const last = (body?.props.children ?? []).filter(isValidElement).at(-1)
-    expect(last?.type).toBe(WebsiteRelatedProjects)
-    expect(last?.props).toEqual({ websites: [related] })
-  })
-
-  it('renders a listing with nothing related, without the related section (#378 review)', () => {
-    const project: WebsiteDetailMetadata = {
-      category: 'fixture-tools',
-      description: 'A fixture listing alone in its category.',
-      name: 'Fixture',
-      publishedAt: '2026-07-04T00:00:00.000Z',
-      relatedWebsites: [],
-      slug: 'fixture.test',
-      website: 'https://fixture.test/'
-    }
-    const page = WebsiteDetailRoutePage({ project })
-    expect(findElement(page, DetailPageLayout)).not.toBeNull()
-    expect(findElement(page, WebsiteRelatedProjects)).toBeNull()
-    const related = {
-      description: 'Another.',
-      name: 'Other',
-      slug: 'other.test',
-      website: 'https://other.test/'
-    }
-    expect(
-      findElement(
-        WebsiteDetailRoutePage({ project: { ...project, relatedWebsites: [related] } }),
-        WebsiteRelatedProjects
-      )
-    ).not.toBeNull()
+    const layout = findElement(page, DetailPageLayout)
+    expect(findElement(layout?.props.sidebar as ReactNode, WebsiteAlternatives)?.props).toEqual({
+      websites: [listing('picked.test')]
+    })
+    expect(findElement(layout?.props.lower as ReactNode, WebsiteRelated)?.props).toEqual({
+      websites: [listing('related.test')]
+    })
+    expect(findElement(layout?.props.children as ReactNode, WebsiteRelated)).toBeNull()
   })
 })
 
@@ -148,7 +150,8 @@ describe('the listing page in the taxonomy (#347)', () => {
     description: 'A fixture listing.',
     name: 'Fixture',
     publishedAt: '2026-07-04T00:00:00.000Z',
-    relatedWebsites: [],
+    alternatives: [],
+    related: [],
     slug: 'fixture.test',
     tags: [{ name: 'Note Taking', slug: 'note-taking' }],
     website: 'https://fixture.test/'
@@ -206,7 +209,8 @@ describe('a listing names its hub as D1 does (#416)', () => {
     description: 'Music.',
     name: 'Tunes',
     publishedAt: '2026-07-04T00:00:00.000Z',
-    relatedWebsites: [],
+    alternatives: [],
+    related: [],
     slug: 'fixture-tunes.test',
     website: 'https://fixture-tunes.test/'
   }

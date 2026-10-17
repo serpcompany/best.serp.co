@@ -3,19 +3,18 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
-import { Item, ItemContent } from '@/components/ui/item'
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   getFeaturedOnBadgeListingUrl,
   getFeaturedOnBadgePreviewPathFromKey,
   getFeaturedOnBadgePublicUrlFromKey
 } from '@/lib/directory/featured-on-badge-url'
+import { cn } from '@/lib/utils'
 import { withDubVia } from '../../lib/analytics/dub-via'
 import type { TaxonomyName, WebsiteLinkRel } from '../../lib/directory/content-query'
 import { getRoute } from '../../lib/routing/routes'
 import { siteConfig } from '../../lib/site/site-config'
-import { FavoriteButton } from '../favorites/favorite-button'
 import { FeaturedOnBadgeEmbedPanel } from './featured-on-badge-embed-panel'
-import { VerifiedOwnerBadge } from './verified-owner-badge'
 
 const OUTBOUND_REL: Record<WebsiteLinkRel, string> = {
   follow: 'noopener noreferrer',
@@ -31,25 +30,30 @@ export function outboundWebsiteRel(linkRel: WebsiteLinkRel): string {
   return OUTBOUND_REL[linkRel] ?? OUTBOUND_REL.nofollow
 }
 
-export type WebsiteDetailActionsProps = {
-  website: { linkRel: WebsiteLinkRel; slug: string; website: string }
+export type WebsiteVisitLinkProps = {
+  className?: string
+  website: { linkRel: WebsiteLinkRel; website: string }
 }
 
-/** The product page header's actions (#273): "Visit Site" and the favorite button. */
-export function WebsiteDetailActions({ website }: WebsiteDetailActionsProps) {
+/**
+ * The listing page's "Visit Site" (#273): a button-styled outbound link in the theme's blue `cta`
+ * colour (#535), first and sticky on every screen.
+ */
+export function WebsiteVisitLink({ className, website }: WebsiteVisitLinkProps) {
   return (
-    <>
-      <Link
-        href={withDubVia(website.website)}
-        target="_blank"
-        rel={outboundWebsiteRel(website.linkRel)}
-        className={buttonVariants()}
-      >
-        Visit Site
-        <ExternalLink data-icon="inline-end" aria-hidden />
-      </Link>
-      <FavoriteButton slug={website.slug} />
-    </>
+    <Link
+      href={withDubVia(website.website)}
+      target="_blank"
+      rel={outboundWebsiteRel(website.linkRel)}
+      className={cn(
+        buttonVariants({ size: 'lg' }),
+        'bg-cta text-cta-foreground hover:bg-cta/90',
+        className
+      )}
+    >
+      Visit Site
+      <ExternalLink data-icon="inline-end" aria-hidden />
+    </Link>
   )
 }
 
@@ -59,19 +63,17 @@ export type WebsiteDetailMetaWebsite = {
   isUnofficial?: boolean
   /** Its active tags with their names from D1, the most central first (#341, #347). */
   tags?: readonly TaxonomyName[]
-  /** The public "Verified owner" badge (#70 screen 9b). */
-  verifiedOwner?: true
 }
 
 /**
- * The product page header's meta row (#273): the Unofficial and Verified owner badges, then its
- * hub badge, its other categories and its tag chips as links (#347), named from D1. Nothing when
- * the listing has none of them.
+ * The product page header's chips (#273): the Unofficial badge, then its hub badge, its other
+ * categories and its tag chips as links (#347), named from D1. Nothing when the listing has none
+ * of them. The Claimed badge sits by the name instead (#535).
  */
 export function websiteDetailMeta(website: WebsiteDetailMetaWebsite): ReactNode {
   const [hub, ...otherCategories] = website.categories ?? []
   const tags = website.tags ?? []
-  if (!website.isUnofficial && !website.verifiedOwner && !hub && tags.length === 0) {
+  if (!website.isUnofficial && !hub && tags.length === 0) {
     return undefined
   }
 
@@ -82,7 +84,6 @@ export function websiteDetailMeta(website: WebsiteDetailMetaWebsite): ReactNode 
           Unofficial
         </Badge>
       ) : null}
-      {website.verifiedOwner ? <VerifiedOwnerBadge /> : null}
       {hub || tags.length > 0 ? (
         <div className="flex flex-wrap gap-1.5">
           {/* The hub as on a best page's entries (#346): secondary, its tags outline. */}
@@ -120,8 +121,8 @@ export function websiteDetailMeta(website: WebsiteDetailMetaWebsite): ReactNode 
 
 export type WebsiteDetailAsideProps = {
   /**
-   * The claim link (#67, #70 screen 9a: "Work at …? Claim this listing") of a listing that has
-   * no owner. The app passes it while claims are on.
+   * The claim link (#67, #70 screen 9a: "Claim this listing") of a listing that has no owner. The
+   * app passes it while claims are on.
    */
   claim?: ReactNode
   website: { slug: string; verifiedOwner?: true }
@@ -130,8 +131,9 @@ export type WebsiteDetailAsideProps = {
 const BADGE_EMBED_HEADING_ID = 'badge-embed-heading'
 
 /**
- * The product page's maker block (#491): the "Featured on" badge, then the claim, under the
- * listing's own content, so the header holds only the product. An `aside` named by its heading.
+ * The product page's maker block (#491, #535): a card of the "Featured on" badge for the page's
+ * theme, then the claim in its footer, after Visit Site and Alternatives and never sticky, so it
+ * doesn't compete with them. An `aside` named by its heading.
  */
 export function WebsiteDetailAside({ claim, website }: WebsiteDetailAsideProps) {
   const listingUrl = getFeaturedOnBadgeListingUrl({
@@ -141,12 +143,17 @@ export function WebsiteDetailAside({ claim, website }: WebsiteDetailAsideProps) 
     slug: website.slug
   })
   const badgeKeys = siteConfig.badges.featuredOn
+  const claimLink = claim && !website.verifiedOwner ? claim : null
 
   return (
-    <Item variant="outline" render={<aside aria-labelledby={BADGE_EMBED_HEADING_ID} />}>
-      <ItemContent>
-        {/* An ordinary wrapper spaces the badge from the claim; ItemContent keeps its stock gap. */}
-        <div className="flex flex-col gap-3">
+    <aside aria-labelledby={BADGE_EMBED_HEADING_ID}>
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            <h2 id={BADGE_EMBED_HEADING_ID}>Click a badge to copy its code.</h2>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
           <FeaturedOnBadgeEmbedPanel
             badgePreviewUrls={{
               dark: getFeaturedOnBadgePreviewPathFromKey(badgeKeys.dark),
@@ -156,14 +163,13 @@ export function WebsiteDetailAside({ claim, website }: WebsiteDetailAsideProps) 
               dark: getFeaturedOnBadgePublicUrlFromKey(badgeKeys.dark, siteConfig.publicUrl),
               light: getFeaturedOnBadgePublicUrlFromKey(badgeKeys.light, siteConfig.publicUrl)
             }}
-            headingId={BADGE_EMBED_HEADING_ID}
             listingUrl={listingUrl}
             siteId={siteConfig.id}
             siteName={badgeKeys.displayName}
           />
-          {claim && !website.verifiedOwner ? claim : null}
-        </div>
-      </ItemContent>
-    </Item>
+        </CardContent>
+        {claimLink ? <CardFooter>{claimLink}</CardFooter> : null}
+      </Card>
+    </aside>
   )
 }

@@ -114,7 +114,7 @@ describe('website lookup index', () => {
       'target-listing'
     )
 
-    expect(detail?.relatedWebsites.map(website => website.slug)).toEqual([
+    expect(detail?.alternatives.map(website => website.slug)).toEqual([
       'newer-listing',
       'older-listing'
     ])
@@ -126,7 +126,7 @@ describe('website lookup index', () => {
       'target-listing'
     )
 
-    expect(detail?.relatedWebsites).toEqual([
+    expect(detail?.alternatives).toEqual([
       {
         slug: 'newer-listing',
         name: 'Newer Listing',
@@ -147,7 +147,7 @@ describe('website lookup index', () => {
         }
       }
     ])
-    for (const relatedWebsite of detail?.relatedWebsites || []) {
+    for (const relatedWebsite of detail?.alternatives || []) {
       expect(relatedWebsite).not.toHaveProperty('content')
       expect(relatedWebsite).not.toHaveProperty('resourceLinks')
       expect(relatedWebsite).not.toHaveProperty('categories')

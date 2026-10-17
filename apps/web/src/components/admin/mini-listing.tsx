@@ -3,7 +3,7 @@ import { ListingImage } from '@/components/listing/listing-image'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { VerifiedOwnerBadge } from '@/components/website/verified-owner-badge'
+import { ClaimedBadge } from '@/components/website/claimed-badge'
 import { WebsiteContentSection } from '@/components/website/website-content-section'
 import { faqsToShow, WebsiteFaqsSection } from '@/components/website/website-faqs-section'
 import { WebsiteResourcesSection } from '@/components/website/website-resources-section'
@@ -14,7 +14,7 @@ import type { ListingDetail } from '@/db/contracts'
  * `DetailPageLayout`, #273) and content in small, built from the staged content by
  * `buildSubmissionReviewPreview` (`lib/submissions/review-preview.ts`). It is a picture of the
  * page: Visit Site and the category are inert, and the category is the staged one's name. A
- * preview shows the Verified owner badge when the live page will: a revision's while its listing
+ * preview shows the Claimed badge when the live page will: a revision's while its listing
  * has a current owner, a submission's when approval makes its signed-in submitter the owner.
  */
 export function MiniListing({
@@ -42,7 +42,7 @@ export function MiniListing({
           {listing.description}
         </p>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
-          {verifiedOwner ? <VerifiedOwnerBadge /> : null}
+          {verifiedOwner ? <ClaimedBadge /> : null}
           <Badge variant="outline">{categoryName ?? listing.category}</Badge>
         </div>
         <div className="flex flex-wrap gap-2">

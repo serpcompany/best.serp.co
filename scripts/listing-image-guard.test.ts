@@ -42,6 +42,7 @@ const LISTING_IMAGE_CALLERS = [
   'apps/web/src/components/submit/submit-ui.tsx',
   'apps/web/src/components/taxonomy/best-page.tsx',
   'apps/web/src/components/website-routes/detail-page.tsx',
+  'apps/web/src/components/website/website-alternatives.tsx',
   'apps/web/src/components/website/website-content-section.tsx'
 ]
 /** A source that names listing media: a logo, an image list, a featured image, a media key. */

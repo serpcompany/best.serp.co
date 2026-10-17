@@ -30,7 +30,7 @@ test.use({
  * #133): the product page's claim link, sign-in first for visitors, the method step's badge and
  * payment options, the four steps with their approved errors (webmail, another domain, a wrong,
  * expired, or over-attempt code), the badge check and the badge program's weekly-check copy,
- * success, the "Verified owner" badge, the already-owned dialog, and the contact path for a held
+ * success, the "Claimed" badge, the already-owned dialog, and the contact path for a held
  * listing or one whose slug and website disagree, and a new code for a paid claim with too little
  * of its confirmation left to pay (#128). Paying for a claim is `billing.spec.ts`'s.
  * Desktop uses the dialog; a phone gets the drawer.
@@ -118,7 +118,9 @@ test.beforeEach(async ({ context, page }) => {
 test('a visitor sees the claim link and signs in first', async ({ page }) => {
   const listing = await seed('Visitor product')
   await page.goto(`/products/${listing.slug}/`)
-  await expect(page.getByText('Work at Visitor product?')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Claim this listing' })).toBeVisible()
+  // The badge card's claim link stands alone (#535).
+  await expect(page.getByText('Work at Visitor product?')).toHaveCount(0)
   await capture(page, '9a-claim-link')
   await page.getByRole('button', { name: 'Claim this listing' }).click()
   await page.waitForURL(/\/login\/\?callbackUrl=/u)
@@ -240,7 +242,7 @@ test('claims a listing with the badge through every step and its errors', async 
   await expect(dialog(page).getByRole('button', { name: 'Verify badge and claim' })).toBeEnabled()
   await dialog(page).getByRole('button', { name: 'Verify badge and claim' }).click()
 
-  // Success, and the listing now shows the Verified owner badge without the claim link.
+  // Success, and the listing no longer offers the claim link.
   await expect(
     dialog(page).getByRole('heading', { name: 'You now manage Dialog product' })
   ).toBeVisible()
@@ -272,7 +274,7 @@ test('claims a listing with the badge through every step and its errors', async 
   await expect(page.getByRole('button', { name: 'Claim this listing' })).toHaveCount(0)
 })
 
-test('shows the Verified owner badge, with its tooltip, and no claim link on an owned listing', async ({
+test('shows the Claimed badge by the name, with its tooltip, and no claim link on an owned listing', async ({
   page
 }) => {
   const listing = await seed('Verified product')
@@ -283,8 +285,12 @@ test('shows the Verified owner badge, with its tooltip, and no claim link on an 
       VALUES (${q(listing.id)}, ${q(ownerId)}, 'badge_claim', ${q(new Date().toISOString())});
   `)
   await page.goto(`/products/${listing.slug}/`)
-  const verified = page.getByText('Verified owner')
+  // Beside the name in the header panel, in place of #70's "Verified owner" (#535).
+  const verified = page
+    .locator('[data-slot="detail-page-header"]')
+    .getByText('Claimed', { exact: true })
   await expect(verified).toBeVisible()
+  await expect(page.getByText('Verified owner')).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Claim this listing' })).toHaveCount(0)
   await verified.hover()
   await expect(page.getByText('The maker verified ownership of this listing').first()).toBeVisible()

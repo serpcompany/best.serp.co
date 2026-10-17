@@ -30,7 +30,7 @@ describe('submission review preview', () => {
         resourceLinks: [{ label: 'Documentation', url: 'https://example.com/docs' }],
         // The submitted logo source is never rendered: no hosted copy, no logo (#96 S9).
         media: { video: 'https://example.com/video.mp4' },
-        relatedWebsites: []
+        alternatives: []
       })
     )
   })

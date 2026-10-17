@@ -154,7 +154,7 @@ test.describe('best.serp.co D1 Worker smoke', () => {
     await expect(
       source === 'seed'
         ? claimLink
-        : claimLink.or(page.getByText('Verified owner', { exact: true })).first()
+        : claimLink.or(page.getByText('Claimed', { exact: true })).first()
     ).toBeVisible()
 
     const linkedUrls = await expectCanonicalStructuredData(page, origin)

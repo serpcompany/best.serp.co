@@ -37,6 +37,7 @@ export type CatalogQueryShape =
   | 'listing-name-page-items'
   | 'publication-version'
   | 'published-summaries'
+  | 'related-hub-members'
   | 'search-summaries'
   | 'shell-stats'
   | 'tag-name-order'
@@ -155,7 +156,7 @@ export interface ListingSummary {
   website: string
 }
 
-/** One of the listings a listing page's Alternatives section shows (#519). */
+/** One of the listings a listing page's Alternatives (#519) or Related (#535) section shows. */
 export interface RelatedListing {
   description: string
   isUnofficial?: boolean
@@ -200,10 +201,15 @@ export interface ListingDetail extends ListingSummary {
   media?: ListingMedia
   priority?: 'high' | 'medium' | 'low'
   /**
-   * Its Alternatives section (#519): up to six public listings, its hand picks first, then
+   * Its Alternatives list (#519, #535): up to six public listings, its hand picks first, then
    * similar listings in its hub, then the rest of its hub (`alternativesStatement`).
    */
-  relatedWebsites: RelatedListing[]
+  alternatives: RelatedListing[]
+  /**
+   * Its Related section (#535): up to six more public listings in its hub, never the listing
+   * itself or one of its `alternatives` (`relatedStatement`).
+   */
+  related: RelatedListing[]
   resourceLinks?: ListingResourceLink[]
   /**
    * Its active tags (#341), the most central first (`listing_tags.sort_order`, then slug); absent

@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { siteConfig } from '../../lib/site/site-config'
 import {
   outboundWebsiteRel,
-  WebsiteDetailActions,
   WebsiteDetailAside,
+  WebsiteVisitLink,
   websiteDetailMeta
 } from './website-detail-header'
 
@@ -103,10 +103,9 @@ describe('the product page header', () => {
   })
 
   it("adds the site's Dub partner ID to a serp.ly listing URL", () => {
-    const actions = WebsiteDetailActions({
+    const actions = WebsiteVisitLink({
       website: {
         linkRel: 'follow',
-        slug: 'example-product',
         website: 'https://serp.ly/example-product'
       }
     })
@@ -117,10 +116,9 @@ describe('the product page header', () => {
   })
 
   it('leaves non-SERP listing URLs unchanged', () => {
-    const actions = WebsiteDetailActions({
+    const actions = WebsiteVisitLink({
       website: {
         linkRel: 'follow',
-        slug: 'example-product',
         website: 'https://vendor.example.com/pricing?plan=pro#buy'
       }
     })
@@ -130,10 +128,9 @@ describe('the product page header', () => {
 
   it('renders the per-listing outbound rel, keeping followed links exactly as before', () => {
     const rels = (['follow', 'nofollow', 'sponsored'] as const).map(linkRel => {
-      const actions = WebsiteDetailActions({
+      const actions = WebsiteVisitLink({
         website: {
           linkRel,
-          slug: 'example-product',
           website: 'https://vendor.example.com/'
         }
       })
@@ -161,13 +158,15 @@ describe('the product page header', () => {
     expect(collectStringProp(aside, 'siteName')).toContain('SERP Best')
   })
 
-  it('is an aside named by its badge heading (#491)', () => {
-    const aside = WebsiteDetailAside({ website: { slug: 'launchbuzz.io' } })
-    const element = (aside.props as { render: ReactElement<Record<string, unknown>> }).render
+  it('is an aside named by its one-line badge heading (#491, #535)', () => {
+    const aside = WebsiteDetailAside({ website: { slug: 'launchbuzz.io' } }) as ReactElement<
+      Record<string, unknown>
+    >
 
-    expect(element.type).toBe('aside')
-    expect(element.props['aria-labelledby']).toBe('badge-embed-heading')
-    expect(collectStringProp(aside, 'headingId')).toEqual(['badge-embed-heading'])
+    expect(aside.type).toBe('aside')
+    expect(aside.props['aria-labelledby']).toBe('badge-embed-heading')
+    expect(collectStringProp(aside, 'id')).toEqual(['badge-embed-heading'])
+    expect(collectText(aside)).toContain('Click a badge to copy its code.')
   })
 
   it('offers the claim only on a listing without an owner', () => {
@@ -182,15 +181,14 @@ describe('the product page header', () => {
     expect(collectText(owned)).not.toContain('Claim this listing')
   })
 
-  it('shows the badges, the hub, other categories and tags as links, and nothing for none', () => {
+  it('shows Unofficial, the hub, other categories and tags as links, and nothing for none', () => {
     const meta = websiteDetailMeta({
       categories: [
         { name: 'Video Downloaders', slug: 'video-downloaders' },
         { name: 'Browser Extensions', slug: 'browser-extensions' }
       ],
       isUnofficial: true,
-      tags: [{ name: 'Vimeo', slug: 'vimeo' }],
-      verifiedOwner: true
+      tags: [{ name: 'Vimeo', slug: 'vimeo' }]
     })
 
     expect(collectText(meta)).toContain('Unofficial')

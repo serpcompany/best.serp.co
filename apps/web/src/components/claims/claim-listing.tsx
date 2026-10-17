@@ -795,20 +795,17 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
     )
   }
 
-  // A small text link beside the listing's badge (#491).
+  // A small text link in the listing's badge card (#491, #535).
   const trigger = (
-    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-      <p className="text-sm text-muted-foreground">{`Work at ${name}?`}</p>
-      <Button
-        variant="link"
-        className="h-auto w-fit p-0 text-foreground"
-        onClick={openDialog}
-        data-testid="claim-listing"
-      >
-        <BadgeCheck />
-        Claim this listing
-      </Button>
-    </div>
+    <Button
+      variant="link"
+      className="h-auto w-fit p-0 text-foreground"
+      onClick={openDialog}
+      data-testid="claim-listing"
+    >
+      <BadgeCheck />
+      Claim this listing
+    </Button>
   )
 
   if (isMobile) {

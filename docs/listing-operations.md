@@ -110,7 +110,7 @@ unpublished. `pnpm catalog:downloader-links` writes #376's manifest from the lin
 ## Alternatives
 
 `listing-alternatives-set` (#519) replaces a listing's hand-picked alternatives, which lead its
-page's Alternatives section in their order; the page tops them up to six from similar listings
+page's Alternatives list in their order; the page tops them up to six from similar listings
 ([Public catalog](./public-catalog.md#reads)). It is row-level. It names the listing's `id` and
 `slug`, a `reason` for the activity log, `expected` (every current pick, `{id, slug}`, in order,
 unpublished ones too), and `alternatives` (the whole new list, in order, each `{id, slug}`; at most

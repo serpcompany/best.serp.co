@@ -106,7 +106,8 @@ describe('media keys', () => {
     const detail = resolveListingDetailMedia(
       {
         media: { images: [logoKey.replace('/logo/', '/image/'), '/x.png'], logo: logoKey },
-        relatedWebsites: [{ media: { logo: logoKey } }, {}]
+        alternatives: [{ media: { logo: logoKey } }, {}],
+        related: [{}, { media: { logo: logoKey } }]
       },
       'https://cdn.serp.co'
     )
@@ -114,10 +115,8 @@ describe('media keys', () => {
       `https://cdn.serp.co/${logoKey.replace('/logo/', '/image/')}`,
       '/x.png'
     ])
-    expect(detail.relatedWebsites).toEqual([
-      { media: { logo: `https://cdn.serp.co/${logoKey}` } },
-      {}
-    ])
+    expect(detail.alternatives).toEqual([{ media: { logo: `https://cdn.serp.co/${logoKey}` } }, {}])
+    expect(detail.related).toEqual([{}, { media: { logo: `https://cdn.serp.co/${logoKey}` } }])
   })
 
   it('takes the media host as an https origin remotely and /_media locally, else fails closed', () => {

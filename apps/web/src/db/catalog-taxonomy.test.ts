@@ -119,10 +119,10 @@ describe('taxonomy reads (#345)', () => {
         'secondary'
       ])
       expect([...cache.values.keys()].filter(key => key.includes('secondary')).sort()).toEqual([
-        `catalog-name-order:v10:${epoch}:c:secondary`,
-        `catalog-name-order:v10:${epoch}:t:secondary`,
-        `catalog-name-page:v10:${epoch}:c:secondary:48:1`,
-        `catalog-name-page:v10:${epoch}:t:secondary:48:1`
+        `catalog-name-order:v11:${epoch}:c:secondary`,
+        `catalog-name-order:v11:${epoch}:t:secondary`,
+        `catalog-name-page:v11:${epoch}:c:secondary:48:1`,
+        `catalog-name-page:v11:${epoch}:t:secondary:48:1`
       ])
       // Warm: both come from the cache, still apart.
       const warm = operations(cache)
@@ -260,7 +260,7 @@ describe('taxonomy reads (#345)', () => {
     const cold = operations(cache)
     const items = await cold.operations.getBestPageItems('best-primary')
     expect(items).toHaveLength(4)
-    expect([...cache.values.keys()]).toContain(`catalog-best-items:v10:${epoch}:best-primary`)
+    expect([...cache.values.keys()]).toContain(`catalog-best-items:v11:${epoch}:best-primary`)
     const warm = operations(cache)
     expect(await warm.operations.getBestPageItems('best-primary')).toEqual(items)
     expect(queries(warm.events)).toEqual(['publication-version'])
@@ -272,7 +272,7 @@ describe('taxonomy reads (#345)', () => {
 
     // An entry cached before items carried their tags is read again from D1 (#346).
     const untagged = new MemoryCatalogCache()
-    untagged.values.set(`catalog-best-items:v10:${epoch}:best-primary`, {
+    untagged.values.set(`catalog-best-items:v11:${epoch}:best-primary`, {
       items: items.map(({ tags: _tags, ...item }) => item),
       publicationVersion: 1
     })
@@ -282,8 +282,8 @@ describe('taxonomy reads (#345)', () => {
 
     // A corrupt entry is read again from D1.
     const corrupt = new MemoryCatalogCache()
-    corrupt.values.set(`catalog-best-items:v10:${epoch}:best-primary`, { items: 'wrong' })
-    corrupt.values.set(`catalog-best-index:v10:${epoch}`, { pages: [{ slug: 'x' }] })
+    corrupt.values.set(`catalog-best-items:v11:${epoch}:best-primary`, { items: 'wrong' })
+    corrupt.values.set(`catalog-best-index:v11:${epoch}`, { pages: [{ slug: 'x' }] })
     const recovered = operations(corrupt)
     expect(await recovered.operations.getBestPageItems('best-primary')).toEqual(items)
     expect(recovered.events).toContainEqual({
@@ -355,8 +355,8 @@ describe('taxonomy reads (#345)', () => {
     const start = sqlite.statements.length
     const roundTrips = sqlite.roundTrips.length
     const bravo = await catalog.getListingBySlug('bravo')
-    // Epoch, detail, alternatives: the last two in one batch (#378, #519).
-    expect(sqlite.statements.length - start).toBe(3)
+    // Epoch, detail, alternatives, related: the last three in one batch (#378, #519, #535).
+    expect(sqlite.statements.length - start).toBe(4)
     expect(sqlite.roundTrips.slice(roundTrips).map(trip => trip.kind)).toEqual([
       'statement',
       'batch'
@@ -369,7 +369,7 @@ describe('taxonomy reads (#345)', () => {
     // alpha and charlie share both tags, delta and echo one (delta's retired tag doesn't
     // count); within a score, the names after bravo's come first, then the wrap to the start.
     // bravo is the only listing its best page pins, so that page adds no one.
-    expect(bravo?.relatedWebsites.map(item => item.slug)).toEqual([
+    expect(bravo?.alternatives.map(item => item.slug)).toEqual([
       'charlie',
       'alpha',
       'delta',
@@ -378,12 +378,15 @@ describe('taxonomy reads (#345)', () => {
     expect(queries(events)).toContain('alternatives-shared-tags')
     // From echo, every candidate sorts before it, so the order wraps to the start. Its one tag
     // yields three; delta, pinned beside it on `best-writers`, scores for that page, after them.
-    expect(
-      (await catalog.getListingBySlug('echo'))?.relatedWebsites.map(item => item.slug)
-    ).toEqual(['alpha', 'bravo', 'charlie', 'delta'])
+    expect((await catalog.getListingBySlug('echo'))?.alternatives.map(item => item.slug)).toEqual([
+      'alpha',
+      'bravo',
+      'charlie',
+      'delta'
+    ])
     // Neighbours differ: the "same three" (#331) no longer repeat.
     const alpha = await catalog.getListingBySlug('alpha')
-    expect(alpha?.relatedWebsites.map(item => item.slug)).toEqual([
+    expect(alpha?.alternatives.map(item => item.slug)).toEqual([
       'bravo',
       'charlie',
       'delta',
@@ -399,8 +402,8 @@ describe('taxonomy reads (#345)', () => {
       { page: 'best-editors-in-secondary', position: 1 },
       { page: 'best-primary', position: null }
     ])
-    // Epoch, detail, alternatives: the marks add no statement.
-    expect(sqlite.statements.length - start).toBe(3)
+    // Epoch, detail, alternatives, related: the marks add no statement.
+    expect(sqlite.statements.length - start).toBe(4)
     expect((await catalog.getListingBySlug('delta'))?.bestPageMarks).toEqual([
       { page: 'best-writers', position: 1 }
     ])
@@ -449,7 +452,7 @@ describe('taxonomy reads (#345)', () => {
       // Scored on all four, delta (3) would lead. On three it ties with alpha and charlie (2), and
       // the keyset from bravo's name orders the tie: charlie, delta, then the wrap to alpha.
       expect(
-        (await catalog.getListingBySlug('bravo'))?.relatedWebsites.map(item => item.slug)
+        (await catalog.getListingBySlug('bravo'))?.alternatives.map(item => item.slug)
       ).toEqual(['charlie', 'delta', 'alpha', 'echo'])
 
       // A tag no other public listing has, and excluded from its best page: all four come from the
@@ -463,13 +466,13 @@ describe('taxonomy reads (#345)', () => {
       const start = sqlite.statements.length
       const charlie = await fresh.operations.getListingBySlug('charlie')
       expect(charlie?.tags).toEqual([{ name: 'Solo', slug: 'solo' }])
-      expect(charlie?.relatedWebsites.map(item => item.slug)).toEqual([
+      expect(charlie?.alternatives.map(item => item.slug)).toEqual([
         'delta',
         'echo',
         'alpha',
         'bravo'
       ])
-      expect(sqlite.statements.length - start).toBe(3)
+      expect(sqlite.statements.length - start).toBe(4)
       expect(queries(fresh.events)).toContain('alternatives-shared-tags')
     } finally {
       sqlite.database.exec(`
@@ -610,9 +613,7 @@ describe('listing alternatives (#519)', () => {
   const queries = (events: Array<CatalogCacheEvent | CatalogQueryEvent>) =>
     events.flatMap(event => (event.event === 'd1_query' ? [event.queryShape] : []))
   const alternativesOf = async (slug: string, cache?: CatalogDataCache) =>
-    (await operations(cache).operations.getListingBySlug(slug))?.relatedWebsites.map(
-      item => item.slug
-    )
+    (await operations(cache).operations.getListingBySlug(slug))?.alternatives.map(item => item.slug)
 
   it('leads with the public hand picks, then similar listings in its hub, then the hub', async () => {
     const { events, operations: catalog } = operations()
@@ -620,7 +621,7 @@ describe('listing alternatives (#519)', () => {
     // Zebra and Kiwi by position (Gone is unpublished, Later not public yet); then Apple (both
     // tags, 6), Banana (paint and the best page, 5) and Olive (the best page, 2), never Kiwi again
     // or Quince (another hub); then the hub onward from mango's name: Nectarine.
-    expect(mango?.relatedWebsites.map(item => item.slug)).toEqual([
+    expect(mango?.alternatives.map(item => item.slug)).toEqual([
       'zebra',
       'kiwi',
       'apple',
@@ -628,7 +629,7 @@ describe('listing alternatives (#519)', () => {
       'olive',
       'nectarine'
     ])
-    expect(mango?.relatedWebsites[0]).toEqual({
+    expect(mango?.alternatives[0]).toEqual({
       description: 'Zebra description',
       name: 'Zebra',
       slug: 'zebra',
@@ -642,7 +643,8 @@ describe('listing alternatives (#519)', () => {
       )
     ).toEqual([
       ['listing-detail', 1],
-      ['alternatives-shared-tags', 4]
+      ['alternatives-shared-tags', 4],
+      ['related-hub-members', 7]
     ])
   })
 
@@ -674,7 +676,7 @@ describe('listing alternatives (#519)', () => {
     const { events, operations: catalog } = operations()
     const olive = await catalog.getListingBySlug('olive')
     // Its four picks, then the two listings its best page pins, by name (both before olive's).
-    expect(olive?.relatedWebsites.map(item => item.slug)).toEqual([
+    expect(olive?.alternatives.map(item => item.slug)).toEqual([
       'zebra',
       'apple',
       'cherry',
