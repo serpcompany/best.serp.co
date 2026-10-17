@@ -3,8 +3,9 @@ import 'server-only'
 /**
  * Server-only admin adapter (serpcompany/best.serp.co#64): acquires and validates the `DB`
  * binding and builds the admin reads and the decision context for one request. The caller has
- * already authorized an admin (`requireAdmin()` or `authorizeAdminRequest()`); the admin's email
- * is the actor recorded on every decision. All SQL lives in `@/db`.
+ * already authorized an admin (`requireAdmin()` or `authorizeAdminRequest()`, or, for the account
+ * layout's review queue count, `getSessionAdmin()`); the admin's email is the actor recorded on
+ * every decision. All SQL lives in `@/db`.
  */
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { cache } from 'react'
@@ -35,7 +36,10 @@ async function adminDatabase(): Promise<Database> {
   return createDatabase(workerEnv.DB)
 }
 
-/** The admin reads for this request (pages call it after `requireAdmin()`). */
+/**
+ * The admin reads for this request. Admin pages call it after `requireAdmin()`; the account
+ * layout calls it after `getSessionAdmin()`, for the review queue count (#489).
+ */
 export const getAdminReads = cache(
   async (): Promise<AdminReadOperations> =>
     createAdminReadOperations({ client: await adminDatabase() })
