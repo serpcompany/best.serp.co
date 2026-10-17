@@ -75,6 +75,7 @@ import { decisionEmailNote, type ReviewView, withCreatedTag } from '@/lib/admin/
 import { SUBMISSION_TAG_LIMIT } from '@/lib/submissions/contract'
 import { cn } from '@/lib/utils'
 import { adminRequest } from './api'
+import { ExternalUrl } from './external-url'
 import { Kv } from './kv'
 import { LogoPreview } from './logo-preview'
 import { RecordHeader } from './record-header'
@@ -566,12 +567,7 @@ export function ReviewDetail({
         <CardContent>
           <Kv
             rows={[
-              [
-                'URL',
-                <span key="u" className="font-mono text-[13px]">
-                  {view.website}
-                </span>
-              ],
+              ['URL', <ExternalUrl key="u" url={view.website} />],
               [
                 'Matched on',
                 <span key="m">

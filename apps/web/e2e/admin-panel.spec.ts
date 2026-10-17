@@ -290,6 +290,8 @@ test.describe('admin gate', () => {
     expect(stale.headers().location).toBe(
       `/login/?callbackUrl=${encodeURIComponent('/admin/submissions/')}`
     )
+    expect(stale.headers()['cache-control']).toContain('private')
+    expect(stale.headers()['cache-control']).toContain('no-store')
     await page.goto('/admin/submissions/')
     await page.waitForURL(signInFor('/admin/submissions/'))
   })
