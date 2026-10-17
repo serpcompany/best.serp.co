@@ -665,6 +665,17 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
     )
     expect(await submission('sub-rejected')).toMatchObject({ refunded_at: NOW, status: 'rejected' })
     expect(await refundPending()).not.toContain('sub-rejected')
+    // Its refund was recorded in the window the sweep sends "rejected and refunded" again (#514).
+    const recentlyRefunded = async (since: string, before: string) =>
+      (
+        await all<{ id: string }>(
+          S.selectRecentlyRefundedRejectionsPlan({ before, limit: 50, since })
+        )
+      ).map(row => row.id)
+    expect(await recentlyRefunded(NOW, '2026-10-06T12:00:01.000Z')).toEqual(['sub-rejected'])
+    expect(await recentlyRefunded('2026-10-06T12:00:01.000Z', '2026-10-06T13:00:00.000Z')).toEqual(
+      []
+    )
 
     // A payment held for review, and one that arrives after the owner withdrew.
     await insertDraft('sub-held', 'https://held.example/')

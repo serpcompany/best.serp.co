@@ -82,11 +82,14 @@ recording the refund that sent it back (`provider_refund_id`), so that refund's 
 the order again and a later dispute takes the listing down. When none does, a `refund.failed` flags
 the order, and so does a `charge.refunded` of a `refunded` order: a retried report that lands after
 its refund failed never clears it. A `refunded` order's flag records the refund that failed (as
-`provider_refund_id`: the newest failed one in Stripe's record, or the `refund.failed`'s when Stripe
-can't say), and the admin's email is keyed on it, hashed (an email key can't hold Stripe's
-capitals): the dashboard refund that cleared a flag and then failed too emails the admin again,
-and a retried report of the same failure doesn't, whichever of its `charge.refunded` and
-`refund.failed` lands first. A `refunding` order
+`provider_refund_id`): the one a `refund.failed` names while the order isn't flagged (#514), else
+the newest failed one in Stripe's record (a `charge.refunded` names none), or the
+`refund.failed`'s when Stripe can't say. The admin's email is keyed on it, hashed (an email key
+can't hold Stripe's capitals): a refund that fails after a refund cleared the flag emails the admin
+again, whether it is the dashboard refund that cleared it or an older partial refund (#514), and a
+retried report of the same failure doesn't, whichever of its `charge.refunded` and `refund.failed`
+lands first. A second refund that fails while the order is still flagged (two partial refunds that
+both fail, the newer first) shares the first one's email, which went out. A `refunding` order
 records no refund until its refund finishes, so its failure is keyed on the order. The sweep sends
 a failed refund's email again only while the order is still flagged. A clear is compared and
 swapped on the order as read before Stripe was asked (its `updated_at`), so a refund's failure

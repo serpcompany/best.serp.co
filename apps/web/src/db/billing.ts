@@ -22,7 +22,11 @@ import type {
   SubmissionPlan,
   SubmissionStatus
 } from './schema'
-import { DISPUTE_DECIDES_REFUND_NOTE, selectRefundPendingSubmissionsPlan } from './submission-plans'
+import {
+  DISPUTE_DECIDES_REFUND_NOTE,
+  selectRecentlyRefundedRejectionsPlan,
+  selectRefundPendingSubmissionsPlan
+} from './submission-plans'
 import { selectActiveUrlBlockStatement } from './submissions'
 
 /**
@@ -471,9 +475,9 @@ export function buildRecordProviderRefundPlans(input: {
  * takedown of its listing, and a flag without one asserts no such dispute was recorded meanwhile,
  * so a dispute and a failed refund that race always meet (one of them takes the listing down).
  * Either refuses the batch once the order moved on. A `refunded` order records the refund that
- * failed (`refundId`: the provider's record's newest failed one, else the one the report names) as
- * its refund, so the admin's email for it is keyed on that refund however its events arrive
- * (#503); without one it keeps the refund it records.
+ * failed (`refundId`: the one a `refund.failed` names while the order isn't flagged, #514, else the
+ * provider's record's newest failed one) as its refund, so the admin's email for it is keyed on
+ * that refund (#503); without one it keeps the refund it records.
  */
 export function buildFlagRefundFailedPlans(input: {
   disputed?: boolean
@@ -1079,6 +1083,15 @@ export interface BillingOperations {
     limit: number
     since: string
   }): Promise<OrderRecord[]>
+  /**
+   * `selectRecentlyRefundedRejectionsPlan`: paid submissions rejected as `other` whose refund was
+   * recorded in the window (#514), the "rejected and refunded" emails the sweep sends again.
+   */
+  recentlyRefundedRejections(input: {
+    before: string
+    limit: number
+    since: string
+  }): Promise<string[]>
   /** Paid submissions rejected as `other` whose refund isn't recorded yet, oldest first. */
   refundPendingSubmissions(limit: number): Promise<string[]>
   /** A rejected submission's category and reason. */
@@ -1199,6 +1212,13 @@ export function createBillingOperations(config: { client: Database }): BillingOp
     },
     async recentlyAppliedOrders(input) {
       return (await queryPlan<Row>(client, selectRecentlyAppliedOrdersPlan(input))).map(toOrder)
+    },
+    async recentlyRefundedRejections(input) {
+      const rows = await queryPlan<{ id: string }>(
+        client,
+        selectRecentlyRefundedRejectionsPlan(input)
+      )
+      return rows.map(row => String(row.id))
     },
     async refundPendingSubmissions(limit) {
       const rows = await queryPlan<{ id: string }>(
