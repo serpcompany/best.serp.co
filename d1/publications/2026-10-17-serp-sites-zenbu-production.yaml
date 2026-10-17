@@ -1,0 +1,30 @@
+# serpcompany/best.serp.co#506: add Zenbu Japanese as a live listing on PRODUCTION ONLY, as the
+# owner asked ("admin = approved, outbound links = dofollow").
+# Staging already has it: listing submission_4d090909-4d59-424f-8cd5-e59634f816b1, from a submission
+# approved there on 2026-10-11, whose link was set to follow in staging's admin on 2026-10-17. So
+# this manifest has no staging run: on staging it would be refused, with nothing written, because a
+# listing already has the slug and the website. Production has no such listing, submission, or
+# blocked URL (read-only check, 2026-10-17).
+# The listing-create inserts the listing approved and live, with its outbound link followed
+# (`link_rel` follow), under Education as on staging. The short description is the site's own
+# homepage description, read on 2026-10-17; no long description, logo, or tags.
+# Row-level: it refuses the whole batch, with nothing written, when a listing already has its id or
+# slug, or its website is another listing's, a submission's in flight, or blocked.
+# Publish on production after the promotion that carries it, after 2026-10-17-serp-sites.
+version: 1
+id: 2026-10-17-serp-sites-zenbu-production
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  - action: listing-create
+    listing:
+      id: lst_a79e1333afdecf3e9ebc4f49
+      slug: zenbujapanese.com
+      name: Zenbu Japanese
+      description: Look up Japanese words offline, read menus and signs with your camera, draw kanji you can’t type, and translate conversations on iPhone. Free on the web too.
+      website: https://zenbujapanese.com
+      publishedAt: '2026-10-17T07:36:35.000Z'
+      categories:
+        - education

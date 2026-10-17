@@ -1,0 +1,61 @@
+# serpcompany/best.serp.co#506: add four SERP sites as live listings, as the owner asked ("admin =
+# approved, outbound links = dofollow"): SERP Tools, SERP Games, SERP Lists, and Keybumps App. None
+# of the four is a listing, a submission, or a blocked URL on staging or production (read-only
+# check, 2026-10-17). Zenbu Japanese, the issue's fifth site, is already a listing on staging, so it
+# has its own production-only manifest, 2026-10-17-serp-sites-zenbu-production.
+# Each listing-create inserts the listing approved and live, with its outbound link followed
+# (`link_rel` follow). The short descriptions are the sites' own homepage descriptions, read on
+# 2026-10-17; no long description, logo, or tags (no active tag describes these sites).
+# Row-level: each create refuses the whole batch, with nothing written, when a listing already has
+# its id or slug, or its website is another listing's, a submission's in flight, or blocked.
+# Publish on staging first, then on production after promotion.
+version: 1
+id: 2026-10-17-serp-sites
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  - action: listing-create
+    listing:
+      id: lst_e7dc82255f70c7bb508c6d12
+      slug: tools.serp.co
+      name: SERP Tools
+      description: Free online file converters, compressors, and utilities for images, audio, and video.
+      website: https://tools.serp.co
+      publishedAt: '2026-10-17T07:36:35.000Z'
+      categories:
+        - productivity
+        - image-design
+        - audio
+        - video
+  - action: listing-create
+    listing:
+      id: lst_94f4216c04d33a9a8bc2adf3
+      slug: games.serp.co
+      name: SERP Games
+      description: Play free games online.
+      website: https://games.serp.co
+      publishedAt: '2026-10-17T07:36:35.000Z'
+      categories:
+        - lifestyle
+  - action: listing-create
+    listing:
+      id: lst_760ff525d9033ca34a8beb36
+      slug: serplists.com
+      name: SERP Lists
+      description: Create and run checklists for your processes.
+      website: https://serplists.com
+      publishedAt: '2026-10-17T07:36:35.000Z'
+      categories:
+        - productivity
+  - action: listing-create
+    listing:
+      id: lst_1df3a39aa72def5a12c1b7f1
+      slug: keybumps.app
+      name: Keybumps App
+      description: Search, clipboard history, screenshots, on-device dictation, and more Mac utilities in one keyboard-first native macOS app.
+      website: https://keybumps.app
+      publishedAt: '2026-10-17T07:36:35.000Z'
+      categories:
+        - productivity

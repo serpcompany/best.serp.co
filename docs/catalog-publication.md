@@ -137,6 +137,28 @@ new checksum, so an admin edit or owner revision read before it is refused as st
 `edited` event, which `/admin` shows as "Details edited: name, description". An unpublished
 listing stays unpublished, its categories stay, and the long description is left as it is.
 
+## New listings
+
+`listing-create` adds a live listing (#506). It is row-level, so one manifest fits staging and
+production; before #506 it needed a base version, which no two environments share. It names the
+whole `listing`: `id`, `slug`, `name`, `description`, `website`, `publishedAt`, and `categories`
+(the first is primary), and optionally `content`, `media` (hosted keys from a media plan),
+`resources`, and `faqs`. Within the batch the listing is inserted as a draft, filed under its
+categories, and approved, so the primary-category triggers hold. Its outbound link is followed
+(`link_rel` `follow`, set by the insert); an admin can change it later.
+
+The batch is refused, with nothing written, when:
+
+- a listing already has the id or slug, for example `bad JSON path: 'listing-create tools.serp.co:
+  a listing already has this id or slug'`, so a second run of the same manifest writes nothing;
+- the website is another listing's, the host of a submission in flight, or under a block
+  (`listingWebsiteConflicts`, as for [`listing-details-set`](#listing-details));
+- a category is missing or retired.
+
+The manifest itself is refused when the website isn't a public HTTP(S) URL. A `publication`
+manifest's `listing-create` runs the same guards. It records the listing's page and its category
+pages in `affected_routes`, and logs no `listing_events` row.
+
 ## Resource links
 
 `listing-resources-set` (#376) replaces a listing's resource links, the "Links" section of its

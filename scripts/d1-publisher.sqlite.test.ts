@@ -887,7 +887,7 @@ describe('publisher plan in SQLite transaction (D1 batch emulator)', () => {
             { action: 'category-update', category: { slug: 'seo', name: 'SEO' } }
           ]
         })
-      ).toThrow(/only listing-media-update/u)
+      ).toThrow(/only listing-create, listing-media-update/u)
       expect(() =>
         manifestSchema.parse({
           version: 1,
@@ -1831,7 +1831,7 @@ describe('listing-categories-set and category-create in a row-level manifest (#3
     // category-update still names its base version.
     expect(() =>
       rows([{ action: 'category-update', category: { slug: 'seo', name: 'SEO' } }])
-    ).toThrow(/only listing-media-update/u)
+    ).toThrow(/only listing-create, listing-media-update/u)
   })
 })
 
@@ -2081,6 +2081,193 @@ describe('listing-details-set in a row-level manifest (#340: a renamed product)'
       details: { name: 'New' }
     })
     expect(() => rows([set(renamed), set({ name: 'Newer' })])).toThrow(/Duplicate listing/u)
+  })
+})
+
+describe('listing-create in a row-level manifest (#506: new listings on both environments)', () => {
+  const live = { checksum: beforeChecksum, version: 4 }
+  const rows = (operations: Record<string, unknown>[]) =>
+    manifestSchema.parse({
+      version: 1,
+      id: 'new-listings',
+      concurrency: 'rows',
+      provenance: { actor: 'test@example.com', workflow: 'test/sqlite' },
+      operations
+    })
+  const create = (extra: Record<string, unknown> = {}) => ({
+    action: 'listing-create',
+    listing: {
+      id: 'lst_sqlite_created',
+      slug: 'new.example',
+      name: 'New',
+      description: 'What New does.',
+      website: 'https://new.example',
+      publishedAt: now,
+      categories: ['seo'],
+      ...extra
+    }
+  })
+  const websiteTaken =
+    'listing-create new.example: the website belongs to another listing or a submission in flight, or is blocked'
+  const created = (db: DatabaseSync) =>
+    db
+      .prepare(
+        "SELECT slug,name,website,status,is_active,link_rel,source_kind FROM listings WHERE id='lst_sqlite_created'"
+      )
+      .get()
+  const publish = (db: DatabaseSync, operations: Record<string, unknown>[], base = live) =>
+    executeInTestTransaction(db, buildPublicationPlan(rows(operations), 'new listings', now, base))
+  /** Asserts the batch was refused whole: no new listing, and the version as before. */
+  const expectRefused = (db: DatabaseSync) => {
+    expect(created(db)).toBeUndefined()
+    expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
+      version: 4
+    })
+    expect(db.prepare('SELECT COUNT(*) AS count FROM publication_runs').get()).toEqual({ count: 0 })
+  }
+
+  it('creates a live, followed listing at whatever version the environment is at', () => {
+    const db = database()
+    // Another publication moved this environment past any version the manifest could name.
+    db.prepare('UPDATE publication_state SET version=9').run()
+    const publication = buildPublicationPlan(rows([create()]), 'new listings', now, {
+      ...live,
+      version: 9
+    })
+    expect(
+      publication.statements.flatMap(item => item.bindings).filter(b => typeof b === 'boolean')
+    ).toEqual([])
+    executeInTestTransaction(db, publication)
+    expect(created(db)).toEqual({
+      slug: 'new.example',
+      name: 'New',
+      website: 'https://new.example',
+      status: 'approved',
+      is_active: 1,
+      link_rel: 'follow',
+      source_kind: 'yaml-manifest-v1'
+    })
+    expect(
+      db
+        .prepare(
+          "SELECT c.slug,lc.is_primary FROM listing_categories lc JOIN categories c ON c.id=lc.category_id WHERE lc.listing_id='lst_sqlite_created'"
+        )
+        .all()
+    ).toEqual([{ slug: 'seo', is_primary: 1 }])
+    expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
+      version: 10
+    })
+    expect(publication.affectedRoutes.split('\n')).toEqual(
+      expect.arrayContaining(['/products/new.example/', '/products/categories/seo/'])
+    )
+    // Applied once: the listing now exists, so a second run is refused with nothing written.
+    expect(() =>
+      publish(db, [create()], { checksum: publication.afterChecksum, version: 10 })
+    ).toThrow('listing-create new.example: a listing already has this id or slug')
+    expect(db.prepare('SELECT version FROM publication_state WHERE id=1').get()).toEqual({
+      version: 10
+    })
+  })
+
+  it.each([
+    ['id', { id: 'lst_sqlite_test' }],
+    ['slug', { slug: 'old-slug' }]
+  ])('refuses a listing whose %s another listing has, writing nothing', (_field, extra) => {
+    const db = database()
+    expect(() => publish(db, [create(extra)])).toThrow(
+      `listing-create ${'slug' in extra ? extra.slug : 'new.example'}: a listing already has this id or slug`
+    )
+    expect(db.prepare('SELECT COUNT(*) AS count FROM listings').get()).toEqual({ count: 1 })
+    expectRefused(db)
+  })
+
+  it.each([
+    ["another listing's website", "'https://new.example/?ref=x'", 'other.example'],
+    ['a listing whose slug is the host', "'https://other.example'", 'new.example']
+  ])('refuses a website that is %s', (_name, website, slug) => {
+    const db = database()
+    db.exec(`INSERT INTO listings (id,slug,name,description,website,status,published_at,source_kind,source_identity,checksum)
+      VALUES ('lst_sqlite_other','${slug}','Other','Description',${website},'draft','${now}','test','fixture','${'d'.repeat(64)}');
+      INSERT INTO listing_categories (listing_id,category_id,sort_order,is_primary) VALUES ('lst_sqlite_other',1,0,1);`)
+    expect(() => publish(db, [create({ slug: 'new-listing' })])).toThrow(
+      websiteTaken.replace('new.example:', 'new-listing:')
+    )
+    expectRefused(db)
+  })
+
+  it('refuses a website a submission in flight or a block covers, and accepts it after', () => {
+    const db = database()
+    db.exec(`INSERT INTO listing_submissions (id,slug,name,description,website,content,category_slug,logo_url,status,plan)
+      VALUES ('sub_new','new.example','New','d','https://new.example/','c','seo','l','verified','free')`)
+    expect(() => publish(db, [create()])).toThrow(websiteTaken)
+    expectRefused(db)
+    db.exec(`UPDATE listing_submissions SET status='rejected', rejection_reason='No',
+        rejection_category='prohibited' WHERE id='sub_new';
+      INSERT INTO listing_submission_url_blocks (url_key,covers_subdomains,submission_id,reason,blocked_by,blocked_at)
+        VALUES ('new.example',1,'sub_new','No','admin','${now}')`)
+    expect(() => publish(db, [create()])).toThrow(websiteTaken)
+    expectRefused(db)
+    db.exec(`UPDATE listing_submission_url_blocks SET lifted_at='${now}', lifted_by='admin'`)
+    publish(db, [create()])
+    expect(created(db)).toMatchObject({ status: 'approved', is_active: 1, link_rel: 'follow' })
+  })
+
+  it('binds the flags of a create and an update as 1 or 0, as D1’s REST API needs', () => {
+    const flags = { featured: true, isUnofficial: true }
+    const db = database()
+    const update = plan({
+      operations: [
+        {
+          action: 'listing-update',
+          previousCategories: ['seo'],
+          listing: {
+            id: 'lst_sqlite_test',
+            slug: 'old-slug',
+            name: 'Old',
+            description: 'Description',
+            website: 'https://example.com',
+            publishedAt: now,
+            categories: ['seo'],
+            ...flags
+          }
+        }
+      ]
+    })
+    const creation = buildPublicationPlan(rows([create(flags)]), 'new listings', now, live)
+    for (const publication of [update, creation])
+      expect(
+        publication.statements.flatMap(item => item.bindings).filter(b => typeof b === 'boolean')
+      ).toEqual([])
+    executeInTestTransaction(db, update)
+    const state = db.prepare('SELECT version,checksum FROM publication_state WHERE id=1').get() as {
+      checksum: string
+      version: number
+    }
+    publish(db, [create(flags)], state)
+    expect(
+      db
+        .prepare(
+          'SELECT l.id,l.is_featured,l.is_unofficial,lc.is_primary FROM listings l JOIN listing_categories lc ON lc.listing_id=l.id ORDER BY l.id'
+        )
+        .all()
+    ).toEqual([
+      { id: 'lst_sqlite_created', is_featured: 1, is_unofficial: 1, is_primary: 1 },
+      { id: 'lst_sqlite_test', is_featured: 1, is_unofficial: 1, is_primary: 1 }
+    ])
+  })
+
+  it('refuses a missing category and a non-public website, writing nothing', () => {
+    const db = database()
+    expect(() => publish(db, [create({ categories: ['missing'] })])).toThrow()
+    expectRefused(db)
+    expect(() =>
+      buildPublicationPlan(
+        rows([create({ website: 'http://localhost:3000/' })]),
+        'new listings',
+        now,
+        live
+      )
+    ).toThrow(/public HTTP\(S\) URL/u)
   })
 })
 
