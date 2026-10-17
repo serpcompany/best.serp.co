@@ -11,8 +11,8 @@ The webhook also takes `charge.refunded`, `charge.dispute.created`, `charge.disp
 `refund.failed`, with the same signature check and once-per-event handling, and finds the order by
 the charge's PaymentIntent (an unknown one is recorded as `unknown_order` and answered 200).
 Everything is recorded before the answer; only the admin's email (`admin-payment-alert`) goes
-after it, and the sweep re-sends it. The four events stay dormant until the owner ticks them on
-both webhooks ([Configuration](./billing.md#configuration-owner)).
+after it, and the sweep re-sends it. Both webhooks have sent the four events since 2026-10-17
+([Configuration](./billing.md#configuration-owner)).
 
 A refund of a payment the site hasn't recorded yet (before the checkout's own report, the buyer's
 return or the sweep) finds its order by the `order_id` the checkout put on the PaymentIntent,
@@ -106,10 +106,14 @@ refund failed, the dashboard refund finishes it the same way (its listing change
 submission and emails the owner), unless Stripe's record shows its refunds that haven't failed
 don't send the payment back (the reported refund failed since, its report retried after its
 failure): then nothing went back, so the order stays `refunding`, flagged `refund_failed`, and the
-owner is never told the rejection was refunded (#498's review). One Stripe's record shows naming the order (or, when Stripe can't
-say, whose event carries the site's `refund:<order>` idempotency key: a call that timed out after
-Stripe refunded) finishes it as the site's refund, with no "refunded outside the site" email
-(#484). An admin's "Refund…" on an order refunded outside the site, before it, while it was
-claimed, or while it ran, answers 409 and is never reported as the admin's refund.
+owner is never told the rejection was refunded (#498's review). While Stripe can't be read for
+now (unreachable, rate-limited, or more refunds than the site reads), the report alone can't show
+the money went back, so nothing is recorded: the delivery answers 500, the order stays as it was,
+and Stripe's retry finishes it by its record (#504). One Stripe's record shows naming the order
+(or, when Stripe refuses the read, whose event carries the site's `refund:<order>` idempotency key:
+a call that timed out after Stripe refunded) finishes it as the site's refund, with no "refunded
+outside the site" email (#484). An admin's "Refund…" on an order refunded outside the site,
+before it, while it was claimed, or while it ran, answers 409 and is never reported as the admin's
+refund.
 
 Admin Orders shows "Disputed", "Dispute won", "Dispute lost" or "Refunded outside the site".
