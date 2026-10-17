@@ -1,0 +1,302 @@
+# serpcompany/best.serp.co#539 (batch C): hand-picked alternatives for the 32 live listings whose
+# primary category is Education and whose slug starts with a to i (briskteaching.com to
+# ipscreener.com), the first part of Education in #539's size order; a later batch takes j to z.
+# The picks lead each page's Alternatives section; the page tops it up to six from similar listings.
+# Picked on 2026-10-18 from staging's live listings (read-only), each also live on production
+# (https://best.serp.co/sitemap-products.xml, read that day), by what each listing and its
+# candidates say they do: a pick does the same job for the same kind of user, best first, and a
+# listing gets fewer than six, or none, when nothing else fits. That day each listing's site and
+# each pick's site was read to confirm it still offers the product its listing describes; four that
+# block scripts were read from their latest readable Internet Archive snapshot (Gliglish,
+# Quizgecko and Scite from September or October 2026, Interactive Mathematics from March 2026).
+# Picks may come from any category: Wolfram|Alpha is filed under Chatbots & Agents, ChatMind and
+# ConceptMap.ai under Productivity, SciSummary and Summarist under Writing, ClientZen under
+# Marketing & SEO and Traq.ai under Business & Finance. Khanmigo has two listings (khanacademy.org,
+# khanmigo.ai); picks name khanmigo.ai only. Every listing and pick is a v1 import listing, with the
+# same id and slug on staging and production. The reason for each listing is the comment above its
+# operation.
+# Eight listings have no operation. Four because nothing in the catalog substitutes for them: ES.AI
+# (college application essays), Hello History (chats with historical figures), Credly (digital
+# credentials) and IPscreener (patent research; the catalog's patent tools draft applications
+# instead). Four because their sites don't offer the listed product today, so they are retirement
+# candidates and no listing picks them: Codeamigo (its courses say "Coming Soon" behind a waitlist),
+# Delv (now a waitlist for a message-writing tool), Eilla (now an M&A advisory service) and Emberly
+# (now a bookmark and notes organizer). Their pages keep the similar-listings fallback.
+# Each listing-alternatives-set compares and swaps the listing's slug and current picks (none yet),
+# refuses a pick that isn't live with that id and slug, keeps the listing's checksum, and logs an
+# `edited` event. Row-level, so the batch is refused with nothing written if any listing changed.
+# Needs migration 0018_listing_alternatives (#534, release 9). Publish on staging first, then on
+# production after the promotion that carries it.
+version: 1
+id: 2026-10-18-alternatives-education-a-i
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  # briskteaching.com: AI assistants that help teachers plan, create and give feedback.
+  - action: listing-alternatives-set
+    id: lst_30a55339ed378891dff3de60
+    slug: briskteaching.com
+    reason: '#539: hand-picked alternatives (batch C, 2026-10-18)'
+    expected: []
+    alternatives:
+      - { id: lst_211664782b6147f406839e91, slug: khanmigo.ai }
+      - { id: lst_890beb9ed0bf9737a1ae2e97, slug: teachermatic.com }
+      - { id: lst_70c6c51767ec5c4ea7539db6, slug: to-teach.ai }
+      - { id: lst_839ba3c4bd971342505362aa, slug: twee.com }
+      - { id: lst_1dc6c0fce235ddf2e5e34d8f, slug: educatorlab.org }
+      - { id: lst_265202541480559a6ba7cf72, slug: teacherbot.io }
+  # callannie.ai: speaking practice with an AI conversation partner for language learners.
+  - action: listing-alternatives-set
+    id: lst_2a0e72af5ccd0492d4bdc610
+    slug: callannie.ai
+    reason: '#539: hand-picked alternatives (batch C, 2026-10-18)'
+    expected: []
+    alternatives:
+      - { id: lst_c93008caa82d38c2e470f80f, slug: praktika.ai }
+      - { id: lst_0a59f0c79c3bb736e8fbe5eb, slug: speak.com }
+      - { id: lst_6d1a8853a12ec9a03fcc5cf1, slug: talkpal.ai }
+      - { id: lst_28ecd91990328f79a353549e, slug: polyglotchatbot.com }
+      - { id: lst_00f10366fd528dafe86f3ccd, slug: gliglish.com }
+      - { id: lst_ea2d5133fc2f47dd60d63b83, slug: langotalk.org }
+  # collegetools.io: AI homework help for students (collegetools.io now redirects to Mindko, an LMS-integrated AI homework helper).
+  - action: listing-alternatives-set
+    id: lst_34a6254128744203a5387fca
+    slug: collegetools.io
+    reason: '#539: hand-picked alternatives (batch C, 2026-10-18)'
+    expected: []
+    alternatives:
+      - { id: lst_7b2f65f4841094fa2accdd7c, slug: tutorly.ai }
+      - { id: lst_72ccaeb572ac28f40c6991fc, slug: geleza.app }
+      - { id: lst_9ea83ae68e7776e9bbb825b7, slug: mindgrasp.ai }
+      - { id: lst_a4b6ffa8ebd33ff7a646db8d, slug: youlearn.ai }
+  # consensus.app: AI search and answers over research papers.
+  - action: listing-alternatives-set
+    id: lst_9519fb856be1eaa8bc6b0ed1
+    slug: consensus.app
+    reason: '#539: hand-picked alternatives (batch C, 2026-10-18)'
+    expected: []
+    alternatives:
+      - { id: lst_9b0c0b03b64a8f9d34d10391, slug: elicit.com }
+      - { id: lst_fab760b2f65e50ea2c0d0c64, slug: scite.ai }
+      - { id: lst_6626e6a8f22aca3abe2f46f2, slug: semanticscholar.org }
+      - { id: lst_1e560f6bbe052d35a1add9fc, slug: openread.academy }
+      - { id: lst_38645f5343e2f80c8f478a79, slug: researchrabbit.ai }
+      - { id: lst_3f23c17a0ff9bf886e5638d0, slug: unriddle.ai }
+  # courseau.co: AI course authoring tools (courseau.co now redirects to CreateUpon, the same tool renamed).
+  - action: listing-alternatives-set
+    id: lst_532c3fd3ffac83b78407f2a4
+    slug: courseau.co
+    reason: '#539: hand-picked alternatives (batch C, 2026-10-18)'
+    expected: []
+    alternatives:
+      - { id: lst_af2ff4fb14fb6b989ea8b678, slug: mindsmith.ai }
+      - { id: lst_18d73d5e9e1a0480f46284ed, slug: coursebox.ai }
+      - { id: lst_1b2ee6e6321e1fc3756f2c91, slug: minicoursegenerator.com }
+      - { id: lst_0a940423e91553bbde0f3041, slug: steppit.com }
+  # coursebox.ai: AI course authoring tools.
+  - action: listing-alternatives-set
+    id: lst_18d73d5e9e1a0480f46284ed
+    slug: coursebox.ai
+    reason: '#539: hand-picked alternatives (batch C, 2026-10-18)'
+    expected: []
+    alternatives:
+      - { id: lst_af2ff4fb14fb6b989ea8b678, slug: mindsmith.ai }
+      - { id: lst_532c3fd3ffac83b78407f2a4, slug: courseau.co }
+      - { id: lst_1b2ee6e6321e1fc3756f2c91, slug: minicoursegenerator.com }
+      - { id: lst_0a940423e91553bbde0f3041, slug: steppit.com }
+  # curipod.com: AI-made lessons and activities for classrooms.
+  - action: listing-alternatives-set
+    id: lst_93d32001549a18e8f52ffb79
+    slug: curipod.com
+    reason: '#539: hand-picked alternatives (batch C, 2026-10-18)'
+    expected: []
+    alternatives:
+      - { id: lst_265202541480559a6ba7cf72, slug: teacherbot.io }
+      - { id: lst_30a55339ed378891dff3de60, slug: briskteaching.com }
+      - { id: lst_70c6c51767ec5c4ea7539db6, slug: to-teach.ai }
+      - { id: lst_890beb9ed0bf9737a1ae2e97, slug: teachermatic.com }
+      - { id: lst_839ba3c4bd971342505362aa, slug: twee.com }
+      - { id: lst_5e07a75e1ba6765b586b7d27, slug: lessonplans.ai }
+  # deaplearning.com: AI tutors that help students prepare for exams.
+  - action: listing-alternatives-set
+    id: lst_6eb19308616cd0581c5a429c
+    slug: deaplearning.com
+    reason: '#539: hand-picked alternatives (batch C, 2026-10-18)'
+    expected: []
+    alternatives:
+      - { id: lst_211664782b6147f406839e91, slug: khanmigo.ai }
+      - { id: lst_7b2f65f4841094fa2accdd7c, slug: tutorly.ai }
+  # duolingo.com: language learning apps with AI conversation practice.
+  - action: listing-alternatives-set
+    id: lst_3f36b9035da3423302cd9480
+    slug: duolingo.com
+    reason: '#539: hand-picked alternatives (batch C, 2026-10-18)'
+    expected: []
+    alternatives:
+      - { id: lst_0a59f0c79c3bb736e8fbe5eb, slug: speak.com }
+      - { id: lst_c93008caa82d38c2e470f80f, slug: praktika.ai }
+      - { id: lst_6d1a8853a12ec9a03fcc5cf1, slug: talkpal.ai }
+      - { id: lst_ea2d5133fc2f47dd60d63b83, slug: langotalk.org }
+      - { id: lst_3c3b6e41758e60eb6c3d10e4, slug: talkio.ai }
+      - { id: lst_00f10366fd528dafe86f3ccd, slug: gliglish.com }
+  # dupple.com: the listing is Techpresso's AI Academy: courses that teach professionals to use AI tools.
+  - action: listing-alternatives-set
+    id: lst_78d50921ed563452295e80b8
+    slug: dupple.com
+    reason: '#539: hand-picked alternatives (batch C, 2026-10-18)'
+    expected: []
+    alternatives:
+      - { id: lst_219b76db2a21d5b22bd0f38e, slug: nocode.mba }
+  # educatorlab.org: AI lesson plans and classroom materials for teachers.
+  - action: listing-alternatives-set
+    id: lst_1dc6c0fce235ddf2e5e34d8f
+    slug: educatorlab.org
+    reason: '#539: hand-picked alternatives (batch C, 2026-10-18)'
+    expected: []
+    alternatives:
+      - { id: lst_5e07a75e1ba6765b586b7d27, slug: lessonplans.ai }
+      - { id: lst_70c6c51767ec5c4ea7539db6, slug: to-teach.ai }
+      - { id: lst_890beb9ed0bf9737a1ae2e97, slug: teachermatic.com }
+      - { id: lst_30a55339ed378891dff3de60, slug: briskteaching.com }
+      - { id: lst_211664782b6147f406839e91, slug: khanmigo.ai }
+      - { id: lst_265202541480559a6ba7cf72, slug: teacherbot.io }
+  # elicit.com: AI research assistants for academic literature.
+  - action: listing-alternatives-set
+    id: lst_9b0c0b03b64a8f9d34d10391
+    slug: elicit.com
+    reason: '#539: hand-picked alternatives (batch C, 2026-10-18)'
+    expected: []
+    alternatives:
+      - { id: lst_9519fb856be1eaa8bc6b0ed1, slug: consensus.app }
+      - { id: lst_fab760b2f65e50ea2c0d0c64, slug: scite.ai }
+      - { id: lst_6626e6a8f22aca3abe2f46f2, slug: semanticscholar.org }
+      - { id: lst_1e560f6bbe052d35a1add9fc, slug: openread.academy }
+      - { id: lst_38645f5343e2f80c8f478a79, slug: researchrabbit.ai }
+      - { id: lst_3f23c17a0ff9bf886e5638d0, slug: unriddle.ai }
+  # elsaspeak.com: AI English speaking and pronunciation practice.
+  - action: listing-alternatives-set
+    id: lst_4a631adc88e83fbc6eb0e373
+    slug: elsaspeak.com
+    reason: '#539: hand-picked alternatives (batch C, 2026-10-18)'
+    expected: []
+    alternatives:
+      - { id: lst_c93008caa82d38c2e470f80f, slug: praktika.ai }
+      - { id: lst_0a59f0c79c3bb736e8fbe5eb, slug: speak.com }
+      - { id: lst_8749c15eed672f18048d47a8, slug: speakenglishwithai.com }
+      - { id: lst_6d1a8853a12ec9a03fcc5cf1, slug: talkpal.ai }
+      - { id: lst_00f10366fd528dafe86f3ccd, slug: gliglish.com }
+      - { id: lst_3c3b6e41758e60eb6c3d10e4, slug: talkio.ai }
+  # essaygrader.ai: AI grading and feedback on student writing.
+  - action: listing-alternatives-set
+    id: lst_fcb457625bb825f9201dc780
+    slug: essaygrader.ai
+    reason: '#539: hand-picked alternatives (batch C, 2026-10-18)'
+    expected: []
+    alternatives:
+      - { id: lst_30a55339ed378891dff3de60, slug: briskteaching.com }
+      - { id: lst_890beb9ed0bf9737a1ae2e97, slug: teachermatic.com }
+      - { id: lst_ce7bf56d63ff82aeeaf302fa, slug: opexams.com }
+  # findsight.ai: the key ideas of non-fiction books.
+  - action: listing-alternatives-set
+    id: lst_2b1e0b413c79faacb69be7f3
+    slug: findsight.ai
+    reason: '#539: hand-picked alternatives (batch C, 2026-10-18)'
+    expected: []
+    alternatives:
+      - { id: lst_2fd4fe9a786ca15caf3fa956, slug: summarist.ai }
+  # geleza.app: AI study tools for students.
+  - action: listing-alternatives-set
+    id: lst_72ccaeb572ac28f40c6991fc
+    slug: geleza.app
+    reason: '#539: hand-picked alternatives (batch C, 2026-10-18)'
+    expected: []
+    alternatives:
+      - { id: lst_9ea83ae68e7776e9bbb825b7, slug: mindgrasp.ai }
+      - { id: lst_34a6254128744203a5387fca, slug: collegetools.io }
+      - { id: lst_7b2f65f4841094fa2accdd7c, slug: tutorly.ai }
+      - { id: lst_a4b6ffa8ebd33ff7a646db8d, slug: youlearn.ai }
+      - { id: lst_b93020b09d3f285b7440e2aa, slug: studywand.com }
+  # genei.io: AI summaries and notes for research reading.
+  - action: listing-alternatives-set
+    id: lst_726124e23b7257d53833cb46
+    slug: genei.io
+    reason: '#539: hand-picked alternatives (batch C, 2026-10-18)'
+    expected: []
+    alternatives:
+      - { id: lst_fc6b933c8130659438184cea, slug: scisummary.com }
+      - { id: lst_3f23c17a0ff9bf886e5638d0, slug: unriddle.ai }
+      - { id: lst_1e560f6bbe052d35a1add9fc, slug: openread.academy }
+      - { id: lst_4977a717fb105d5f491126c2, slug: petal.org }
+  # getquizwizard.com: AI quiz generators for teachers and trainers (getquizwizard.com now redirects to Quiz Wizard on Wooclap).
+  - action: listing-alternatives-set
+    id: lst_bf54657e4eef9d9bba1e7fff
+    slug: getquizwizard.com
+    reason: '#539: hand-picked alternatives (batch C, 2026-10-18)'
+    expected: []
+    alternatives:
+      - { id: lst_4fad3a5c7605b41003706dcb, slug: quizgecko.com }
+      - { id: lst_7ff2d19ecb44ec060a679ade, slug: questgen.ai }
+      - { id: lst_5591723eb864ff51839b4aca, slug: quizbot.ai }
+      - { id: lst_ce7bf56d63ff82aeeaf302fa, slug: opexams.com }
+      - { id: lst_86e096542477b9473889178a, slug: quizmakito.com }
+  # getsuperteacher.com: AI tutoring for young students.
+  - action: listing-alternatives-set
+    id: lst_32b279aa648471d268e5c283
+    slug: getsuperteacher.com
+    reason: '#539: hand-picked alternatives (batch C, 2026-10-18)'
+    expected: []
+    alternatives:
+      - { id: lst_211664782b6147f406839e91, slug: khanmigo.ai }
+      - { id: lst_74dbf0da04127de33157cbdb, slug: squirrelai.com }
+      - { id: lst_e957d8fb0df0546301f0b112, slug: synthesis.com }
+  # gliglish.com: speaking practice with an AI conversation partner for language learners.
+  - action: listing-alternatives-set
+    id: lst_00f10366fd528dafe86f3ccd
+    slug: gliglish.com
+    reason: '#539: hand-picked alternatives (batch C, 2026-10-18)'
+    expected: []
+    alternatives:
+      - { id: lst_6d1a8853a12ec9a03fcc5cf1, slug: talkpal.ai }
+      - { id: lst_0a59f0c79c3bb736e8fbe5eb, slug: speak.com }
+      - { id: lst_c93008caa82d38c2e470f80f, slug: praktika.ai }
+      - { id: lst_3c3b6e41758e60eb6c3d10e4, slug: talkio.ai }
+      - { id: lst_ea2d5133fc2f47dd60d63b83, slug: langotalk.org }
+      - { id: lst_2a0e72af5ccd0492d4bdc610, slug: callannie.ai }
+  # hallo.ai: AI language proficiency assessments.
+  - action: listing-alternatives-set
+    id: lst_e1da9cb3ca80a5fe7e8319a9
+    slug: hallo.ai
+    reason: '#539: hand-picked alternatives (batch C, 2026-10-18)'
+    expected: []
+    alternatives:
+      - { id: lst_add46c821e81be7faa1d7590, slug: speakable.io }
+  # infranodus.com: turning text into visual maps of its ideas.
+  - action: listing-alternatives-set
+    id: lst_251be8662ec213f46fb50e17
+    slug: infranodus.com
+    reason: '#539: hand-picked alternatives (batch C, 2026-10-18)'
+    expected: []
+    alternatives:
+      - { id: lst_5c623298f3e74aa614201065, slug: mapify.so }
+      - { id: lst_2ba5a3b1f813a18050ee4a01, slug: conceptmap.ai }
+  # insight7.io: AI analysis of customer conversations and feedback.
+  - action: listing-alternatives-set
+    id: lst_b3fa439eb8a816dd62595130
+    slug: insight7.io
+    reason: '#539: hand-picked alternatives (batch C, 2026-10-18)'
+    expected: []
+    alternatives:
+      - { id: lst_c3bb1a13cb0c093667d98d5d, slug: clientzen.io }
+      - { id: lst_9a0fbd5ef5ff853afce4f195, slug: traq.ai }
+  # intmath.com: math problem solving and help for students.
+  - action: listing-alternatives-set
+    id: lst_78d2de806538493c97a281e1
+    slug: intmath.com
+    reason: '#539: hand-picked alternatives (batch C, 2026-10-18)'
+    expected: []
+    alternatives:
+      - { id: lst_aa8ec7db36fce25944a5c3e0, slug: wolframalpha.com }
+      - { id: lst_211664782b6147f406839e91, slug: khanmigo.ai }
+      - { id: lst_72ccaeb572ac28f40c6991fc, slug: geleza.app }
