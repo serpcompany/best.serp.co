@@ -277,6 +277,20 @@ describe('applyLegalContentBranding', () => {
     ).toBe('Best SERP operates Best SERP.')
   })
 
+  it('names the company as the operator and the site as the website (#521)', () => {
+    const template = '{{companyName}} operates the {{siteName}} website.'
+    expect(
+      applyLegalContentBranding(template, {
+        companyName: 'SERP',
+        domain: 'best.serp.co',
+        siteName: 'SERP Best'
+      })
+    ).toBe('SERP operates the SERP Best website.')
+    expect(
+      applyLegalContentBranding(template, { domain: 'example.com', siteName: 'Example' })
+    ).toBe('Example operates the Example website.')
+  })
+
   const legalDirectory = fileURLToPath(new URL('../../../content/legal/', import.meta.url))
   const legalFiles = readdirSync(legalDirectory).filter(file => file.endsWith('.mdx'))
   // /legal/cookies/ still names placeholder example.com addresses, as best.serp.co does today
@@ -297,6 +311,7 @@ describe('applyLegalContentBranding', () => {
 
   it.each(legalFiles)('renders %s with contact addresses at the legal email domain', file => {
     const branded = applyLegalContentBranding(readFileSync(join(legalDirectory, file), 'utf8'), {
+      companyName: siteConfig.networkName,
       domain: siteConfig.domain,
       legalEmailDomain: siteConfig.legalEmailDomain,
       siteName: siteConfig.name
@@ -316,5 +331,10 @@ describe('applyLegalContentBranding', () => {
     ).toEqual(placeholderAddresses[file] ?? [])
     if (['dmca.mdx', 'privacy.mdx', 'terms.mdx'].includes(file))
       expect(addresses.length).toBeGreaterThan(0)
+    // The company, SERP, operates the website and is the one not liable (#521).
+    if (['privacy.mdx', 'terms.mdx'].includes(file)) {
+      expect(branded).toContain('SERP ("us", "we", or "our") operates the SERP Best website')
+      expect(branded).toMatch(/\. SERP (?:is|will) not (?:be )?liable/u)
+    }
   })
 })

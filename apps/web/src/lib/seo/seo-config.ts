@@ -14,6 +14,11 @@ import { absoluteUrl, canonicalPathname } from './canonical-url'
 import { listingTitle } from './page-titles'
 
 export const SITE_NAME = siteConfig.name
+/**
+ * The company behind the site ("SERP", #521): the JSON-LD `Organization` that publishes it and
+ * owns SERP's social profiles. The site itself is `SITE_NAME`.
+ */
+export const ORGANIZATION_NAME = siteConfig.networkName
 export const SITE_TAGLINE = siteConfig.tagline
 export const SITE_DESCRIPTION = siteConfig.description
 
@@ -299,7 +304,7 @@ export function generateWebsiteSchema() {
     url: origin,
     publisher: {
       '@type': 'Organization',
-      name: SITE_NAME,
+      name: ORGANIZATION_NAME,
       url: origin,
       logo: {
         '@type': 'ImageObject',

@@ -83,41 +83,115 @@ function collectionDescriptionLead(parts: CollectionTitleParts): string {
 }
 
 /**
- * A category's last word already names a kind of tool (Developer Tools, Video Downloaders,
- * Chatbots & Agents), so it takes no second noun.
+ * Words a title keeps in their own case when it title-cases an all-lower-case name
+ * (`ai time tracking` is "AI Time Tracking"), keyed by their lower case.
  */
-const NAMES_A_KIND_OF_TOOL = /(?:tools|[eo]rs|[ae]nts|bots)$/iu
+const CASED_WORDS = new Map(
+  '3D AI API APIs CMS CRM GPU HIPAA HR LLM PDF SaaS SEO SERP SMS SQL UGC UI UX VPN'
+    .split(' ')
+    .map(word => [word.toLowerCase(), word])
+)
 
-/** `Audio & Music Tools`; `Developer Tools` and `Video Downloaders` as they are. */
-function categoryTopic(name: string): string {
-  const trimmed = name.trim()
-  return NAMES_A_KIND_OF_TOOL.test(trimmed) ? trimmed : `${trimmed} Tools`
+/** Words a title-cased name keeps lower case unless they open it. */
+const MINOR_WORDS = new Set('a an and as at by for in of on or the to vs with'.split(' '))
+
+/**
+ * A name as a title writes it: one typed all in lower case is title-cased, keeping known acronyms
+ * upper case; any other is left as written. D1 keeps the name as it is.
+ */
+function titleCased(name: string): string {
+  if (name !== name.toLowerCase()) return name
+  let first = true
+  return name.replace(/[\p{L}\p{N}]+/gu, word => {
+    const opens = first
+    first = false
+    const cased = CASED_WORDS.get(word)
+    if (cased) return cased
+    if (!opens && MINOR_WORDS.has(word)) return word
+    return `${word.charAt(0).toUpperCase()}${word.slice(1)}`
+  })
 }
 
-function categoryParts(name: string, input: CollectionTitleInput): CollectionTitleParts {
-  return { ...input, plus: true, topic: categoryTopic(name) }
+/**
+ * The noun a category or tag title adds after a name that isn't already a plural noun for tools
+ * (`AI Accounting Software`). Of "Software", "Tools" and "Apps", it had the most US search volume
+ * (Ahrefs, October 2026) for 7 of the 13 live names with any: `ai accounting software` 3,100 a
+ * month to 520 for "tools", `ecommerce software` 5,000 to 1,150.
+ */
+export const DEFAULT_TOPIC_NOUN = 'Software'
+
+/**
+ * Names, as a title writes them, whose searches clearly favour another noun: `seo tools`
+ * (319,000 a month), `best productivity apps` (73,000; 75,500 for "apps" to 2,700 for
+ * "software"), `education apps` (790 to 600).
+ */
+export const TOPIC_NOUN_OVERRIDES: ReadonlyMap<string, string> = new Map([
+  ['Education', 'Apps'],
+  ['Productivity', 'Apps'],
+  ['SEO', 'Tools']
+])
+
+/** Last words that name tools without the plural `s` test (`Software`), or with it. */
+const TOOL_NOUNS = new Set(
+  ['agents', 'apps', 'software', 'tools', DEFAULT_TOPIC_NOUN, ...TOPIC_NOUN_OVERRIDES.values()].map(
+    noun => noun.toLowerCase()
+  )
+)
+
+/** Endings of words that end in "s" without being plural: Business, Status, Analysis, Analytics. */
+const NOT_PLURAL_ENDING = /(?:ss|us|is|ics)$/iu
+
+/** Words that end in a plural-looking "s" but name no set of tools. */
+const NOT_PLURAL_WORDS = new Set(['news'])
+
+/**
+ * Whether a name's last word is already a plural noun for tools (`AI Lyrics Generators`,
+ * `Chatbots & Agents`, `Review Management Software`), so it takes no noun. The rule is
+ * deliberately simple: a word in `TOOL_NOUNS`, or one ending in a lower-case "s" (so `CMS` is
+ * not plural) that is not one of the endings above.
+ */
+function namesTools(name: string): boolean {
+  const last = /(\p{L}+)\P{L}*$/u.exec(name)?.[1]
+  if (!last) return false
+  const lower = last.toLowerCase()
+  if (TOOL_NOUNS.has(lower)) return true
+  return last.endsWith('s') && !NOT_PLURAL_ENDING.test(last) && !NOT_PLURAL_WORDS.has(lower)
 }
 
-/** A category's title: `{N}+ Best {Category} Tools in {Year}`, stepping down. */
+/**
+ * What a category or tag title ranks: its name title-cased if D1 has it in lower case, then,
+ * unless its last word is already a plural noun for tools, its override noun or
+ * `DEFAULT_TOPIC_NOUN`. `AI Lawyer` is "AI Lawyer Software", `Data & Analytics` is
+ * "Data & Analytics Software", `SEO` is "SEO Tools", `Productivity` is "Productivity Apps";
+ * `AI Lyrics Generators` and `Developer Tools` stay as they are.
+ */
+function toolsTopic(name: string): string {
+  const cased = titleCased(name.trim())
+  if (namesTools(cased)) return cased
+  return `${cased} ${TOPIC_NOUN_OVERRIDES.get(cased) ?? DEFAULT_TOPIC_NOUN}`
+}
+
+/** A category or a tag: it grows, so its count takes a `+`. */
+function toolsParts(name: string, input: CollectionTitleInput): CollectionTitleParts {
+  return { ...input, plus: true, topic: toolsTopic(name) }
+}
+
+/** A category's title: `{N}+ Best {Category} Software in {Year}`, stepping down. */
 export function categoryTitle(name: string, input: CollectionTitleInput): string {
-  return collectionTitle(categoryParts(name, input))
+  return collectionTitle(toolsParts(name, input))
 }
 
 export function categoryDescriptionLead(name: string, input: CollectionTitleInput): string {
-  return collectionDescriptionLead(categoryParts(name, input))
+  return collectionDescriptionLead(toolsParts(name, input))
 }
 
-function tagParts(name: string, input: CollectionTitleInput): CollectionTitleParts {
-  return { ...input, plus: true, topic: name.trim() }
-}
-
-/** A tag's title: `{N}+ Best {Label} in {Year}`, stepping down. */
+/** A tag's title: `{N}+ Best {Tag} Software in {Year}` by the same rule, stepping down. */
 export function tagTitle(name: string, input: CollectionTitleInput): string {
-  return collectionTitle(tagParts(name, input))
+  return collectionTitle(toolsParts(name, input))
 }
 
 export function tagDescriptionLead(name: string, input: CollectionTitleInput): string {
-  return collectionDescriptionLead(tagParts(name, input))
+  return collectionDescriptionLead(toolsParts(name, input))
 }
 
 /** What a best page ranks: its D1 title without the leading "Best" its titles are written with. */

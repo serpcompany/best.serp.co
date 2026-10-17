@@ -129,6 +129,11 @@ test.describe('taxonomy routes on the fixture seed (#346)', () => {
       noteTakingApp.heading
     ])
     expect(data.some(entry => entry['@type'] === 'BreadcrumbList')).toBe(true)
+    // The site is SERP Best; the company that publishes it is SERP (#521).
+    expect(collection).toMatchObject({
+      isPartOf: { '@type': 'WebSite', name: 'SERP Best' },
+      publisher: { '@type': 'Organization', name: 'SERP' }
+    })
     // No ratings: D1 holds none.
     expect(JSON.stringify(data)).not.toMatch(/Review|Rating/u)
   })
@@ -168,6 +173,10 @@ test.describe('taxonomy routes on the fixture seed (#346)', () => {
     const response = await page.goto(tagPath(noteTaking.slug))
     expect(response?.status()).toBe(200)
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(noteTaking.name)
+    // A tag whose name is not a plural noun for tools takes "Software" in its title (#521).
+    await expect(page).toHaveTitle(
+      `${noteTaking.listingCount}+ Best ${noteTaking.name} Software in ${new Date().getUTCFullYear()} | SERP Best`
+    )
     await expectCanonical(page, tagPath(noteTaking.slug))
     // 12 listings, but a best page ranks the tag alone: the tag page links to it instead.
     await expectRobots(page, false)
@@ -199,6 +208,10 @@ test.describe('taxonomy routes on the fixture seed (#346)', () => {
     // Fewer than 10 listings.
     await page.goto(tagPath(seedTags.documentEditors.slug))
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(seedTags.documentEditors.name)
+    // A plural noun for tools takes nothing.
+    await expect(page).toHaveTitle(
+      `${seedTags.documentEditors.listingCount}+ Best ${seedTags.documentEditors.name} in ${new Date().getUTCFullYear()} | SERP Best`
+    )
     await expectRobots(page, false)
     // A best page that ranks the tag within a category is linked too.
     await page.goto(tagPath(seedTags.whiteboards.slug))

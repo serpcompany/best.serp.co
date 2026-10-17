@@ -116,7 +116,10 @@ export type SiteDefinition = {
      */
     legalEmailDomain?: string
     name: string
-    /** The network of sites the Brands page lists, when it is not `name` ("SERP", #521). */
+    /**
+     * The company behind the site when it is not `name` ("SERP", #521): the JSON-LD
+     * `Organization`, the operator the legal pages name, and the network the Brands page lists.
+     */
     networkName?: string
     publicUrl: string
     tagline: string

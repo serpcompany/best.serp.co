@@ -75,6 +75,7 @@ export const site: SiteDefinition = {
     legalEmailDomain: 'serp.co',
     // The site-wide name (#521): every title's ` | SERP Best`, Open Graph's site name, the feed.
     name: 'SERP Best',
+    // The company (#521): the JSON-LD Organization, the legal pages' operator, the Brands network.
     networkName: 'SERP',
     publicUrl: 'https://best.serp.co',
     tagline: 'Software, AI tools, companies, resources, and SERP projects'

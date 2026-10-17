@@ -5,10 +5,12 @@ import {
   categoryDescriptionLead,
   categoryTitle,
   currentYear,
+  DEFAULT_TOPIC_NOUN,
   listingDescriptionLead,
   listingTitle,
   TITLE_MAX_LENGTH,
   TITLE_SUFFIX,
+  TOPIC_NOUN_OVERRIDES,
   tagDescriptionLead,
   tagTitle
 } from './page-titles'
@@ -16,6 +18,11 @@ import {
 /** A name of exactly `length` characters. */
 function nameOf(length: number): string {
   return 'Acmesoftwarestudio'.repeat(5).slice(0, length)
+}
+
+/** A name of exactly `length` characters ending in a plural noun for tools, so it takes no noun. */
+function appsOf(length: number): string {
+  return `${nameOf(length - 5)} Apps`
 }
 
 /** The `<title>` the root layout's template writes. */
@@ -85,9 +92,10 @@ describe('listingTitle (#521)', () => {
 })
 
 describe('categoryTitle (#521)', () => {
-  it('writes {N}+ Best {Category} Tools in {Year}', () => {
+  it('writes {N}+ Best {Category} Software in {Year}', () => {
+    expect(DEFAULT_TOPIC_NOUN).toBe('Software')
     expect(rendered(categoryTitle('Audio & Music', { count: 123, year }))).toBe(
-      '123+ Best Audio & Music Tools in 2026 | SERP Best'
+      `123+ Best Audio & Music ${DEFAULT_TOPIC_NOUN} in 2026 | SERP Best`
     )
   })
 
@@ -95,52 +103,100 @@ describe('categoryTitle (#521)', () => {
     expect(categoryTitle('Developer Tools', { count: 266, year })).toBe(
       '266+ Best Developer Tools in 2026'
     )
-    expect(categoryTitle('Video Downloaders', { count: 55, year })).toBe(
-      '55+ Best Video Downloaders in 2026'
-    )
     expect(categoryTitle('Chatbots & Agents', { count: 245, year })).toBe(
       '245+ Best Chatbots & Agents in 2026'
     )
     expect(categoryTitle('Careers & Hiring', { count: 40, year })).toBe(
-      '40+ Best Careers & Hiring Tools in 2026'
+      `40+ Best Careers & Hiring ${DEFAULT_TOPIC_NOUN} in 2026`
+    )
+    expect(categoryTitle('Data & Analytics', { count: 40, year })).toBe(
+      `40+ Best Data & Analytics ${DEFAULT_TOPIC_NOUN} in 2026`
     )
   })
 
-  it('drops the year from 25 characters, then the count from 33', () => {
-    // "123+ Best " and " Tools in 2026" with the suffix leave 24 characters for the name.
-    expect(rendered(categoryTitle(nameOf(24), { count: 123, year }))).toHaveLength(60)
-    expect(categoryTitle(nameOf(24), { count: 123, year })).toBe(
-      `123+ Best ${nameOf(24)} Tools in 2026`
+  it('adds the noun searches favour for an overridden name', () => {
+    expect([...TOPIC_NOUN_OVERRIDES]).toEqual([
+      ['Education', 'Apps'],
+      ['Productivity', 'Apps'],
+      ['SEO', 'Tools']
+    ])
+    expect(categoryTitle('Productivity', { count: 300, year })).toBe(
+      '300+ Best Productivity Apps in 2026'
     )
-    expect(categoryTitle(nameOf(25), { count: 123, year })).toBe(`123+ Best ${nameOf(25)} Tools`)
-    expect(categoryTitle(nameOf(32), { count: 123, year })).toBe(`123+ Best ${nameOf(32)} Tools`)
-    expect(categoryTitle(nameOf(33), { count: 123, year })).toBe(`Best ${nameOf(33)} Tools`)
+    expect(categoryTitle('Education', { count: 40, year })).toBe('40+ Best Education Apps in 2026')
+    expect(tagTitle('SEO', { count: 9, year })).toBe('9+ Best SEO Tools in 2026')
+    expect(tagTitle('seo', { count: 9, year })).toBe('9+ Best SEO Tools in 2026')
+    // The override is the whole name's: one that only ends in it takes the default.
+    expect(tagTitle('Local SEO', { count: 9, year })).toBe('9+ Best Local SEO Software in 2026')
+    expect(categoryTitle('Ecommerce', { count: 40, year })).toBe(
+      '40+ Best Ecommerce Software in 2026'
+    )
+  })
+
+  it('drops the year past the room it leaves, then the count past 8 characters more', () => {
+    // "123+ Best ", " Software in 2026" and the suffix leave 21 characters for the name.
+    const room = TITLE_MAX_LENGTH - `123+ Best  ${DEFAULT_TOPIC_NOUN} in 2026${TITLE_SUFFIX}`.length
+    const at = (length: number) => categoryTitle(nameOf(length), { count: 123, year })
+    expect(rendered(at(room))).toHaveLength(60)
+    expect(at(room)).toBe(`123+ Best ${nameOf(room)} ${DEFAULT_TOPIC_NOUN} in 2026`)
+    expect(at(room + 1)).toBe(`123+ Best ${nameOf(room + 1)} ${DEFAULT_TOPIC_NOUN}`)
+    expect(at(room + 8)).toBe(`123+ Best ${nameOf(room + 8)} ${DEFAULT_TOPIC_NOUN}`)
+    expect(at(room + 9)).toBe(`Best ${nameOf(room + 9)} ${DEFAULT_TOPIC_NOUN}`)
   })
 
   it('leads the meta description with every word of the full pattern', () => {
     expect(categoryDescriptionLead(nameOf(40), { count: 123, year })).toBe(
-      `123+ best ${nameOf(40)} Tools in 2026.`
+      `123+ best ${nameOf(40)} ${DEFAULT_TOPIC_NOUN} in 2026.`
     )
   })
 })
 
 describe('tagTitle (#521)', () => {
-  it('writes {N}+ Best {Label} in {Year}', () => {
+  it('writes {N}+ Best {Tag} in {Year} for a tag named by a plural noun for tools', () => {
     expect(rendered(tagTitle('AI Lyrics Generators', { count: 6, year }))).toBe(
       '6+ Best AI Lyrics Generators in 2026 | SERP Best'
+    )
+    expect(tagTitle('Review Management Software', { count: 6, year })).toBe(
+      '6+ Best Review Management Software in 2026'
+    )
+  })
+
+  it('adds the default noun to any other tag, by the category rule', () => {
+    const topic = (name: string) => tagTitle(name, { count: 0, year }).replace(/ in 2026$/u, '')
+    expect(topic('AI Lawyer')).toBe(`Best AI Lawyer ${DEFAULT_TOPIC_NOUN}`)
+    expect(topic('Analytics')).toBe(`Best Analytics ${DEFAULT_TOPIC_NOUN}`)
+    expect(topic('Payment Processing')).toBe(`Best Payment Processing ${DEFAULT_TOPIC_NOUN}`)
+    expect(topic('AI News')).toBe(`Best AI News ${DEFAULT_TOPIC_NOUN}`)
+    expect(topic('Headless CMS')).toBe(`Best Headless CMS ${DEFAULT_TOPIC_NOUN}`)
+    expect(topic('Chatbots & Agents')).toBe('Best Chatbots & Agents')
+    expect(topic('Web Proxies')).toBe('Best Web Proxies')
+  })
+
+  it('title-cases a name D1 has in lower case, keeping acronyms upper case', () => {
+    expect(tagTitle('ai time tracking', { count: 6, year })).toBe(
+      `6+ Best AI Time Tracking ${DEFAULT_TOPIC_NOUN} in 2026`
+    )
+    expect(tagTitle('ai productivity tools', { count: 6, year })).toBe(
+      '6+ Best AI Productivity Tools in 2026'
+    )
+    expect(tagDescriptionLead('ai text to speech', { count: 6, year })).toBe(
+      `6+ best AI Text to Speech ${DEFAULT_TOPIC_NOUN} in 2026.`
+    )
+    expect(tagTitle('Nextjs Templates', { count: 6, year })).toBe(
+      '6+ Best Nextjs Templates in 2026'
     )
   })
 
   it('drops the year from 33 characters, then the count from 41, and never cuts the name', () => {
-    const at = (length: number) => tagTitle(nameOf(length), { count: 6, year })
-    expect(at(32)).toBe(`6+ Best ${nameOf(32)} in 2026`)
+    const at = (length: number) => tagTitle(appsOf(length), { count: 6, year })
+    expect(at(32)).toBe(`6+ Best ${appsOf(32)} in 2026`)
     expect(rendered(at(32))).toHaveLength(60)
-    expect(at(33)).toBe(`6+ Best ${nameOf(33)}`)
+    expect(at(33)).toBe(`6+ Best ${appsOf(33)}`)
     expect(rendered(at(40))).toHaveLength(60)
-    expect(at(40)).toBe(`6+ Best ${nameOf(40)}`)
-    expect(at(41)).toBe(`Best ${nameOf(41)}`)
+    expect(at(40)).toBe(`6+ Best ${appsOf(40)}`)
+    expect(at(41)).toBe(`Best ${appsOf(41)}`)
     expect(rendered(at(43))).toHaveLength(60)
-    expect(rendered(at(50))).toBe(`Best ${nameOf(50)} | SERP Best`)
+    expect(rendered(at(50))).toBe(`Best ${appsOf(50)} | SERP Best`)
   })
 
   it('has no count while it has no listing', () => {
@@ -149,8 +205,8 @@ describe('tagTitle (#521)', () => {
   })
 
   it('leads the meta description with every word of the full pattern', () => {
-    expect(tagDescriptionLead(nameOf(50), { count: 6, year })).toBe(
-      `6+ best ${nameOf(50)} in 2026.`
+    expect(tagDescriptionLead(appsOf(50), { count: 6, year })).toBe(
+      `6+ best ${appsOf(50)} in 2026.`
     )
   })
 })

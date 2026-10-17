@@ -17,6 +17,7 @@ import {
 import {
   composeMetaDescription,
   generateDynamicMetadata,
+  ORGANIZATION_NAME,
   SITE_NAME,
   siteLogoUrl,
   siteOrigin,
@@ -248,7 +249,7 @@ export function CollectionRoutePage({
             },
             publisher: {
               '@type': 'Organization',
-              name: SITE_NAME,
+              name: ORGANIZATION_NAME,
               url: origin,
               logo: {
                 '@type': 'ImageObject',

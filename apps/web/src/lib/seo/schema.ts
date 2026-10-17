@@ -2,7 +2,7 @@ import { categoryNameFromSlug } from '../directory/categories'
 import { shouldUseProvidedListingLogo } from '../directory/listing-logo-presentation'
 import { getCanonicalListingListRoute, getRoute } from '../routing/routes'
 import { siteCopy } from '../site/site-copy'
-import { SITE_NAME, siteLogoUrl, siteOrigin, siteWebsiteId } from './seo-config'
+import { ORGANIZATION_NAME, SITE_NAME, siteLogoUrl, siteOrigin, siteWebsiteId } from './seo-config'
 
 export interface SchemaOrg {
   '@context': 'https://schema.org'
@@ -116,7 +116,7 @@ export function generateArticleSchema(website: WebsiteMetadataLike): ArticleSche
     datePublished: website.publishedAt,
     author: {
       '@type': 'Organization',
-      name: SITE_NAME
+      name: ORGANIZATION_NAME
     }
   }
 }
@@ -220,12 +220,12 @@ export function generateWebsiteDetailSchema(
         dateModified: website.modifiedAt ?? website.publishedAt,
         author: {
           '@type': 'Organization',
-          name: SITE_NAME,
+          name: ORGANIZATION_NAME,
           url: origin
         },
         publisher: {
           '@type': 'Organization',
-          name: SITE_NAME,
+          name: ORGANIZATION_NAME,
           url: origin,
           logo: {
             '@type': 'ImageObject',
