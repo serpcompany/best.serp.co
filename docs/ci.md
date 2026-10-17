@@ -167,3 +167,12 @@ Rollback is deleting the variable or setting it to `"ubuntu-latest"`. A job alre
 the self-hosted labels keeps waiting until it is cancelled and re-run. Required check names do
 not change, so the rulesets need no edit either way.
 
+
+## No Next.js build cache
+
+CI and the deploy workflows don't restore `.next/cache`: every build starts cold. This is a
+recorded exception to serp's CI Workflows standard, which says to cache it ([#556](https://github.com/serpcompany/best.serp.co/issues/556),
+owner-approved 2026-10-18; serp issue serpcompany/serp#1504 to revisit the standard). A restored
+cache brought back old Turbopack state and shipped a stale stylesheet. Jobs that never build re-save
+the entry they restored under a new key, so a better key doesn't fix it. A cold build costs about
+10 s per job. The pnpm store cache is meant to stay, but it doesn't restore yet ([#557](https://github.com/serpcompany/best.serp.co/issues/557)).
