@@ -1,0 +1,345 @@
+# serpcompany/best.serp.co#539 (batch E): hand-picked alternatives for the 36 live listings whose
+# primary category is Audio and whose slug starts with a to g (autopod.fm to goodtape.io), the first
+# part of Audio in #539's size order; a later batch takes h to z. The picks lead each page's
+# Alternatives section; the page tops it up to six from similar listings.
+# Picked on 2026-10-18 from staging's live listings (read-only), each also live on production
+# (https://best.serp.co/sitemap-products.xml, read that day), by what each listing and its
+# candidates say they do and what their sites offer that day: a pick does the same job for the same
+# kind of user, best first, and a listing gets fewer than six, or none, when nothing else fits.
+# Every listing and pick is a v1 import listing, with the same id and slug on staging and
+# production. The reason for each listing is the comment above its operation. Picks may come from
+# any category: Kapwing, Veed, Submagic, Captions, Gling and Fliki are filed under Video, Dubverse
+# and RadioNewsAI under Writing, Soundraw under Image & Design, and Otter.ai under Productivity.
+# Free Subtitles AI (freesubtitles.ai) now redirects to its new name, Subtitles.app, and RadioNewsAI
+# (radionewsai.com) to Audio.co; both still offer what their listings describe.
+# Two listings have no operation, because nothing in the catalog substitutes for them: Cyanite
+# (cyanite.ai) and Dadabots (dadabots.com). Their pages keep the similar-listings fallback.
+# Five listings have no operation, because their sites no longer offer what the listing describes
+# (pivoted, shut down, or a repurposed domain), and batch E's pull request lists them for
+# retirement: Balacoon (balacoon.com), Beatsbrew (beatsbrew.com), Blogcast (blogcast.host),
+# Clonemyvoice (clonemyvoice.io), and Charactr (gemelo.ai).
+# Each listing-alternatives-set compares and swaps the listing's slug and current picks (none yet),
+# refuses a pick that isn't live with that id and slug, keeps the listing's checksum, and logs an
+# `edited` event. Row-level, so the batch is refused with nothing written if any listing changed.
+# Needs migration 0018_listing_alternatives (#534, release 9). Publish on staging first, then on
+# production after the promotion that carries it.
+version: 1
+id: 2026-10-18-alternatives-audio-a-g
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  # autopod.fm: automatic editing of video podcasts and shows (multicam cuts, silences, social clips).
+  - action: listing-alternatives-set
+    id: lst_885345ae5c95bc35be1a46e5
+    slug: autopod.fm
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_a3e7bfcf16a51cfa6903e98d, slug: descript.com }
+      - { id: lst_00700d96f8d85e30213dc9ef, slug: riverside.fm }
+      - { id: lst_27464a85ad3e031f63eda41e, slug: gling.ai }
+      - { id: lst_e052e709aa8800710cb67e35, slug: cleanvoice.ai }
+  # avmapping.co: AI soundtrack music matched to videos.
+  - action: listing-alternatives-set
+    id: lst_eb55152ed3e78c9f856a1c4a
+    slug: avmapping.co
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_8acf5384c3a85a5c2122a116, slug: beatoven.ai }
+      - { id: lst_dd51f34afe4ad99773dce8ae, slug: soundraw.io }
+      - { id: lst_8e44ddee9cbd28b3801b3a83, slug: mubert.com }
+      - { id: lst_bb89a7ee7c28890a4986187c, slug: loudly.com }
+      - { id: lst_e02606122b42b7336bf17a08, slug: soundful.com }
+      - { id: lst_850d658dd6e04628a322e132, slug: ecrettmusic.com }
+  # beatoven.ai: royalty-free AI background music for videos, podcasts and games.
+  - action: listing-alternatives-set
+    id: lst_8acf5384c3a85a5c2122a116
+    slug: beatoven.ai
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_dd51f34afe4ad99773dce8ae, slug: soundraw.io }
+      - { id: lst_8e44ddee9cbd28b3801b3a83, slug: mubert.com }
+      - { id: lst_bb89a7ee7c28890a4986187c, slug: loudly.com }
+      - { id: lst_e02606122b42b7336bf17a08, slug: soundful.com }
+      - { id: lst_850d658dd6e04628a322e132, slug: ecrettmusic.com }
+      - { id: lst_eb55152ed3e78c9f856a1c4a, slug: avmapping.co }
+  # beepbooply.com: text-to-speech voiceovers in many voices and languages.
+  - action: listing-alternatives-set
+    id: lst_2df53324a49e8e010f261366
+    slug: beepbooply.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_23509d85df29e3b7df8551a8, slug: elevenlabs.io }
+      - { id: lst_15caf71f765ce253eb674674, slug: murf.ai }
+      - { id: lst_4537e2f15efdc8f6b30aad2b, slug: wellsaid.io }
+      - { id: lst_07f4546fc668173d6d72d9eb, slug: listnr.ai }
+      - { id: lst_2cb80a795c682957b11959c1, slug: getwoord.com }
+      - { id: lst_b60aad2072dd2df6d31c2283, slug: naturalreaders.com }
+  # beyondwords.io: turning articles and blog posts into listenable audio.
+  - action: listing-alternatives-set
+    id: lst_9b95981a7faecf12a4b9dc98
+    slug: beyondwords.io
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_23509d85df29e3b7df8551a8, slug: elevenlabs.io }
+      - { id: lst_2cb80a795c682957b11959c1, slug: getwoord.com }
+      - { id: lst_07f4546fc668173d6d72d9eb, slug: listnr.ai }
+  # captioncreator.cc: automatic subtitles and transcripts for videos.
+  - action: listing-alternatives-set
+    id: lst_a6a1664ff09d37789b9c4598
+    slug: captioncreator.cc
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_105c64f979906b6aa969e8fc, slug: freesubtitles.ai }
+      - { id: lst_f7286d338ccc6a26b2e18fb8, slug: kapwing.com }
+      - { id: lst_ac66bd0505467dbb716b90db, slug: veed.io }
+      - { id: lst_d58fb9148b846760fd8e13c6, slug: taption.com }
+      - { id: lst_07236be97271e32c58abb224, slug: submagic.co }
+      - { id: lst_cbf4dcf4fcc75f3a7fa6a440, slug: dubverse.ai }
+  # cassetteai.com: AI music generation that apps and games call through an API.
+  - action: listing-alternatives-set
+    id: lst_6e42711391de462b446faf1d
+    slug: cassetteai.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_bb89a7ee7c28890a4986187c, slug: loudly.com }
+      - { id: lst_8e44ddee9cbd28b3801b3a83, slug: mubert.com }
+      - { id: lst_40d7cea248731e6c68498ce8, slug: musicapi.ai }
+      - { id: lst_8acf5384c3a85a5c2122a116, slug: beatoven.ai }
+      - { id: lst_dd51f34afe4ad99773dce8ae, slug: soundraw.io }
+  # castmagic.io: turning podcast and audio recordings into transcripts, show notes and posts.
+  - action: listing-alternatives-set
+    id: lst_4c88bc863a70227fc2eb2241
+    slug: castmagic.io
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_ce4c704c2d37130812eb8724, slug: deciphr.ai }
+      - { id: lst_508f62751b28598b3f0b7aeb, slug: podsqueeze.com }
+      - { id: lst_31b4cea66ad2ad40f00b290b, slug: swellai.com }
+  # chordai.net: finding the chords of any song.
+  - action: listing-alternatives-set
+    id: lst_341a6f3c8d6fef46b8553b6c
+    slug: chordai.net
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_3a0c67b2cbcf97d9e9c52aa6, slug: moises.ai }
+      - { id: lst_e2910030b742587ff468eb7b, slug: fadr.com }
+  # cleanvoice.ai: cleaning up podcast recordings with AI (filler words, silences, noise).
+  - action: listing-alternatives-set
+    id: lst_e052e709aa8800710cb67e35
+    slug: cleanvoice.ai
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_a3e7bfcf16a51cfa6903e98d, slug: descript.com }
+      - { id: lst_00700d96f8d85e30213dc9ef, slug: riverside.fm }
+      - { id: lst_32641bc4a5574caae327bf71, slug: koolio.ai }
+      - { id: lst_27464a85ad3e031f63eda41e, slug: gling.ai }
+  # cybervoice.io: AI voices and voice cloning for content and game creators.
+  - action: listing-alternatives-set
+    id: lst_8c22440ecd2ac6da039f127e
+    slug: cybervoice.io
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_23509d85df29e3b7df8551a8, slug: elevenlabs.io }
+      - { id: lst_a68b4e00c1d0537a319b78c3, slug: respeecher.com }
+      - { id: lst_d5e66fec6f00de01db8932a3, slug: uberduck.ai }
+  # deciphr.ai: podcast transcripts, summaries and show notes from raw audio.
+  - action: listing-alternatives-set
+    id: lst_ce4c704c2d37130812eb8724
+    slug: deciphr.ai
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_4c88bc863a70227fc2eb2241, slug: castmagic.io }
+      - { id: lst_508f62751b28598b3f0b7aeb, slug: podsqueeze.com }
+      - { id: lst_31b4cea66ad2ad40f00b290b, slug: swellai.com }
+  # descript.com: editing video and audio by editing the transcript.
+  - action: listing-alternatives-set
+    id: lst_a3e7bfcf16a51cfa6903e98d
+    slug: descript.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_00700d96f8d85e30213dc9ef, slug: riverside.fm }
+      - { id: lst_f7286d338ccc6a26b2e18fb8, slug: kapwing.com }
+      - { id: lst_ac66bd0505467dbb716b90db, slug: veed.io }
+      - { id: lst_f614201afbf4c642b440559d, slug: captions.ai }
+      - { id: lst_27464a85ad3e031f63eda41e, slug: gling.ai }
+  # dubbingai.io: real-time voice changers for gamers and streamers.
+  - action: listing-alternatives-set
+    id: lst_cf663339eccb41dc9b1494b3
+    slug: dubbingai.io
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_f0ff6b492499a0f559ce0c51, slug: voicemod.net }
+      - { id: lst_9ccacd678c8e704e056a95b1, slug: voice.ai }
+      - { id: lst_95e091b76768b181809911e7, slug: screamingbee.com }
+  # dupdub.com: AI voiceovers, avatars and videos from text in one platform.
+  - action: listing-alternatives-set
+    id: lst_30db4ccbb529af7a5b275b07
+    slug: dupdub.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_33534dbd720ff1866cea0957, slug: fliki.ai }
+      - { id: lst_5f4fb2054fa0fbf96b679947, slug: topmediai.com }
+      - { id: lst_44b278e879e4d1f8d12107fd, slug: wavel.ai }
+      - { id: lst_1bf2fc0b04205a1556b3e349, slug: verbatik.com }
+      - { id: lst_23509d85df29e3b7df8551a8, slug: elevenlabs.io }
+      - { id: lst_15caf71f765ce253eb674674, slug: murf.ai }
+  # echofox.pro: transcribing WhatsApp voice messages.
+  - action: listing-alternatives-set
+    id: lst_0ccc4088a4106465ce9ae4c8
+    slug: echofox.pro
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_ad7dff75614092b30cd019ba, slug: whisperize.me }
+  # ecrettmusic.com: royalty-free music for videos, made with AI.
+  - action: listing-alternatives-set
+    id: lst_850d658dd6e04628a322e132
+    slug: ecrettmusic.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_8acf5384c3a85a5c2122a116, slug: beatoven.ai }
+      - { id: lst_dd51f34afe4ad99773dce8ae, slug: soundraw.io }
+      - { id: lst_8e44ddee9cbd28b3801b3a83, slug: mubert.com }
+      - { id: lst_bb89a7ee7c28890a4986187c, slug: loudly.com }
+      - { id: lst_e02606122b42b7336bf17a08, slug: soundful.com }
+      - { id: lst_eb55152ed3e78c9f856a1c4a, slug: avmapping.co }
+  # elevenlabs.io: lifelike AI voices and text to speech.
+  - action: listing-alternatives-set
+    id: lst_23509d85df29e3b7df8551a8
+    slug: elevenlabs.io
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_15caf71f765ce253eb674674, slug: murf.ai }
+      - { id: lst_4537e2f15efdc8f6b30aad2b, slug: wellsaid.io }
+      - { id: lst_a68b4e00c1d0537a319b78c3, slug: respeecher.com }
+      - { id: lst_07f4546fc668173d6d72d9eb, slug: listnr.ai }
+      - { id: lst_2df53324a49e8e010f261366, slug: beepbooply.com }
+      - { id: lst_2cb80a795c682957b11959c1, slug: getwoord.com }
+  # emvoiceapp.com: AI singing voices for music producers.
+  - action: listing-alternatives-set
+    id: lst_fd34902801d150ca27800256
+    slug: emvoiceapp.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_d5e66fec6f00de01db8932a3, slug: uberduck.ai }
+      - { id: lst_1bc609b8e24c3948a1d78ea7, slug: revocalize.ai }
+  # endel.io: adaptive soundscapes for focus, relaxation and sleep.
+  - action: listing-alternatives-set
+    id: lst_6dfe404b671b6a01c048b95f
+    slug: endel.io
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_acb0241a720801aba99f2924, slug: getsound.ai }
+  # fadr.com: splitting songs into stems and removing vocals.
+  - action: listing-alternatives-set
+    id: lst_e2910030b742587ff468eb7b
+    slug: fadr.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_fbe388b4981e057998b53649, slug: lalal.ai }
+      - { id: lst_3a0c67b2cbcf97d9e9c52aa6, slug: moises.ai }
+      - { id: lst_e9eb1b7053f10c8393d4fb92, slug: vocalremover.com }
+  # freesubtitles.ai: transcribing, translating and subtitling videos.
+  - action: listing-alternatives-set
+    id: lst_105c64f979906b6aa969e8fc
+    slug: freesubtitles.ai
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_a6a1664ff09d37789b9c4598, slug: captioncreator.cc }
+      - { id: lst_f7286d338ccc6a26b2e18fb8, slug: kapwing.com }
+      - { id: lst_ac66bd0505467dbb716b90db, slug: veed.io }
+      - { id: lst_d58fb9148b846760fd8e13c6, slug: taption.com }
+      - { id: lst_3294db949b46ccc99cf3db6c, slug: sonix.ai }
+      - { id: lst_07236be97271e32c58abb224, slug: submagic.co }
+  # futurimedia.com: AI-made content and voices for radio stations.
+  - action: listing-alternatives-set
+    id: lst_864992608e4295e26ac005b5
+    slug: futurimedia.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_814f992b5ede835f2195d397, slug: radionewsai.com }
+  # generatelyrics.io: AI song-lyrics generators.
+  - action: listing-alternatives-set
+    id: lst_557d2acaa742b798dec41634
+    slug: generatelyrics.io
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_30d7c88b3bc439968f6a7516, slug: lyricsgenerator.io }
+      - { id: lst_89db0e1cab645f702b66ff7e, slug: theselyricsdonotexist.com }
+  # getsound.ai: real-time soundscapes for focus.
+  - action: listing-alternatives-set
+    id: lst_acb0241a720801aba99f2924
+    slug: getsound.ai
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_6dfe404b671b6a01c048b95f, slug: endel.io }
+  # getwoord.com: online text to speech with downloadable audio.
+  - action: listing-alternatives-set
+    id: lst_2cb80a795c682957b11959c1
+    slug: getwoord.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_23509d85df29e3b7df8551a8, slug: elevenlabs.io }
+      - { id: lst_b60aad2072dd2df6d31c2283, slug: naturalreaders.com }
+      - { id: lst_15caf71f765ce253eb674674, slug: murf.ai }
+      - { id: lst_2df53324a49e8e010f261366, slug: beepbooply.com }
+      - { id: lst_07f4546fc668173d6d72d9eb, slug: listnr.ai }
+      - { id: lst_58eb4f4e495886d56ca8da1f, slug: speechgen.io }
+  # gladia.io: speech-to-text APIs for developers.
+  - action: listing-alternatives-set
+    id: lst_a648ee8fee4d5599d0368a12
+    slug: gladia.io
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_2bbd0983f1332b5e3eda8367, slug: speechmatics.com }
+      - { id: lst_9829df7eb3f3feb949ca8aee, slug: whisperapi.com }
+      - { id: lst_a1d920e5f1a64693d5002e41, slug: vocapia.com }
+  # goodsnooze.gumroad.com: transcribing audio and video offline on your own computer.
+  - action: listing-alternatives-set
+    id: lst_6f056f9165cf45a3354febaa
+    slug: goodsnooze.gumroad.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_926517ae3d7eb3090a984c71, slug: vid2txt.com }
+  # goodtape.io: automatic transcription of audio and video files.
+  - action: listing-alternatives-set
+    id: lst_01e8eeee01c5e887371f71e5
+    slug: goodtape.io
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_3294db949b46ccc99cf3db6c, slug: sonix.ai }
+      - { id: lst_334360169f73c5a7620d44e0, slug: otter.ai }
+      - { id: lst_0b03d81e39f11963863bb0f2, slug: scribewave.com }
+      - { id: lst_a30522599fcde83935e94f40, slug: speechtext.ai }
+      - { id: lst_5e219e55a6383ed91d0a6b84, slug: transkribieren.xyz }
+      - { id: lst_22d2c24db8de9bad83b7478f, slug: revoldiv.com }

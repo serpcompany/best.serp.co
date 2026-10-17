@@ -14,6 +14,8 @@
 # Two listings have no operation, because nothing in the catalog substitutes for them: Colourlab (AI
 # color grading for colorists) and FineCam (a phone as a webcam). Their pages keep the
 # similar-listings fallback.
+# Latte (latte.social) was taken out as a pick for Choppity, Clip FM and ClipMaker on 2026-10-18,
+# before this manifest was published: its site says Latte is sunsetting (#548).
 # Each listing-alternatives-set compares and swaps the listing's slug and current picks (none yet),
 # refuses a pick that isn't live with that id and slug, keeps the listing's checksum, and logs an
 # `edited` event. Row-level, so the batch is refused with nothing written if any listing changed.
@@ -139,7 +141,6 @@ operations:
       - { id: lst_650c3873aaf7811a09e78101, slug: klap.app }
       - { id: lst_b59714ead0da10ecad522baf, slug: vidyo.ai }
       - { id: lst_52aa51b7aa54966b08dd3a1d, slug: sendshort.ai }
-      - { id: lst_cecc6149eb1b45dba34057f9, slug: latte.social }
   # clip.fm: turning long videos into short social clips.
   - action: listing-alternatives-set
     id: lst_2eb25871f8f476c2d8279d1f
@@ -152,7 +153,6 @@ operations:
       - { id: lst_650c3873aaf7811a09e78101, slug: klap.app }
       - { id: lst_b59714ead0da10ecad522baf, slug: vidyo.ai }
       - { id: lst_52aa51b7aa54966b08dd3a1d, slug: sendshort.ai }
-      - { id: lst_cecc6149eb1b45dba34057f9, slug: latte.social }
   # clipfly.ai: AI video generation and editing suites.
   - action: listing-alternatives-set
     id: lst_c562db082cccaf7b836c835b
@@ -175,7 +175,6 @@ operations:
       - { id: lst_b59714ead0da10ecad522baf, slug: vidyo.ai }
       - { id: lst_650c3873aaf7811a09e78101, slug: klap.app }
       - { id: lst_52aa51b7aa54966b08dd3a1d, slug: sendshort.ai }
-      - { id: lst_cecc6149eb1b45dba34057f9, slug: latte.social }
       - { id: lst_b69412cd71a638236b7790f1, slug: vizard.ai }
   # clipsai.com: the listing is an open-source clipping library: hosted apps that cut long videos into clips.
   - action: listing-alternatives-set

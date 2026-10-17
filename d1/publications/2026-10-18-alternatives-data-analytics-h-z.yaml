@@ -1,0 +1,431 @@
+# serpcompany/best.serp.co#539 (batch E): hand-picked alternatives for the 63 live listings whose
+# primary category is Data & Analytics and whose slug starts with h to z (hash.ai to zuora.com), the
+# second part of Data & Analytics in #539's size order after batch D's a to g. The picks lead each
+# page's Alternatives section; the page tops it up to six from similar listings.
+# Picked on 2026-10-18 from staging's live listings (read-only), each also live on production
+# (https://best.serp.co/sitemap-products.xml, read that day), by what each listing and its
+# candidates say they do and what their sites offer that day: a pick does the same job for the same
+# kind of user, best first, and a listing gets fewer than six, or none, when nothing else fits.
+# Every listing and pick is a v1 import listing, with the same id and slug on staging and
+# production. The reason for each listing is the comment above its operation. Picks may come from
+# any category: Stripe, Paddle, Orb, FinChat and Finsheet are filed under Business & Finance,
+# ClientZen under Marketing, AIHelperBot (sqlai.ai), Firebase, Knack, Caspio, Softr AI, Glide,
+# Twelve Labs and Valossa (valossa.com) under Developer Tools, and GPT Workspace, DiagramGPT
+# (eraser.io), Sensible, Nanonets, Parseur, DocumentPro, FormX and Base64 under Productivity.
+# FinChat (finchat.io) now redirects to its new name, Fiscal.ai, and Vizly (www.vizly.fyi) to
+# legacy.vizly.ai; both still offer what their listings describe.
+# Seventeen listings have no operation, because nothing in the catalog substitutes for them: HASH
+# (hash.ai), Jadbio (jadbio.com), Jua (jua.ai), Jungle AI (jungle.ai), PowerBI AI Lens
+# (lensvisual.io), Mixpanel Spark (mixpanel.com), Neptyne (neptyne.com), Novacene (novacene.ai),
+# SPREEV (oneconnectsolutions.com), Pi Exchange (pi.exchange), Hachi (ramanlabs.in), Source
+# (source.ag), SyntheticAIdata (syntheticaidata.com), Syntho (syntho.ai), Syntonym (syntonym.com),
+# Trade Foresight (tradeforesight.com), and Zite (ziteai.com). Their pages keep the similar-listings
+# fallback.
+# Nine listings have no operation, because their products are gone or abandoned (shut down,
+# acquired, archived, pivoted, or unchanged since 2022), and batch E's pull request lists them for
+# retirement: June AI (june.so), Obviously AI (obviously.ai), OtterTune (ottertune.com), EZQL
+# (outerbase.com), Raw Query (rawquery.com), Rows AI (rows.com), Sequin.io (sequin.io), Skills AI
+# Chat (skills.ai), and Structured Labs (structuredlabs.com). Defog (defog.ai), on batch D's retire
+# list, is not a pick either.
+# Each listing-alternatives-set compares and swaps the listing's slug and current picks (none yet),
+# refuses a pick that isn't live with that id and slug, keeps the listing's checksum, and logs an
+# `edited` event. Row-level, so the batch is refused with nothing written if any listing changed.
+# Needs migration 0018_listing_alternatives (#534, release 9). Publish on staging first, then on
+# production after the promotion that carries it.
+version: 1
+id: 2026-10-18-alternatives-data-analytics-h-z
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  # hex.tech: collaborative analytics notebooks and BI for data teams.
+  - action: listing-alternatives-set
+    id: lst_6bb3c650690fab4f0481bc8d
+    slug: hex.tech
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_bb6446d5879a2e746b224b6c, slug: deepnote.com }
+      - { id: lst_99bdb22cb2d01a204cb786a7, slug: tableau.com }
+  # informatica.com: enterprise data integration and master data management.
+  - action: listing-alternatives-set
+    id: lst_30f2bf51f5a46d6e02188de1
+    slug: informatica.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_4030d654c6334326bb3e18ca, slug: tamr.com }
+      - { id: lst_4ec24597a46f88a386aa732a, slug: weld.app }
+  # kanaries.net: AI-assisted exploratory data analysis and charts.
+  - action: listing-alternatives-set
+    id: lst_367184ac70d03d1fa0acd414
+    slug: kanaries.net
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_a9a868f81f9ca7185b0a42c4, slug: vizly.fyi }
+      - { id: lst_d309a5dfaf62dd5ce60dd807, slug: columns.ai }
+      - { id: lst_14463cf060bcc3080c31bcf6, slug: tomat.ai }
+      - { id: lst_e0548da75032401636af0f71, slug: graphy.app }
+      - { id: lst_b353697b1fc37fb8c828a699, slug: magictool.ai }
+  # logisense.com: usage-based and subscription billing.
+  - action: listing-alternatives-set
+    id: lst_b90eb4eb86330f2335c341fd
+    slug: logisense.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_5e4b2b4d5e822fd4cf24d2f8, slug: metronome.com }
+      - { id: lst_d12c544696133d00f8631089, slug: m3ter.com }
+      - { id: lst_c4cebfd6b9579da3a901a11d, slug: getlago.com }
+      - { id: lst_c284c0a1b8460c8abb24af5a, slug: withorb.com }
+      - { id: lst_bb7370710688ea402e9968e0, slug: zuora.com }
+      - { id: lst_9077c08e86b6c36e167cb1b0, slug: chargebee.com }
+  # m3ter.com: usage-based billing for B2B software companies.
+  - action: listing-alternatives-set
+    id: lst_d12c544696133d00f8631089
+    slug: m3ter.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_5e4b2b4d5e822fd4cf24d2f8, slug: metronome.com }
+      - { id: lst_c284c0a1b8460c8abb24af5a, slug: withorb.com }
+      - { id: lst_c4cebfd6b9579da3a901a11d, slug: getlago.com }
+      - { id: lst_b90eb4eb86330f2335c341fd, slug: logisense.com }
+      - { id: lst_bb7370710688ea402e9968e0, slug: zuora.com }
+      - { id: lst_9077c08e86b6c36e167cb1b0, slug: chargebee.com }
+  # magictool.ai: uploading a spreadsheet and asking it questions in plain English.
+  - action: listing-alternatives-set
+    id: lst_b353697b1fc37fb8c828a699
+    slug: magictool.ai
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_a9a868f81f9ca7185b0a42c4, slug: vizly.fyi }
+      - { id: lst_14463cf060bcc3080c31bcf6, slug: tomat.ai }
+      - { id: lst_7487a5e75daae5669a95c513, slug: gptexcel.uk }
+      - { id: lst_367184ac70d03d1fa0acd414, slug: kanaries.net }
+  # medallia.com: analyzing customer feedback text for insights.
+  - action: listing-alternatives-set
+    id: lst_07ba1fe335c6b87a4bd58b33
+    slug: medallia.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_c3bb1a13cb0c093667d98d5d, slug: clientzen.io }
+      - { id: lst_e3dde629a461abe3a1710f61, slug: symanto.ai }
+  # metronome.com: usage-based billing for software companies.
+  - action: listing-alternatives-set
+    id: lst_5e4b2b4d5e822fd4cf24d2f8
+    slug: metronome.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_c284c0a1b8460c8abb24af5a, slug: withorb.com }
+      - { id: lst_d12c544696133d00f8631089, slug: m3ter.com }
+      - { id: lst_c4cebfd6b9579da3a901a11d, slug: getlago.com }
+      - { id: lst_b90eb4eb86330f2335c341fd, slug: logisense.com }
+      - { id: lst_bb7370710688ea402e9968e0, slug: zuora.com }
+      - { id: lst_9077c08e86b6c36e167cb1b0, slug: chargebee.com }
+  # mixpeek.com: AI that searches, classifies and moderates video and image content.
+  - action: listing-alternatives-set
+    id: lst_134ce01fe1ba05cf1941252f
+    slug: mixpeek.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_3a2ed94d20db88165b798770, slug: twelvelabs.io }
+      - { id: lst_67fdca1f9700f0c54bc65de1, slug: coactive.ai }
+      - { id: lst_7a1711ca3cc8b7efa40a5cb2, slug: valossa.com }
+      - { id: lst_16fc9bff7e648d36b0775477, slug: thehive.ai }
+  # mongodb.com: managed databases for app developers.
+  - action: listing-alternatives-set
+    id: lst_f7ad7a5bf7f9f4da863ff34c
+    slug: mongodb.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_a2d63e2ceaa3702910309aa6, slug: firebase.google.com }
+      - { id: lst_d55dff1d612f30fcbec99e92, slug: supabase.com }
+      - { id: lst_315ed60646089aacc4011cd3, slug: xata.io }
+  # nlsql.com: asking business databases questions in plain English.
+  - action: listing-alternatives-set
+    id: lst_59f7bfaf13d906bbced7ff55
+    slug: nlsql.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_d98c7c311d99f648f3086c7e, slug: blazesql.com }
+      - { id: lst_901b319f2fe22af7c9ca2af3, slug: veezoo.com }
+      - { id: lst_36888ee8f5819655c4fafcf2, slug: sqlai.ai }
+      - { id: lst_8047c25091b53b2404dc5ef8, slug: vanna.ai }
+  # numerous.ai: AI functions inside Google Sheets and Excel.
+  - action: listing-alternatives-set
+    id: lst_d7162c9cc6717150dbbec3ae
+    slug: numerous.ai
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_9d00ff66b17a3e581a37e780, slug: sheetai.app }
+      - { id: lst_f3cc65e5649cc677edae7036, slug: gpt.space }
+      - { id: lst_77b5c1ce176fbc57b4931095, slug: flowshot.ai }
+      - { id: lst_7487a5e75daae5669a95c513, slug: gptexcel.uk }
+      - { id: lst_70e27b5c7b230c20452bdebf, slug: formulashq.com }
+      - { id: lst_c6806b4adbbb65a7c7397030, slug: boloforms.com }
+  # numind.ai: AI that extracts structured data from documents.
+  - action: listing-alternatives-set
+    id: lst_4610266fdadaf4c78f73e440
+    slug: numind.ai
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_6725c26ac9d0ac6e8446bad4, slug: sensible.so }
+      - { id: lst_52122d28344f642e91fb01ab, slug: nanonets.com }
+      - { id: lst_64e59695bd404e16ebee649f, slug: parseur.com }
+      - { id: lst_7ba0e7684082d999e7d541b0, slug: documentpro.ai }
+      - { id: lst_a049bebdf6a425248ac3ad59, slug: formx.ai }
+      - { id: lst_bff561a1779a6e9008c22aab, slug: base64.ai }
+  # pinecone.io: vector databases for AI search and retrieval.
+  - action: listing-alternatives-set
+    id: lst_515c24aec70e8def091645b7
+    slug: pinecone.io
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_7f37574909354dbef4ad771d, slug: weaviate.io }
+      - { id: lst_7bc6bf980a8e3f03ac59024d, slug: vespa.ai }
+      - { id: lst_d55dff1d612f30fcbec99e92, slug: supabase.com }
+  # recurly.com: subscription billing and recurring payments.
+  - action: listing-alternatives-set
+    id: lst_13df075e8b8ee5e41801daa2
+    slug: recurly.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_9077c08e86b6c36e167cb1b0, slug: chargebee.com }
+      - { id: lst_bb7370710688ea402e9968e0, slug: zuora.com }
+      - { id: lst_cdab88dff63eda52fb445aa4, slug: stripe.com }
+      - { id: lst_bc729b21fb0407dffb944ce7, slug: paddle.com }
+      - { id: lst_982edeef0a0b3aef9e2bf712, slug: fastspring.com }
+      - { id: lst_c4cebfd6b9579da3a901a11d, slug: getlago.com }
+  # rose.ai: financial data discovery and analysis for investors.
+  - action: listing-alternatives-set
+    id: lst_5a4ec25c6f43e008a9dd1883
+    slug: rose.ai
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_9348a9265576728265df6fa8, slug: finchat.io }
+      - { id: lst_bfa2eb9de6623e49fb123da3, slug: finsheet.io }
+  # scale.com: labeled training data for AI models.
+  - action: listing-alternatives-set
+    id: lst_087e3773390273041528b726
+    slug: scale.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_f365decc26150548db0f916e, slug: ubiai.tools }
+  # sheetai.app: AI functions inside Google Sheets.
+  - action: listing-alternatives-set
+    id: lst_9d00ff66b17a3e581a37e780
+    slug: sheetai.app
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_d7162c9cc6717150dbbec3ae, slug: numerous.ai }
+      - { id: lst_f3cc65e5649cc677edae7036, slug: gpt.space }
+      - { id: lst_77b5c1ce176fbc57b4931095, slug: flowshot.ai }
+      - { id: lst_7487a5e75daae5669a95c513, slug: gptexcel.uk }
+      - { id: lst_70e27b5c7b230c20452bdebf, slug: formulashq.com }
+      - { id: lst_c6806b4adbbb65a7c7397030, slug: boloforms.com }
+  # sheeter.ai: AI Excel formula generators.
+  - action: listing-alternatives-set
+    id: lst_8a842628e5e1a3177f8c87d0
+    slug: sheeter.ai
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_7487a5e75daae5669a95c513, slug: gptexcel.uk }
+      - { id: lst_70e27b5c7b230c20452bdebf, slug: formulashq.com }
+      - { id: lst_c6806b4adbbb65a7c7397030, slug: boloforms.com }
+      - { id: lst_d7162c9cc6717150dbbec3ae, slug: numerous.ai }
+      - { id: lst_77b5c1ce176fbc57b4931095, slug: flowshot.ai }
+      - { id: lst_9d00ff66b17a3e581a37e780, slug: sheetai.app }
+  # soft-builder.com: database modeling and schema diagrams.
+  - action: listing-alternatives-set
+    id: lst_58d3b68c3f4284e09f63bc19
+    slug: soft-builder.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_45e291e544773814213761b0, slug: drawsql.app }
+      - { id: lst_23f0d92a5076fa3114048fa0, slug: eraser.io }
+  # stackby.com: no-code databases and business apps built on them.
+  - action: listing-alternatives-set
+    id: lst_12252e4406183bd018576bcf
+    slug: stackby.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_6df197b2d48f05ec618168d9, slug: knack.com }
+      - { id: lst_7f80dc6529813e9dface903f, slug: caspio.com }
+      - { id: lst_02c69023341a0ca2066d76be, slug: softr.io }
+      - { id: lst_3b7150ae97d28f358b3b591b, slug: glideapps.com }
+  # supabase.com: hosted backends and databases for app developers.
+  - action: listing-alternatives-set
+    id: lst_d55dff1d612f30fcbec99e92
+    slug: supabase.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_a2d63e2ceaa3702910309aa6, slug: firebase.google.com }
+      - { id: lst_315ed60646089aacc4011cd3, slug: xata.io }
+      - { id: lst_f7ad7a5bf7f9f4da863ff34c, slug: mongodb.com }
+  # symanto.ai: AI analysis of customer text and feedback.
+  - action: listing-alternatives-set
+    id: lst_e3dde629a461abe3a1710f61
+    slug: symanto.ai
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_07ba1fe335c6b87a4bd58b33, slug: medallia.com }
+      - { id: lst_c3bb1a13cb0c093667d98d5d, slug: clientzen.io }
+  # tableau.com: business intelligence dashboards and data visualization.
+  - action: listing-alternatives-set
+    id: lst_99bdb22cb2d01a204cb786a7
+    slug: tableau.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_6bb3c650690fab4f0481bc8d, slug: hex.tech }
+      - { id: lst_901b319f2fe22af7c9ca2af3, slug: veezoo.com }
+      - { id: lst_d309a5dfaf62dd5ce60dd807, slug: columns.ai }
+  # tagbox.io: AI tagging and search for photo and video libraries.
+  - action: listing-alternatives-set
+    id: lst_b24bd5be6b3f379f16398152
+    slug: tagbox.io
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_67fdca1f9700f0c54bc65de1, slug: coactive.ai }
+  # tamr.com: master data management.
+  - action: listing-alternatives-set
+    id: lst_4030d654c6334326bb3e18ca
+    slug: tamr.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_30f2bf51f5a46d6e02188de1, slug: informatica.com }
+  # thehive.ai: AI APIs that understand, classify and moderate images and video.
+  - action: listing-alternatives-set
+    id: lst_16fc9bff7e648d36b0775477
+    slug: thehive.ai
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_134ce01fe1ba05cf1941252f, slug: mixpeek.com }
+      - { id: lst_3a2ed94d20db88165b798770, slug: twelvelabs.io }
+      - { id: lst_7a1711ca3cc8b7efa40a5cb2, slug: valossa.com }
+  # tomat.ai: analyzing CSV files with AI, without code.
+  - action: listing-alternatives-set
+    id: lst_14463cf060bcc3080c31bcf6
+    slug: tomat.ai
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_a9a868f81f9ca7185b0a42c4, slug: vizly.fyi }
+      - { id: lst_b353697b1fc37fb8c828a699, slug: magictool.ai }
+      - { id: lst_367184ac70d03d1fa0acd414, slug: kanaries.net }
+      - { id: lst_7487a5e75daae5669a95c513, slug: gptexcel.uk }
+  # ubiai.tools: labeling text and documents to train AI models.
+  - action: listing-alternatives-set
+    id: lst_f365decc26150548db0f916e
+    slug: ubiai.tools
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_087e3773390273041528b726, slug: scale.com }
+  # vanna.ai: text-to-SQL agents that answer questions from company databases.
+  - action: listing-alternatives-set
+    id: lst_8047c25091b53b2404dc5ef8
+    slug: vanna.ai
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_59f7bfaf13d906bbced7ff55, slug: nlsql.com }
+      - { id: lst_d98c7c311d99f648f3086c7e, slug: blazesql.com }
+      - { id: lst_901b319f2fe22af7c9ca2af3, slug: veezoo.com }
+      - { id: lst_36888ee8f5819655c4fafcf2, slug: sqlai.ai }
+  # veezoo.com: business users asking their data questions in plain English.
+  - action: listing-alternatives-set
+    id: lst_901b319f2fe22af7c9ca2af3
+    slug: veezoo.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_d98c7c311d99f648f3086c7e, slug: blazesql.com }
+      - { id: lst_59f7bfaf13d906bbced7ff55, slug: nlsql.com }
+      - { id: lst_8047c25091b53b2404dc5ef8, slug: vanna.ai }
+      - { id: lst_36888ee8f5819655c4fafcf2, slug: sqlai.ai }
+  # vespa.ai: search and vector retrieval platforms for AI apps.
+  - action: listing-alternatives-set
+    id: lst_7bc6bf980a8e3f03ac59024d
+    slug: vespa.ai
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_7f37574909354dbef4ad771d, slug: weaviate.io }
+      - { id: lst_515c24aec70e8def091645b7, slug: pinecone.io }
+  # vizly.fyi: AI data analysts you chat with about your files.
+  - action: listing-alternatives-set
+    id: lst_a9a868f81f9ca7185b0a42c4
+    slug: vizly.fyi
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_b353697b1fc37fb8c828a699, slug: magictool.ai }
+      - { id: lst_14463cf060bcc3080c31bcf6, slug: tomat.ai }
+      - { id: lst_367184ac70d03d1fa0acd414, slug: kanaries.net }
+      - { id: lst_7487a5e75daae5669a95c513, slug: gptexcel.uk }
+      - { id: lst_d309a5dfaf62dd5ce60dd807, slug: columns.ai }
+  # weaviate.io: vector databases for AI apps.
+  - action: listing-alternatives-set
+    id: lst_7f37574909354dbef4ad771d
+    slug: weaviate.io
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_515c24aec70e8def091645b7, slug: pinecone.io }
+      - { id: lst_7bc6bf980a8e3f03ac59024d, slug: vespa.ai }
+      - { id: lst_d55dff1d612f30fcbec99e92, slug: supabase.com }
+  # weld.app: pipelines that move business data into a warehouse.
+  - action: listing-alternatives-set
+    id: lst_4ec24597a46f88a386aa732a
+    slug: weld.app
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_30f2bf51f5a46d6e02188de1, slug: informatica.com }
+  # xata.io: hosted Postgres and managed databases for developers.
+  - action: listing-alternatives-set
+    id: lst_315ed60646089aacc4011cd3
+    slug: xata.io
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_d55dff1d612f30fcbec99e92, slug: supabase.com }
+      - { id: lst_f7ad7a5bf7f9f4da863ff34c, slug: mongodb.com }
+  # zuora.com: subscription billing and revenue management.
+  - action: listing-alternatives-set
+    id: lst_bb7370710688ea402e9968e0
+    slug: zuora.com
+    reason: '#539: hand-picked alternatives (batch E)'
+    expected: []
+    alternatives:
+      - { id: lst_9077c08e86b6c36e167cb1b0, slug: chargebee.com }
+      - { id: lst_13df075e8b8ee5e41801daa2, slug: recurly.com }
+      - { id: lst_cdab88dff63eda52fb445aa4, slug: stripe.com }
+      - { id: lst_5e4b2b4d5e822fd4cf24d2f8, slug: metronome.com }
+      - { id: lst_c4cebfd6b9579da3a901a11d, slug: getlago.com }
+      - { id: lst_b90eb4eb86330f2335c341fd, slug: logisense.com }
