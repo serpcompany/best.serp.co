@@ -3,6 +3,7 @@ import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
+import { Item, ItemContent } from '@/components/ui/item'
 import {
   getFeaturedOnBadgeListingUrl,
   getFeaturedOnBadgePreviewPathFromKey,
@@ -126,7 +127,12 @@ export type WebsiteDetailAsideProps = {
   website: { slug: string; verifiedOwner?: true }
 }
 
-/** The panel beside the product page header (#273): the "Featured on" badge, then the claim. */
+const BADGE_EMBED_HEADING_ID = 'badge-embed-heading'
+
+/**
+ * The product page's maker block (#491): the "Featured on" badge, then the claim, under the
+ * listing's own content, so the header holds only the product. An `aside` named by its heading.
+ */
 export function WebsiteDetailAside({ claim, website }: WebsiteDetailAsideProps) {
   const listingUrl = getFeaturedOnBadgeListingUrl({
     listingBasePath: siteConfig.listingRouteBasePath,
@@ -137,21 +143,24 @@ export function WebsiteDetailAside({ claim, website }: WebsiteDetailAsideProps) 
   const badgeKeys = siteConfig.badges.featuredOn
 
   return (
-    <div className="flex flex-col gap-4">
-      <FeaturedOnBadgeEmbedPanel
-        badgePreviewUrls={{
-          dark: getFeaturedOnBadgePreviewPathFromKey(badgeKeys.dark),
-          light: getFeaturedOnBadgePreviewPathFromKey(badgeKeys.light)
-        }}
-        badgeUrls={{
-          dark: getFeaturedOnBadgePublicUrlFromKey(badgeKeys.dark, siteConfig.publicUrl),
-          light: getFeaturedOnBadgePublicUrlFromKey(badgeKeys.light, siteConfig.publicUrl)
-        }}
-        listingUrl={listingUrl}
-        siteId={siteConfig.id}
-        siteName={badgeKeys.displayName}
-      />
-      {claim && !website.verifiedOwner ? claim : null}
-    </div>
+    <Item variant="outline" render={<aside aria-labelledby={BADGE_EMBED_HEADING_ID} />}>
+      <ItemContent className="gap-3">
+        <FeaturedOnBadgeEmbedPanel
+          badgePreviewUrls={{
+            dark: getFeaturedOnBadgePreviewPathFromKey(badgeKeys.dark),
+            light: getFeaturedOnBadgePreviewPathFromKey(badgeKeys.light)
+          }}
+          badgeUrls={{
+            dark: getFeaturedOnBadgePublicUrlFromKey(badgeKeys.dark, siteConfig.publicUrl),
+            light: getFeaturedOnBadgePublicUrlFromKey(badgeKeys.light, siteConfig.publicUrl)
+          }}
+          headingId={BADGE_EMBED_HEADING_ID}
+          listingUrl={listingUrl}
+          siteId={siteConfig.id}
+          siteName={badgeKeys.displayName}
+        />
+        {claim && !website.verifiedOwner ? claim : null}
+      </ItemContent>
+    </Item>
   )
 }

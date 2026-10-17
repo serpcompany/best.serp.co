@@ -39,16 +39,15 @@ import { InputOTP, InputOTPGroup, InputOTPSeparator, InputOTPSlot } from '@/comp
 import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from '@/components/ui/item'
 import { Progress } from '@/components/ui/progress'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { Separator } from '@/components/ui/separator'
 import { buildFeaturedOnBadgeEmbedHtml } from '@/components/website/featured-on-badge-embed-panel'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { CONFIRM_AGAIN_HASH, tooLateForCheckout } from '@/lib/billing/checkout-window'
 
 /**
  * Claiming a listing (serpcompany/best.serp.co#67, #70 screens 8 and 9a): the "Claim this
- * listing" link in the product page's header panel (#273) opens a dialog (a drawer on mobile)
- * that walks through the method, the work email, its code, then the badge (or the payment, #68,
- * offered only while orders are on).
+ * listing" link beside the product page's badge, under its content (#491), opens a dialog (a
+ * drawer on mobile) that walks through the method, the work email, its code, then the badge (or
+ * the payment, #68, offered only while orders are on).
  * Every string is the approved #70 copy (`.archive/mockups/submissions/COPY.md`). The API decides
  * everything (`/api/claims`); this component only shows its answers.
  */
@@ -796,22 +795,20 @@ export function ClaimListing({ badge, copy, listing, priceCents }: ClaimListingP
     )
   }
 
+  // A small text link beside the listing's badge (#491).
   const trigger = (
-    <>
-      <Separator className="bg-border/50" />
-      <div className="flex flex-col gap-1">
-        <p className="text-sm text-muted-foreground">{`Work at ${name}?`}</p>
-        <Button
-          variant="link"
-          className="h-auto w-fit p-0 text-foreground"
-          onClick={openDialog}
-          data-testid="claim-listing"
-        >
-          <BadgeCheck />
-          Claim this listing
-        </Button>
-      </div>
-    </>
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+      <p className="text-sm text-muted-foreground">{`Work at ${name}?`}</p>
+      <Button
+        variant="link"
+        className="h-auto w-fit p-0 text-foreground"
+        onClick={openDialog}
+        data-testid="claim-listing"
+      >
+        <BadgeCheck />
+        Claim this listing
+      </Button>
+    </div>
   )
 
   if (isMobile) {

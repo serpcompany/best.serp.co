@@ -162,9 +162,6 @@ export function WebsiteDetailRoutePage({
             }}
           />
         }
-        aside={
-          <WebsiteDetailAside claim={claim} website={{ slug: project.slug, ...verifiedOwner }} />
-        }
       >
         <div className="flex flex-col gap-12">
           {/* The listing's own text, links and FAQs read in one column. */}
@@ -178,6 +175,9 @@ export function WebsiteDetailRoutePage({
             <WebsiteResourcesSection website={resourcesWebsite} />
 
             <WebsiteFaqsSection website={{ faqs: faqsToShow(project.faqs, project.content) }} />
+
+            {/* The badge and the claim, for the listing's makers, below its content (#491). */}
+            <WebsiteDetailAside claim={claim} website={{ slug: project.slug, ...verifiedOwner }} />
           </div>
 
           {featuredIn.length > 0 ? (

@@ -10,6 +10,8 @@ const FEATURED_ON_BADGE_HEIGHT = 50
 
 export type FeaturedOnBadgeEmbedPanelProps = {
   badgePreviewUrls?: Record<BadgeTheme, string>
+  /** Its heading's `id`, so the block around it can take the heading as its name. */
+  headingId?: string
   badgeUrls: Record<BadgeTheme, string>
   listingUrl: string
   siteId: string
@@ -45,6 +47,7 @@ export function buildFeaturedOnBadgeEmbedHtml({
 export function FeaturedOnBadgeEmbedPanel({
   badgePreviewUrls,
   badgeUrls,
+  headingId,
   listingUrl,
   siteId,
   siteName
@@ -59,40 +62,43 @@ export function FeaturedOnBadgeEmbedPanel({
   }
 
   return (
-    // The product page's header panel holds it (#273), so it brings no card of its own.
-    <div>
-      <h2 className="text-sm font-semibold text-foreground">
+    // The listing page's badge block holds it under the content (#491), so it brings no card.
+    <div className="flex flex-col gap-3">
+      <h2 id={headingId} className="text-sm font-semibold text-foreground">
         Add a badge to your website. Click the badge below to copy the code.
       </h2>
-      {(['light', 'dark'] as const).map(theme => {
-        const embedHtml = buildFeaturedOnBadgeEmbedHtml({
-          badgeUrl: badgeUrls[theme],
-          listingUrl,
-          siteName
-        })
+      <div className="flex flex-wrap items-center gap-2">
+        {(['light', 'dark'] as const).map(theme => {
+          const embedHtml = buildFeaturedOnBadgeEmbedHtml({
+            badgeUrl: badgeUrls[theme],
+            listingUrl,
+            siteName
+          })
 
-        return (
-          <Button
-            key={`${siteId}-${theme}`}
-            variant="ghost"
-            onClick={() => void handleCopy(theme, embedHtml)}
-            className="mt-4 flex h-auto max-w-full p-0"
-            aria-label={`Copy ${theme} badge embed code`}
-            title={`Copy ${theme} badge embed code`}
-          >
-            <img
-              src={previewUrls[theme]}
-              alt={`${theme === 'light' ? 'Light' : 'Dark'} Featured on ${siteName} badge`}
-              width={FEATURED_ON_BADGE_WIDTH}
-              height={FEATURED_ON_BADGE_HEIGHT}
-              className="h-auto max-w-full"
-            />
-          </Button>
-        )
-      })}
-      <p className="mt-2 min-h-4 text-xs text-muted-foreground" aria-live="polite">
-        {copiedTheme ? `Copied ${copiedTheme} badge` : null}
-      </p>
+          return (
+            <Button
+              key={`${siteId}-${theme}`}
+              variant="ghost"
+              onClick={() => void handleCopy(theme, embedHtml)}
+              className="h-auto p-0"
+              aria-label={`Copy ${theme} badge embed code`}
+              title={`Copy ${theme} badge embed code`}
+            >
+              {/* At a small size (#491); the copied code keeps the full 200 by 50. */}
+              <img
+                src={previewUrls[theme]}
+                alt={`${theme === 'light' ? 'Light' : 'Dark'} Featured on ${siteName} badge`}
+                width={FEATURED_ON_BADGE_WIDTH}
+                height={FEATURED_ON_BADGE_HEIGHT}
+                className="h-9 w-auto"
+              />
+            </Button>
+          )
+        })}
+        <p className="text-xs text-muted-foreground" aria-live="polite">
+          {copiedTheme ? `Copied ${copiedTheme} badge` : null}
+        </p>
+      </div>
     </div>
   )
 }
