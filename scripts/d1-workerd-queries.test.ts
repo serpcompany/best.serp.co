@@ -55,6 +55,24 @@ const NOW = new Date('2026-10-06T12:00:00.000Z')
  * but not for a lost index or a full scan of a larger table.
  */
 const ROWS_READ_BUDGET: Record<CatalogQueryShape, number> = {
+  // A listing page's alternatives after its hand picks (#519), which replaced its related
+  // listings and dropped previous and next. Each shape also reads the hand picks (to leave them
+  // out), the best pages that pin the listing, and its hub; each step reads six, and only the last
+  // leaves out what an earlier one took.
+  // Untagged, filled through a small hub's members (`RELATED_MEMBER_SCAN_LIMIT`): 577 for the
+  // sparse-hub test (a hub of 133 memberships with 3 public members, read twice: once to count,
+  // once to rank; 570 for the related listings, #378), 186 at worst on the generated catalog.
+  'alternatives-hub-members': 700,
+  // Untagged, filled by walking the public name index: 484, on the widest listing's hub (461 on
+  // `longestWalk`), about 260 of them the hub-size probe. The related listings' four read 377;
+  // six walk further.
+  'alternatives-hub-seek': 600,
+  // Untagged, with hand picks enough for six: no fill, no probe. 44.
+  'alternatives-no-fill': 100,
+  // Scored on a listing's three most central tags (#362 review), whatever its fill: 3,151 (the
+  // related listings read 2,462 for the 335-listing tag and two more, #378). Since #519 each
+  // candidate is grouped and checked against the hub before its row is read.
+  'alternatives-shared-tags': 4_000,
   // 60 pages; the tag-only pools come from the tag stats, so only pools with a category are read
   'best-index': 6_000, // 4,353, cached per epoch
   'best-page-items': 2_500, // the 335-listing tag, 25 entries with their tags (#346): 2,002
@@ -62,39 +80,13 @@ const ROWS_READ_BUDGET: Record<CatalogQueryShape, number> = {
   'legacy-root-target': 10, // a retired category URL, its target, and whether it renders (#346): 8
   'featured-summaries': 2_500, // 100 featured: 1,887 (walks the publication index)
   'latest-summaries': 1_500, // 100 latest: 829
-  // the most FAQs, links and images, its tags and its best pages' pins and exclusions (#347): 45
+  // the most FAQs, links and images, its tags, its best pages' pins and exclusions (#347) and its
+  // hand picks (#519): 49
   'listing-detail': 100,
   'listing-name-order': 12_000, // `other`: 8,854 (3 rows per member)
   'listing-name-page-items': 1_200, // 100 ids: ~900
-  // 12 at worst, at every boundary: 5 before #378 found the listing by its slug in the statement
-  // (3,425 on the oldest before #314)
-  'navigation-next': 20,
-  'navigation-previous': 20, // 12
   'publication-version': 5, // 2 index seeks
   'published-summaries': 35_000, // 28,203, cached per epoch for sitemaps and the feed
-  // Measured on listings without tags (a tagged listing ranks by its tags): 2,293 (2,250 before
-  // #378's slug lookup and ranking choice in the statement) and 78; 2,401 and 104 on the worst
-  // listings before they had tags (#345).
-  'related-shared-categories': 3_000, // worst untagged listing: 2,293
-  // Scored on a listing's three most central tags (#362 review): the 335-listing tag and two
-  // more, 2,462 (2,442 before #378's slug lookup; 2,757 on all nine of one listing's tags before
-  // the cap). Filling from the hub, before #378: 196 when it walks the name index, 119 through a
-  // small hub's members.
-  'related-shared-tags': 3_000,
-  // Onward from the listing's own name, wrapping round to the start (#331). Since #378 the
-  // statement picks its plan itself, instead of reading the shell statistics first, so a listing
-  // page's reads are one batch: a probe counts the hub's public members (as the shell statistics
-  // do) up to 129, each a category index entry and its listing row.
-  // - Members: 161 at worst on the generated catalog (77 before #378, 78 from the start before
-  //   #331), and 570 for a hub of 133 memberships with 3 public members (the sparse-hub test),
-  //   which reads its memberships twice, once to count and once to rank; counting memberships
-  //   instead sent that hub to the walk, 3,595 rows. So the budget rose from 500 to 700 (#378).
-  // - Seek: 377 on its longest walk (`longestWalk`, 62 name-index entries at the widest gap
-  //   between a large category's names; 84 before #378, 79 from the start before #331), of which
-  //   about 260 are the probe, so its budget rose from 200 to 400 (#378). Materializing the
-  //   members to count them once would read 320 for the sparse hub but 895 here, the common case.
-  'related-single-category-members': 700,
-  'related-single-category-seek': 400,
   // worst: a term in the catch-all's name (`other`, `the`): 10,826; 15,520 before #345's
   // uncorrelated category and tag subqueries. The widest searches have their own budget below.
   'search-summaries': 17_000,
@@ -225,32 +217,6 @@ const longestWalk = first(
     .sort((left, right) => right.walk - left.walk),
   'listing the seek reaches'
 )
-/** Public listings in publication order (`PUBLICATION_ORDER` in `catalog.ts`): newest first. */
-const publicationOrder = [...live].sort(
-  (left, right) =>
-    binary(right.publishedAt as string, left.publishedAt as string) ||
-    left.displayOrder - right.displayOrder ||
-    binary(left.slug, right.slug)
-)
-const bulkStart = publicationOrder.findIndex(
-  listing => listing.publishedAt === publicationOrder.at(-1)?.publishedAt
-)
-/**
- * Navigation at every kind of boundary: the newest listing (no previous), listings published
- * after the bulk import (each its own date: the next one is on another date), the last of them
- * (next crosses into the bulk import), the first and a middle bulk listing (same date, next
- * display order), and the oldest (no next).
- */
-const navigationStops = [
-  0,
-  1,
-  Math.floor(bulkStart / 2),
-  bulkStart - 2,
-  bulkStart - 1,
-  bulkStart,
-  Math.floor((bulkStart + publicationOrder.length) / 2),
-  publicationOrder.length - 1
-].map(index => ({ index, listing: publicationOrder[index] as ScaleListing }))
 /** The listing with the most FAQs, resource links and images: the largest detail statement. */
 const richness = new Map<string, number>()
 for (const { listingId } of [...scale.faqs, ...scale.resources, ...scale.media]) {
@@ -314,14 +280,31 @@ const widestTagged = first(
     .sort((left, right) => scoredMembers(right) - scoredMembers(left)),
   'tagged listing'
 )
+/** Each listing's hand picks (#519), by position, and the best pages that pin it. */
+const listingById = new Map(scale.listings.map(listing => [listing.id, listing]))
+const picksOf = new Map<string, ScaleListing[]>()
+for (const pick of [...scale.alternatives].sort((left, right) => left.position - right.position)) {
+  picksOf.set(pick.listingId, [
+    ...(picksOf.get(pick.listingId) ?? []),
+    listingById.get(pick.alternativeId) as ScaleListing
+  ])
+}
+const pinnedOn = new Map<string, Set<number>>()
+for (const entry of scale.bestPageEntries) {
+  if (entry.position === null) continue
+  pinnedOn.set(entry.listingId, (pinnedOn.get(entry.listingId) ?? new Set()).add(entry.bestPageId))
+}
 /**
- * A tagged listing's related listings by the contract (#341 design 3.2, #362): the public
- * listings sharing its scored tags, by how many they share, then the names after its own first
- * (binary name and slug order), then from the start; fewer than four are filled from its hub (its
- * primary category) in the same name order.
+ * A listing's alternatives by the contract (#519, after #341 design 3.2 and #362): its public hand
+ * picks by position; then the public listings filed under its hub (its primary category) that
+ * share its scored tags (3 points each) or a best page's pins with it (2 points), by score, then
+ * the names after its own first (binary name and slug order), then from the start; then the rest
+ * of its hub in the same name order. Never itself or twice, and six at most.
  */
-function expectedRelatedByTags(listing: ScaleListing): string[] {
+function expectedAlternatives(listing: ScaleListing): string[] {
+  const picks = (picksOf.get(listing.id) ?? []).filter(other => isLive.has(other)).slice(0, 6)
   const scored = new Set(scoredTags(listing))
+  const pages = pinnedOn.get(listing.id) ?? new Set<number>()
   const after = (other: ScaleListing) =>
     binary(other.name, listing.name) > 0 ||
     (other.name === listing.name && binary(other.slug, listing.slug) > 0)
@@ -329,23 +312,21 @@ function expectedRelatedByTags(listing: ScaleListing): string[] {
     Number(!after(left)) - Number(!after(right)) ||
     binary(left.name, right.name) ||
     binary(left.slug, right.slug)
-  const score = (other: ScaleListing) => other.tags.filter(slug => scored.has(slug)).length
-  const tagged = live
-    .filter(other => other.id !== listing.id && score(other) > 0)
+  const score = (other: ScaleListing) =>
+    3 * other.tags.filter(slug => scored.has(slug)).length +
+    ([...(pinnedOn.get(other.id) ?? [])].some(page => pages.has(page)) ? 2 : 0)
+  const hub = listing.categories[0] as string
+  const inHub = live.filter(
+    other => other.id !== listing.id && !picks.includes(other) && other.categories.includes(hub)
+  )
+  const similar = inHub
+    .filter(other => score(other) > 0)
     .sort((left, right) => score(right) - score(left) || byKeyset(left, right))
-    .slice(0, 4)
-  const hub = listing.categories[0]
-  const fill = live
-    .filter(
-      other =>
-        other.id !== listing.id &&
-        !tagged.includes(other) &&
-        other.categories.includes(hub as string)
-    )
-    .sort(byKeyset)
-  return [...tagged, ...fill].slice(0, 4).map(other => other.slug)
+    .slice(0, 6 - picks.length)
+  const fill = inHub.filter(other => !similar.includes(other)).sort(byKeyset)
+  return [...picks, ...similar, ...fill].slice(0, 6).map(other => other.slug)
 }
-/** Tagged listings whose scored tags yield fewer than four: their hubs fill the rest (#362). */
+/** Tagged listings whose scored tags yield fewer than six: their hubs fill the rest (#362). */
 const thinTagged = live.filter(
   listing =>
     activeTags(listing).length > 0 &&
@@ -353,7 +334,7 @@ const thinTagged = live.filter(
       live.filter(
         other => other !== listing && other.tags.some(slug => scoredTags(listing).includes(slug))
       )
-    ).size < 4
+    ).size < 6
 )
 /**
  * One whose hub walks the name index (more than 128 memberships). The catalog has no thin listing
@@ -622,7 +603,7 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
     ]) {
       await ops.getListingNamePage(query)
     }
-    // The detail shapes: several categories (worst related scan), one dense, one sparse and one
+    // The detail shapes: several categories (the widest hub), one dense, one sparse and one
     // small category, the seek's longest walk, the most FAQs, links and images, an unpublished
     // listing, and a slug that does not exist.
     for (const slug of [
@@ -648,17 +629,16 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
         validate: (value): value is string => typeof value === 'string'
       })
     ).toBe(widest.slug)
-    // Previous and next are the neighbours in publication order, across every boundary.
-    for (const { index, listing } of navigationStops) {
+    // Every listing with hand picks (#519), by the contract: the public picks first, at most six.
+    for (const slug of new Set(scale.alternatives.map(pick => pick.listingId))) {
+      const listing = listingById.get(slug) as ScaleListing
+      if (!isLive.has(listing)) continue
       // A fresh operations object, so no detail read earlier in this test is reused.
       const detail = await catalog().getListingBySlug(listing.slug)
       expect(
-        [detail?.previousWebsite?.slug ?? null, detail?.nextWebsite?.slug ?? null],
-        `${index}: ${listing.slug}`
-      ).toEqual([
-        publicationOrder[index - 1]?.slug ?? null,
-        publicationOrder[index + 1]?.slug ?? null
-      ])
+        detail?.relatedWebsites.map(item => item.slug),
+        listing.slug
+      ).toEqual(expectedAlternatives(listing))
     }
     expect(await ops.getListingBySlug(unpublished.slug)).toBeNull()
     expect(await ops.getUnpublishedListing(widest.slug)).toBeNull()
@@ -927,8 +907,8 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
       )
     }
     expect(await ops.getTaxonomyRedirect('category', 'x'.repeat(300))).toBeNull()
-    // The detail with the widest related-by-tags scan, one whose tags yield fewer than four (its
-    // large hub fills the rest), and every 40th tagged listing, by the contract.
+    // The detail with the widest scan by tags, one whose tags yield fewer than six (its large hub
+    // fills the rest), and every 40th tagged listing, by the contract (#519).
     const detail = await ops.getListingBySlug(widestTagged.slug)
     expect(detail?.tags?.map(tag => tag.slug)).toEqual(activeTags(widestTagged))
     const tagged = live.filter(listing => activeTags(listing).length > 0)
@@ -941,7 +921,7 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
       expect(
         related?.map(item => item.slug),
         listing.slug
-      ).toEqual(expectedRelatedByTags(listing))
+      ).toEqual(expectedAlternatives(listing))
     }
     // A small hub (at most 128 memberships) fills through its members: tag the small category's
     // listing with a tag no other listing has, then put the catalog back.
@@ -962,7 +942,7 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
       const solo = await catalog().getListingBySlug(small.listing.slug)
       expect(solo?.tags).toEqual([{ name: 'Workerd Solo', slug: 'workerd-solo' }])
       expect(solo?.relatedWebsites.map(item => item.slug)).toEqual(
-        expectedRelatedByTags({ ...small.listing, tags: [] })
+        expectedAlternatives({ ...small.listing, tags: [] })
       )
     } finally {
       await db.batch([
@@ -973,8 +953,9 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
       ])
     }
     // An untagged listing in one category (#331, design 3.2) takes the members after its own
-    // name, then from the start: the hub fill's contract with no tags. The catch-all's and the
-    // sparse category's last names wrap; every 25th such listing checks the rest.
+    // name, then from the start, after any hand picks and best-page neighbours (#519). The
+    // catch-all's and the sparse category's last names wrap; every 25th such listing checks the
+    // rest.
     const singleUntagged = untagged.filter(listing => listing.categories.length === 1)
     const lastIn = (slug: string) =>
       first(
@@ -996,7 +977,43 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
       expect(
         related?.map(item => item.slug),
         listing.slug
-      ).toEqual(expectedRelatedByTags(listing))
+      ).toEqual(expectedAlternatives(listing))
+    }
+    // Six public hand picks leave no gap: no probe, no fill. Pick for the small category's
+    // untagged listing, then put the catalog back.
+    const sixPicks = live.filter(other => other !== small.listing).slice(0, 6)
+    expect(picksOf.has(small.listing.id)).toBe(false)
+    await db.batch(
+      sixPicks.map((other, index) =>
+        db
+          .prepare(
+            'INSERT INTO listing_alternatives (listing_id, alternative_id, position) VALUES (?, ?, ?)'
+          )
+          .bind(small.listing.id, other.id, index + 1)
+      )
+    )
+    try {
+      const seen: CatalogQueryEvent[] = []
+      const picked = await createCatalogOperations({
+        cache: noCatalogDataCache,
+        client: createDatabase(checked(db)),
+        clock: () => NOW,
+        observe: event => {
+          events.push(event)
+          if (event.event === 'd1_query') seen.push(event)
+        }
+      }).getListingBySlug(small.listing.slug)
+      expect(picked?.relatedWebsites.map(item => item.slug)).toEqual(
+        sixPicks.map(other => other.slug)
+      )
+      expect(seen.map(event => [event.queryShape, event.resultRows])).toContainEqual([
+        'alternatives-no-fill',
+        0
+      ])
+    } finally {
+      await db.batch([
+        db.prepare('DELETE FROM listing_alternatives WHERE listing_id = ?').bind(small.listing.id)
+      ])
     }
   }, 120_000)
 
@@ -1006,7 +1023,12 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
     // `RELATED_MEMBER_SCAN_LIMIT` memberships, three public members. Counted by memberships, the
     // hub would take the walk of the public name index, which visits most of it to find two
     // members; counted by public members, as the shell statistics count them, it reads its members.
-    const lonely = untagged.filter(listing => listing.categories.length === 1).slice(0, 3)
+    const lonely = untagged
+      .filter(
+        listing =>
+          listing.categories.length === 1 && !picksOf.has(listing.id) && !pinnedOn.has(listing.id)
+      )
+      .slice(0, 3)
     const hidden = scale.listings.filter(listing => !isLive.has(listing)).slice(0, 130)
     expect(lonely).toHaveLength(3)
     expect(hidden).toHaveLength(130)
@@ -1050,7 +1072,7 @@ describe('every query on Wrangler-local D1 with a catalog at production scale (#
           detail?.relatedWebsites.map(item => item.slug),
           listing.slug
         ).toEqual([...byName.slice(index + 1), ...byName.slice(0, index)].map(other => other.slug))
-        const related = seen.find(event => event.queryShape === 'related-single-category-members')
+        const related = seen.find(event => event.queryShape === 'alternatives-hub-members')
         expect(related, listing.slug).toBeDefined()
         sparseRows.push(related?.rowsRead ?? null)
       }

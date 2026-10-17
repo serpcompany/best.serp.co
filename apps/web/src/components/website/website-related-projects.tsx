@@ -7,6 +7,10 @@ export type WebsiteRelatedProjectsProps = {
   websites: WebsiteRelatedCardMetadata[]
 }
 
+/**
+ * A listing page's Alternatives section (#519), in the look "Related Entries" had: every
+ * alternative the catalog read returns (at most six), its hand picks first, then similar listings.
+ */
 export function WebsiteRelatedProjects({ websites }: WebsiteRelatedProjectsProps) {
   if (websites.length === 0) {
     return null
@@ -14,12 +18,12 @@ export function WebsiteRelatedProjects({ websites }: WebsiteRelatedProjectsProps
 
   return (
     <Section
-      title="Related Entries"
+      title="Alternatives"
       viewAllHref={getCanonicalListingListRoute()}
       viewAllText="Browse the directory"
-      titleId="related-projects"
+      titleId="alternatives"
     >
-      <LLMGrid items={websites.slice(0, 3)} analyticsSource="related-projects" />
+      <LLMGrid items={websites} analyticsSource="related-projects" />
     </Section>
   )
 }

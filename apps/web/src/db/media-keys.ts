@@ -184,21 +184,16 @@ export function resolveListingMedia<T extends WithMedia>(listing: T, mediaBaseUr
 }
 
 interface WithLinkedListings extends WithMedia {
-  nextWebsite: WithMedia | null
-  previousWebsite: WithMedia | null
   relatedWebsites: WithMedia[]
 }
 
-/** A listing detail with its own, its neighbors', and its related listings' media resolved. */
+/** A listing detail with its own and its alternatives' media resolved. */
 export function resolveListingDetailMedia<T extends WithLinkedListings>(
   detail: T,
   mediaBaseUrl: string
 ): T {
   return {
     ...resolveListingMedia(detail, mediaBaseUrl),
-    nextWebsite: detail.nextWebsite && resolveListingMedia(detail.nextWebsite, mediaBaseUrl),
-    previousWebsite:
-      detail.previousWebsite && resolveListingMedia(detail.previousWebsite, mediaBaseUrl),
     relatedWebsites: detail.relatedWebsites.map(related =>
       resolveListingMedia(related, mediaBaseUrl)
     )

@@ -12,7 +12,7 @@ test.use({
 /**
  * A listing image never renders as a broken image (serpcompany/best.serp.co#122): every image
  * request but the #86 tile answers 404 here, and every listing image (cards, the detail page's
- * logo and featured image, the previous and next links) must end as the tile, loaded, with no
+ * logo and featured image, the Alternatives cards) must end as the tile, loaded, with no
  * alt text or broken-image icon on screen.
  */
 const tilePath = '/listing-logos/favicon-fallback-512x512.png'

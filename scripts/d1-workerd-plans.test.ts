@@ -1898,6 +1898,79 @@ operations:
     )
     expect(await live()).toEqual(describedState)
 
+    // #519: hand-picked alternatives, compared and swapped on every pick, each a live listing.
+    await seed('lst_picked_workerd', 'picked.example')
+    const picksManifest = (id: string, alternatives: string) => `version: 1
+id: ${id}
+concurrency: rows
+provenance:
+  actor: test
+  workflow: test/workerd
+operations:
+  - action: listing-alternatives-set
+    id: lst_moved_workerd
+    slug: moved.example
+    reason: hand-picked
+    expected: []
+    alternatives: ${alternatives}
+`
+    const unpicked = await live()
+    const picked = picksManifest(
+      'workerd-alternatives-moved.example',
+      '[{ id: lst_picked_workerd, slug: picked.example }]'
+    )
+    await executePublicationPlan(
+      db,
+      buildPublicationPlan(parseManifest(picked), picked, NOW, unpicked)
+    )
+    expect(
+      (
+        await db
+          .prepare(
+            "SELECT alternative_id, position FROM listing_alternatives WHERE listing_id = 'lst_moved_workerd'"
+          )
+          .all()
+      ).results
+    ).toEqual([{ alternative_id: 'lst_picked_workerd', position: 1 }])
+    const pickedState = await live()
+    expect(pickedState.version).toBe(unpicked.version + 1)
+    const pickTwice = picksManifest(
+      'workerd-alternatives-again',
+      '[{ id: lst_picked_workerd, slug: picked.example }]'
+    )
+    await expect(
+      executePublicationPlan(
+        db,
+        buildPublicationPlan(parseManifest(pickTwice), pickTwice, NOW, pickedState)
+      )
+    ).rejects.toThrow(
+      /bad JSON path: 'listing-alternatives-set moved\.example: the listing is not approved, or its slug or alternatives changed since the manifest'/u
+    )
+    // parked.example was unpublished above: never a pick.
+    const pickParked = `version: 1
+id: workerd-alternatives-parked
+concurrency: rows
+provenance:
+  actor: test
+  workflow: test/workerd
+operations:
+  - action: listing-alternatives-set
+    id: lst_moved_workerd
+    slug: moved.example
+    reason: hand-picked
+    expected: [{ id: lst_picked_workerd, slug: picked.example }]
+    alternatives: [{ id: lst_unpublish_workerd, slug: parked.example }]
+`
+    await expect(
+      executePublicationPlan(
+        db,
+        buildPublicationPlan(parseManifest(pickParked), pickParked, NOW, pickedState)
+      )
+    ).rejects.toThrow(
+      /bad JSON path: 'listing-alternatives-set moved\.example: the alternative parked\.example is not this live listing'/u
+    )
+    expect(await live()).toEqual(pickedState)
+
     // A listing whose website moved: the guard's malformed JSON rolls the whole batch back.
     const after = await live()
     const stale = manifest('lst_moved_workerd', 'moved.example', 'https://elsewhere.example/')

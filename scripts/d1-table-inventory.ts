@@ -96,6 +96,7 @@ export const applicationColumnInventory = {
   ],
   listing_resource_links: ['id', 'listing_id', 'label', 'url', 'sort_order'],
   listing_faqs: ['id', 'listing_id', 'question', 'answer', 'sort_order'],
+  listing_alternatives: ['listing_id', 'alternative_id', 'position'],
   publication_state: ['id', 'version', 'manifest_id', 'checksum', 'published_at'],
   migration_runs: [
     'id',
@@ -404,6 +405,7 @@ export const importOrder: ApplicationTableName[] = [
   'listing_media',
   'listing_resource_links',
   'listing_faqs',
+  'listing_alternatives',
   'publication_state',
   'migration_runs',
   'publication_runs',

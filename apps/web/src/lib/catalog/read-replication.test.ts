@@ -138,7 +138,7 @@ describe('D1 read replication (#382)', () => {
       expect(await nearReplica('/products/charlie/')).toEqual({ state: 'MISS', text: RENAMED })
     })
     expect(db.sessions).toEqual(['first-primary', '00000002'])
-    expect(served).toEqual(['primary', 'replica', 'replica', 'replica', 'replica'])
+    expect(served).toEqual(['primary', 'replica', 'replica'])
     expect(db.waits).toBe(1)
     expect(cachedDetailNames('charlie')).toEqual({ '2': RENAMED })
 
@@ -198,12 +198,12 @@ describe('D1 read replication (#382)', () => {
       expect(await nearReplica('/products/charlie/')).toEqual({ state: 'MISS', text: RENAMED })
     })
     // The epoch read on the primary, then the listing's one batch (#378) on the replica.
-    expect(served).toEqual(['primary', 'replica', 'replica', 'replica', 'replica'])
+    expect(served).toEqual(['primary', 'replica', 'replica'])
     expect(db.waits).toBe(0)
     expect(db.primary.roundTrips).toEqual([
       { kind: 'statement', sql: expect.stringContaining('publication_state') }
     ])
-    expect(db.replica.roundTrips).toEqual([{ kind: 'batch', size: 4 }])
+    expect(db.replica.roundTrips).toEqual([{ kind: 'batch', size: 2 }])
     expect(cachedDetailNames('charlie')).toEqual({ '2': RENAMED })
   })
 
@@ -283,7 +283,7 @@ describe('D1 read replication (#382)', () => {
     })
     expect(db.primary.roundTrips).toEqual([
       { kind: 'statement', sql: expect.stringContaining('publication_state') },
-      { kind: 'batch', size: 4 }
+      { kind: 'batch', size: 2 }
     ])
     expect(db.replica.roundTrips).toEqual([])
     expect(await withoutReplication('/products/charlie/')).toEqual({

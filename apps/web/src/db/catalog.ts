@@ -28,7 +28,6 @@ import type {
   ListingLinkRel,
   ListingNamePage,
   ListingNamePageQuery,
-  ListingNavigation,
   ListingResourceLink,
   ListingSummary,
   ListingTag,
@@ -41,10 +40,12 @@ import type {
   UnpublishedListing
 } from './contracts'
 import { latestInstant } from './instants'
-import { listingSlugRedirects, listings } from './schema'
+import { LISTING_ALTERNATIVES_SHOWN, listingSlugRedirects, listings } from './schema'
 
 /**
- * v9: listing details carry `bestPageMarks`, and an untagged listing in one category takes its
+ * v10: listing details carry no `previousWebsite` or `nextWebsite`, and `relatedWebsites` are the
+ * Alternatives section's: hand picks, then similar listings, up to six (#519); v9: listing details
+ * carry `bestPageMarks`, and an untagged listing in one category takes its
  * related listings onward from its own name (#347, #331); v8: listing details carry `tags`, name
  * pages `tag`, and name-order and name-page keys name their scope (`*`, `c:<category>`,
  * `t:<tag>`), so a tag and a category with one slug never share an entry (#345); v7: listing
@@ -52,7 +53,7 @@ import { listingSlugRedirects, listings } from './schema'
  * carry `faqs` (#105); v5: a hosted logo or image is its media key (#95), which the web adapter
  * turns into a URL on the environment's media host; v4 added `linkRel` and `verifiedOwner` (#62).
  */
-const CACHE_SCHEMA = 'v9'
+const CACHE_SCHEMA = 'v10'
 /**
  * Keys include the catalog epoch (publication version plus the latest public
  * `published_at`), so an entry can never outlive the content it was built from; the TTL
@@ -90,21 +91,28 @@ async function sha256Hex(value: string): Promise<string> {
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
 }
 /**
- * A hub's related candidates (an untagged listing in one category, or a tagged listing whose tags
- * yield fewer than four) are read from its members when it has at most this many public members,
- * the count the shell statistics give; larger (dense) hubs walk the name index instead, which
- * finds four members after a handful of rows. Both plans return the same rows; this only picks the
- * cheaper one (see `relatedStatement`). Counting public members, not memberships, keeps a hub with
+ * A hub's fill for a listing's alternatives (when its hand picks and similar listings leave a gap)
+ * is read from its members when it has at most this many public members, the count the shell
+ * statistics give; larger (dense) hubs walk the name index instead, which finds the members it
+ * needs after a handful of rows. Both plans return the same rows; this only picks the cheaper one
+ * (see `alternativesStatement`). Counting public members, not memberships, keeps a hub with
  * many unpublished or draft memberships but few public members off the walk, which would visit
  * most of the name index to find them (#378 review).
  */
 const RELATED_MEMBER_SCAN_LIMIT = 128
 /**
- * How many of a tagged listing's active tags score its related listings: the most central
+ * How many of a tagged listing's active tags score its alternatives: the most central
  * (`listing_tags.sort_order`, then slug, the order its page lists them in), so the statement reads
  * the members of at most this many tags however many the listing has (#362 review).
  */
 const RELATED_SCORED_TAGS = 3
+/**
+ * What a similar listing scores toward a listing's alternatives (#519, the scout's mix): this
+ * much for each scored tag it shares, and `ALTERNATIVE_BEST_PAGE_POINTS` once for being pinned
+ * on an active best page that pins the listing too.
+ */
+const ALTERNATIVE_TAG_POINTS = 3
+const ALTERNATIVE_BEST_PAGE_POINTS = 2
 /**
  * How many of a best-page entry's active tags it carries for its chips (#341, design 5.1): the
  * most central, so hydrating an entry reads at most this many tags however many it has.
@@ -143,6 +151,7 @@ interface SummaryRow {
 }
 
 interface DetailRow extends SummaryRow {
+  alternative_picks: string
   best_page_marks: string
   content: string | null
   entity_type: string | null
@@ -198,18 +207,11 @@ interface UnpublishedRow {
   slug: string
 }
 
-interface NavigationRow {
-  logo: string | null
-  name: string
-  slug: string
-  website: string
-}
-
 /**
- * A row of `relatedStatement`: the ranking and the fill's plan, then a related listing, whose
- * columns are null on the one row of a listing with nothing related.
+ * A row of `alternativesStatement`: the ranking and the fill's plan, then an alternative, whose
+ * columns are null on the one row of a listing with none.
  */
-interface RelatedRow {
+interface AlternativeRow {
   description: string | null
   fill_plan: string | null
   id: string | null
@@ -384,16 +386,6 @@ function mapSummary(row: SummaryRow): ListingSummary {
   }
 }
 
-function mapNavigation(row: NavigationRow | undefined): ListingNavigation | null {
-  if (!row) return null
-  return {
-    media: row.logo ? { logo: requireString(row.logo, 'navigation logo') } : undefined,
-    name: requireString(row.name, 'navigation name'),
-    slug: requireString(row.slug, 'navigation slug'),
-    website: requireString(row.website, 'navigation website')
-  }
-}
-
 function mapListingTags(value: string): ListingTag[] {
   return parseJsonArray(value, 'listing tags').map((tag, index) => {
     if (!tag || typeof tag !== 'object') throw new Error(`Invalid D1 tag ${index + 1}.`)
@@ -420,9 +412,7 @@ function mapBestPageMarks(value: string): ListingBestPageMark[] {
   })
 }
 
-function mapDetail(
-  row: DetailRow
-): Omit<ListingDetail, 'nextWebsite' | 'previousWebsite' | 'relatedWebsites'> {
+function mapDetail(row: DetailRow): Omit<ListingDetail, 'relatedWebsites'> {
   const summary = mapSummary(row)
   const imageValues = parseJsonArray(row.images, 'listing images')
   const resourceValues = parseJsonArray(row.resource_links, 'listing resource links')
@@ -551,20 +541,6 @@ function isListingSummary(value: unknown): value is ListingSummary {
   )
 }
 
-function isNavigation(value: unknown): value is ListingNavigation {
-  if (!value || typeof value !== 'object') return false
-  const candidate = value as Partial<ListingNavigation>
-  return (
-    isLogoMedia(candidate.media) &&
-    typeof candidate.name === 'string' &&
-    candidate.name.length > 0 &&
-    typeof candidate.slug === 'string' &&
-    candidate.slug.length > 0 &&
-    typeof candidate.website === 'string' &&
-    candidate.website.length > 0
-  )
-}
-
 function isRelatedListing(value: unknown): value is RelatedListing {
   if (!value || typeof value !== 'object') return false
   const candidate = value as Partial<RelatedListing>
@@ -603,8 +579,6 @@ function isListingDetail(value: unknown): value is ListingDetail {
     runtimeLinkRels.has(candidate.linkRel) &&
     (candidate.verifiedOwner === undefined || candidate.verifiedOwner === true) &&
     isDetailMedia(candidate.media) &&
-    (candidate.nextWebsite === null || isNavigation(candidate.nextWebsite)) &&
-    (candidate.previousWebsite === null || isNavigation(candidate.previousWebsite)) &&
     (candidate.priority === undefined || runtimePriorities.has(candidate.priority)) &&
     (candidate.faqs === undefined ||
       (Array.isArray(candidate.faqs) &&
@@ -891,7 +865,11 @@ const CURRENT_LISTING = `current_listing AS MATERIALIZED (
     LIMIT 1
   )`
 
-/** The listing's detail row: its summary, body, media, links, FAQs, tags and best-page marks. */
+/**
+ * The listing's detail row: its summary, body, media, links, FAQs, tags, best-page marks, and its
+ * public hand-picked alternatives with their logos (`publicPicks`, #519), which lead its
+ * Alternatives section.
+ */
 function detailStatement(slug: string, asOf: string): CompiledQuery {
   return numberedQuery(
     `SELECT
@@ -950,7 +928,21 @@ function detailStatement(slug: string, asOf: string): CompiledQuery {
             WHERE e.listing_id = l.id AND b.is_active = 1
             ORDER BY b.slug ASC
           ) ordered
-        ), '[]') AS best_page_marks
+        ), '[]') AS best_page_marks,
+        COALESCE((
+          SELECT json_group_array(json_object(
+            'slug', ordered.slug, 'name', ordered.name, 'description', ordered.description,
+            'website', ordered.website, 'isUnofficial', ordered.is_unofficial, 'logo', ordered.logo
+          ))
+          FROM (
+            SELECT alt.slug, alt.name, alt.description, alt.website, alt.is_unofficial, (
+              SELECT COALESCE(m.media_key, m.url) FROM listing_media m
+              WHERE m.listing_id = alt.id AND m.kind = 'logo'
+              ORDER BY m.sort_order ASC LIMIT 1
+            ) AS logo
+            ${publicPicks('l.id', 'alt')}
+          ) ordered
+        ), '[]') AS alternative_picks
       FROM listings l
       WHERE ${eligibleAt()} AND l.slug = ${SLUG}
       LIMIT 1`,
@@ -959,37 +951,66 @@ function detailStatement(slug: string, asOf: string): CompiledQuery {
 }
 
 /**
- * Up to four related listings, in one statement that picks its ranking from the listing the slug
- * names (#378: it needs neither the detail row nor the shell statistics first), with each related
- * logo resolved only for the returned rows.
- *
- * - Tags (#341, design 3.2, #362 review): ranked by how many of the listing's
- *   `RELATED_SCORED_TAGS` most central active tags they share (bounded by the size of those tags).
- *   Ties break on a keyset from the listing's own name and slug: the listings after it in name
- *   order first, wrapping round to the start, so listings that share the same tags link onward to
- *   different neighbours instead of all linking to the first names (#331).
- * - No tags, several categories: ranked by shared categories (most first), counted from the
- *   listing's own categories (bounded by the size of those categories), then name and slug.
- * - No tags, one category, and a tagged listing whose tags yield fewer than four: its hub (primary
- *   category) fills the rest with score 0 and the same keyset (design 3.2, #331), so two listings
- *   in one large category link onward to different neighbours. `fill.plan`
- *   picks how: through the hub's members when it has at most `RELATED_MEMBER_SCAN_LIMIT` public
- *   members (a probe that stops at one more), else by walking the public name index from the
- *   listing's own name, where a dense category yields four members almost immediately, then from
- *   the start only for as many as that walk lacked. Both plans return the same rows; the probe
- *   only picks the cheaper one.
- *
- * The branches that don't apply have `LIMIT 0`, which SQLite checks before reading a row. The
- * first row always carries the ranking (`kind`) and the fill's plan (`fill_plan`), which name the
- * statement's query shape; when nothing is related, it is the only row and its listing columns are
- * null.
+ * A listing's public hand picks (`listing_alternatives`, #519), by position, at most
+ * `LISTING_ALTERNATIVES_SHOWN`: the rows (each listing aliased `alias`) the detail statement
+ * hydrates for its Alternatives section and the alternatives statement leaves out, so both read
+ * the same picks. `listingId` is the listing's id in the outer query. An unpublished pick keeps its
+ * row and drops out until it is public again.
  */
-function relatedStatement(slug: string, asOf: string): CompiledQuery {
+function publicPicks(listingId: string, alias = 'l'): string {
+  return `FROM listing_alternatives pick
+    CROSS JOIN listings ${alias} ON ${alias}.id = pick.alternative_id
+    WHERE pick.listing_id = ${listingId} AND ${eligibleAt(alias)}
+    ORDER BY pick.position ASC
+    LIMIT ${LISTING_ALTERNATIVES_SHOWN}`
+}
+
+/**
+ * The rest of a listing's Alternatives section (#519), after its hand picks (`publicPicks`, which
+ * the detail statement hydrates): up to `LISTING_ALTERNATIVES_SHOWN` less those picks, never one
+ * of them, never the listing itself, and nothing twice. One statement finds the listing by its
+ * slug (#378: it needs neither the detail row nor the shell statistics first), and resolves each
+ * alternative's logo only for the returned rows.
+ *
+ * 1. Similar listings filed under its hub (its primary category), scored `ALTERNATIVE_TAG_POINTS`
+ *    for each of its `RELATED_SCORED_TAGS` most central active tags they share and
+ *    `ALTERNATIVE_BEST_PAGE_POINTS` for being pinned on an active best page that pins it (the
+ *    scout's mix on #519). Candidates are grouped, then checked against the hub before their
+ *    rows are read, so each is read once and only when it can qualify. Ties break on a keyset
+ *    from the listing's own name and slug: the listings after it in name order first, wrapping
+ *    round to the start, so listings with the same tags link onward to different neighbours
+ *    instead of all linking to the first names (#331). Keeping them to the hub spreads the links:
+ *    on staging's catalog the most links one listing would receive fell from 47 to 25.
+ * 2. The hub fills the rest with the same keyset (design 3.2, #331). `fill.plan` picks how:
+ *    through the hub's members when it has at most `RELATED_MEMBER_SCAN_LIMIT` public members (a
+ *    probe that stops at one more), else by walking the public name index from the listing's own
+ *    name, where a dense category yields its members almost immediately, then from the start only
+ *    for as many as that walk lacked. Both plans return the same rows; the probe only picks the
+ *    cheaper one, and runs only when the picks and the first step leave a gap.
+ *
+ * Each step reads its first `LISTING_ALTERNATIVES_SHOWN` without leaving out what an earlier one
+ * took, and the last step drops the picks and repeats: the picks and the similar listings fill at
+ * most six slots between them, so six of each step always leave enough. Leaving them out row by
+ * row instead cost a read per row scanned (#519: the longest walk read 671 rows instead of 439).
+ * The picks are not returned here: with them, the statement would combine six SELECTs, past the
+ * five a compound SELECT may have (`D1_MAX_COMPOUND_SELECT_TERMS`, counted over the statement).
+ * The branches that don't apply have `LIMIT 0`, which SQLite checks before reading a row. The
+ * first row always carries the ranking (`kind`: `tags` when the listing has an active tag) and
+ * the fill's plan (`fill_plan`), which name the statement's query shape; when nothing qualifies,
+ * it is the only row and its listing columns are null.
+ */
+function alternativesStatement(slug: string, asOf: string): CompiledQuery {
+  const shown = LISTING_ALTERNATIVES_SHOWN
   const columns = 'l.id, l.slug, l.name, l.description, l.website, l.is_unofficial'
   const currentNameSlug = '(SELECT name, slug FROM current_listing)'
-  const walk = (name: 'onward' | 'wrapped', comparison: '<' | '>', wrap: 0 | 1, limit: string) =>
-    `${name} AS (
-    SELECT ${columns}, 0 AS score, ${wrap} AS wrap
+  const wrap = `CASE WHEN (l.name, l.slug) > ${currentNameSlug} THEN 0 ELSE 1 END`
+  const walk = (
+    name: 'onward' | 'wrapped',
+    comparison: '<' | '>',
+    wrapValue: 0 | 1,
+    limit: string
+  ) => `${name} AS (
+    SELECT ${columns}, 0 AS score, ${wrapValue} AS wrap
     FROM listings l INDEXED BY listings_related_name_idx
     WHERE ${eligibleAt()}
       AND (l.name, l.slug) ${comparison} ${currentNameSlug}
@@ -1002,7 +1023,17 @@ function relatedStatement(slug: string, asOf: string): CompiledQuery {
   )`
   return numberedQuery(
     `WITH ${CURRENT_LISTING},
-  current_tags AS (
+  hub AS MATERIALIZED (
+    SELECT lc.category_id AS id
+    FROM listing_categories lc
+    WHERE lc.listing_id = (SELECT id FROM current_listing) AND lc.is_primary = 1
+    LIMIT 1
+  ),
+  picks AS MATERIALIZED (
+    SELECT l.id
+    ${publicPicks('(SELECT id FROM current_listing)')}
+  ),
+  current_tags AS MATERIALIZED (
     SELECT lt.tag_id
     FROM listing_tags lt
     CROSS JOIN tags t ON t.id = lt.tag_id
@@ -1010,224 +1041,155 @@ function relatedStatement(slug: string, asOf: string): CompiledQuery {
     ORDER BY lt.sort_order ASC, t.slug ASC
     LIMIT ${RELATED_SCORED_TAGS}
   ),
-  ranking AS MATERIALIZED (
-    SELECT CASE
-      WHEN EXISTS (SELECT 1 FROM current_tags) THEN 'tags'
-      WHEN (
-        SELECT COUNT(*)
-        FROM listing_categories lc
-        CROSS JOIN categories c ON c.id = lc.category_id
-        WHERE lc.listing_id = current.id AND c.is_active = 1
-      ) > 1 THEN 'categories'
-      ELSE 'hub'
-    END AS kind
-    FROM current_listing current
-  ),
-  tagged AS (
-    SELECT ${columns},
-      COUNT(*) AS score,
-      CASE WHEN (l.name, l.slug) > ${currentNameSlug} THEN 0 ELSE 1 END AS wrap
+  shared AS (
+    SELECT member.listing_id AS id, ${ALTERNATIVE_TAG_POINTS} * COUNT(*) AS points
     FROM current_tags current
-    CROSS JOIN listing_tags shared INDEXED BY listing_tags_tag_idx
-      ON shared.tag_id = current.tag_id
-    CROSS JOIN listings l ON l.id = shared.listing_id
-    WHERE shared.listing_id != (SELECT id FROM current_listing) AND ${eligibleAt()}
-    GROUP BY l.id
+    CROSS JOIN listing_tags member INDEXED BY listing_tags_tag_idx ON member.tag_id = current.tag_id
+    GROUP BY member.listing_id
+    UNION ALL
+    SELECT DISTINCT peer.listing_id AS id, ${ALTERNATIVE_BEST_PAGE_POINTS} AS points
+    FROM best_page_listings mine INDEXED BY best_page_listings_listing_idx
+    CROSS JOIN best_pages page ON page.id = mine.best_page_id
+    CROSS JOIN best_page_listings peer ON peer.best_page_id = mine.best_page_id
+    WHERE mine.listing_id = (SELECT id FROM current_listing)
+      AND mine.position IS NOT NULL
+      AND page.is_active = 1
+      AND peer.position IS NOT NULL
+  ),
+  candidates AS (
+    SELECT id, SUM(points) AS score FROM shared GROUP BY id
+  ),
+  scored AS MATERIALIZED (
+    SELECT ${columns}, candidate.score AS score, ${wrap} AS wrap
+    FROM candidates candidate
+    CROSS JOIN listing_categories member
+      ON member.listing_id = candidate.id AND member.category_id = (SELECT id FROM hub)
+    CROSS JOIN listings l ON l.id = candidate.id
+    WHERE ${eligibleAt()} AND l.id != (SELECT id FROM current_listing)
     ORDER BY score DESC, wrap ASC, l.name ASC, l.slug ASC
-    LIMIT 4
+    LIMIT ${shown}
   ),
-  shared_categories AS (
-    SELECT ${columns}, COUNT(*) AS score, 0 AS wrap
-    FROM listing_categories current
-    CROSS JOIN listing_categories shared INDEXED BY listing_categories_category_idx
-      ON shared.category_id = current.category_id
-    CROSS JOIN listings l ON l.id = shared.listing_id
-    WHERE current.listing_id = (SELECT id FROM current_listing)
-      AND shared.listing_id != current.listing_id
-      AND ${eligibleAt()}
-    GROUP BY l.id
-    ORDER BY score DESC, l.name ASC, l.slug ASC
-    LIMIT CASE WHEN (SELECT kind FROM ranking) = 'categories' THEN 4 ELSE 0 END
-  ),
-  fill AS (
-    SELECT hub.category_id AS id,
+  fill AS MATERIALIZED (
+    SELECT hub.id AS id,
       CASE
-        WHEN (SELECT kind FROM ranking) = 'categories' THEN 'none'
-        WHEN (SELECT COUNT(*) FROM tagged) >= 4 THEN 'none'
+        WHEN (SELECT COUNT(*) FROM picks)
+          + (SELECT COUNT(*) FROM scored WHERE id NOT IN (SELECT id FROM picks)) >= ${shown}
+          THEN 'none'
         WHEN NOT EXISTS (
           SELECT 1
           FROM listing_categories sized INDEXED BY listing_categories_category_idx
           CROSS JOIN listings p ON p.id = sized.listing_id
-          WHERE sized.category_id = hub.category_id AND ${eligibleAt('p')}
+          WHERE sized.category_id = hub.id AND ${eligibleAt('p')}
           LIMIT 1 OFFSET ${RELATED_MEMBER_SCAN_LIMIT}
         ) THEN 'members'
         ELSE 'walk'
       END AS plan
-    FROM listing_categories hub
-    WHERE hub.listing_id = (SELECT id FROM current_listing) AND hub.is_primary = 1
-    LIMIT 1
+    FROM hub
   ),
   members AS (
-    SELECT ${columns}, 0 AS score,
-      CASE WHEN (l.name, l.slug) > ${currentNameSlug} THEN 0 ELSE 1 END AS wrap
+    SELECT ${columns}, 0 AS score, ${wrap} AS wrap
     FROM listing_categories member INDEXED BY listing_categories_category_idx
     CROSS JOIN listings l ON l.id = member.listing_id
     WHERE member.category_id = (SELECT id FROM fill)
       AND ${eligibleAt()}
       AND l.id != (SELECT id FROM current_listing)
     ORDER BY wrap ASC, l.name ASC, l.slug ASC
-    LIMIT CASE WHEN (SELECT plan FROM fill) = 'members' THEN 4 ELSE 0 END
+    LIMIT CASE WHEN (SELECT plan FROM fill) = 'members' THEN ${shown} ELSE 0 END
   ),
-  ${walk('onward', '>', 0, '4')},
-  ${walk('wrapped', '<', 1, '4 - (SELECT COUNT(*) FROM onward)')},
+  ${walk('onward', '>', 0, String(shown))},
+  ${walk('wrapped', '<', 1, `${shown} - (SELECT COUNT(*) FROM onward)`)},
   ranked AS (
     SELECT id, slug, name, description, website, is_unofficial,
       MAX(score) AS score, MIN(wrap) AS wrap
     FROM (
-      SELECT * FROM tagged
-      UNION ALL SELECT * FROM shared_categories
+      SELECT * FROM scored
       UNION ALL SELECT * FROM members
       UNION ALL SELECT * FROM onward
       UNION ALL SELECT * FROM wrapped
     )
+    WHERE id NOT IN (SELECT id FROM picks)
     GROUP BY id
     ORDER BY score DESC, wrap ASC, name ASC, slug ASC
-    LIMIT 4
+    LIMIT ${shown} - (SELECT COUNT(*) FROM picks)
   )
 SELECT
-  ranking.kind,
+  CASE WHEN EXISTS (SELECT 1 FROM current_tags) THEN 'tags' ELSE 'hub' END AS kind,
   (SELECT plan FROM fill) AS fill_plan,
-  related.id,
-  related.slug,
-  related.name,
-  related.description,
-  related.website,
-  related.is_unofficial,
+  alternative.id,
+  alternative.slug,
+  alternative.name,
+  alternative.description,
+  alternative.website,
+  alternative.is_unofficial,
   (
     SELECT COALESCE(m.media_key, m.url) FROM listing_media m
-    WHERE m.listing_id = related.id AND m.kind = 'logo'
+    WHERE m.listing_id = alternative.id AND m.kind = 'logo'
     ORDER BY m.sort_order ASC LIMIT 1
   ) AS logo
-FROM ranking
-LEFT JOIN ranked related ON 1
-ORDER BY related.score DESC, related.wrap ASC, related.name ASC, related.slug ASC`,
+FROM current_listing current
+LEFT JOIN ranked alternative ON 1
+ORDER BY alternative.score DESC, alternative.wrap ASC, alternative.name ASC, alternative.slug ASC`,
     [asOf, slug]
   )
 }
 
 /**
- * The query shape a related statement ran as, named by its first row (`relatedStatement`), or
- * null when the rows name none (a public listing without a primary category, which the baseline
- * triggers prevent).
+ * The query shape an alternatives statement ran as, named by its first row
+ * (`alternativesStatement`), or null when the rows name none (a public listing without a primary
+ * category, which the baseline triggers prevent). A listing with tags reads them whatever its
+ * fill; one without reads its hub's members, walks the name index, or, when its hand picks and
+ * best pages leave no gap, neither.
  */
-function relatedQueryShape(row: RelatedRow | undefined): CatalogQueryShape | null {
-  switch (row?.kind) {
-    case 'tags':
-      return 'related-shared-tags'
-    case 'categories':
-      return 'related-shared-categories'
-    case 'hub':
-      if (row.fill_plan === 'members') return 'related-single-category-members'
-      if (row.fill_plan === 'walk') return 'related-single-category-seek'
+function alternativesQueryShape(row: AlternativeRow | undefined): CatalogQueryShape | null {
+  if (!row?.fill_plan) return null
+  if (row.kind === 'tags') return 'alternatives-shared-tags'
+  if (row.kind !== 'hub') return null
+  switch (row.fill_plan) {
+    case 'none':
+      return 'alternatives-no-fill'
+    case 'members':
+      return 'alternatives-hub-members'
+    case 'walk':
+      return 'alternatives-hub-seek'
   }
   return null
 }
 
-/**
- * The adjacent listing in publication order. The three keyset branches (same publication time
- * and display order, same publication time, earlier/later publication) are each an index seek on
- * the current listing's values (`current_listing`). They run as one statement whose COALESCE
- * only evaluates a branch when the previous ones found nothing, so each direction is one
- * statement in the page's batch, without reading more rows.
- */
-function navigationStatement(
-  direction: 'next' | 'previous',
-  slug: string,
-  asOf: string
-): CompiledQuery {
-  const current = (column: 'display_order' | 'published_at' | 'slug') =>
-    `(SELECT ${column} FROM current_listing)`
-  const branches =
-    direction === 'previous'
-      ? [
-          {
-            asOfBound: true,
-            order: 'l.slug DESC',
-            predicate: `l.published_at = ${current('published_at')} AND l.display_order = ${current('display_order')} AND l.slug < ${current('slug')}`
-          },
-          {
-            asOfBound: true,
-            order: 'l.display_order DESC, l.slug DESC',
-            predicate: `l.published_at = ${current('published_at')} AND l.display_order < ${current('display_order')}`
-          },
-          {
-            asOfBound: true,
-            order: 'l.published_at ASC, l.display_order DESC, l.slug DESC',
-            predicate: `l.published_at > ${current('published_at')}`
-          }
-        ]
-      : [
-          {
-            asOfBound: true,
-            order: 'l.slug ASC',
-            predicate: `l.published_at = ${current('published_at')} AND l.display_order = ${current('display_order')} AND l.slug > ${current('slug')}`
-          },
-          {
-            asOfBound: true,
-            order: 'l.display_order ASC, l.slug ASC',
-            predicate: `l.published_at = ${current('published_at')} AND l.display_order > ${current('display_order')}`
-          },
-          {
-            // Published before the current listing, which is public at `asOf`, so already
-            // public too. A second upper bound (`<= asOf`) would let SQLite seek on that one
-            // and walk every newer listing first: 3,425 rows for the oldest listing (#314).
-            asOfBound: false,
-            order: PUBLICATION_ORDER,
-            predicate: `l.published_at < ${current('published_at')}`
-          }
-        ]
-  return numberedQuery(
-    `WITH ${CURRENT_LISTING}
-      SELECT
-        l.slug,
-        l.name,
-        l.website,
-        (
-          SELECT COALESCE(m.media_key, m.url) FROM listing_media m
-          WHERE m.listing_id = l.id AND m.kind = 'logo'
-          ORDER BY m.sort_order ASC LIMIT 1
-        ) AS logo
-      FROM listings l
-      WHERE l.id = COALESCE(
-        ${branches
-          .map(
-            branch => `(
-          SELECT l.id
-          FROM listings l
-          WHERE ${branch.asOfBound ? eligibleAt() : publishedSql()} AND ${branch.predicate}
-          ORDER BY ${branch.order}
-          LIMIT 1
-        )`
-          )
-          .join(',\n        ')}
-      )
-      LIMIT 1`,
-    [asOf, slug]
-  )
+/** A detail row's hand-picked alternatives (`alternative_picks`, #519), in position order. */
+function mapAlternativePicks(value: string): RelatedListing[] {
+  return parseJsonArray(value, 'alternative picks').map((pick, index) => {
+    if (!pick || typeof pick !== 'object')
+      throw new Error(`Invalid D1 alternative pick ${index + 1}.`)
+    const candidate = pick as Record<string, unknown>
+    const field = (name: string) => `alternative pick ${index + 1} ${name}`
+    return {
+      description: requireString(candidate.description, field('description')),
+      isUnofficial: candidate.isUnofficial === 1 || undefined,
+      media:
+        candidate.logo === null
+          ? undefined
+          : { logo: requireString(candidate.logo, field('logo')) },
+      name: requireString(candidate.name, field('name')),
+      slug: requireString(candidate.slug, field('slug')),
+      website: requireString(candidate.website, field('website'))
+    }
+  })
 }
 
-function mapRelated(rows: RelatedRow[]): RelatedListing[] {
-  return rows.flatMap(related =>
-    related.id === null
+function mapAlternatives(rows: AlternativeRow[]): RelatedListing[] {
+  return rows.flatMap(alternative =>
+    alternative.id === null
       ? []
       : [
           {
-            description: requireString(related.description, 'related description'),
-            isUnofficial: related.is_unofficial === 1 || undefined,
-            media: related.logo ? { logo: requireString(related.logo, 'related logo') } : undefined,
-            name: requireString(related.name, 'related name'),
-            slug: requireString(related.slug, 'related slug'),
-            website: requireString(related.website, 'related website')
+            description: requireString(alternative.description, 'alternative description'),
+            isUnofficial: alternative.is_unofficial === 1 || undefined,
+            media: alternative.logo
+              ? { logo: requireString(alternative.logo, 'alternative logo') }
+              : undefined,
+            name: requireString(alternative.name, 'alternative name'),
+            slug: requireString(alternative.slug, 'alternative slug'),
+            website: requireString(alternative.website, 'alternative website')
           }
         ]
   )
@@ -1462,12 +1424,13 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
   }
 
   /**
-   * A listing's detail, related listings and both neighbours, as one D1 batch of four statements
-   * that each find the listing by its slug: an uncached listing page waits on one round trip to
-   * D1 after the epoch, where it waited on two or three before (#378). Each statement reports its
-   * own rows and D1 time under its own query shape, all with the batch's wall time. A slug that
-   * names no public listing reports one `listing-detail` event with the batch's totals: the other
-   * three statements found no listing and read only their slug seeks.
+   * A listing's detail and its alternatives, as one D1 batch of two statements that each find the
+   * listing by its slug: an uncached listing page waits on one round trip to D1 after the epoch,
+   * where it waited on two or three before (#378). (#519 dropped the batch's previous and next
+   * listings with the page's "Browse more".) Each statement reports its own rows and D1 time
+   * under its own query shape, both with the batch's wall time. A slug that names no public
+   * listing reports one `listing-detail` event with the batch's totals: the alternatives statement
+   * found no listing and read only its slug seek.
    */
   async function queryListingBySlug(slug: string): Promise<ListingDetail | null> {
     const asOf = operationTime()
@@ -1476,9 +1439,7 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
     try {
       results = await runBatch(client, [
         detailStatement(slug, asOf),
-        relatedStatement(slug, asOf),
-        navigationStatement('previous', slug, asOf),
-        navigationStatement('next', slug, asOf)
+        alternativesStatement(slug, asOf)
       ])
     } catch (error) {
       observe({
@@ -1496,11 +1457,9 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
       throw error
     }
     const wallDurationMs = performance.now() - startedAt
-    const [detailResult, relatedResult, previousResult, nextResult] = results as [
+    const [detailResult, alternativesResult] = results as [
       D1Result<DetailRow>,
-      D1Result<RelatedRow>,
-      D1Result<NavigationRow>,
-      D1Result<NavigationRow>
+      D1Result<AlternativeRow>
     ]
     const row = detailResult.results[0]
     if (!row) {
@@ -1515,29 +1474,29 @@ export function createCatalogOperations(config: CatalogOperationsConfig): Catalo
       return null
     }
     // Every statement whose shape is known is reported before anything can refuse the rows. The
-    // related statement's shape is unknown only for a listing without a primary category, which
-    // the triggers prevent; it is not reported then. Its placeholder row (nothing related) is not
-    // a result row.
-    const relatedShape = relatedQueryShape(relatedResult.results[0])
+    // alternatives statement's shape is unknown only for a listing without a primary category,
+    // which the triggers prevent; it is not reported then. Its placeholder row (no alternative) is
+    // not a result row.
+    const alternativesShape = alternativesQueryShape(alternativesResult.results[0])
     observe(queryEvent('listing-detail', 'listing-detail', detailResult, wallDurationMs))
-    if (relatedShape) {
+    if (alternativesShape) {
       observe({
-        ...queryEvent('listing-detail', relatedShape, relatedResult, wallDurationMs),
-        resultRows: relatedResult.results.filter(related => related.id !== null).length
+        ...queryEvent('listing-detail', alternativesShape, alternativesResult, wallDurationMs),
+        resultRows: alternativesResult.results.filter(alternative => alternative.id !== null).length
       })
     }
-    observe(queryEvent('listing-detail', 'navigation-previous', previousResult, wallDurationMs))
-    observe(queryEvent('listing-detail', 'navigation-next', nextResult, wallDurationMs))
     if (!results.every(result => result.success)) throw new Error('D1 catalog query failed.')
 
     // A listing without its primary category fails here, as it did before the batch.
     const detail = mapDetail(row)
-    if (!relatedShape) throw new Error('Invalid D1 related listings plan.')
+    if (!alternativesShape) throw new Error('Invalid D1 alternatives plan.')
     return {
       ...detail,
-      nextWebsite: mapNavigation(nextResult.results[0]),
-      previousWebsite: mapNavigation(previousResult.results[0]),
-      relatedWebsites: mapRelated(relatedResult.results)
+      // The hand picks first, then the statement that leaves them out (#519).
+      relatedWebsites: [
+        ...mapAlternativePicks(row.alternative_picks),
+        ...mapAlternatives(alternativesResult.results)
+      ]
     }
   }
 

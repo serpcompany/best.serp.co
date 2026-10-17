@@ -38,7 +38,6 @@ const NON_LISTING_IMAGES: Readonly<Record<string, string>> = {
 const LISTING_IMAGE_CALLERS = [
   'apps/web/src/components/admin/mini-listing.tsx',
   'apps/web/src/components/admin/product-cell.tsx',
-  'apps/web/src/components/directory/project-navigation.tsx',
   'apps/web/src/components/llm/listing-card.tsx',
   'apps/web/src/components/submit/submit-ui.tsx',
   'apps/web/src/components/taxonomy/best-page.tsx',

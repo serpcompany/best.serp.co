@@ -39,8 +39,8 @@ export async function runQuery<T>(
 
 /**
  * Execute typed, parameterized statements as one D1 batch: one round trip to D1, where they run
- * in order, each result keeping its own metadata. A listing page's detail, related listings and
- * neighbours are read this way (#378).
+ * in order, each result keeping its own metadata. A listing page's detail and its alternatives
+ * are read this way (#378, #519).
  */
 export async function runBatch(
   client: Database,

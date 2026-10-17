@@ -2,6 +2,7 @@ import {
   SEED_ID,
   SEED_MEDIA_ORIGIN,
   SEED_NOW,
+  seedAlternatives,
   seedBestPages,
   seedCategories,
   seedFillerListings,
@@ -906,10 +907,22 @@ function taxonomyStatements(): SeedStatement[] {
   return statements
 }
 
+/** `seedAlternatives`: one listing's hand picks, at positions 1, 2, … (#519). */
+function alternativeStatements(): SeedStatement[] {
+  return seedAlternatives.picks.map((pick, index) =>
+    insert('listing_alternatives', {
+      alternative_id: seedListingId(pick.slug),
+      listing_id: seedListingId(seedAlternatives.listing.slug),
+      position: index + 1
+    })
+  )
+}
+
 /** Every row of the seed but its hosted media, in foreign-key order. */
 export function fixtureSeedStatements(): SeedStatement[] {
   return [
     ...catalogStatements(),
+    ...alternativeStatements(),
     ...taxonomyStatements(),
     ...userStatements(),
     ...submissionStatements(),

@@ -1,6 +1,7 @@
 import { type APIRequestContext, expect, type Page } from '@playwright/test'
 import { sitemapLocations } from './catalog-sample'
 import {
+  seedAlternatives,
   seedBestPages,
   seedCategories,
   seedListings,
@@ -362,11 +363,11 @@ test.describe('taxonomy routes on the fixture seed (#346)', () => {
 
 /** A listing page's "Featured in" band (#347). */
 const featuredIn = (page: Page) => page.getByRole('region', { name: 'Featured in' })
-/** The slugs of a listing's related listings as its page shows them (the first three), in order. */
-async function relatedSlugs(page: Page, slug: string): Promise<string[]> {
+/** The slugs of a listing's alternatives as its page shows them (#519), in order. */
+async function alternativeSlugs(page: Page, slug: string): Promise<string[]> {
   await page.goto(listingPath(slug))
   return page
-    .getByRole('region', { name: 'Related Entries' })
+    .getByRole('region', { name: 'Alternatives' })
     .locator('[data-website-slug]')
     .evaluateAll(links => links.map(link => link.getAttribute('data-website-slug') ?? ''))
 }
@@ -449,15 +450,45 @@ test.describe('the taxonomy on listing, hub and home pages (#347)', () => {
   test('two untagged listings of one category link onward to different neighbours (#331)', async ({
     page
   }) => {
-    // Before #331 every listing of a category linked its first names (Fixture Inkwell, …).
-    expect(await relatedSlugs(page, writer(20))).toEqual([21, 22, 23].map(writer))
-    expect(await relatedSlugs(page, writer(30))).toEqual([31, 32, 33].map(writer))
+    // Before #331 every listing of a category linked its first names (Fixture Inkwell, …); six
+    // since #519.
+    expect(await alternativeSlugs(page, writer(20))).toEqual([21, 22, 23, 24, 25, 26].map(writer))
+    expect(await alternativeSlugs(page, writer(30))).toEqual([31, 32, 33, 34, 35, 36].map(writer))
     // The last name wraps round to the start of the category.
-    expect(await relatedSlugs(page, writer(47))).toEqual([
+    expect(await alternativeSlugs(page, writer(47))).toEqual([
       seedListings.submitted.slug,
       seedListings.paid.slug,
-      writer(1)
+      writer(1),
+      writer(2),
+      writer(3),
+      writer(4)
     ])
+  })
+
+  test("a listing's hand picks lead its Alternatives, then similar listings, then its hub (#519)", async ({
+    page
+  }) => {
+    // Fixture Studio's picks are Fixture Ledger, the unpublished Fixture Scribe (left out) and
+    // Fixture Inkwell; then Fixture Canvas shares its tag, and Fixture Doodlewick fills from its
+    // hub.
+    const [ledger, scribe, inkwell] = seedAlternatives.picks
+    expect(await alternativeSlugs(page, seedAlternatives.listing.slug)).toEqual([
+      ledger.slug,
+      inkwell.slug,
+      seedListings.claimable.slug,
+      seedListings.noLogo.slug
+    ])
+    const alternatives = page.getByRole('region', { name: 'Alternatives' })
+    await expect(alternatives.getByRole('heading', { level: 2 })).toHaveText('Alternatives')
+    await expect(alternatives.getByRole('link', { name: ledger.name })).toHaveAttribute(
+      'href',
+      listingPath(ledger.slug)
+    )
+    await expect(alternatives.getByText(scribe.name)).toHaveCount(0)
+    // "Browse more" (previous and next) is gone.
+    await expect(page.getByRole('heading', { name: 'Browse more' })).toHaveCount(0)
+    // A tagged listing without picks: the listings sharing its tag, onward from its own name.
+    expect(await alternativeSlugs(page, writer(5))).toEqual([6, 7, 8, 9, 10, 11].map(writer))
   })
 
   test('a hub page: its tags of 3 or more as chips, most listings first, and its best pages', async ({

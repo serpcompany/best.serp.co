@@ -171,7 +171,8 @@ describe('fresh Drizzle D1 history', () => {
       '0014_category_suggestions.sql',
       '0015_feature_listings.sql',
       '0016_order_disputes.sql',
-      '0017_order_partial_refunds.sql'
+      '0017_order_partial_refunds.sql',
+      '0018_listing_alternatives.sql'
     ])
     expect(existsSync(resolve('d1/migrations'))).toBe(false)
     // Drizzle's journal lists exactly the SQL files, in order, each with its snapshot.

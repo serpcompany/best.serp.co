@@ -14,7 +14,6 @@ import { generateWebsiteDetailSchema } from '../../lib/seo/schema'
 import { composeMetaDescription, generateDynamicMetadata } from '../../lib/seo/seo-config'
 import { siteConfig } from '../../lib/site/site-config'
 import { siteCopy } from '../../lib/site/site-copy'
-import { ProjectNavigation } from '../directory/project-navigation'
 import { DetailPageLayout } from '../layout/detail-page-layout'
 import { SectionHeader } from '../layout/section-header'
 import { ListingImage } from '../listing/listing-image'
@@ -191,14 +190,6 @@ export function WebsiteDetailRoutePage({
               <BestPageCards pages={featuredIn} />
             </section>
           ) : null}
-
-          <section aria-labelledby="browse-more-heading">
-            <SectionHeader id="browse-more-heading" title="Browse more" />
-            <ProjectNavigation
-              previousWebsite={project.previousWebsite}
-              nextWebsite={project.nextWebsite}
-            />
-          </section>
 
           {project.relatedWebsites?.length > 0 && (
             <WebsiteRelatedProjects websites={project.relatedWebsites} />

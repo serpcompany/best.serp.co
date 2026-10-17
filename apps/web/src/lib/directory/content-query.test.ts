@@ -88,7 +88,7 @@ const websites: WebsiteMetadata[] = [
 ]
 
 describe('website lookup index', () => {
-  it('resolves details with previous and next entries from the provided ordering', () => {
+  it('resolves details from the provided ordering', () => {
     const detail = resolveWebsiteBySlugFromIndex(
       buildWebsiteLookupIndex(websites),
       'target-listing'
@@ -104,8 +104,8 @@ describe('website lookup index', () => {
         url: 'https://target.example.com/docs'
       }
     ])
-    expect(detail?.previousWebsite?.slug).toBe('newer-listing')
-    expect(detail?.nextWebsite?.slug).toBe('older-listing')
+    expect(detail).not.toHaveProperty('previousWebsite')
+    expect(detail).not.toHaveProperty('nextWebsite')
   })
 
   it('keeps the related listing algorithm ordered by shared categories then name', () => {
@@ -120,7 +120,7 @@ describe('website lookup index', () => {
     ])
   })
 
-  it('returns slim related card and navigation payloads', () => {
+  it('returns slim related card payloads', () => {
     const detail = resolveWebsiteBySlugFromIndex(
       buildWebsiteLookupIndex(websites),
       'target-listing'
@@ -147,38 +147,12 @@ describe('website lookup index', () => {
         }
       }
     ])
-    expect(detail?.previousWebsite).toEqual({
-      slug: 'newer-listing',
-      name: 'Newer Listing',
-      website: 'https://newer.example.com',
-      media: {
-        logo: '/logos/newer.png'
-      }
-    })
-    expect(detail?.nextWebsite).toEqual({
-      slug: 'older-listing',
-      name: 'Older Listing',
-      website: 'https://older.example.com',
-      media: {
-        logo: '/logos/older.png'
-      }
-    })
-
     for (const relatedWebsite of detail?.relatedWebsites || []) {
       expect(relatedWebsite).not.toHaveProperty('content')
       expect(relatedWebsite).not.toHaveProperty('resourceLinks')
       expect(relatedWebsite).not.toHaveProperty('categories')
       expect(relatedWebsite.media).not.toHaveProperty('images')
       expect(relatedWebsite.media).not.toHaveProperty('video')
-    }
-
-    for (const navWebsite of [detail?.previousWebsite, detail?.nextWebsite]) {
-      expect(navWebsite).not.toHaveProperty('content')
-      expect(navWebsite).not.toHaveProperty('resourceLinks')
-      expect(navWebsite).not.toHaveProperty('categories')
-      expect(navWebsite).not.toHaveProperty('description')
-      expect(navWebsite?.media).not.toHaveProperty('images')
-      expect(navWebsite?.media).not.toHaveProperty('video')
     }
   })
 
