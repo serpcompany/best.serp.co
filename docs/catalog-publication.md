@@ -25,12 +25,12 @@ No staging-verification check gates these workflows the way it gates Deploy Prod
 change data, not schema or code. For manifests, staging first is this procedure; for media, the
 production upload copies the objects staging verified.
 
-**Exceptions (#506, #523).** The owner put the five SERP-site listings on production only (#506):
-`2026-10-17-serp-sites.yaml` and `-zenbu-production.yaml` ran there alone, and #523's
-`2026-10-17-serp-sites-fill*.yaml` follow them. Staging has none of the four SERP sites, and its
-Zenbu Japanese came from a submission, with an id no manifest can name, so on staging these
-manifests are refused with nothing written. Their media plan still goes to the staging bucket first,
-as every plan does. No guard changed.
+**Exceptions (#506, #523, #539).** The owner put the five SERP-site listings on production only
+(#506): `2026-10-17-serp-sites.yaml` and `-zenbu-production.yaml` ran there alone, and #523's
+`2026-10-17-serp-sites-fill*.yaml` and #539's `2026-10-18-alternatives-serp-sites.yaml` follow
+them. Staging has none of the four SERP sites, and its Zenbu Japanese came from a submission, with
+an id no manifest can name, so on staging these manifests are refused with nothing written. Their
+media plan still goes to the staging bucket first, as every plan does. No guard changed.
 
 ## Guards
 
