@@ -4816,6 +4816,41 @@ describe('the refund that sent the money back, and the refund_failed flag (#486)
     }
   )
 
+  // #516's review: a refund.failed's flag keeps losing its compare and swap (the order changes on
+  // every read of Stripe). After deciding again once, nothing is recorded or sent, and the delivery
+  // answers 500 unprocessed, so Stripe delivers it again.
+  it('records and sends nothing, and answers 500, when the order keeps changing under a refund.failed (#516)', async () => {
+    const f = fixture()
+    claimedListing(f)
+    await refundOrder(f.deps, { actor: 'devin@serp.co', orderId: 'ord_claim' })
+    const recorded = f.row<{ provider_refund_id: string | null }>(
+      'SELECT provider_refund_id FROM orders'
+    ).provider_refund_id
+    const sent = f.emails.length
+    let reads = 0
+    f.provider.paymentRefunds = async () => {
+      reads += 1
+      f.clock.now = new Date(f.clock.now.getTime() + 1000)
+      f.db.exec(`UPDATE orders SET updated_at='${f.clock.now.toISOString()}'`)
+      return [{ amountCents: 4900, id: 're_1', orderId: 'ord_claim', status: 'failed' }]
+    }
+    const failed = paymentEvent('payment_refund_failed', 'pi_claim', {
+      id: 'evt_failed',
+      refundId: 're_1'
+    })
+    await expect(webhook(f, failed)).rejects.toMatchObject({
+      code: 'billing_payment_change_not_recorded'
+    })
+    expect(reads).toBe(2)
+    expect(f.row('SELECT status, attention, provider_refund_id FROM orders')).toEqual({
+      attention: null,
+      provider_refund_id: recorded,
+      status: 'refunded'
+    })
+    expect(f.emails.slice(sent)).toEqual([])
+    expect(processed(f, 'evt_failed')).toBe(false)
+  })
+
   // #503: the sweep sends a failed refund's email again only while the order is flagged. Once a
   // refund cleared the flag, the order records that refund, whose own failure needs its own email.
   it.each([
