@@ -15,6 +15,14 @@ import { logoNote } from './logo-note'
  * activity timeline built from the listing log and its submissions' events.
  */
 
+/** One row of an admin timeline (`components/admin/timeline.tsx`). */
+export interface TimelineItem {
+  detail: string
+  key: string
+  title: string
+  tone?: 'err' | 'ok' | 'warn'
+}
+
 function parse(detail: string | null): Record<string, unknown> {
   if (!detail) return {}
   try {
@@ -199,7 +207,7 @@ export type LinkRel = 'follow' | 'nofollow' | 'sponsored'
 
 /** What the admin listing screen (`components/admin/listing-detail.tsx`) renders. */
 export interface ListingDetailView {
-  activity: Array<{ detail: string; key: string; title: string; tone?: 'err' | 'ok' | 'warn' }>
+  activity: TimelineItem[]
   adminStatus: 'blocked' | 'draft' | 'live' | 'rejected' | 'unlisted'
   badgeChecks: Array<{
     checkedAt: string | null

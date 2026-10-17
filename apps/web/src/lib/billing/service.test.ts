@@ -2915,7 +2915,23 @@ describe('dispute and refund follow-ups (#483, #484)', () => {
     return rejectSubmission(
       {
         ...adminContext(f),
-        refunds: { refundRejectedSubmission: input => refundRejectedSubmission(f.deps, input) }
+        // The refund's emails go through the decision's `notify`, which answers them (#490).
+        notify: (async (template, request) => {
+          await f.deps.notify(template, request)
+          return 'sent'
+        }) as AdminContext['notify'],
+        refunds: {
+          refundRejectedSubmission: ({ notify, ...input }) =>
+            refundRejectedSubmission(
+              {
+                ...f.deps,
+                notify: async (template, request) => {
+                  await notify(template, request)
+                }
+              },
+              input
+            )
+        }
       },
       { category: 'other', reason: 'Not a fit.', submissionId }
     )
@@ -2927,6 +2943,7 @@ describe('dispute and refund follow-ups (#483, #484)', () => {
     await webhook(f, paymentEvent('payment_disputed', order.payment))
     f.emails.length = 0
     await expect(rejectAsOther(f)).resolves.toEqual({
+      email: { outcome: 'sent', to: 'maya@example.com' },
       ok: true,
       refundPending: false,
       refunded: false,

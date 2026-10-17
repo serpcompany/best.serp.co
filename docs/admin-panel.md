@@ -111,10 +111,16 @@ below), and otherwise sends the reviewed statement plans as one D1 batch:
   404. A body `urlKey`, the key the admin confirmed, is only compared with it (409 when they
   differ), so a request can't lift a block on another URL.
 
-Emails go through `enqueueEmail` ([Email](./email.md)), built from the stored state whenever
-the decision holds. A replay enqueues the same email under the same event key: the ledger sends
+Emails go through `deliverEmail` ([Email](./email.md)), built from the stored state whenever
+the decision holds. A replay sends the same email under the same event key: the ledger sends
 it at most once, and resends one whose first send failed (a provider outage), so retrying the
 decision is the recovery path.
+
+A submission decision waits for its email and answers what it did as `email` (#490):
+`{outcome, to}` with `sent`, `failed`, `pending` or `not_sent`, or `no_account` (no account on
+file) or `paid` (a paid approval). Its toast says so, and the submission page's Emails card lists
+the submission's decision emails from the ledger with their status and time. The ledger keeps
+no recipient, so a row shows the submitter's current address.
 
 | Decision | Template | Event key |
 |---|---|---|

@@ -1,5 +1,6 @@
 import { selectAdminAllowlistPlan } from './admin-plans'
 import type { Database } from './client'
+import type { EmailDeliveryStatus } from './email-deliveries'
 import { toInstant } from './instants'
 import { listingWebsiteConflicts } from './listing-plans'
 import {
@@ -161,9 +162,42 @@ const activeBlockColumns = (keySql: string) => `
     WHERE b.url_key=${keySql} AND b.lifted_at IS NULL) AS block_blocked_at`
 
 /**
+ * The emails a submission's review decisions send (`lib/admin/decisions.ts`, and the refund's
+ * rejection email), keyed `submission-approved:<id>`, `submission-rejected:<id>` and
+ * `submission-changes-requested:<id>:<n>` (docs/admin-panel.md).
+ */
+const SUBMISSION_DECISION_EMAILS = {
+  'changes-requested': 'changes_requested',
+  'listing-approved': 'approved',
+  'submission-rejected': 'rejected',
+  'submission-rejected-prohibited': 'rejected_prohibited',
+  'submission-rejected-refunded': 'rejected_refunded'
+} as const satisfies Record<string, DecisionEmailKind>
+const SUBMISSION_DECISION_EMAIL_TEMPLATES = Object.keys(SUBMISSION_DECISION_EMAILS)
+
+/** A submission's decision emails in the email ledger (#490), most recently updated first. */
+function selectSubmissionDecisionEmailsPlan(submissionId: string): StatementPlan {
+  const changesRequested = `submission-changes-requested:${submissionId}:`
+  return {
+    sql: `SELECT template_id,event_key,status,updated_at FROM email_deliveries
+      WHERE template_id IN (${SUBMISSION_DECISION_EMAIL_TEMPLATES.map(() => '?').join(',')})
+        AND (event_key IN (?,?) OR substr(event_key,1,?)=?)
+      ORDER BY updated_at DESC,event_key DESC LIMIT 20`,
+    params: [
+      ...SUBMISSION_DECISION_EMAIL_TEMPLATES,
+      `submission-approved:${submissionId}`,
+      `submission-rejected:${submissionId}`,
+      changesRequested.length,
+      changesRequested
+    ]
+  }
+}
+
+/**
  * One submission under review: its staged content and decision state, the submitter, its live
  * listing (when paid and published before review), duplicates on its URL key, and the active
- * block on its key; then its resource links, FAQs, events, and the listing's badge checks.
+ * block on its key; then its resource links, FAQs, events, the listing's badge checks, and its
+ * decision emails.
  */
 export function selectSubmissionReviewPlans(submissionId: string): StatementPlan[] {
   return [
@@ -220,7 +254,8 @@ export function selectSubmissionReviewPlans(submissionId: string): StatementPlan
         WHERE listing_id=(SELECT listing_id FROM listing_submissions WHERE id=?)
         ORDER BY checked_at DESC,id DESC LIMIT 10`,
       params: [submissionId]
-    }
+    },
+    selectSubmissionDecisionEmailsPlan(submissionId)
   ]
 }
 
@@ -749,6 +784,22 @@ export interface Submitter {
   userId: string
 }
 
+/** Which decision email a ledger row is (by its template). */
+export type DecisionEmailKind =
+  | 'approved'
+  | 'changes_requested'
+  | 'rejected'
+  | 'rejected_prohibited'
+  | 'rejected_refunded'
+
+/** One decision email's ledger row; the ledger keeps no recipient, subject, or body. */
+export interface DecisionEmailRecord {
+  eventKey: string
+  kind: DecisionEmailKind
+  status: EmailDeliveryStatus
+  updatedAt: string | null
+}
+
 export interface SubmissionReview {
   badgeChecks: BadgeCheckRecord[]
   badgeVerifiedAt: string | null
@@ -762,6 +813,8 @@ export interface SubmissionReview {
   description: string
   duplicateListings: number
   duplicateSubmissions: number
+  /** Its decision emails in the email ledger (#490), most recent first. */
+  emails: DecisionEmailRecord[]
   events: ActivityEvent[]
   faqs: Faq[]
   id: string
@@ -1323,7 +1376,7 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
     },
 
     async getSubmissionReview(submissionId) {
-      const [rows, links, faqs, submissionEvents, checks] = await batch(
+      const [rows, links, faqs, submissionEvents, checks, emails] = await batch(
         selectSubmissionReviewPlans(submissionId)
       )
       const row = rows?.[0]
@@ -1342,6 +1395,14 @@ export function createAdminReadOperations({ client }: { client: Database }): Adm
         description: text(row.description),
         duplicateListings: Number(row.duplicate_listings ?? 0),
         duplicateSubmissions: Number(row.duplicate_submissions ?? 0),
+        emails: (emails ?? []).map(email => ({
+          eventKey: text(email.event_key),
+          kind: SUBMISSION_DECISION_EMAILS[
+            text(email.template_id) as keyof typeof SUBMISSION_DECISION_EMAILS
+          ],
+          status: text(email.status) as EmailDeliveryStatus,
+          updatedAt: toInstant(email.updated_at)
+        })),
         events: events(submissionEvents ?? [], 'submission'),
         faqs: (faqs ?? []).map(faq => ({ answer: text(faq.answer), question: text(faq.question) })),
         id: text(row.id),

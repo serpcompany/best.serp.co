@@ -13,6 +13,7 @@ import { insertPublishedListing, SqliteD1 } from '@/db/test-support'
 import { BillingProviderError } from '../billing/provider'
 import {
   type AdminContext,
+  type AdminRefunds,
   addAdmin,
   allowResubmission,
   approveRevision,
@@ -29,6 +30,7 @@ import {
   unpublishListing,
   updateListingDetails
 } from './decisions'
+import { submissionView } from './review-view'
 
 const NOW = new Date('2026-10-06T12:00:00.000Z')
 
@@ -83,6 +85,7 @@ function fixture() {
     eventKey: (event, ...ids) => [event, ...ids].join(':'),
     notify: vi.fn(async (template, request) => {
       emails.push({ ...request, template })
+      return 'sent'
     }) as AdminContext['notify'],
     now: () => NOW,
     ...overrides
@@ -138,6 +141,7 @@ describe('submission decisions', () => {
         submissionId: 'sub_quill'
       })
     expect(await approve()).toEqual({
+      email: { outcome: 'sent', to: 'maya@example.com' },
       listingSlug: 'quillmate.app',
       ok: true,
       replayed: false
@@ -169,7 +173,12 @@ describe('submission decisions', () => {
     ])
     // A replay (double click, retry) writes nothing. It hands the same email to the ledger
     // under the same event key, which sends it only if the first send failed.
-    expect(await approve()).toEqual({ listingSlug: 'quillmate.app', ok: true, replayed: true })
+    expect(await approve()).toEqual({
+      email: { outcome: 'sent', to: 'maya@example.com' },
+      listingSlug: 'quillmate.app',
+      ok: true,
+      replayed: true
+    })
     expect(row('SELECT version FROM publication_state')).toEqual({ version: 2 })
     expect(emails).toHaveLength(2)
     expect(emails[1]).toEqual(emails[0])
@@ -184,7 +193,7 @@ describe('submission decisions', () => {
         expectedContentVersion: 1,
         submissionId: 'sub_quill'
       })
-    ).toEqual({ listingSlug: 'quillmate.app', ok: true, replayed: false })
+    ).toMatchObject({ listingSlug: 'quillmate.app', ok: true, replayed: false })
     expect(row("SELECT status FROM listing_submissions WHERE id='sub_quill'")).toEqual({
       status: 'approved'
     })
@@ -271,11 +280,15 @@ describe('submission decisions', () => {
     ).toMatchObject({ error: 'note_required', status: 422 })
     const send = () =>
       requestSubmissionChanges(context(), { note: 'Logo is blurry.', submissionId: 'sub_quill' })
-    expect(await send()).toEqual({ ok: true, replayed: false })
+    expect(await send()).toEqual({
+      email: { outcome: 'sent', to: 'maya@example.com' },
+      ok: true,
+      replayed: false
+    })
     // The replay retries the same email (same event key) with the stored note.
     expect(
       await requestSubmissionChanges(context(), { note: 'Other words.', submissionId: 'sub_quill' })
-    ).toEqual({ ok: true, replayed: true })
+    ).toEqual({ email: { outcome: 'sent', to: 'maya@example.com' }, ok: true, replayed: true })
     expect(
       row("SELECT status, reviewer_note FROM listing_submissions WHERE id='sub_quill'")
     ).toEqual({ reviewer_note: 'Logo is blurry.', status: 'changes_requested' })
@@ -302,21 +315,39 @@ describe('submission decisions', () => {
         reason: 'Waitlist only.',
         submissionId: 'sub_other'
       })
-    ).toEqual({ ok: true, refundPending: false, refunded: false, replayed: false })
+    ).toEqual({
+      email: { outcome: 'sent', to: 'maya@example.com' },
+      ok: true,
+      refundPending: false,
+      refunded: false,
+      replayed: false
+    })
     expect(
       await rejectSubmission(context(), {
         category: 'prohibited',
         reason: 'Gambling without a license.',
         submissionId: 'sub_bad'
       })
-    ).toEqual({ ok: true, refundPending: false, refunded: false, replayed: false })
+    ).toEqual({
+      email: { outcome: 'sent', to: 'maya@example.com' },
+      ok: true,
+      refundPending: false,
+      refunded: false,
+      replayed: false
+    })
     expect(
       await rejectSubmission(context(), {
         category: 'prohibited',
         reason: 'Again.',
         submissionId: 'sub_bad'
       })
-    ).toEqual({ ok: true, refundPending: false, refunded: false, replayed: true })
+    ).toEqual({
+      email: { outcome: 'sent', to: 'maya@example.com' },
+      ok: true,
+      refundPending: false,
+      refunded: false,
+      replayed: true
+    })
     expect(
       row('SELECT url_key FROM listing_submission_url_blocks WHERE lifted_at IS NULL')
     ).toEqual({ url_key: 'casino.example' })
@@ -428,7 +459,7 @@ describe('submission decisions', () => {
     // #68's refund fails once (a provider outage): the rejection stands, the refund stays
     // pending, and a replay of the rejection retries it.
     const refundRejectedSubmission = vi
-      .fn<(input: { actor: string; submissionId: string }) => Promise<'disputed' | 'refunded'>>()
+      .fn<AdminRefunds['refundRejectedSubmission']>()
       .mockRejectedValueOnce(
         new BillingProviderError('Stripe is unreachable.', 'provider_unreachable', 503)
       )
@@ -441,6 +472,7 @@ describe('submission decisions', () => {
       })
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
     expect(await reject()).toEqual({
+      email: null,
       ok: true,
       refundPending: true,
       refunded: false,
@@ -458,6 +490,7 @@ describe('submission decisions', () => {
       )
     ).toEqual({ refunded_at: null, rejection_category: 'other', status: 'rejected' })
     expect(await reject()).toEqual({
+      email: null,
       ok: true,
       refundPending: false,
       refunded: true,
@@ -466,6 +499,7 @@ describe('submission decisions', () => {
     expect(refundRejectedSubmission).toHaveBeenCalledTimes(2)
     expect(refundRejectedSubmission).toHaveBeenLastCalledWith({
       actor: 'devin@serp.co',
+      notify: expect.any(Function),
       submissionId: 'sub_paid'
     })
     // Once #68 records the refund, a replay leaves it alone.
@@ -473,6 +507,7 @@ describe('submission decisions', () => {
       "UPDATE listing_submissions SET refunded_at = '2026-10-06T12:01:00.000Z' WHERE id='sub_paid'"
     )
     expect(await reject()).toEqual({
+      email: null,
       ok: true,
       refundPending: false,
       refunded: true,
@@ -486,7 +521,7 @@ describe('submission decisions', () => {
     paidLive('sub_paid')
     expect(
       await approveSubmission(context(), { expectedContentVersion: 1, submissionId: 'sub_paid' })
-    ).toEqual({ listingSlug: 'brieflow.ai', ok: true, replayed: false })
+    ).toEqual({ email: { outcome: 'paid' }, listingSlug: 'brieflow.ai', ok: true, replayed: false })
     expect(row("SELECT is_active, name FROM listings WHERE id='lst_brief'")).toEqual({
       is_active: 1,
       name: 'Name sub_paid'
@@ -509,6 +544,166 @@ describe('submission decisions', () => {
     })
     // Two publications: the approval and the link change.
     expect(row('SELECT version FROM publication_state')).toEqual({ version: 3 })
+  })
+})
+
+describe('decision emails (#490)', () => {
+  const maya = 'maya@example.com'
+  /** A notify whose delivery answers `failed` for one event key and `sent` for the rest. */
+  const failingFor =
+    (eventKey: string): AdminContext['notify'] =>
+    async (_template, request) =>
+      request.eventKey === eventKey ? 'failed' : 'sent'
+
+  it('answers what the submitter’s email did: sent, failed, no account, or a paid approval', async () => {
+    const { context, db, paidLive, submission } = fixture()
+    for (const id of ['sub_sent', 'sub_failed', 'sub_orphan', 'sub_back', 'sub_out']) {
+      submission(id, `${id.slice(4)}.example`, 'verified')
+    }
+    // A submission with no account behind it (LaunchStall, 2026-10-05).
+    db.exec(
+      "UPDATE listing_submissions SET owner_user_id = NULL WHERE id IN ('sub_orphan', 'sub_back')"
+    )
+    paidLive('sub_paid')
+    const approve = (submissionId: string, overrides: Partial<AdminContext> = {}) =>
+      approveSubmission(context(overrides), { expectedContentVersion: 1, submissionId })
+
+    expect(await approve('sub_sent')).toMatchObject({ email: { outcome: 'sent', to: maya } })
+    expect(
+      await approve('sub_failed', { notify: failingFor('submission-approved:sub_failed') })
+    ).toMatchObject({ email: { outcome: 'failed', to: maya } })
+    expect(await approve('sub_orphan')).toMatchObject({ email: { outcome: 'no_account' } })
+    // The paid approval email waits for its template (#70).
+    expect(await approve('sub_paid')).toMatchObject({ email: { outcome: 'paid' } })
+
+    expect(
+      await requestSubmissionChanges(context(), { note: 'Add a logo.', submissionId: 'sub_back' })
+    ).toEqual({ email: { outcome: 'no_account' }, ok: true, replayed: false })
+    expect(
+      await rejectSubmission(context({ notify: failingFor('submission-rejected:sub_out') }), {
+        category: 'other',
+        reason: 'Waitlist only.',
+        submissionId: 'sub_out'
+      })
+    ).toEqual({
+      email: { outcome: 'failed', to: maya },
+      ok: true,
+      refundPending: false,
+      refunded: false,
+      replayed: false
+    })
+  })
+
+  it('answers the rejection email a refund sends, not its other emails', async () => {
+    const { context, paidLive } = fixture()
+    paidLive('sub_paid')
+    const refundRejectedSubmission: AdminRefunds['refundRejectedSubmission'] = async input => {
+      await input.notify('submission-rejected-refunded', {
+        eventKey: 'submission-rejected:sub_paid',
+        input: {
+          reason: 'Duplicate.',
+          refundedCents: 4900,
+          submissionId: 'sub_paid',
+          submissionName: 'Name sub_paid'
+        },
+        to: maya
+      })
+      await input.notify('changes-requested', {
+        eventKey: 'unrelated:1',
+        input: { note: 'n', submissionId: 'sub_paid', submissionName: 'n' },
+        to: 'admin@serp.co'
+      })
+      return 'refunded'
+    }
+    expect(
+      await rejectSubmission(
+        context({
+          notify: failingFor('submission-rejected:sub_paid'),
+          refunds: { refundRejectedSubmission }
+        }),
+        { category: 'other', reason: 'Duplicate.', submissionId: 'sub_paid' }
+      )
+    ).toMatchObject({ email: { outcome: 'failed', to: maya }, refunded: true })
+  })
+
+  it('lists a submission’s decision emails from the ledger, with their delivery', async () => {
+    const { context, db, emails, submission } = fixture()
+    submission('sub_quill', 'quillmate.app', 'verified')
+    await approveSubmission(context(), { expectedContentVersion: 1, submissionId: 'sub_quill' })
+    const [approval] = emails
+    const ledger = db.prepare(
+      `INSERT INTO email_deliveries (template_id, event_key, provider, status, updated_at)
+        VALUES (?, ?, 'usesend', ?, ?)`
+    )
+    // The approval's own row, as the decision keyed it.
+    ledger.run(approval?.template ?? '', approval?.eventKey ?? '', 'sent', '2026-10-06 12:00:05')
+    ledger.run(
+      'changes-requested',
+      'submission-changes-requested:sub_quill:1',
+      'failed',
+      '2026-10-05 09:30:00'
+    )
+    ledger.run(
+      'submission-rejected',
+      'submission-rejected:sub_quill',
+      'sending',
+      '2026-10-04 08:00:00'
+    )
+    // Not this submission's decision emails: another submission's (one whose id starts with
+    // this one's), and this submission's receipt.
+    ledger.run(
+      'changes-requested',
+      'submission-changes-requested:sub_quill2:1',
+      'sent',
+      '2026-10-06 13:00:00'
+    )
+    ledger.run('listing-approved', 'submission-approved:sub_quill2', 'sent', '2026-10-06 13:00:00')
+    ledger.run('submission-received', 'submission-created:sub_quill', 'sent', '2026-10-03 07:00:00')
+
+    const review = await createAdminReadOperations({
+      client: context().client
+    }).getSubmissionReview('sub_quill')
+    expect(review?.emails).toEqual([
+      {
+        eventKey: 'submission-approved:sub_quill',
+        kind: 'approved',
+        status: 'sent',
+        updatedAt: '2026-10-06T12:00:05.000Z'
+      },
+      {
+        eventKey: 'submission-changes-requested:sub_quill:1',
+        kind: 'changes_requested',
+        status: 'failed',
+        updatedAt: '2026-10-05T09:30:00.000Z'
+      },
+      {
+        eventKey: 'submission-rejected:sub_quill',
+        kind: 'rejected',
+        status: 'sending',
+        updatedAt: '2026-10-04T08:00:00.000Z'
+      }
+    ])
+    // The submission page's rows: the email, its recipient, its delivery, and when.
+    expect(review && submissionView(review, 'https://media.example').emails).toEqual([
+      {
+        detail: 'Tue, Oct 6, 12:00 · Sent',
+        key: 'approved-submission-approved:sub_quill',
+        title: `“Approved” to ${maya}`,
+        tone: 'ok'
+      },
+      {
+        detail: 'Mon, Oct 5, 09:30 · Failed',
+        key: 'changes_requested-submission-changes-requested:sub_quill:1',
+        title: `“Changes requested” to ${maya}`,
+        tone: 'err'
+      },
+      {
+        detail: 'Sun, Oct 4, 08:00 · Pending',
+        key: 'rejected-submission-rejected:sub_quill',
+        title: `“Rejected” to ${maya}`,
+        tone: 'warn'
+      }
+    ])
   })
 })
 
