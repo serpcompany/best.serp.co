@@ -1,6 +1,7 @@
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose'
 import { describe, expect, it, vi } from 'vitest'
 import { parseRobotsTxt, robotsTxtAllows } from '../../../../../scripts/crawl-policy'
+import { ADMIN_PAGE_PATH_HEADER } from '../auth/admin-gate'
 import { ACCESS_JWT_HEADER } from '../auth/cloudflare-access'
 import { STAGING_ADMIN_KEY_HEADER } from '../auth/staging-admin-key'
 import { EDGE_CACHE_HEADER, withEdgeCache } from '../edge-cache/html-cache'
@@ -656,10 +657,16 @@ describe('admin gate', () => {
     }
   })
 
-  it('answers 403 in production without a valid Access JWT, even with a session', async () => {
-    for (const headers of [session, { ...session, [ACCESS_JWT_HEADER]: 'forged.token.value' }]) {
+  it('answers 403 in production without a valid Access JWT, with or without a session', async () => {
+    for (const headers of [
+      session,
+      { ...session, [ACCESS_JWT_HEADER]: 'forged.token.value' },
+      {},
+      { [ACCESS_JWT_HEADER]: 'forged.token.value' }
+    ]) {
       const { response, serve } = await gate(`${production}/admin/`, accessEnv, headers)
       expect(response.status).toBe(403)
+      expect(response.headers.get('location')).toBeNull()
       expect(serve).not.toHaveBeenCalled()
     }
   })
@@ -671,6 +678,41 @@ describe('admin gate', () => {
     })
     expect(response.status).toBe(401)
     expect(serve).not.toHaveBeenCalled()
+  })
+
+  it('sends an Access-verified admin page read without a session cookie to sign-in and back (#488)', async () => {
+    const { response, serve } = await gate(
+      `${production}/admin/submissions/sub_1/?tab=media`,
+      accessEnv,
+      { [ACCESS_JWT_HEADER]: 'VALID_JWT', cookie: 'theme=dark' }
+    )
+    expect(response.status).toBe(303)
+    expect(response.headers.get('location')).toBe(
+      `/login/?callbackUrl=${encodeURIComponent('/admin/submissions/sub_1/?tab=media')}`
+    )
+    expect(response.headers.get('cache-control')).toBe('private, no-store')
+    expect(response.headers.get('x-robots-tag')).toBe('noindex, nofollow')
+    expect(serve).not.toHaveBeenCalled()
+  })
+
+  it("hands Next.js an admin page's own path, and never a client's (#488)", async () => {
+    const spoofed = { [ADMIN_PAGE_PATH_HEADER]: '/elsewhere/' }
+    const page = await gate(`${production}/admin/listings/?q=x&_rsc=1a2b3`, accessEnv, {
+      ...session,
+      ...spoofed,
+      [ACCESS_JWT_HEADER]: 'VALID_JWT'
+    })
+    const forwarded = page.serve.mock.calls[0]?.[0] as Request
+    expect(forwarded.headers.get(ADMIN_PAGE_PATH_HEADER)).toBe('/admin/listings/?q=x')
+    for (const path of ['/api/admin/listings', '/about/']) {
+      const other = await gate(`${production}${path}`, accessEnv, {
+        ...session,
+        ...spoofed,
+        [ACCESS_JWT_HEADER]: 'VALID_JWT'
+      })
+      const request = other.serve.mock.calls[0]?.[0] as Request
+      expect(request.headers.has(ADMIN_PAGE_PATH_HEADER), path).toBe(false)
+    }
   })
 
   it('passes Access plus a session cookie on to the admin pages, which check the role', async () => {
@@ -690,9 +732,13 @@ describe('admin gate', () => {
     }
     for (const path of ['/admin/', '/ADMIN/']) {
       const { response } = await gate(`${staging}${path}`, stagingEnv, withPassword)
-      expect(response.status, path).toBe(401)
+      expect(response.status, path).toBe(303)
+      expect(response.headers.get('location'), path).toBe(
+        `/login/?callbackUrl=${encodeURIComponent(path)}`
+      )
       expect(response.headers.get('www-authenticate'), path).toBeNull()
     }
+    expect((await gate(`${staging}/api/admin`, stagingEnv, withPassword)).response.status).toBe(401)
     expect(
       (await gate(`${staging}/admin/`, stagingEnv, { ...withPassword, ...session })).serve
     ).toHaveBeenCalledOnce()
@@ -838,6 +884,20 @@ describe('staging admin key in the Worker gate', () => {
       })
       expect(response.status, path).toBe(401)
       expect(serve, path).not.toHaveBeenCalled()
+    }
+    // A page read with the key is 401 too, never sign-in (#488): the header decides.
+    for (const cookie of [{}, session]) {
+      const handler = pipeline()
+      const response = await handleWorkerRequest(
+        new Request(`${stagingCanonical}/admin/submissions/`, {
+          headers: { ...withPassword, ...cookie, ...keyHeader }
+        }),
+        stagingKeyEnv,
+        handler
+      )
+      expect(response.status).toBe(401)
+      expect(response.headers.get('location')).toBeNull()
+      expect(handler.serve).not.toHaveBeenCalled()
     }
   })
 

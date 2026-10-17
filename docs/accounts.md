@@ -194,12 +194,18 @@ path (any case, decoded) before the edge cache and Next.js:
 | Access required, `Cf-Access-Jwt-Assertion` missing or invalid (RS256, issuer, AUD, expiry) | 403 |
 | `X-Staging-Admin-Token` present, unless it is the right key on staging's `/api/admin/*` behind the password: `/admin` pages even with a session, the smoke-test exemption, local, and production past Access ([Staging admin key](./staging-admin-key.md)) | 401 |
 | The right staging key on `/api/admin/admins` (the allowlist) | 403 |
-| No Better Auth session cookie (and no key) | 401 |
+| No Better Auth session cookie (and no key), `GET` or `HEAD` of an `/admin` page | 303 to `/login/?callbackUrl=<the page's path and query>` (#488) |
+| No Better Auth session cookie (and no key), anything else: `/api/admin`, other methods | 401 |
 
-Requests that pass reach pages and handlers, which call `requireAdmin()` (Next.js
-`unauthorized()` 401 / `forbidden()` 403, with `experimental.authInterrupts`) or
-`authorizeAdminRequest()` (JSON; a state-changing method also needs an `Origin` among the
-trusted origins, since every `*.serp.co` site is same-site). `/admin/` redirects admins to
+The sign-in redirect is relative and `private, no-store`, `noindex`; the login page accepts the
+path (`safeCallbackPath`) and returns there after sign-in. Requests that pass reach pages and
+handlers, which call `requireAdmin()` or `authorizeAdminRequest()`. `requireAdmin()` sends an
+invalid or expired session to sign-in and back the same way, using the page's own path and query
+that the Worker puts on every admin page request (`x-admin-page-path`, replacing any a client
+sent); without it (`next dev`) it is Next.js `unauthorized()` 401. A signed-in non-admin gets
+`forbidden()` 403 (with `experimental.authInterrupts`). `authorizeAdminRequest()` answers JSON
+(a state-changing method also needs an `Origin` among the trusted origins, since every
+`*.serp.co` site is same-site). `/admin/` redirects admins to
 the review queue ([Admin panel](./admin-panel.md)). Unknown admin paths are caught by `app/admin/[...path]`
 and `app/api/admin/[[...path]]`. `scripts/architecture-guard.test.ts` fails any admin page or
 route that does not call the guard, and any Server Action anywhere in `apps/web`
@@ -214,7 +220,9 @@ path answers 503, and with test values it answers 403 to a missing or malformed 
 for the signed-in owner; an RS256 token with a `kid` makes the Worker fetch the test team's
 JWKS and still answers 403. After each deploy, `scripts/d1-preview-http-gates.ts` requires the
 admin paths to answer exactly what `wrangler.jsonc` implies: production 403 now that its
-Access values are set (503 fails the deploy), staging 401, or 403/503 if `CF_ACCESS_REQUIRED=on`.
+Access values are set (503 fails the deploy), staging the sign-in redirect on `/admin/` and 401 on
+`/api/admin`, or 403/503 if `CF_ACCESS_REQUIRED=on`. `apps/web/e2e/admin-panel.spec.ts` signs a
+signed-out admin in from an admin page's link and checks the return, and a stale session's.
 The same gates require `GET /api/auth/get-session` to answer 200 without a redirect, and a
 sign-in `POST` with an empty email, from the environment's trusted origin, to answer exactly 400
 `INVALID_EMAIL`: the send hook returns before its rate limits for an empty email, so repeated

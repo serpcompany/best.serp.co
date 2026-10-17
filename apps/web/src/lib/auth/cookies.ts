@@ -3,9 +3,10 @@
  * `<prefix>.<name>` (`better-auth.session_token`) and adds `__Secure-` on https origins.
  *
  * The edge HTML cache (`lib/edge-cache/html-cache.ts`) bypasses every request that carries
- * one of these cookies, and the Worker's admin gate (`lib/auth/admin-gate.ts`) answers 401
- * when no session cookie is present. Both run before Next.js loads, so this module has no
- * imports; `lib/auth/config.ts` configures Better Auth with the same prefix.
+ * one of these cookies, and the Worker's admin gate (`lib/auth/admin-gate.ts`) answers 401 (or
+ * sign-in, for an admin page) when no session cookie is present. Both run before Next.js loads,
+ * so this module has no imports; `lib/auth/config.ts` configures Better Auth with the same
+ * prefix.
  */
 
 export const AUTH_COOKIE_PREFIX = 'better-auth'

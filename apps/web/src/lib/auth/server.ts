@@ -7,6 +7,8 @@ import 'server-only'
  *
  * - `requireUser()` / `requireAdmin()` for Server Components and route handlers: they return
  *   the signed-in user or interrupt with Next.js `unauthorized()` (401) / `forbidden()` (403).
+ *   On an admin page, `requireAdmin()` sends an invalid session to sign-in and back instead
+ *   (#488).
  * - `authorizeAdminRequest()` returns the decision, for route handlers that answer JSON. On
  *   staging it also takes the admin key for agents (#408, `staging-admin-key.ts`).
  *
@@ -15,12 +17,14 @@ import 'server-only'
  */
 import { getCloudflareContext } from '@opennextjs/cloudflare'
 import { headers } from 'next/headers'
-import { forbidden, unauthorized } from 'next/navigation'
+import { forbidden, redirect, unauthorized } from 'next/navigation'
 import { cache } from 'react'
 import { type AuthRateLimitDecision, type AuthRateLimitRule, createAuthOperations } from '@/db/auth'
 import { createDatabase } from '@/db/client'
 import { pruneEmailDeliveries } from '@/db/email-deliveries'
 import { CodedError } from '@/lib/telemetry/coded-error'
+import { ADMIN_PAGE_PATH_HEADER } from './admin-gate'
+import { signInPath } from './callback-url'
 import { type Auth, createAuth } from './config'
 import {
   type Authorization,
@@ -188,9 +192,19 @@ export async function requireUser(): Promise<SessionUser> {
   return interrupt(await authorizeCurrentUser())
 }
 
-/** A signed-in admin; otherwise 401 or 403 (Next.js `unauthorized()` / `forbidden()`). */
+/**
+ * A signed-in admin; otherwise 401 or 403 (Next.js `unauthorized()` / `forbidden()`). Without a
+ * valid session, an admin page goes to sign-in and back to its own path and query, which the
+ * Worker puts on every admin page request (`withAdminPagePath` in `admin-gate.ts`, #488); a
+ * request without it (`next dev`, which runs no Worker) keeps the 401.
+ */
 export async function requireAdmin(): Promise<SessionUser> {
-  return interrupt(await authorizeCurrentAdmin())
+  const result = await authorizeCurrentAdmin()
+  if (!result.ok && result.reason === 'session_required') {
+    const returnPath = (await headers()).get(ADMIN_PAGE_PATH_HEADER)
+    if (returnPath) redirect(signInPath(returnPath))
+  }
+  return interrupt(result)
 }
 
 /**

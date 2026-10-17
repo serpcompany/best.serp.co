@@ -554,8 +554,9 @@ async function expectRoute(
  * imply. Where Access is required (always in production; on staging with
  * `CF_ACCESS_REQUIRED=on`) that is 403 when the team domain and AUD tag are valid (the platform
  * host never carries an Access JWT) and 503 when they are not; without Access it is 401 (no
- * session). Any other answer, including a 503 from a production Worker whose Access vars are
- * set, means the lock is misconfigured and fails the deploy.
+ * session), which the `/admin/` page answers as a 303 to sign-in and back (#488,
+ * `ADMIN_PAGE_SIGN_IN`). Any other answer, including a 503 from a production Worker whose Access
+ * vars are set, means the lock is misconfigured and fails the deploy.
  */
 export function expectedAdminLockStatus(vars: AccessEnv): 401 | 403 | 503 {
   if (!accessRequired(vars)) return 401
@@ -593,14 +594,30 @@ export function allowedAdminLockStatuses(
   return [401, 403, 503]
 }
 
+/** The `/admin/` page's answer where the lock answers 401: sign-in, then back (#488). */
+export const ADMIN_PAGE_SIGN_IN = { location: '/login/?callbackUrl=%2Fadmin%2F', status: 303 }
+
 async function expectAdminLock(target: GateTarget, statuses: AdminLockStatuses): Promise<void> {
   const allowed = allowedAdminLockStatuses(expectedSiteEnvironment(target), statuses)
   for (const path of ['/admin/', '/api/admin']) {
+    const page = path === '/admin/'
+    const expected = page
+      ? allowed.map(status => (status === 401 ? ADMIN_PAGE_SIGN_IN.status : status))
+      : allowed
     await boundedFetch(target, routeUrl(target.baseUrl, path), async response => {
       await response.body?.cancel().catch(() => undefined)
-      if (!allowed.includes(response.status))
+      if (!expected.includes(response.status))
         throw new Error(
-          `${target.mode} admin route ${path} returned ${response.status}, not ${allowed.join(' or ')}; the admin lock does not match wrangler.jsonc.`
+          `${target.mode} admin route ${path} returned ${response.status}, not ${expected.join(' or ')}; the admin lock does not match wrangler.jsonc.`
+        )
+      const location = response.headers.get('location')
+      if (
+        page &&
+        response.status === ADMIN_PAGE_SIGN_IN.status &&
+        location !== ADMIN_PAGE_SIGN_IN.location
+      )
+        throw new Error(
+          `${target.mode} admin route ${path} redirected to ${location}, not ${ADMIN_PAGE_SIGN_IN.location}; the admin lock does not send a signed-out visitor to sign-in.`
         )
     })
   }

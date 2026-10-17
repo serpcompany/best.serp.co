@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { SqliteD1 } from '@/db/test-support'
 import { CodedError } from '@/lib/telemetry/coded-error'
 import { errorFields } from '@/lib/telemetry/error-fields'
+import { ADMIN_PAGE_PATH_HEADER } from './admin-gate'
 import { hasSessionCookie } from './cookies'
 import { clearDevOtpOutbox } from './otp-sender'
 import { authorizeAdminRequest, handleAuthRequest, requireAdmin } from './server'
@@ -25,6 +26,9 @@ vi.mock('next/headers', () => ({ headers: async () => requestHeaders.current }))
 vi.mock('next/navigation', () => ({
   forbidden: () => {
     throw new Error('NEXT_FORBIDDEN')
+  },
+  redirect: (url: string) => {
+    throw new Error(`NEXT_REDIRECT ${url}`)
   },
   unauthorized: () => {
     throw new Error('NEXT_UNAUTHORIZED')
@@ -92,8 +96,8 @@ function adminApiRequest(cookie: string): Request {
   return new Request(`${ORIGIN}/api/admin/listings`, { headers: { cookie, host: HOST } })
 }
 
-async function adminPage(cookie: string): Promise<string> {
-  requestHeaders.current = new Headers({ cookie, host: HOST })
+async function adminPage(cookie: string, headers: Record<string, string> = {}): Promise<string> {
+  requestHeaders.current = new Headers({ ...headers, cookie, host: HOST })
   try {
     return (await requireAdmin()).email
   } catch (error) {
@@ -135,6 +139,24 @@ describe('admin adapters re-check the allowlist on every request', () => {
     expect(await authorizeAdminRequest(adminApiRequest(second))).toMatchObject({ ok: true })
     expect(await adminPage(second)).toBe('second@example.com')
     expect(await adminPage('')).toBe('NEXT_UNAUTHORIZED')
+  })
+
+  it('sends an admin page without a valid session to sign-in and back; a non-admin keeps 403 (#488)', async () => {
+    localWorker()
+    const owner = await signIn('devin@serp.co', '192.0.2.14')
+    const visitor = await signIn('visitor@example.com', '192.0.2.15')
+    const returnPath = '/admin/submissions/sub_1/?tab=media'
+    // What the Worker puts on every admin page request (`withAdminPagePath`).
+    const page = { [ADMIN_PAGE_PATH_HEADER]: returnPath }
+    const signInUrl = `/login/?callbackUrl=${encodeURIComponent(returnPath)}`
+    expect(await adminPage('', page)).toBe(`NEXT_REDIRECT ${signInUrl}`)
+    expect(await adminPage('better-auth.session_token=stale.value', page)).toBe(
+      `NEXT_REDIRECT ${signInUrl}`
+    )
+    expect(await adminPage(visitor, page)).toBe('NEXT_FORBIDDEN')
+    expect(await adminPage(owner, page)).toBe('devin@serp.co')
+    // Without the Worker's path (`next dev`), the 401 stays.
+    expect(await adminPage('better-auth.session_token=stale.value')).toBe('NEXT_UNAUTHORIZED')
   })
 
   it('fails a page closed with a code that names the guard, when D1 cannot answer (#389)', async () => {

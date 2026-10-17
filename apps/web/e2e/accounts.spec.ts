@@ -208,14 +208,27 @@ test.describe('admin gate', () => {
   const adminPages = ['/admin/', '/admin/not-a-page/', '/admin/submissions/x/']
   const adminApi = ['/api/admin', '/api/admin/listings']
 
-  test('answers 401 to anonymous visitors', async ({ request }) => {
-    for (const path of [...adminPages, ...adminApi, '/ADMIN/']) {
+  test('sends anonymous visitors to sign-in from a page, and answers 401 elsewhere (#488)', async ({
+    request
+  }) => {
+    for (const path of [...adminPages, '/ADMIN/']) {
+      const response = await request.get(path, { maxRedirects: 0 })
+      expect(response.status(), path).toBe(303)
+      expect(response.headers().location, path).toBe(
+        `/login/?callbackUrl=${encodeURIComponent(path)}`
+      )
+      expect(response.headers()['cache-control'], path).toContain('no-store')
+      expect(response.headers()['x-robots-tag'], path).toContain('noindex')
+    }
+    for (const path of adminApi) {
       const response = await request.get(path, { maxRedirects: 0 })
       expect(response.status(), path).toBe(401)
       expect(response.headers()['cache-control'], path).toContain('no-store')
     }
     const post = await request.post('/api/admin/listings', { data: {}, maxRedirects: 0 })
     expect(post.status()).toBe(401)
+    const pagePost = await request.post('/admin/', { data: {}, maxRedirects: 0 })
+    expect(pagePost.status()).toBe(401)
   })
 
   test('answers 403 to signed-in users who are not admins', async ({ baseURL, request }) => {
