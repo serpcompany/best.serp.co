@@ -44,6 +44,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { featureCopy } from '@/lib/feature-copy'
+import { siteConfig } from '@/lib/site/site-config'
 import {
   type Availability,
   categorySuggestionErrors,
@@ -993,7 +994,7 @@ function AvailabilityNotice({
     const { listing } = availability
     return (
       <ToneAlert
-        title={`${listing.name} is already listed on SERP`}
+        title={`${listing.name} is already listed on ${siteConfig.name}`}
         actions={
           <>
             <Link href={`${listing.path}#claim`} className={buttonVariants({ size: 'sm' })}>

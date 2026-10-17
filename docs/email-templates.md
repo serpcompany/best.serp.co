@@ -76,7 +76,7 @@ it on (owner decision on #64):
   listing…" and its "Relist for $49" button, `ownership-removed` offers to claim it again (with
   claims on), the draft reminder offers both plans with the price and sends a draft left in
   checkout to "Complete checkout", and billing sends its own emails. Off, all of that is left
-  out and `ownership-removed` says only "The listing stays on SERP.".
+  out and `ownership-removed` says only "The listing stays on SERP Best.".
 - `features.claims` (#67, on since #130). Off, `ownership-removed` leaves out the claim offer
   too: it needs both flags, since it offers the badge or a payment. The audit's `orders` and
   `claims` patterns ($ amounts, "paid listing", "relist", "claim … again") catch either offer

@@ -3,7 +3,7 @@
 best.serp.co sends transactional email through [useSend](https://usesend.com) (open source,
 backed by Amazon SES), using the hosted instance at `https://app.usesend.com`. This replaces
 the "Cloudflare Email Sending" choice in serpcompany/best.serp.co#59 (owner decision). Staging
-and production both send from `SERP Directory <noreply@mail.serp.co>`, with **no Reply-To**
+and production both send from `SERP Best <noreply@mail.serp.co>`, with **no Reply-To**
 (owner decision: the staging useSend key is restricted to `mail.serp.co`). Staging mail is
 marked by a `[staging]` subject prefix and goes only to its allowlist. The dedicated sending
 subdomain keeps this mail's reputation separate from `serp.co`.
@@ -33,7 +33,8 @@ Worker handler outside Next.js.
 
 The idempotency ledger lives in `apps/web/src/db/email-deliveries.ts` (table
 `email_deliveries`), like every other SQL statement. The sender and the dashboard paths come
-from `apps/web/src/lib/site` (`email.from`, `email.dashboardPath`, `email.adminDashboardPath`).
+from `apps/web/src/lib/site` (`email.from`, `email.dashboardPath`, `email.adminDashboardPath`);
+the sender's name is the site's (`site.name`).
 
 ## Environments
 
@@ -204,7 +205,7 @@ listed in [Email templates](./email-templates.md); they share the layout in
 - Register each template in `registry.ts` under its id, with a test of its rendered subject,
   bodies, and links in every environment.
 - Sign-in and claim code emails put the code in the subject (owner decision), for example
-  `482913 is your SERP sign-in code`. This module never logs or stores a subject, body, or
+  `482913 is your SERP Best sign-in code`. This module never logs or stores a subject, body, or
   code (keys are per call), but others can keep them:
   - Hosted useSend stores every sent email (recipients, subject, text, and HTML) for its
     dashboard. Codes, addresses, and reviewer notes are therefore held by useSend, under its

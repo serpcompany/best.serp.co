@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { ChoosePlan } from '@/components/submit/choose-plan'
 import { ordersEnabled } from '@/lib/billing/runtime'
-import { generateBaseMetadata } from '@/lib/seo/seo-config'
+import { generateBaseMetadata, SITE_NAME } from '@/lib/seo/seo-config'
 import { site } from '@/lib/site'
 import { nextStepPath } from '@/lib/submissions/contract'
 import { toSummary } from '@/lib/submissions/http'
@@ -11,7 +11,7 @@ import { ownSubmissionForPage } from '@/lib/submissions/pages'
 export function generateMetadata(): Metadata {
   return generateBaseMetadata({
     title: 'Choose how to get listed',
-    description: 'Choose how to get your product listed on SERP.',
+    description: `Choose how to get your product listed on ${SITE_NAME}.`,
     path: '/submit/',
     noindex: true
   })

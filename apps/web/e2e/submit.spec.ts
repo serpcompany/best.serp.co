@@ -442,7 +442,7 @@ test.describe('submit v2', () => {
     const listedHost = new URL(seedWebsite(listed.slug)).host
     expect(listedHost).toBe(listed.slug)
     await typeWebsite(page, `https://www.${listedHost}/pricing`)
-    await expect(page.getByText(`${listed.name} is already listed on SERP`)).toBeVisible()
+    await expect(page.getByText(`${listed.name} is already listed on SERP Best`)).toBeVisible()
     await expect(
       page.getByText(`We match on the domain, so ${listedHost}/pricing counts as ${listedHost}.`)
     ).toBeVisible()

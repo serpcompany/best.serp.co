@@ -56,9 +56,9 @@ describe('readCodeText', () => {
       '719\u2009208',
       ' 719208\n',
       '\u200b719\u200b208\ufeff',
-      '719208 is your SERP sign-in code',
+      '719208 is your SERP Best sign-in code',
       // The same code twice (subject and body) is still one code.
-      '719208 is your SERP sign-in code\n\n    719208',
+      '719208 is your SERP Best sign-in code\n\n    719208',
       'Call 555-1234 and enter 719208',
       'Enter this code:\n\n    719208\n\n\nIt expires in 10 minutes'
     ]) {

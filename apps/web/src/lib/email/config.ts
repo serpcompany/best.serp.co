@@ -27,13 +27,14 @@ export interface EmailSenderIdentity {
 }
 
 /**
- * The sender in every environment, from site-config: `SERP Directory <noreply@mail.serp.co>`.
+ * The sender in every environment, from the site definition: `SERP Best <noreply@mail.serp.co>`,
+ * the site's name and its sending address (#538).
  * Staging shares it (owner decision: the staging useSend key is restricted to `mail.serp.co`);
  * its `[staging]` subject prefix and recipient allowlist tell the two apart.
  */
 export const EMAIL_SENDER: Readonly<EmailSenderIdentity> = Object.freeze({
   email: site.email.from.address,
-  name: site.email.from.name
+  name: site.site.name
 })
 
 /** The Worker secret holding the useSend API key (staging and production). */

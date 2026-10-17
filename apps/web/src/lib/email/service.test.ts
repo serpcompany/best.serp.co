@@ -79,7 +79,7 @@ describe('email delivery', () => {
     await settle()
     expect(sender.sent).toEqual([
       {
-        from: { email: 'noreply@mail.serp.co', name: 'SERP Directory' },
+        from: { email: 'noreply@mail.serp.co', name: 'SERP Best' },
         headers: { 'Auto-Submitted': 'auto-generated' },
         html: '<p>Secret body text</p><p><a href="https://best.serp.co/products/autoenhance.ai/">https://best.serp.co/products/autoenhance.ai/</a></p><p><a href="https://best.serp.co/account/">https://best.serp.co/account/</a></p>',
         idempotencyKey: 'production:test-fixture:fixture:delivery',
@@ -112,7 +112,7 @@ describe('email delivery', () => {
     expect(sender.sent[0]?.subject).toBe('[staging] Fixture: Secret body text')
     expect(sender.sent[0]?.text).toContain('https://staging.best.serp.co/products/autoenhance.ai/')
     expect(sender.sent[0]?.to).toBe('owner@serp.co')
-    expect(sender.sent[0]?.from).toEqual({ email: 'noreply@mail.serp.co', name: 'SERP Directory' })
+    expect(sender.sent[0]?.from).toEqual({ email: 'noreply@mail.serp.co', name: 'SERP Best' })
     expect(logs.find(entry => entry.event === 'email_skipped')).toMatchObject({
       eventKey: 'fixture:blocked',
       level: 'warn',
@@ -485,8 +485,8 @@ describe('Worker email service', () => {
 
   it('sends through useSend from mail.serp.co in staging and production, with no Reply-To', async () => {
     const cases = [
-      [staging, 'SERP Directory <noreply@mail.serp.co>', '[staging] Fixture: Secret body text'],
-      [production, 'SERP Directory <noreply@mail.serp.co>', 'Fixture: Secret body text']
+      [staging, 'SERP Best <noreply@mail.serp.co>', '[staging] Fixture: Secret body text'],
+      [production, 'SERP Best <noreply@mail.serp.co>', 'Fixture: Secret body text']
     ] as const
     for (const [vars, from, subject] of cases) {
       const { calls, fetcher } = fakeFetch()
@@ -520,7 +520,7 @@ describe('Worker email service', () => {
     const logged = JSON.parse(String(info.mock.calls[0]?.[0])) as Record<string, unknown>
     expect(logged).toMatchObject({
       event: 'email_logged',
-      from: 'SERP Directory <noreply@mail.serp.co>',
+      from: 'SERP Best <noreply@mail.serp.co>',
       subject: 'Fixture: Secret body text',
       text: 'Secret body text\n\nhttp://localhost:8787/products/autoenhance.ai/\n\nhttp://localhost:8787/account/',
       to: 'owner@serp.co'

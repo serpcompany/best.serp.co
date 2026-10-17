@@ -1,4 +1,5 @@
 import { type SiteFeatures, features as siteFeatures } from './features'
+import { site } from './site/site'
 
 /**
  * Submitter-facing page copy that promises a site area a later step of #59 builds, by its flag
@@ -29,7 +30,7 @@ export function featureCopy(features: SiteFeatures = siteFeatures) {
         ? 'If it’s still failing at the recheck about 24 hours later, the listing is unlisted.'
         : null,
       failingTitle: features.badgeProgram ? 'Fix the badge before the recheck' : 'Fix the badge',
-      programCheckBy: features.badgeProgram ? 'Weekly' : 'SERP'
+      programCheckBy: features.badgeProgram ? 'Weekly' : site.site.name
     },
     /**
      * The claim dialog (#67, #70 screen 8): the badge method's card and the success alert say the

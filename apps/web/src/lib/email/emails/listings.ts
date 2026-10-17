@@ -2,6 +2,7 @@
  * Emails about a live listing: approved, live after payment, badge missing (24h warning),
  * unlisted, and ownership removed (#70 screen 15).
  */
+import { site } from '../../site/site'
 import { clip, defineEmailTemplate, EmailTemplateError } from '../templates'
 import {
   bold,
@@ -40,7 +41,7 @@ export const listingApprovedEmail = defineEmailTemplate<ListingApprovedInput>({
     return composeEmail(
       {
         body: [
-          paragraph(`${name} passed review and is now listed on SERP:`),
+          paragraph(`${name} passed review and is now listed on ${site.site.name}:`),
           box(bold(url)),
           // Weekly checks, and removal when the badge goes missing, are #66's badge program:
           // until `features.badgeProgram` is on, the email only asks to keep the badge.
@@ -53,7 +54,7 @@ export const listingApprovedEmail = defineEmailTemplate<ListingApprovedInput>({
         cta: { label: 'View your listing', url },
         heading: `${name} is live`,
         preheader: `Your listing is published at ${url.replace(/^https?:\/\//u, '')}`,
-        subject: `${clip(name, SUBJECT_NAME_MAX)} is live on SERP`
+        subject: `${clip(name, SUBJECT_NAME_MAX)} is live on ${site.site.name}`
       },
       context
     )
@@ -76,7 +77,7 @@ export const listingLivePaidEmail = defineEmailTemplate<ListingLivePaidInput>({
       {
         body: [
           paragraph(
-            `${free ? 'Your promotion code covered the full price.' : `Thanks for your payment of ${formatUsd(input.paidCents, { cents: true })}.`} ${name} passed our automatic checks and is now listed on SERP:`
+            `${free ? 'Your promotion code covered the full price.' : `Thanks for your payment of ${formatUsd(input.paidCents, { cents: true })}.`} ${name} passed our automatic checks and is now listed on ${site.site.name}:`
           ),
           box(bold(url)),
           paragraph(
@@ -89,7 +90,7 @@ export const listingLivePaidEmail = defineEmailTemplate<ListingLivePaidInput>({
         cta: { label: 'View your listing', url },
         heading: `${name} is live`,
         preheader: 'Payment received. Your listing is published and in review.',
-        subject: `${clip(name, SUBJECT_NAME_MAX)} is live on SERP`
+        subject: `${clip(name, SUBJECT_NAME_MAX)} is live on ${site.site.name}`
       },
       context
     )
@@ -178,7 +179,7 @@ export const badgeMissingEmail = defineEmailTemplate<BadgeMissingInput>({
           paragraph(
             'We’ll check again around ',
             bold(formatCheckTime(input.recheckAt)),
-            `. If there still isn’t a badge with a dofollow link to your listing, ${name} will be removed from SERP.`
+            `. If there still isn’t a badge with a dofollow link to your listing, ${name} will be removed from ${site.site.name}.`
           ),
           // The badge is usually still there behind a firewall or bot protection: the submit
           // page's approved advice for the same result, word for word.
@@ -194,7 +195,7 @@ export const badgeMissingEmail = defineEmailTemplate<BadgeMissingInput>({
         },
         heading: 'We couldn’t find a working badge',
         preheader: 'We’ll check again in about 24 hours.',
-        subject: `Action needed: the SERP badge is missing on ${hostOf(website)}`
+        subject: `Action needed: the ${site.site.name} badge is missing on ${hostOf(website)}`
       },
       context
     )
@@ -221,7 +222,7 @@ export const listingUnlistedEmail = defineEmailTemplate<ListingUnlistedInput>({
       {
         body: [
           paragraph(
-            `We rechecked ${required(input.website, 'a website')} on ${formatCheckTime(input.checkedAt)} and the badge was still missing, so ${name} has been removed from SERP, as we warned on ${formatDay(input.warnedAt)}.`
+            `We rechecked ${required(input.website, 'a website')} on ${formatCheckTime(input.checkedAt)} and the badge was still missing, so ${name} has been removed from ${site.site.name}, as we warned on ${formatDay(input.warnedAt)}.`
           ),
           ...(relist
             ? [
@@ -241,7 +242,7 @@ export const listingUnlistedEmail = defineEmailTemplate<ListingUnlistedInput>({
           : {}),
         heading: `${name} is no longer listed`,
         preheader: 'The badge was still missing on our recheck.',
-        subject: `${clip(name, SUBJECT_NAME_MAX)} has been removed from SERP`
+        subject: `${clip(name, SUBJECT_NAME_MAX)} has been removed from ${site.site.name}`
       },
       context
     )
@@ -268,8 +269,8 @@ export const ownershipRemovedEmail = defineEmailTemplate<OwnershipRemovedInput>(
           ),
           paragraph(
             claimAgain
-              ? `The listing stays on SERP. To manage it again, claim it again with the badge or a ${formatUsd(input.priceCents, { cents: false })} one-off payment.`
-              : 'The listing stays on SERP.'
+              ? `The listing stays on ${site.site.name}. To manage it again, claim it again with the badge or a ${formatUsd(input.priceCents, { cents: false })} one-off payment.`
+              : `The listing stays on ${site.site.name}.`
           )
         ],
         ...(claimAgain
@@ -277,7 +278,7 @@ export const ownershipRemovedEmail = defineEmailTemplate<OwnershipRemovedInput>(
           : {}),
         heading: `Your ownership of ${name} was removed`,
         preheader: 'The badge was still missing on our recheck.',
-        subject: `You no longer manage ${clip(name, SUBJECT_NAME_MAX)} on SERP`
+        subject: `You no longer manage ${clip(name, SUBJECT_NAME_MAX)} on ${site.site.name}`
       },
       context
     )

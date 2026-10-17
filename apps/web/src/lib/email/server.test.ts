@@ -66,7 +66,7 @@ describe('enqueueEmail', () => {
     const lines = loggedLines(infos)
     expect(lines[0]).toMatchObject({
       event: 'email_logged',
-      subject: '481902 is your SERP sign-in code',
+      subject: '481902 is your SERP Best sign-in code',
       to: 'owner@serp.co'
     })
     expect(lines[1]).toMatchObject({

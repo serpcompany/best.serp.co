@@ -144,7 +144,7 @@ export async function claimCode(
         const { messages } = (await response.json()) as { messages: Array<{ subject: string }> }
         // Newest first.
         codes = messages.flatMap(
-          message => /^(\d{6}) is your SERP code to claim /u.exec(message.subject)?.[1] ?? []
+          message => /^(\d{6}) is your SERP Best code to claim /u.exec(message.subject)?.[1] ?? []
         )
         return codes.length
       },

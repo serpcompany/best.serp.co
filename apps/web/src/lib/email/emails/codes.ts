@@ -9,6 +9,7 @@
  * (`lib/auth/otp-sender.ts`) enqueues this email for sign-in codes only, with the lifetime it
  * enforces.
  */
+import { site } from '../../site/site'
 import { SIGN_IN_CODE_LENGTH, SIGN_IN_CODE_TEMPLATE, type SignInCodeInput } from '../sign-in-code'
 import { clip, defineEmailTemplate, EmailTemplateError } from '../templates'
 import { composeEmail, paragraph, required, SUBJECT_NAME_MAX } from './layout'
@@ -57,7 +58,7 @@ export const signInCodeEmail = defineEmailTemplate<SignInCodeInput>({
         heading: 'Your sign-in code',
         preheader: `It expires in ${expires} minutes.`,
         reason: `You’re getting this because this address was entered at ${host}/login.`,
-        subject: `${code} is your SERP sign-in code`
+        subject: `${code} is your ${site.site.name} sign-in code`
       },
       context
     )
@@ -86,14 +87,14 @@ export const claimCodeEmail = defineEmailTemplate<ClaimCodeInput>({
         ],
         body: [
           paragraph(
-            `A SERP account is claiming the ${name} listing and entered this address to show they work there. Enter this code to confirm:`
+            `A ${site.site.name} account is claiming the ${name} listing and entered this address to show they work there. Enter this code to confirm:`
           )
         ],
         code,
         heading: `Confirm your email to claim ${name}`,
         preheader: `Confirm you work at ${name}.`,
         reason: `You’re getting this because this address was entered to claim a listing on ${host}.`,
-        subject: `${code} is your SERP code to claim ${clip(name, SUBJECT_NAME_MAX)}`
+        subject: `${code} is your ${site.site.name} code to claim ${clip(name, SUBJECT_NAME_MAX)}`
       },
       context
     )
