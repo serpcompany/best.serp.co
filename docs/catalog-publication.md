@@ -25,14 +25,19 @@ No staging-verification check gates these workflows the way it gates Deploy Prod
 change data, not schema or code. For manifests, staging first is this procedure; for media, the
 production upload copies the objects staging verified.
 
+**Exception (#506).** `2026-10-17-serp-sites-zenbu-production.yaml` runs on production only: staging
+already has Zenbu Japanese from an approved submission, linked `follow`, and `listing-create` itself
+runs on staging first in `2026-10-17-serp-sites.yaml`. Staging's id is the submission's, which no
+manifest can name, so later Zenbu manifests are per environment. No guard changed.
+
 ## Guards
 
 - `d1-remote-publisher.ts` and `media-upload.ts` each refuse to run outside their own workflow,
   branch, and confirmation; the publisher also refuses a database that is not its target's.
 - The uploader refuses any key outside `best.serp.co/listings/` and verifies, never
   overwrites, an object the bucket already holds.
-- The publisher refuses a media manifest until the target's own bucket holds every object it
-  names, byte for byte.
+- The publisher refuses a manifest that names hosted media, a `listing-media-update`'s or a
+  `listing-create`'s, until the target's own bucket holds every object it names, byte for byte.
 - The publisher refuses any statement D1's remote API would reject, even one local SQLite runs
   (`scripts/d1-compat.ts` lists them).
 - **Row-level manifests** (`concurrency: rows`, holding only the operations `rowLevelActions` in
@@ -139,25 +144,26 @@ listing stays unpublished, its categories stay, and the long description is left
 
 ## New listings
 
-`listing-create` adds a live listing (#506). It is row-level, so one manifest fits staging and
-production; before #506 it needed a base version, which no two environments share. It names the
-whole `listing`: `id`, `slug`, `name`, `description`, `website`, `publishedAt`, and `categories`
-(the first is primary), and optionally `content`, `media` (hosted keys from a media plan),
-`resources`, and `faqs`. Within the batch the listing is inserted as a draft, filed under its
-categories, and approved, so the primary-category triggers hold. Its outbound link is followed
-(`link_rel` `follow`, set by the insert); an admin can change it later.
+`listing-create` adds a live listing (#506). It is row-level, so one manifest fits both
+environments. It names the whole `listing`: `id`, `slug`, `name`, `description`, `website`,
+`publishedAt`, `categories` (the first is primary), and optionally `content`, `media` (held to the
+media rule in [Guards](#guards)), `resources`, and `faqs`. The batch inserts it as a draft, files
+it, and approves it, so the primary-category triggers hold, and links it `follow`.
 
-The batch is refused, with nothing written, when:
+The manifest is refused when the name is over 80 characters or the description over 160 (the admin
+panel's limits), or the website isn't a public HTTP(S) URL; all three are trimmed first, as the
+admin edit stores them. The batch is refused when:
 
-- a listing already has the id or slug, for example `bad JSON path: 'listing-create tools.serp.co:
-  a listing already has this id or slug'`, so a second run of the same manifest writes nothing;
-- the website is another listing's, the host of a submission in flight, or under a block
-  (`listingWebsiteConflicts`, as for [`listing-details-set`](#listing-details));
+- a listing has the id or slug (`bad JSON path: 'listing-create tools.serp.co: a listing already has
+  this id or slug'`): the same listing under another manifest id, or a slug taken elsewhere;
+- the website is another listing's, a submission's in flight, or blocked (`listingWebsiteConflicts`,
+  as for [`listing-details-set`](#listing-details));
 - a category is missing or retired.
 
-The manifest itself is refused when the website isn't a public HTTP(S) URL. A `publication`
-manifest's `listing-create` runs the same guards. It records the listing's page and its category
-pages in `affected_routes`, and logs no `listing_events` row.
+A refused batch leaves the catalog unchanged; the remote publisher records a `failed`
+`publication_runs` row, and the manifest may run again. A rerun after a success is answered as
+already done (`idempotent`) before any guard. A `publication` manifest's `listing-create` runs the
+same guards, records its pages in `affected_routes`, and logs no `listing_events` row.
 
 ## Resource links
 

@@ -179,6 +179,22 @@ function mediaUpdates(manifest: PublicationManifest) {
   return manifest.operations.flatMap(op => (op.action === 'listing-media-update' ? [op] : []))
 }
 
+/**
+ * Every hosted logo and image the manifest publishes: a `listing-media-update`'s, and a new
+ * listing's (`listing-create`, #506 review), so a create's media is held to the same rule.
+ */
+function hostedImages(manifest: PublicationManifest) {
+  return manifest.operations.flatMap(op => {
+    const media =
+      op.action === 'listing-media-update'
+        ? op.media
+        : op.action === 'listing-create'
+          ? op.listing.media
+          : undefined
+    return [...(media?.logo ? [media.logo] : []), ...(media?.images ?? [])]
+  })
+}
+
 /** The reviewed upload plans' objects by key (`d1/media/*.json`), for their MD5. */
 export function reviewedPlanObjects(directory = resolve('d1/media')): Map<string, MediaPlanObject> {
   const objects = new Map<string, MediaPlanObject>()
@@ -210,10 +226,7 @@ export async function assertHostedMediaServed(
   fetchImplementation: FetchImplementation,
   plans: Map<string, MediaPlanObject> = reviewedPlanObjects()
 ): Promise<void> {
-  const images = mediaUpdates(manifest).flatMap(op => [
-    ...(op.media.logo ? [op.media.logo] : []),
-    ...(op.media.images ?? [])
-  ])
+  const images = hostedImages(manifest)
   if (images.length === 0) return
   const { bucket } = project.remote[target].media
   const listed = await listR2Objects(bucket, `${MEDIA_SITE}/listings/`, env, fetchImplementation)

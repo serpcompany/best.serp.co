@@ -275,10 +275,21 @@ const listing = z
 /** The admin panel's limits for a listing's name and short description (`lib/admin/decisions.ts`). */
 const LISTING_NAME_MAX = 80
 const LISTING_DESCRIPTION_MAX = 160
+/**
+ * A new listing (#506 review): its name, short description, and website are trimmed and capped
+ * as `listing-details-set` takes them, the admin edit's rules, so the admin edit can save the
+ * listing unchanged and the exact website match finds it. The website's public-URL rule is in
+ * `manifestSchema`. `listing-update` keeps the shared `listing`, so stored rows still match it.
+ */
+const createdListing = listing.extend({
+  name: z.string().trim().min(1).max(LISTING_NAME_MAX),
+  description: z.string().trim().min(1).max(LISTING_DESCRIPTION_MAX),
+  website: z.string().trim().url()
+})
 /** The listing fields `listing-details-set` compares and replaces, in the order it logs them. */
 const listingDetailFields = ['name', 'description', 'website'] as const
 const operation = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('listing-create'), listing }).strict(),
+  z.object({ action: z.literal('listing-create'), listing: createdListing }).strict(),
   z
     .object({ action: z.literal('listing-update'), listing, previousCategories: categories })
     .strict(),
@@ -949,6 +960,13 @@ export const manifestSchema = z
           path: ['operations', index, 'categories']
         })
       }
+      // The submission intake's and the admin edit's URL rule, as for `listing-details-set`.
+      if (op.action === 'listing-create' && !validatePublicHttpUrl(op.listing.website).ok)
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'A listing website must be a public HTTP(S) URL.',
+          path: ['operations', index, 'listing', 'website']
+        })
       if (op.action === 'listing-details-set') {
         const changed = listingDetailFields.filter(
           field => op.details[field] !== undefined && op.details[field] !== op.expected[field]
@@ -1466,7 +1484,8 @@ export function buildPublicationPlan(
       } else {
         // Row-level (#506): the new listing's own row guards it, not a base version. Its id and
         // slug must be unused, and its website must not be another listing's, a submission's in
-        // flight, or blocked, as for `listing-details-set`. Throws for a non-public website.
+        // flight, or blocked, as for `listing-details-set`. `manifestSchema` has already refused
+        // a non-public website.
         const { id, slug, website } = op.listing
         const label = `listing-create ${slug}`
         const conflicts = Object.values(listingWebsiteConflicts({ listingId: id, website }))

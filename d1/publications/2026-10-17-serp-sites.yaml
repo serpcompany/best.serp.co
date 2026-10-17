@@ -6,8 +6,9 @@
 # Each listing-create inserts the listing approved and live, with its outbound link followed
 # (`link_rel` follow). The short descriptions are the sites' own homepage descriptions, read on
 # 2026-10-17; no long description, logo, or tags (no active tag describes these sites).
-# Row-level: each create refuses the whole batch, with nothing written, when a listing already has
-# its id or slug, or its website is another listing's, a submission's in flight, or blocked.
+# Row-level: each create refuses the whole batch, leaving the catalog unchanged, when a listing
+# already has its id or slug, or its website is another listing's, a submission's in flight, or
+# blocked.
 # Publish on staging first, then on production after promotion.
 version: 1
 id: 2026-10-17-serp-sites

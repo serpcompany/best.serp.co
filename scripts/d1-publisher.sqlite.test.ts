@@ -2256,18 +2256,37 @@ describe('listing-create in a row-level manifest (#506: new listings on both env
     ])
   })
 
-  it('refuses a missing category and a non-public website, writing nothing', () => {
+  it('refuses a missing category, writing nothing', () => {
     const db = database()
     expect(() => publish(db, [create({ categories: ['missing'] })])).toThrow()
     expectRefused(db)
+  })
+
+  it('trims and caps the copy and checks the website in the manifest, as listing-details-set does', () => {
+    const db = database()
+    const padded = {
+      name: '  New  ',
+      description: ' What New does.\n',
+      website: ' https://new.example\n'
+    }
+    const trimmed = { name: 'New', description: 'What New does.', website: 'https://new.example' }
+    expect(rows([create(padded)]).operations[0]).toMatchObject({ listing: trimmed })
+    publish(db, [create(padded)])
+    expect(created(db)).toMatchObject({ name: 'New', website: 'https://new.example' })
+    // The admin edit's limits: 80 characters for the name, 160 for the description.
     expect(() =>
-      buildPublicationPlan(
-        rows([create({ website: 'http://localhost:3000/' })]),
-        'new listings',
-        now,
-        live
-      )
-    ).toThrow(/public HTTP\(S\) URL/u)
+      rows([create({ name: 'N'.repeat(80), description: 'D'.repeat(160) })])
+    ).not.toThrow()
+    for (const copy of [
+      { name: 'N'.repeat(81) },
+      { description: 'D'.repeat(161) },
+      { name: '  ' },
+      { description: ' \n' }
+    ])
+      expect(() => rows([create(copy)]), JSON.stringify(copy)).toThrow()
+    // Refused when the manifest is parsed, before any plan is built.
+    for (const website of ['http://localhost:3000/', 'http://10.0.0.1/', 'ftp://new.example/'])
+      expect(() => rows([create({ website })]), website).toThrow(/public HTTP\(S\) URL/u)
   })
 })
 
