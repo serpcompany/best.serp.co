@@ -9,9 +9,9 @@
 # Every listing and pick is a v1 import listing, with the same id and slug on staging and
 # production. The reason for each listing is the comment above its operation. Picks may come from
 # any category: Kapwing, Veed, Submagic, Captions, Gling and Fliki are filed under Video, Dubverse
-# and RadioNewsAI under Writing, and Soundraw under Image & Design. Free Subtitles AI
-# (freesubtitles.ai) now redirects to its new name, Subtitles.app, and RadioNewsAI (radionewsai.com)
-# to Audio.co; both still offer what their listings describe.
+# and RadioNewsAI under Writing, Soundraw under Image & Design, and Otter.ai under Productivity.
+# Free Subtitles AI (freesubtitles.ai) now redirects to its new name, Subtitles.app, and RadioNewsAI
+# (radionewsai.com) to Audio.co; both still offer what their listings describe.
 # Two listings have no operation, because nothing in the catalog substitutes for them: Cyanite
 # (cyanite.ai) and Dadabots (dadabots.com). Their pages keep the similar-listings fallback.
 # Five listings have no operation, because their sites no longer offer what the listing describes
@@ -87,6 +87,7 @@ operations:
     reason: '#539: hand-picked alternatives (batch E)'
     expected: []
     alternatives:
+      - { id: lst_23509d85df29e3b7df8551a8, slug: elevenlabs.io }
       - { id: lst_2cb80a795c682957b11959c1, slug: getwoord.com }
       - { id: lst_07f4546fc668173d6d72d9eb, slug: listnr.ai }
   # captioncreator.cc: automatic subtitles and transcripts for videos.
@@ -337,6 +338,7 @@ operations:
     expected: []
     alternatives:
       - { id: lst_3294db949b46ccc99cf3db6c, slug: sonix.ai }
+      - { id: lst_334360169f73c5a7620d44e0, slug: otter.ai }
       - { id: lst_0b03d81e39f11963863bb0f2, slug: scribewave.com }
       - { id: lst_a30522599fcde83935e94f40, slug: speechtext.ai }
       - { id: lst_5e219e55a6383ed91d0a6b84, slug: transkribieren.xyz }

@@ -14,17 +14,19 @@
 # (eraser.io), Sensible, Nanonets, Parseur, DocumentPro, FormX and Base64 under Productivity.
 # FinChat (finchat.io) now redirects to its new name, Fiscal.ai, and Vizly (www.vizly.fyi) to
 # legacy.vizly.ai; both still offer what their listings describe.
-# Eighteen listings have no operation, because nothing in the catalog substitutes for them: HASH
+# Seventeen listings have no operation, because nothing in the catalog substitutes for them: HASH
 # (hash.ai), Jadbio (jadbio.com), Jua (jua.ai), Jungle AI (jungle.ai), PowerBI AI Lens
 # (lensvisual.io), Mixpanel Spark (mixpanel.com), Neptyne (neptyne.com), Novacene (novacene.ai),
-# Obviously AI (obviously.ai), SPREEV (oneconnectsolutions.com), Pi Exchange (pi.exchange), Hachi
-# (ramanlabs.in), Source (source.ag), SyntheticAIdata (syntheticaidata.com), Syntho (syntho.ai),
-# Syntonym (syntonym.com), Trade Foresight (tradeforesight.com), and Zite (ziteai.com). Their pages
-# keep the similar-listings fallback.
-# Seven listings have no operation, because their sites no longer offer what the listing describes
-# (shut down, acquired, pivoted, or gone), and batch E's pull request lists them for retirement:
-# June AI (june.so), OtterTune (ottertune.com), EZQL (outerbase.com), Rows AI (rows.com), Sequin.io
-# (sequin.io), Skills AI Chat (skills.ai), and Structured Labs (structuredlabs.com).
+# SPREEV (oneconnectsolutions.com), Pi Exchange (pi.exchange), Hachi (ramanlabs.in), Source
+# (source.ag), SyntheticAIdata (syntheticaidata.com), Syntho (syntho.ai), Syntonym (syntonym.com),
+# Trade Foresight (tradeforesight.com), and Zite (ziteai.com). Their pages keep the similar-listings
+# fallback.
+# Nine listings have no operation, because their products are gone or abandoned (shut down,
+# acquired, archived, pivoted, or unchanged since 2022), and batch E's pull request lists them for
+# retirement: June AI (june.so), Obviously AI (obviously.ai), OtterTune (ottertune.com), EZQL
+# (outerbase.com), Raw Query (rawquery.com), Rows AI (rows.com), Sequin.io (sequin.io), Skills AI
+# Chat (skills.ai), and Structured Labs (structuredlabs.com). Defog (defog.ai), on batch D's retire
+# list, is not a pick either.
 # Each listing-alternatives-set compares and swaps the listing's slug and current picks (none yet),
 # refuses a pick that isn't live with that id and slug, keeps the listing's checksum, and logs an
 # `edited` event. Row-level, so the batch is refused with nothing written if any listing changed.
@@ -155,11 +157,9 @@ operations:
     expected: []
     alternatives:
       - { id: lst_d98c7c311d99f648f3086c7e, slug: blazesql.com }
-      - { id: lst_7ad8c88ff3119740f15a6fb8, slug: defog.ai }
       - { id: lst_901b319f2fe22af7c9ca2af3, slug: veezoo.com }
       - { id: lst_36888ee8f5819655c4fafcf2, slug: sqlai.ai }
       - { id: lst_8047c25091b53b2404dc5ef8, slug: vanna.ai }
-      - { id: lst_143235844ef7f5f28bd2c336, slug: rawquery.com }
   # numerous.ai: AI functions inside Google Sheets and Excel.
   - action: listing-alternatives-set
     id: lst_d7162c9cc6717150dbbec3ae
@@ -196,19 +196,6 @@ operations:
       - { id: lst_7f37574909354dbef4ad771d, slug: weaviate.io }
       - { id: lst_7bc6bf980a8e3f03ac59024d, slug: vespa.ai }
       - { id: lst_d55dff1d612f30fcbec99e92, slug: supabase.com }
-  # rawquery.com: asking databases questions in plain English.
-  - action: listing-alternatives-set
-    id: lst_143235844ef7f5f28bd2c336
-    slug: rawquery.com
-    reason: '#539: hand-picked alternatives (batch E)'
-    expected: []
-    alternatives:
-      - { id: lst_d98c7c311d99f648f3086c7e, slug: blazesql.com }
-      - { id: lst_36888ee8f5819655c4fafcf2, slug: sqlai.ai }
-      - { id: lst_59f7bfaf13d906bbced7ff55, slug: nlsql.com }
-      - { id: lst_7ad8c88ff3119740f15a6fb8, slug: defog.ai }
-      - { id: lst_8047c25091b53b2404dc5ef8, slug: vanna.ai }
-      - { id: lst_901b319f2fe22af7c9ca2af3, slug: veezoo.com }
   # recurly.com: subscription billing and recurring payments.
   - action: listing-alternatives-set
     id: lst_13df075e8b8ee5e41801daa2
@@ -366,12 +353,10 @@ operations:
     reason: '#539: hand-picked alternatives (batch E)'
     expected: []
     alternatives:
-      - { id: lst_7ad8c88ff3119740f15a6fb8, slug: defog.ai }
       - { id: lst_59f7bfaf13d906bbced7ff55, slug: nlsql.com }
       - { id: lst_d98c7c311d99f648f3086c7e, slug: blazesql.com }
       - { id: lst_901b319f2fe22af7c9ca2af3, slug: veezoo.com }
       - { id: lst_36888ee8f5819655c4fafcf2, slug: sqlai.ai }
-      - { id: lst_143235844ef7f5f28bd2c336, slug: rawquery.com }
   # veezoo.com: business users asking their data questions in plain English.
   - action: listing-alternatives-set
     id: lst_901b319f2fe22af7c9ca2af3
@@ -380,10 +365,8 @@ operations:
     expected: []
     alternatives:
       - { id: lst_d98c7c311d99f648f3086c7e, slug: blazesql.com }
-      - { id: lst_7ad8c88ff3119740f15a6fb8, slug: defog.ai }
       - { id: lst_59f7bfaf13d906bbced7ff55, slug: nlsql.com }
       - { id: lst_8047c25091b53b2404dc5ef8, slug: vanna.ai }
-      - { id: lst_143235844ef7f5f28bd2c336, slug: rawquery.com }
       - { id: lst_36888ee8f5819655c4fafcf2, slug: sqlai.ai }
   # vespa.ai: search and vector retrieval platforms for AI apps.
   - action: listing-alternatives-set
