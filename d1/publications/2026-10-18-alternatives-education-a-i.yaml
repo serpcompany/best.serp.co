@@ -12,9 +12,11 @@
 # Picks may come from any category: Wolfram|Alpha is filed under Chatbots & Agents, ChatMind and
 # ConceptMap.ai under Productivity, SciSummary and Summarist under Writing, ClientZen under
 # Marketing & SEO and Traq.ai under Business & Finance. Khanmigo has two listings (khanacademy.org,
-# khanmigo.ai); picks name khanmigo.ai only. Every listing and pick is a v1 import listing, with the
-# same id and slug on staging and production. The reason for each listing is the comment above its
-# operation.
+# khanmigo.ai); picks name khanmigo.ai only. Duolingo Max's Video Call is AI conversation practice,
+# so it is a pick for Call Annie and Gliglish. Two catalog listings are left out as picks: Polyglot
+# AI (polyglotchatbot.com; its only app is gone) and Quiz Makito (quizmakito.com; a self-study quiz
+# app last updated in 2023). Every listing and pick is a v1 import listing, with the same id and
+# slug on staging and production. The reason for each listing is the comment above its operation.
 # Eight listings have no operation. Four because nothing in the catalog substitutes for them: ES.AI
 # (college application essays), Hello History (chats with historical figures), Credly (digital
 # credentials) and IPscreener (patent research; the catalog's patent tools draft applications
@@ -55,9 +57,9 @@ operations:
     expected: []
     alternatives:
       - { id: lst_c93008caa82d38c2e470f80f, slug: praktika.ai }
+      - { id: lst_3f36b9035da3423302cd9480, slug: duolingo.com }
       - { id: lst_0a59f0c79c3bb736e8fbe5eb, slug: speak.com }
       - { id: lst_6d1a8853a12ec9a03fcc5cf1, slug: talkpal.ai }
-      - { id: lst_28ecd91990328f79a353549e, slug: polyglotchatbot.com }
       - { id: lst_00f10366fd528dafe86f3ccd, slug: gliglish.com }
       - { id: lst_ea2d5133fc2f47dd60d63b83, slug: langotalk.org }
   # collegetools.io: AI homework help for students (collegetools.io now redirects to Mindko, an LMS-integrated AI homework helper).
@@ -240,7 +242,7 @@ operations:
       - { id: lst_7ff2d19ecb44ec060a679ade, slug: questgen.ai }
       - { id: lst_5591723eb864ff51839b4aca, slug: quizbot.ai }
       - { id: lst_ce7bf56d63ff82aeeaf302fa, slug: opexams.com }
-      - { id: lst_86e096542477b9473889178a, slug: quizmakito.com }
+      - { id: lst_265202541480559a6ba7cf72, slug: teacherbot.io }
   # getsuperteacher.com: AI tutoring for young students.
   - action: listing-alternatives-set
     id: lst_32b279aa648471d268e5c283
@@ -261,9 +263,9 @@ operations:
       - { id: lst_6d1a8853a12ec9a03fcc5cf1, slug: talkpal.ai }
       - { id: lst_0a59f0c79c3bb736e8fbe5eb, slug: speak.com }
       - { id: lst_c93008caa82d38c2e470f80f, slug: praktika.ai }
+      - { id: lst_3f36b9035da3423302cd9480, slug: duolingo.com }
       - { id: lst_3c3b6e41758e60eb6c3d10e4, slug: talkio.ai }
       - { id: lst_ea2d5133fc2f47dd60d63b83, slug: langotalk.org }
-      - { id: lst_2a0e72af5ccd0492d4bdc610, slug: callannie.ai }
   # hallo.ai: AI language proficiency assessments.
   - action: listing-alternatives-set
     id: lst_e1da9cb3ca80a5fe7e8319a9

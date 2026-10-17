@@ -15,14 +15,17 @@
 # neither pair picks each other, and other listings name runwayml.com only. Every listing and pick
 # is a v1 import listing, with the same id and slug on staging and production. The reason for each
 # listing is the comment above its operation.
-# Ten listings have no operation. Three because nothing in the catalog substitutes for them:
+# Pixop now sells only to broadcasters, so it is not a pick for the self-serve upscalers (HitPaw,
+# Topaz Labs); its own listing keeps its picks. Shuffll still sells AI video, now personalized video
+# from customer data, so its picks follow the site.
+# Nine listings have no operation. Three because nothing in the catalog substitutes for them:
 # LiveReacting (interactive and pre-recorded live streams), Storylane (interactive product demos)
-# and VidDay (group video gifts). Seven because their sites don't offer the listed product today, so
+# and VidDay (group video gifts). Six because their sites don't offer the listed product today, so
 # they are retirement candidates and no listing picks them: Gemoo (a scheduled-maintenance page),
 # Munch (getmunch.com redirects to Munch Studio, a done-for-you social media service), Latte
-# (sunsetting), Oxolo (now construction documentation software), Shuffll (now personalized video
-# generated from customer data), Supercreator (sunset) and Vidnami (vidnamipro.com is an information
-# page about Vidnami). Their pages keep the similar-listings fallback.
+# (sunsetting), Oxolo (now construction documentation software), Supercreator (sunset) and Vidnami
+# (vidnamipro.com is an information page about Vidnami). Their pages keep the similar-listings
+# fallback.
 # Each listing-alternatives-set compares and swaps the listing's slug and current picks (none yet),
 # refuses a pick that isn't live with that id and slug, keeps the listing's checksum, and logs an
 # `edited` event. Row-level, so the batch is refused with nothing written if any listing changed.
@@ -78,7 +81,6 @@ operations:
       - { id: lst_b9856976c3c0384d249226a7, slug: topaz.ai }
       - { id: lst_7229e6b2efff762306abee48, slug: avc.ai }
       - { id: lst_801402b5de773e803e6921f9, slug: bigmp4.com }
-      - { id: lst_0e4b7edf089ea97cba9d00b5, slug: pixop.com }
   # image2video.ai: AI video generators that animate an image or a prompt.
   - action: listing-alternatives-set
     id: lst_9f45f8fb6002dd7830c55608
@@ -404,6 +406,15 @@ operations:
       - { id: lst_b59714ead0da10ecad522baf, slug: vidyo.ai }
       - { id: lst_1c31b52c7058468cf4e2c9dc, slug: choppity.com }
       - { id: lst_2eb25871f8f476c2d8279d1f, slug: clip.fm }
+  # shuffll.com: personalized videos generated at scale from customer data (the listing describes AI brand videos; the site now sells personalized video through an API).
+  - action: listing-alternatives-set
+    id: lst_4793ea5233a2e48cb74a5aa8
+    slug: shuffll.com
+    reason: '#539: hand-picked alternatives (batch C, 2026-10-18)'
+    expected: []
+    alternatives:
+      - { id: lst_609dfc9c5430eef33f3db59e, slug: bhuman.ai }
+      - { id: lst_2f7d0bc28a05c986f3ae8c48, slug: trymaverick.com }
   # steve.ai: AI text-to-video makers.
   - action: listing-alternatives-set
     id: lst_dc0472ad10f386c890c76d02
@@ -485,7 +496,6 @@ operations:
       - { id: lst_c825b2092f89feb41eefb02c, slug: hitpaw.com }
       - { id: lst_7229e6b2efff762306abee48, slug: avc.ai }
       - { id: lst_801402b5de773e803e6921f9, slug: bigmp4.com }
-      - { id: lst_0e4b7edf089ea97cba9d00b5, slug: pixop.com }
   # topazlabs.com: the listing is Topaz Photo AI: AI photo enhancement and upscaling.
   - action: listing-alternatives-set
     id: lst_c5601b3023caad2aee7c9dcf
@@ -507,6 +517,7 @@ operations:
     expected: []
     alternatives:
       - { id: lst_609dfc9c5430eef33f3db59e, slug: bhuman.ai }
+      - { id: lst_4793ea5233a2e48cb74a5aa8, slug: shuffll.com }
   # unscreen.com: removing the background from a video (unscreen.com now redirects to Canva's video background remover).
   - action: listing-alternatives-set
     id: lst_bd59a31139c6c8e19fe0b25f
