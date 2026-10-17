@@ -665,6 +665,17 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
     )
     expect(await submission('sub-rejected')).toMatchObject({ refunded_at: NOW, status: 'rejected' })
     expect(await refundPending()).not.toContain('sub-rejected')
+    // Its refund was recorded in the window the sweep sends "rejected and refunded" again (#514).
+    const recentlyRefunded = async (since: string, before: string) =>
+      (
+        await all<{ id: string }>(
+          S.selectRecentlyRefundedRejectionsPlan({ before, limit: 50, since })
+        )
+      ).map(row => row.id)
+    expect(await recentlyRefunded(NOW, '2026-10-06T12:00:01.000Z')).toEqual(['sub-rejected'])
+    expect(await recentlyRefunded('2026-10-06T12:00:01.000Z', '2026-10-06T13:00:00.000Z')).toEqual(
+      []
+    )
 
     // A payment held for review, and one that arrives after the owner withdrew.
     await insertDraft('sub-held', 'https://held.example/')
@@ -1624,6 +1635,23 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
     expect(await order('ord-dispute')).toMatchObject({
       attention: null,
       provider_refund_id: 're_dash'
+    })
+    // A `refund.failed`'s flag compares and swaps on `updated_at` as read before the provider was
+    // asked (#516's review): refused once the order changed, else it records the refund that failed.
+    const flagAsRead = (updatedAt: string) =>
+      B.buildFlagRefundFailedPlans({
+        disputed: true,
+        now: NOW,
+        orderId: 'ord-dispute',
+        refundId: 're_2',
+        updatedAt
+      })
+    await expect(run(flagAsRead('before'))).rejects.toThrow()
+    expect(await order('ord-dispute')).toMatchObject({ attention: null })
+    await run(flagAsRead(String((await order('ord-dispute'))?.updated_at)))
+    expect(await order('ord-dispute')).toMatchObject({
+      attention: 'refund_failed',
+      provider_refund_id: 're_2'
     })
     // The alerts the sweep sends again come from the events' outcomes.
     const event = {

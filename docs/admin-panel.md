@@ -153,6 +153,13 @@ nothing. The contract:
   once on a replay, and the decision answers its `email` as above. A first rejection can find the
   refund recorded too: a held submission refunded in Stripe before it was rejected (#473) gets
   "rejected and refunded" then (it used to get no email), and its replays send nothing more.
+- A refund the hook claimed but couldn't finish (Stripe down) is finished by a replay, the sweep's
+  run of the hook, the sweep's retry of the claimed refund, or an admin's "Refund…" on Orders. The
+  last two record the submission too and send the same email under the same event key (#514). A
+  refund made in Stripe's dashboard records the order, and the sweep's run of the hook then records
+  the submission and sends it. The sweep sends it again from ten minutes to six hours after the
+  refund is recorded (not once that refund failed), so a failed send isn't lost; the ledger sends
+  it once.
 - When the hook throws, the rejection stands. While the refund is pending, the decision answers
   `{ok: true, refundPending: true}`, and the refund stays pending for the next replay or sweep.
   Once the refund is recorded, it answers `refunded: true` with the email `not_sent` (the toast

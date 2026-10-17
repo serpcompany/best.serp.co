@@ -22,7 +22,11 @@ import type {
   SubmissionPlan,
   SubmissionStatus
 } from './schema'
-import { DISPUTE_DECIDES_REFUND_NOTE, selectRefundPendingSubmissionsPlan } from './submission-plans'
+import {
+  DISPUTE_DECIDES_REFUND_NOTE,
+  selectRecentlyRefundedRejectionsPlan,
+  selectRefundPendingSubmissionsPlan
+} from './submission-plans'
 import { selectActiveUrlBlockStatement } from './submissions'
 
 /**
@@ -471,9 +475,11 @@ export function buildRecordProviderRefundPlans(input: {
  * takedown of its listing, and a flag without one asserts no such dispute was recorded meanwhile,
  * so a dispute and a failed refund that race always meet (one of them takes the listing down).
  * Either refuses the batch once the order moved on. A `refunded` order records the refund that
- * failed (`refundId`: the provider's record's newest failed one, else the one the report names) as
- * its refund, so the admin's email for it is keyed on that refund however its events arrive
- * (#503); without one it keeps the refund it records.
+ * failed (`refundId`: the one a `refund.failed` names while the order isn't flagged or records it,
+ * #514, else the provider's record's newest failed one) as its refund, so the admin's email for it
+ * is keyed on that refund (#503); without one it keeps the refund it records. With `updatedAt`, it
+ * compares and swaps on `updated_at` as read before the provider was asked, so the refund decided
+ * on that read is never recorded over one a refund's failure recorded meanwhile (#516's review).
  */
 export function buildFlagRefundFailedPlans(input: {
   disputed?: boolean
@@ -482,17 +488,25 @@ export function buildFlagRefundFailedPlans(input: {
   refunded?: boolean
   /** The refund that failed, by the provider's record or its report (a `refunded` order only). */
   refundId?: string | null
+  /** The order's `updated_at` when the refund was decided (a `refunded` order only). */
+  updatedAt?: string | null
 }): StatementPlan[] {
   if (input.disputed || input.refunded) {
     const dispute = input.disputed
       ? `dispute_status IN ('open','lost')`
       : `COALESCE(dispute_status,'') NOT IN ('open','lost')`
+    const asRead = input.updatedAt ? ' AND updated_at=?' : ''
     return [
       {
         sql: `UPDATE orders SET attention='refund_failed',
             provider_refund_id=COALESCE(?,provider_refund_id),updated_at=?
-          WHERE id=? AND status='refunded' AND ${dispute}`,
-        params: [input.refundId ?? null, input.now, input.orderId]
+          WHERE id=? AND status='refunded' AND ${dispute}${asRead}`,
+        params: [
+          input.refundId ?? null,
+          input.now,
+          input.orderId,
+          ...(input.updatedAt ? [input.updatedAt] : [])
+        ]
       },
       assertPreviousStatementChangedOne(
         input.disputed ? 'order_refund_failed_disputed' : 'order_refund_failed_undisputed'
@@ -1079,6 +1093,15 @@ export interface BillingOperations {
     limit: number
     since: string
   }): Promise<OrderRecord[]>
+  /**
+   * `selectRecentlyRefundedRejectionsPlan`: paid submissions rejected as `other` whose refund was
+   * recorded in the window (#514), the "rejected and refunded" emails the sweep sends again.
+   */
+  recentlyRefundedRejections(input: {
+    before: string
+    limit: number
+    since: string
+  }): Promise<string[]>
   /** Paid submissions rejected as `other` whose refund isn't recorded yet, oldest first. */
   refundPendingSubmissions(limit: number): Promise<string[]>
   /** A rejected submission's category and reason. */
@@ -1199,6 +1222,13 @@ export function createBillingOperations(config: { client: Database }): BillingOp
     },
     async recentlyAppliedOrders(input) {
       return (await queryPlan<Row>(client, selectRecentlyAppliedOrdersPlan(input))).map(toOrder)
+    },
+    async recentlyRefundedRejections(input) {
+      const rows = await queryPlan<{ id: string }>(
+        client,
+        selectRecentlyRefundedRejectionsPlan(input)
+      )
+      return rows.map(row => String(row.id))
     },
     async refundPendingSubmissions(limit) {
       const rows = await queryPlan<{ id: string }>(

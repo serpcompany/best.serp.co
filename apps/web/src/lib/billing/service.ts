@@ -88,8 +88,8 @@ const SWEEP_PROVIDER_CALLS = 20
 const PUBLICATION_ATTEMPTS = 3
 /**
  * How many times a refund event decides an order's `refund_failed` flag on the provider's record
- * before its delivery answers 500 (#498's review): a clear refused because the order changed
- * while the provider was asked reads both again once.
+ * before its delivery answers 500 (#498's review): a clear, or a `refund.failed`'s flag (#516's
+ * review), refused because the order changed while the provider was asked reads both again once.
  */
 const REFUND_FLAG_DECISIONS = 2
 /**
@@ -1101,8 +1101,9 @@ const SITE_REFUND: ReturnedRefund = { outside: false, refundId: null }
  * What the provider records of an order's payment now (#486): whether its refunds that haven't
  * failed send all of it back (`returned`), and the one that sends the money back (the site's own,
  * by the order it names, else the newest), and the newest that failed or was canceled (`failed`,
- * the refund a flag records, #503), or the provider's error when it couldn't say. The error is
- * null when retrying wouldn't help: nothing to ask about, or a key refused the read.
+ * the refund a flag records unless a report names its own, #503, #514), or the provider's error
+ * when it couldn't say. The error is null when retrying wouldn't help: nothing to ask about, or a
+ * key refused the read.
  */
 type RefundsAtProvider =
   | {
@@ -1466,28 +1467,75 @@ export async function refundRejectedSubmission(
 
 /**
  * The owner's rejection email: "rejected and refunded", or the plain rejection when nothing went
- * back (a 100%-off order charged nothing, #250; a disputed payment, #483).
+ * back (a 100%-off order charged nothing, #250; a disputed payment, #483). `recover`: the sweep's
+ * resend (#514).
  */
 async function emailRejection(
   deps: BillingDependencies,
   submission: CheckoutSubmission,
   review: { reason: string },
-  refundedCents: number
+  refundedCents: number,
+  recover = false
 ): Promise<void> {
   if (!submission.ownerEmail) return
-  const eventKey = deps.eventKey('submission-rejected', submission.id)
+  const request = {
+    eventKey: deps.eventKey('submission-rejected', submission.id),
+    ...(recover ? { recover: true } : {}),
+    to: submission.ownerEmail
+  }
   const rejected = {
     reason: review.reason,
     submissionId: submission.id,
     submissionName: submission.name
   }
   await (refundedCents === 0
-    ? deps.notify('submission-rejected', { eventKey, input: rejected, to: submission.ownerEmail })
+    ? deps.notify('submission-rejected', { ...request, input: rejected })
     : deps.notify('submission-rejected-refunded', {
-        eventKey,
-        input: { ...rejected, refundedCents },
-        to: submission.ownerEmail
+        ...request,
+        input: { ...rejected, refundedCents }
       }))
+}
+
+/**
+ * "Rejected and refunded" for a rejection whose refund is recorded (#514): the submission rejected
+ * as `other` and recorded refunded, its order `refunded` and not flagged `refund_failed` (the money
+ * went back). It goes under the rejection's event key, so the email ledger sends it once whichever
+ * path recorded the refund: the decision and its replays, the sweep's retry, an admin's "Refund…",
+ * or the provider's report and then the sweep. True when it was asked to send.
+ */
+async function emailRefundedRejection(
+  deps: BillingDependencies,
+  submissionId: string,
+  recover = false
+): Promise<boolean> {
+  const submission = await deps.operations.checkoutSubmission(submissionId)
+  if (submission?.status !== 'rejected' || submission.refundedAt === null) return false
+  const review = await deps.operations.rejection(submissionId)
+  if (review?.category !== 'other') return false
+  const order = await deps.operations.submissionPaymentOrder(submissionId)
+  if (order?.status !== 'refunded' || order.attention === 'refund_failed') return false
+  await emailRejection(deps, submission, review, order.chargedCents ?? order.amountCents, recover)
+  return true
+}
+
+/**
+ * Tells the owner of a rejection whose claimed refund was finished outside the rejection's own
+ * refund (`refundRejectedSubmission`): by the sweep's retry, or an admin's "Refund…" of one a
+ * failure left. Finishing it records the submission refunded too, which takes it off the
+ * refund-pending list the rejection's own refund emails from, so nothing else would (#514). A
+ * failure is logged, not thrown: the refund is recorded, and the sweep sends the email again
+ * (`recoverEmails`).
+ */
+async function emailFinishedRejection(
+  deps: BillingDependencies,
+  order: Pick<OrderRecord, 'id' | 'refundReason' | 'submissionId'>
+): Promise<void> {
+  if (order.refundReason !== 'rejected' || !order.submissionId) return
+  try {
+    await emailRefundedRejection(deps, order.submissionId)
+  } catch (error) {
+    logError('billing_rejection_email_failed', error, { order: order.id })
+  }
 }
 
 export type RefundOrderResult =
@@ -1651,7 +1699,11 @@ export async function refundOrder(
   if (order.status === 'refunded') {
     return { listing: await finishRefund(deps, order.id), ok: true, replayed: true }
   }
-  if (order.status === 'refunding') return finishAdminRefund(deps, order.id, false)
+  if (order.status === 'refunding') {
+    const answer = await finishAdminRefund(deps, order.id, false)
+    await emailFinishedRejection(deps, order)
+    return answer
+  }
   if (order.status !== 'paid') {
     return failure(409, 'not_refundable', 'Only a paid order can be refunded.')
   }
@@ -2134,13 +2186,21 @@ async function alertPartialRefund(
  * refunds decides (#486), whatever order their events arrive in: when its refunds that haven't
  * failed still send all of it back (a later refund did, its report delivered first), nothing is
  * flagged, and a flag set while the provider couldn't say is cleared. Otherwise the money never
- * went back (`flagRefundFailedNow`), and a `refunded` order records the newest refund the
- * provider's record says failed, whichever report flags it (#503), so a late report of an older
- * refund can't overwrite it. When the provider can't say, the report decides as before:
- * a failure of a refund other than the one the order records (`provider_refund_id`: an earlier
- * one, reported after a newer one succeeded, #485) flags nothing; the error then answers the
- * delivery 500, so the provider's retry checks again. A clear the order changed under while the
- * provider was asked reads both again, as `settleRefundFlag`'s does.
+ * went back (`flagRefundFailedNow`). A `refunded` order not flagged yet records the refund the
+ * report names, so its own email goes even when an older or newer refund's failure emailed under
+ * another (#514: a refund cleared that flag since). One flagged already keeps the refund it records
+ * when the report names that one, so a report processed again retries its email under the same
+ * key, as the sweep's resend does (#516's review). A report of another refund records the newest
+ * refund the provider's record says failed (#503), as a `charge.refunded` that flagged it did, so
+ * the `refund.failed` of that refund, landing after it, sends no second email. When the provider
+ * can't say, the report decides as before: a failure of a refund other than the one the order
+ * records (`provider_refund_id`: an earlier one, reported after a newer one succeeded, #485) flags
+ * nothing; the error then answers the delivery 500, so the provider's retry checks again. A clear
+ * or a flag the order changed under while the provider was asked (both compare and swap on its
+ * `updated_at`) reads both again, as `settleRefundFlag`'s clear does: a refund decided on a stale
+ * read is never recorded over one a concurrent report recorded meanwhile, whose email would then
+ * never be sent again (#516's review). When that keeps losing, nothing is recorded and the delivery
+ * answers 500.
  */
 async function flagRefundFailed(
   deps: BillingDependencies,
@@ -2161,12 +2221,24 @@ async function flagRefundFailed(
       log('billing_refund_failed_superseded', { order: current.id })
       return 'refund_failed_superseded'
     }
+    // The refund that failed: the one the report names while the order isn't flagged, or when it
+    // names the refund the flagged order records (#514), else the provider's record's newest failed
+    // one, as the flag recorded it (#503).
+    const flaggedOther =
+      current.attention === 'refund_failed' && refundId !== current.providerRefundId
+    let failedRefundId = refundId
+    if (atProvider.checked && (refundId === null || flaggedOther)) {
+      failedRefundId = atProvider.failed?.id ?? refundId
+    }
     const outcome = await flagRefundFailedNow(
       deps,
       current,
       atProvider.checked ? null : refundId,
-      atProvider.checked ? (atProvider.failed?.id ?? refundId) : refundId
+      failedRefundId,
+      true
     )
+    // The order changed while the provider was asked: read both again and decide again.
+    if (outcome === null) continue
     if (!atProvider.checked && atProvider.error) throw atProvider.error
     return outcome
   }
@@ -2184,20 +2256,41 @@ async function flagRefundFailed(
  * recorded meanwhile, so the dispute's own takedown reads the flag. `unlessSupersededBy`: when the
  * provider couldn't say (#486), a failure of a refund other than the one the order records flags
  * nothing; one with no recorded refund (blanked when a refund outside the site cleared the flag)
- * always flags. `failedRefundId`: the refund that failed (the newest failed one in the provider's
- * record, else the one the report names), which a `refunded` order then records as its refund, so
- * the admin's email names that refund however its reports arrive (`alertKey`, #503). Three lost
- * writes throw, so the provider's retry runs it again.
+ * always flags. `failedRefundId`: the refund that failed (`flagRefundFailed`'s: the one its report
+ * names while the order isn't flagged or records that one, #514, else the newest failed one in the
+ * provider's record; `settleRefundFlag`'s: that newest one), which a `refunded` order then records
+ * as its refund, so the admin's email is keyed on that refund (`alertKey`, #503). `asRead`
+ * (`flagRefundFailed`'s, #516's review): that refund was decided on `order` as read before the
+ * provider was asked, so a `refunded` order's write compares and swaps on its `updated_at`. Once
+ * the order changed (a newer refund's failure recorded meanwhile, say), it records and sends
+ * nothing and returns null, and the caller decides again; a write lost on an unchanged order (the
+ * catalog publication race) is tried again. Three lost writes throw, so the provider's retry runs
+ * it again.
  */
+function flagRefundFailedNow(
+  deps: BillingDependencies,
+  order: OrderRecord,
+  unlessSupersededBy: string | null,
+  failedRefundId?: string | null
+): Promise<string>
+function flagRefundFailedNow(
+  deps: BillingDependencies,
+  order: OrderRecord,
+  unlessSupersededBy: string | null,
+  failedRefundId: string | null,
+  asRead: true
+): Promise<string | null>
 async function flagRefundFailedNow(
   deps: BillingDependencies,
   order: OrderRecord,
   unlessSupersededBy: string | null,
-  failedRefundId: string | null = null
-): Promise<string> {
+  failedRefundId: string | null = null,
+  asRead = false
+): Promise<string | null> {
   for (let attempt = 0; attempt < PUBLICATION_ATTEMPTS; attempt += 1) {
     const current = attempt === 0 ? order : await deps.operations.order(order.id)
     if (!current) return 'unknown_order'
+    if (asRead && current.updatedAt !== order.updatedAt) return null
     // An earlier refund's failure, reported after a newer one (the site's retry once its request
     // key expired) succeeded and was recorded (#485): the money went back, so it flags nothing.
     if (
@@ -2218,7 +2311,8 @@ async function flagRefundFailedNow(
         now: nowIso(deps),
         orderId: current.id,
         refunded,
-        refundId: failedRefundId
+        refundId: failedRefundId,
+        updatedAt: asRead ? order.updatedAt : null
       })
     ])
     if (flagged) {
@@ -2291,7 +2385,8 @@ async function alertKey(
 /**
  * Sends again the emails of payments applied, or changed outside the site, in the recovery
  * window (#481): the webhook answers before its fulfilment, so an apply late in `waitUntil`'s
- * 30 seconds, or a Worker stopped after it, may never send them. The email ledger sends each
+ * 30 seconds, or a Worker stopped after it, may never send them. So too the "rejected and
+ * refunded" of rejections whose refund was recorded in it (#514). The email ledger sends each
  * once, and re-claims an attempt cut off mid-send while the provider's idempotency key makes a
  * repeat harmless.
  */
@@ -2346,6 +2441,17 @@ async function recoverEmails(
       logError('billing_sweep_email_failed', error, { order: orderId })
     }
   }
+  // A rejection's refund recorded in the window (#514): once recorded, nothing lists it again, so
+  // a "rejected and refunded" whose send failed (the sweep's, or a decision's no one retried) goes
+  // again here.
+  for (const submissionId of await deps.operations.recentlyRefundedRejections(window)) {
+    try {
+      if (await emailRefundedRejection(deps, submissionId, true)) counts.emails += 1
+    } catch (error) {
+      counts.errors += 1
+      logError('billing_sweep_email_failed', error, { submission: submissionId })
+    }
+  }
   return counts
 }
 
@@ -2354,13 +2460,13 @@ async function recoverEmails(
 
 /**
  * The hourly sweep: retries refunds still owed after an `other` rejection, finishes claimed
- * refunds a failure left, asks the provider about pending orders whose checkout has closed (paid
- * → applied; otherwise failed) and about failed orders still inside the provider's retry window
- * (a superseded checkout paid late), and applies paid orders left unapplied: usually by a
- * webhook fulfilment that failed or ran out of time after its answer (#468), or a Worker stopped
- * before applying. It then sends again the recent emails that may not have gone
- * (`recoverEmails`, #481). Each item is independent; a failure is logged and retried on the
- * next run.
+ * refunds a failure left (a rejection's with its "rejected and refunded", #514), asks the
+ * provider about pending orders whose checkout has closed (paid → applied; otherwise failed) and
+ * about failed orders still inside the provider's retry window (a superseded checkout paid late),
+ * and applies paid orders left unapplied: usually by a webhook fulfilment that failed or ran out
+ * of time after its answer (#468), or a Worker stopped before applying. It then sends again the
+ * recent emails that may not have gone (`recoverEmails`, #481). Each item is independent; a
+ * failure is logged and retried on the next run.
  */
 export async function runBillingSweep(
   deps: BillingDependencies,
@@ -2390,6 +2496,7 @@ export async function runBillingSweep(
       if (order.status === 'refunding') {
         await finishRefund(deps, order.id)
         counts.refunds += 1
+        await emailFinishedRejection(deps, order)
         continue
       }
       if (order.status === 'paid') {

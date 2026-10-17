@@ -1190,3 +1190,22 @@ export function selectRefundPendingSubmissionsPlan(limit: number): StatementPlan
     params: [DISPUTE_DECIDES_REFUND_NOTE, limit]
   }
 }
+
+/**
+ * Paid submissions rejected as `other` whose refund was recorded (`refunded_at`) in the window,
+ * oldest first (#514): the "rejected and refunded" emails #68's sweep sends again, since a recorded
+ * refund leaves `selectRefundPendingSubmissionsPlan` and nothing else lists it.
+ */
+export function selectRecentlyRefundedRejectionsPlan(input: {
+  before: string
+  limit: number
+  since: string
+}): StatementPlan {
+  return {
+    sql: `SELECT s.id FROM listing_submissions s
+      WHERE s.status='rejected' AND s.rejection_category='other' AND s.paid_at IS NOT NULL
+        AND s.refunded_at>=? AND s.refunded_at<?
+      ORDER BY s.refunded_at,s.id LIMIT ?`,
+    params: [input.since, input.before, input.limit]
+  }
+}

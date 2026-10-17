@@ -164,8 +164,9 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
   (`unapplied`); a withdrawn submission records it with `buildRecordUnappliedPaymentPlans`.
 - **Rejection refund.** Rejecting a paid submission as `other` refunds its order through the admin
   panel's `AdminRefunds` hook and sends `submission-rejected-refunded`; `prohibited` never
-  refunds. The hook runs after the rejection, on every replay, and from the sweep. A disputed
-  payment is not refunded while its dispute is open or lost (#483,
+  refunds. The hook runs after the rejection, on every replay, and from the sweep. Whatever
+  finishes the refund, the owner gets that email once (#514, [details](./admin-panel.md#refunds)).
+  A disputed payment is not refunded while its dispute is open or lost (#483,
   [details](./billing-disputes.md#disputes)).
 - **Refund from Orders.** `/admin/orders/` (#70 screen 13) lists orders. "Refund…" first asks
   `POST /api/admin/orders/<id>/refund-preview`, which decides the refund and, for a live paid
@@ -194,9 +195,11 @@ payment nor a refund undo an applied one. Provider calls carry idempotency keys
   checkout closed (paid → applied, otherwise `failed`), failed orders whose superseded checkout
   couldn't be confirmed expired (for three days; it expires an open one and drops one Stripe
   expired), then refunds still owed after an `other` rejection. Last, it sends again the emails of
-  payments applied, and the admin alerts of payment events (#473; a failed refund's only while its
-  order is still flagged, #503), between ten minutes and six hours ago (#481): an apply late in
-  `waitUntil`'s 30 seconds, or a Worker stopped after it, may never have sent them. The email ledger
+  payments applied, the admin alerts of payment events (#473; a failed refund's only while its
+  order is still flagged, #503), and the "rejected and refunded" of rejections whose refund was
+  recorded (#514; not once that refund failed), between ten minutes and six hours ago (#481): an
+  apply late in `waitUntil`'s 30 seconds, or a Worker stopped after it, may never have sent them,
+  and nothing lists a recorded refund again. The email ledger
   sends each once, and claims again a send cut off mid-way while useSend's idempotency key still
   answers a repeat with the original message ([Email](./email.md)).
 
