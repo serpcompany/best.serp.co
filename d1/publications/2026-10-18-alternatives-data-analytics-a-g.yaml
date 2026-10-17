@@ -11,13 +11,14 @@
 # any category: Stripe, Paddle, Orb and Genius Sheets are filed under Business & Finance,
 # AIHelperBot (sqlai.ai), Caspio, Knack and Glide under Developer Tools, and DiagramGPT (eraser.io)
 # and GPT Workspace under Productivity.
-# Five listings have no operation, because nothing in the catalog substitutes for them: Byterat
-# (byterat.io), Cradle AI (cradle.bio), Datasette ChatGPT plugin (datasette.io), Goodlookup
-# (goodlookup.com), and Granica (granica.ai). Their pages keep the similar-listings fallback.
-# Seven listings have no operation, because their sites no longer offer what the listing describes
-# (pivoted, acquired, or unreachable), and batch D's pull request lists them for retirement:
-# Cybertiks (cybertiks.com), Dolly by Databricks (databricks.com), Findly (findly.ai), Channel
-# (fluenthq.com), ChatGPT in Google Sheets (gox.ai), Gretel (gretel.ai), and GRID 2.0 (grid.is).
+# Four listings have no operation, because nothing in the catalog substitutes for them: Byterat
+# (byterat.io), Cradle AI (cradle.bio), Goodlookup (goodlookup.com), and Granica (granica.ai).
+# Their pages keep the similar-listings fallback.
+# Nine listings have no operation, because their sites no longer offer what the listing describes
+# (pivoted, acquired, discontinued, or unreachable), and batch D's pull request lists them for
+# retirement: Cybertiks (cybertiks.com), Dolly by Databricks (databricks.com), Datasette ChatGPT
+# plugin (datasette.io), Defog (defog.ai), Findly (findly.ai), Channel (fluenthq.com), ChatGPT in
+# Google Sheets (gox.ai), Gretel (gretel.ai), and GRID 2.0 (grid.is).
 # Each listing-alternatives-set compares and swaps the listing's slug and current picks (none yet),
 # refuses a pick that isn't live with that id and slug, keeps the listing's checksum, and logs an
 # `edited` event. Row-level, so the batch is refused with nothing written if any listing changed.
@@ -40,7 +41,6 @@ operations:
       - { id: lst_36888ee8f5819655c4fafcf2, slug: sqlai.ai }
       - { id: lst_d98c7c311d99f648f3086c7e, slug: blazesql.com }
       - { id: lst_1b9a79c3283cf942e2a093c7, slug: dbpilot.io }
-      - { id: lst_143235844ef7f5f28bd2c336, slug: rawquery.com }
       - { id: lst_59f7bfaf13d906bbced7ff55, slug: nlsql.com }
   # baremetrics.com: subscription revenue analytics (MRR, churn); Chargebee and Recurly include it with billing.
   - action: listing-alternatives-set
@@ -60,10 +60,8 @@ operations:
     expected: []
     alternatives:
       - { id: lst_36888ee8f5819655c4fafcf2, slug: sqlai.ai }
-      - { id: lst_7ad8c88ff3119740f15a6fb8, slug: defog.ai }
       - { id: lst_901b319f2fe22af7c9ca2af3, slug: veezoo.com }
       - { id: lst_59f7bfaf13d906bbced7ff55, slug: nlsql.com }
-      - { id: lst_143235844ef7f5f28bd2c336, slug: rawquery.com }
       - { id: lst_8047c25091b53b2404dc5ef8, slug: vanna.ai }
   # boloforms.com: AI formula generators for Excel and Google Sheets.
   - action: listing-alternatives-set
@@ -121,6 +119,7 @@ operations:
     alternatives:
       - { id: lst_a9a868f81f9ca7185b0a42c4, slug: vizly.fyi }
       - { id: lst_7487a5e75daae5669a95c513, slug: gptexcel.uk }
+      - { id: lst_b353697b1fc37fb8c828a699, slug: magictool.ai }
       - { id: lst_14463cf060bcc3080c31bcf6, slug: tomat.ai }
       - { id: lst_367184ac70d03d1fa0acd414, slug: kanaries.net }
   # coactive.ai: AI that understands, searches and tags video and image libraries.
@@ -187,19 +186,6 @@ operations:
     expected: []
     alternatives:
       - { id: lst_6bb3c650690fab4f0481bc8d, slug: hex.tech }
-  # defog.ai: natural-language questions over company databases.
-  - action: listing-alternatives-set
-    id: lst_7ad8c88ff3119740f15a6fb8
-    slug: defog.ai
-    reason: '#539: hand-picked alternatives (batch D)'
-    expected: []
-    alternatives:
-      - { id: lst_8047c25091b53b2404dc5ef8, slug: vanna.ai }
-      - { id: lst_59f7bfaf13d906bbced7ff55, slug: nlsql.com }
-      - { id: lst_d98c7c311d99f648f3086c7e, slug: blazesql.com }
-      - { id: lst_901b319f2fe22af7c9ca2af3, slug: veezoo.com }
-      - { id: lst_143235844ef7f5f28bd2c336, slug: rawquery.com }
-      - { id: lst_36888ee8f5819655c4fafcf2, slug: sqlai.ai }
   # drawsql.app: database schema diagrams.
   - action: listing-alternatives-set
     id: lst_45e291e544773814213761b0

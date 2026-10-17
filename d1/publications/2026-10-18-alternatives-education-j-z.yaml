@@ -17,11 +17,11 @@
 # (kodekloud.com), Lablab.ai (lablab.ai), Locus (locusextension.com), Moonbeam Exchange
 # (moonbeamexchange.com), Course: Building No-Code Apps with AI (nocode.mba), SynthaceGPT
 # (synthace.com), and Tarteel (tarteel.ai). Their pages keep the similar-listings fallback.
-# Eight listings have no operation, because their sites no longer offer what the listing describes
-# (pivoted, down, or only a waitlist), and batch D's pull request lists them for retirement: AI
-# Tutor (myapps.ai), Whiteboard (mywhiteboard.ai), Vocabulary Lesson Generator (polyglotmedia.com),
-# Prepsup (prepsup.com), ProfBot (profbot.ai), Talkberry - mock interview (talkberry.ai), Teacherbot
-# (teacherbot.io), and Typpo (typpo.app).
+# Seven listings have no operation, because their sites no longer offer what the listing describes
+# (pivoted, down, abandoned, or only a waitlist), and batch D's pull request lists them for
+# retirement: AI Tutor (myapps.ai), Whiteboard (mywhiteboard.ai), Polyglot AI (polyglotchatbot.com),
+# Prepsup (prepsup.com), ProfBot (profbot.ai), Talkberry - mock interview (talkberry.ai), and Typpo
+# (typpo.app).
 # Each listing-alternatives-set compares and swaps the listing's slug and current picks (none yet),
 # refuses a pick that isn't live with that id and slug, keeps the listing's checksum, and logs an
 # `edited` event. Row-level, so the batch is refused with nothing written if any listing changed.
@@ -127,7 +127,6 @@ operations:
     expected: []
     alternatives:
       - { id: lst_348c2a856020ff1f58d7ce56, slug: langchats.com }
-      - { id: lst_28ecd91990328f79a353549e, slug: polyglotchatbot.com }
       - { id: lst_3f36b9035da3423302cd9480, slug: duolingo.com }
   # litgrades.com: AI flashcards, notes and quizzes for studying.
   - action: listing-alternatives-set
@@ -213,19 +212,17 @@ operations:
       - { id: lst_1d8354603dcb780e93fa5885, slug: docanalyzer.ai }
       - { id: lst_478f9886562c132a50f1df62, slug: pdf.ai }
       - { id: lst_b124dfe52f3e7567e99e8158, slug: docalysis.com }
-  # polyglotchatbot.com: chatting with an AI partner to practise a language.
+  # polyglotmedia.com: AI language-lesson generators (its generator is behind a free sign-up).
   - action: listing-alternatives-set
-    id: lst_28ecd91990328f79a353549e
-    slug: polyglotchatbot.com
+    id: lst_f8ba10da1e966bf3227e2215
+    slug: polyglotmedia.com
     reason: '#539: hand-picked alternatives (batch D)'
     expected: []
     alternatives:
-      - { id: lst_348c2a856020ff1f58d7ce56, slug: langchats.com }
-      - { id: lst_6d1a8853a12ec9a03fcc5cf1, slug: talkpal.ai }
-      - { id: lst_c93008caa82d38c2e470f80f, slug: praktika.ai }
-      - { id: lst_0a59f0c79c3bb736e8fbe5eb, slug: speak.com }
-      - { id: lst_ea2d5133fc2f47dd60d63b83, slug: langotalk.org }
-      - { id: lst_3c3b6e41758e60eb6c3d10e4, slug: talkio.ai }
+      - { id: lst_839ba3c4bd971342505362aa, slug: twee.com }
+      - { id: lst_46422b3a2b981a22f9bfd817, slug: roshi.ai }
+      - { id: lst_70c6c51767ec5c4ea7539db6, slug: to-teach.ai }
+      - { id: lst_5e07a75e1ba6765b586b7d27, slug: lessonplans.ai }
   # practicetalking.net: AI conversations with famous people and historical figures.
   - action: listing-alternatives-set
     id: lst_5b005d1779b5c1d460459b61
@@ -255,10 +252,10 @@ operations:
     expected: []
     alternatives:
       - { id: lst_5591723eb864ff51839b4aca, slug: quizbot.ai }
-      - { id: lst_4fad3a5c7605b41003706dcb, slug: quizgecko.com }
       - { id: lst_bf54657e4eef9d9bba1e7fff, slug: getquizwizard.com }
       - { id: lst_86e096542477b9473889178a, slug: quizmakito.com }
       - { id: lst_ce7bf56d63ff82aeeaf302fa, slug: opexams.com }
+      - { id: lst_4fad3a5c7605b41003706dcb, slug: quizgecko.com }
   # quilgo.com: running and grading online tests.
   - action: listing-alternatives-set
     id: lst_3a9c9c72d958a425029c41b2
@@ -275,10 +272,10 @@ operations:
     expected: []
     alternatives:
       - { id: lst_7ff2d19ecb44ec060a679ade, slug: questgen.ai }
-      - { id: lst_4fad3a5c7605b41003706dcb, slug: quizgecko.com }
       - { id: lst_bf54657e4eef9d9bba1e7fff, slug: getquizwizard.com }
       - { id: lst_86e096542477b9473889178a, slug: quizmakito.com }
       - { id: lst_ce7bf56d63ff82aeeaf302fa, slug: opexams.com }
+      - { id: lst_4fad3a5c7605b41003706dcb, slug: quizgecko.com }
   # quizgecko.com: AI practice quizzes and flashcards from your study material.
   - action: listing-alternatives-set
     id: lst_4fad3a5c7605b41003706dcb
@@ -510,6 +507,17 @@ operations:
       - { id: lst_ea2d5133fc2f47dd60d63b83, slug: langotalk.org }
       - { id: lst_3c3b6e41758e60eb6c3d10e4, slug: talkio.ai }
       - { id: lst_3f36b9035da3423302cd9480, slug: duolingo.com }
+  # teacherbot.io: AI quiz makers for teachers (the site now makes quizzes for live class games).
+  - action: listing-alternatives-set
+    id: lst_265202541480559a6ba7cf72
+    slug: teacherbot.io
+    reason: '#539: hand-picked alternatives (batch D)'
+    expected: []
+    alternatives:
+      - { id: lst_5591723eb864ff51839b4aca, slug: quizbot.ai }
+      - { id: lst_7ff2d19ecb44ec060a679ade, slug: questgen.ai }
+      - { id: lst_bf54657e4eef9d9bba1e7fff, slug: getquizwizard.com }
+      - { id: lst_ce7bf56d63ff82aeeaf302fa, slug: opexams.com }
   # teachermatic.com: AI tools for teachers.
   - action: listing-alternatives-set
     id: lst_890beb9ed0bf9737a1ae2e97
