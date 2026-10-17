@@ -1,0 +1,36 @@
+# serpcompany/best.serp.co#546, the follow-up to 2026-10-18-retire-dead-listings.yaml, which
+# unpublishes these 2 listings: each has a clear successor in the catalog, so its URL answers a
+# permanent redirect (308) to the successor's page instead of 410 Gone, which keeps the retired
+# URL's links and sends visitors to the product (the SEO rule for public URLs, AGENTS.md).
+# Each operation is a listing-slug-redirect: one listing_slug_redirects row (successor id, retired
+# slug, successor slug). The retired rows stay unpublished, so they stay out of the sitemap, search,
+# RSS and category pages; Republish in /admin still brings one back, its live page then winning
+# over the redirect. -retire-dead-listings' comments give the evidence (checked 2026-10-18).
+# Publish after 2026-10-18-retire-dead-listings.yaml on the same environment: until then the
+# retired listings are live and every operation refuses. Row-level: the batch refuses whole, with
+# nothing written, if a retired listing isn't unpublished, a successor isn't live (or its id or slug
+# changed), a retired slug already redirects, or a redirect would chain. Apply staging first, then
+# production after promotion.
+version: 1
+id: 2026-10-18-retire-dead-listings-redirects
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  - action: listing-slug-redirect
+    from:
+      id: lst_e46c716e49f17b17301f2fab
+      slug: takomo.ai
+    to:
+      id: lst_20b9297ba604b6d4b976027b
+      slug: datacrunch.io
+    reason: "#546 successor (checked 2026-10-18): takomo.ai redirects to verda.com, the renamed DataCrunch"
+  - action: listing-slug-redirect
+    from:
+      id: lst_0d34a5b3397b463214cf708e
+      slug: onlyfans-bulk-downloader
+    to:
+      id: lst_4251455a4d740603c89dd58a
+      slug: onlyfans-downloader
+    reason: "#546 successor (checked 2026-10-18): no Bulk product; its link already opens OnlyFans Downloader"
