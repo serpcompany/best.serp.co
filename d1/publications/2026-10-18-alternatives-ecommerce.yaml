@@ -5,10 +5,12 @@
 # (https://best.serp.co/sitemap-products.xml, read that day), by what each listing and its
 # candidates say they do: a pick does the same job for the same kind of user, best first, and a
 # listing gets fewer than six, or none, when nothing else fits. Picks may come from any category:
-# Square, Squarespace, Mixo, Wix ADI and Weblium (website builders that sell online), Shogun (a
-# Shopify storefront builder), and Ecomtent, Productify and TreeBrain (AI product-listing copy) are
-# filed elsewhere. Every listing and pick is a v1 import listing, with the same id and slug on
-# staging and production. The reason for each listing is the comment above its operation.
+# Square, Squarespace, Wix ADI and Weblium (website builders that sell online), Shogun (a Shopify
+# storefront builder), and Ecomtent, CopyMonkey and TreeBrain (AI product-listing copy) are filed
+# elsewhere. Klevu and Searchspring are now one company, Athos Commerce (both sites say so), so
+# neither picks the other, and no listing picks both. Every listing and pick is a v1 import
+# listing, with the same id and slug on staging and production. The reason for each listing is the
+# comment above its operation.
 # Eight listings have no operation, because nothing in the catalog substitutes for them: Broadn (B2B
 # quote-to-cash), BuyLensAI (a shopping extension that saves and compares products), Dropy AI (AI
 # dropshipping automation), Looria (shoppers' product research from independent reviews), PPSPY
@@ -39,7 +41,8 @@ operations:
       - { id: lst_bd08a9050b30eb82283e0e47, slug: shift4shop.com }
       - { id: lst_fdf3ce3e8182c946ffe8f4e5, slug: ecwid.com }
       - { id: lst_c15f52c9dcf33b02da879cbf, slug: squarespace.com }
-  # boostcommerce.net: AI product search, filtering and merchandising for online stores.
+  # boostcommerce.net: AI product search, filtering and merchandising for online stores
+  # (Searchspring is left out: it and Klevu are one company now).
   - action: listing-alternatives-set
     id: lst_311304b2dfab23090c6cf3e8
     slug: boostcommerce.net
@@ -47,11 +50,10 @@ operations:
     expected: []
     alternatives:
       - { id: lst_41b1190f2301849601ed43f5, slug: klevu.com }
-      - { id: lst_66b61375ad57b219b13b3b86, slug: searchspring.com }
       - { id: lst_ebb3c646d7640f4d990a477f, slug: tagalys.com }
       - { id: lst_4acf2320d09ad7d8aa7b2369, slug: nosto.com }
-  # branchbob.ai: quick no-code store builders for new sellers: Shopify, then Mixo's AI-generated
-  # storefronts, Wix ADI, Square Online, Ecwid and Weblium.
+  # branchbob.ai: quick no-code store builders for new sellers: Shopify, then Squarespace's online
+  # stores, Wix ADI, Square Online, Ecwid and Weblium.
   - action: listing-alternatives-set
     id: lst_e140bbb21cc492b813b13787
     slug: branchbob.ai
@@ -59,7 +61,7 @@ operations:
     expected: []
     alternatives:
       - { id: lst_732248ec046f63b3e8ab89a4, slug: shopify.com }
-      - { id: lst_13b5792e655e7863e085bbed, slug: mixo.io }
+      - { id: lst_c15f52c9dcf33b02da879cbf, slug: squarespace.com }
       - { id: lst_b4d2f9f4314f39472ad55f00, slug: wix.com }
       - { id: lst_70844fcbb0da94fad1da1dcb, slug: squareup.com }
       - { id: lst_fdf3ce3e8182c946ffe8f4e5, slug: ecwid.com }
@@ -266,14 +268,14 @@ operations:
       - { id: lst_fbfbfa56c591c33210b0bcd6, slug: fishbowlinventory.com }
       - { id: lst_66ac6d5550027a4a919958c4, slug: orderhive.com }
       - { id: lst_27a5800283b1032187f7e06e, slug: inflowinventory.com }
-  # klevu.com: AI site search and product recommendations for online stores.
+  # klevu.com: AI site search and product recommendations for online stores (Searchspring is left
+  # out: it and Klevu are one company now).
   - action: listing-alternatives-set
     id: lst_41b1190f2301849601ed43f5
     slug: klevu.com
     reason: '#539: hand-picked alternatives (batch A)'
     expected: []
     alternatives:
-      - { id: lst_66b61375ad57b219b13b3b86, slug: searchspring.com }
       - { id: lst_311304b2dfab23090c6cf3e8, slug: boostcommerce.net }
       - { id: lst_4acf2320d09ad7d8aa7b2369, slug: nosto.com }
   # lebesgue.io: Shopify profit, LTV and cohort analytics.
@@ -340,7 +342,8 @@ operations:
     alternatives:
       - { id: lst_1b52b01ff3069870ea494f7d, slug: cs-cart.com }
       - { id: lst_465658a2f4ec18411d5a8ca9, slug: yo-kart.com }
-  # nosto.com: AI product recommendations and personalization for online stores.
+  # nosto.com: AI product recommendations and personalization for online stores (Searchspring is
+  # left out: it and Klevu are one company now).
   - action: listing-alternatives-set
     id: lst_4acf2320d09ad7d8aa7b2369
     slug: nosto.com
@@ -348,7 +351,7 @@ operations:
     expected: []
     alternatives:
       - { id: lst_41b1190f2301849601ed43f5, slug: klevu.com }
-      - { id: lst_66b61375ad57b219b13b3b86, slug: searchspring.com }
+      - { id: lst_311304b2dfab23090c6cf3e8, slug: boostcommerce.net }
       - { id: lst_fedf294f364afc261cee40bf, slug: rosetta.ai }
   # orderdesk.com: order management that routes orders from many channels to fulfillment.
   - action: listing-alternatives-set
@@ -415,7 +418,7 @@ operations:
     expected: []
     alternatives:
       - { id: lst_c99e28d15d00be5954f74ecf, slug: ecomtent.ai }
-      - { id: lst_88d2848b3be0a78dcf71dcd7, slug: productify.ai }
+      - { id: lst_a3d8dd688d991b5d76d81500, slug: copymonkey.ai }
       - { id: lst_0bd747c0bd9d11ad10c25a4e, slug: treebrain.ai }
   # rosetta.ai: AI product recommendations and personalization for online stores.
   - action: listing-alternatives-set
@@ -448,14 +451,14 @@ operations:
       - { id: lst_83d0d31b119563cac7ba706b, slug: inriver.com }
       - { id: lst_a0b3d0c30af155da371be91c, slug: saleslayer.com }
       - { id: lst_23cace55d3fcbe8d928afef4, slug: plytix.com }
-  # searchspring.com: AI site search, merchandising and personalization for online stores.
+  # searchspring.com: AI site search, merchandising and personalization for online stores (Klevu
+  # is left out: it and Searchspring are one company now).
   - action: listing-alternatives-set
     id: lst_66b61375ad57b219b13b3b86
     slug: searchspring.com
     reason: '#539: hand-picked alternatives (batch A)'
     expected: []
     alternatives:
-      - { id: lst_41b1190f2301849601ed43f5, slug: klevu.com }
       - { id: lst_311304b2dfab23090c6cf3e8, slug: boostcommerce.net }
       - { id: lst_4acf2320d09ad7d8aa7b2369, slug: nosto.com }
       - { id: lst_ebb3c646d7640f4d990a477f, slug: tagalys.com }
@@ -550,7 +553,8 @@ operations:
       - { id: lst_83d0d31b119563cac7ba706b, slug: inriver.com }
       - { id: lst_a0b3d0c30af155da371be91c, slug: saleslayer.com }
       - { id: lst_23cace55d3fcbe8d928afef4, slug: plytix.com }
-  # tagalys.com: merchandising and product search for Shopify stores.
+  # tagalys.com: merchandising and product search for Shopify stores (Klevu is left out: it and
+  # Searchspring are one company now).
   - action: listing-alternatives-set
     id: lst_ebb3c646d7640f4d990a477f
     slug: tagalys.com
@@ -559,7 +563,7 @@ operations:
     alternatives:
       - { id: lst_311304b2dfab23090c6cf3e8, slug: boostcommerce.net }
       - { id: lst_66b61375ad57b219b13b3b86, slug: searchspring.com }
-      - { id: lst_41b1190f2301849601ed43f5, slug: klevu.com }
+      - { id: lst_4acf2320d09ad7d8aa7b2369, slug: nosto.com }
   # weaverse.io: visual storefront builders for Shopify.
   - action: listing-alternatives-set
     id: lst_a97a5eeebeb843b4da3ffd32

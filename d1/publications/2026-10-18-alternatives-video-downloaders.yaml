@@ -6,18 +6,29 @@
 # candidates say they do: a pick does the same job for the same kind of user, best first, and a
 # listing gets fewer than six, or none, when nothing else fits. Almost every listing here saves one
 # site's media, and another site's downloader can't do that job, so the picks are the listings that
-# can save the same site's media: SERP Video Downloader (1,000+ sites); M3U8 Stream Downloader where
-# the site serves HLS streams; and, for course and community platforms, the Loom, Vimeo, YouTube,
-# Wistia and SproutVideo downloaders for lessons embedded from the hosts each listing names. Notes
-# (serp-notes) is filed here but is a browser notes app, so it gets notes apps. Every listing and
-# pick is a v1 import listing, with the same id and slug on staging and production. The reason for
-# each listing is the comment above its operation.
-# Ten listings have no operation, because nothing in the catalog substitutes for them: the Adobe
-# Stock, Alamy, DeviantArt, Getty Images, Pinterest, Rawpixel, Unsplash and VectorStock downloaders
-# (each batch-saves one site's images or your licensed files there; no other listing is built for
-# those sites, and SERP Video Downloader is built around video), Fansly Live Downloader (records
-# broadcasts as they happen, which no other listing says it does), and Thumbnail Downloader (saves a
-# YouTube thumbnail on its own). Their pages keep the similar-listings fallback.
+# can save the same site's media: M3U8 Stream Downloader where the listing says the site serves HLS
+# streams, and, for course and community platforms, the Loom, Vimeo, YouTube, Wistia and SproutVideo
+# downloaders for lessons embedded from the hosts each listing names. No listing picks SERP Video
+# Downloader (serp-video-downloader): its product page says "Coming Soon!", so nobody can switch to
+# it yet. It can be added in a later batch once it launches. Its own listing keeps an operation,
+# because M3U8 Stream Downloader is available now. Notes (serp-notes) is filed here but is a
+# browser notes app, so it gets notes apps. Every listing and pick is a v1 import listing, with the
+# same id and slug on staging and production. The reason for each listing is the comment above its
+# operation.
+# Thirty-one listings have no operation, because nothing live in the catalog substitutes for them:
+# - The Adobe Stock, Alamy, DeviantArt, Getty Images, Pinterest, Rawpixel, Unsplash and VectorStock
+#   downloaders: each batch-saves one site's images or your licensed files there, and no other
+#   listing is built for those sites.
+# - Fansly Live Downloader records broadcasts as they happen, which no other listing says it does.
+# - Thumbnail Downloader saves a YouTube thumbnail on its own.
+# - The Facebook, Hulu, Instagram, Internet Archive, LinkedIn, Netflix, Nicovideo, OnlyFans,
+#   Patreon, Pexels, Reddit, Skillshare, Snapchat, Soundgasm, Terabox, TikTok, Twitter X, Udemy and
+#   YouTube downloaders: SERP Video Downloader was their only pick, and no other listing is built
+#   for those sites.
+# - M3U8 Stream Downloader saves HLS streams from any site; SERP Video Downloader was its only pick.
+# - OnlyFans Bulk Downloader: its link opens OnlyFans Downloader and its own product page is gone,
+#   so it is up for retirement (#546).
+# Their pages keep the similar-listings fallback.
 # Each listing-alternatives-set compares and swaps the listing's slug and current picks (none yet),
 # refuses a pick that isn't live with that id and slug, keeps the listing's checksum, and logs an
 # `edited` event. Row-level, so the batch is refused with nothing written if any listing changed.
@@ -30,34 +41,29 @@ provenance:
   actor: devinschumacher
   workflow: github/publish-d1
 operations:
-  # 123movies-downloader: SERP Video Downloader (1,000+ sites), then M3U8 Stream Downloader for the
-  # mirrors' HLS streams.
+  # 123movies-downloader: M3U8 Stream Downloader saves the mirrors' HLS streams as MP4.
   - action: listing-alternatives-set
     id: lst_ea0b04831ab8464683de0b48
     slug: 123movies-downloader
     reason: '#539: hand-picked alternatives (batch A)'
     expected: []
     alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
       - { id: lst_cef8fce97410ddc48129f680, slug: m3u8-downloader }
-  # circle-downloader: Circle community lessons: SERP Video Downloader (1,000+ sites), the Loom,
-  # Vimeo, YouTube and Wistia downloaders for lessons embedded from those hosts, then M3U8 Stream
-  # Downloader for Circle's native HLS video.
+  # circle-downloader: Circle community lessons: the Loom, Vimeo, YouTube and Wistia downloaders for
+  # lessons embedded from those hosts, then M3U8 Stream Downloader for Circle's native HLS video.
   - action: listing-alternatives-set
     id: lst_b6e048caa6225e19e83fd73e
     slug: circle-downloader
     reason: '#539: hand-picked alternatives (batch A)'
     expected: []
     alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
       - { id: lst_bfa3d572078554563e4b9d6c, slug: loom-video-downloader }
       - { id: lst_57e20ae1ccd797430b80911e, slug: vimeo-video-downloader }
       - { id: lst_5c78bbdb78f3fa13970399c1, slug: youtube-downloader }
       - { id: lst_5fd233158f7997c59a6dac65, slug: wistia-video-downloader }
       - { id: lst_cef8fce97410ddc48129f680, slug: m3u8-downloader }
   # clientclub-downloader: ClientClub is a HighLevel portal: GoHighLevel Video Downloader works on
-  # HighLevel portals, then SERP Video Downloader and the Loom, Vimeo, Wistia and YouTube
-  # downloaders for embedded lessons.
+  # HighLevel portals, then the Loom, Vimeo, Wistia and YouTube downloaders for embedded lessons.
   - action: listing-alternatives-set
     id: lst_4b0f5192501e08f933de92c2
     slug: clientclub-downloader
@@ -65,42 +71,29 @@ operations:
     expected: []
     alternatives:
       - { id: lst_64c5f9c72f119b66d7aa77da, slug: gohighlevel-downloader }
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
       - { id: lst_bfa3d572078554563e4b9d6c, slug: loom-video-downloader }
       - { id: lst_57e20ae1ccd797430b80911e, slug: vimeo-video-downloader }
       - { id: lst_5fd233158f7997c59a6dac65, slug: wistia-video-downloader }
       - { id: lst_5c78bbdb78f3fa13970399c1, slug: youtube-downloader }
-  # coursera-downloader: SERP Video Downloader (1,000+ sites), then M3U8 Stream Downloader for
-  # Coursera's HLS streams.
+  # coursera-downloader: M3U8 Stream Downloader saves Coursera's HLS streams.
   - action: listing-alternatives-set
     id: lst_144f637b71524d990eecf821
     slug: coursera-downloader
     reason: '#539: hand-picked alternatives (batch A)'
     expected: []
     alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
       - { id: lst_cef8fce97410ddc48129f680, slug: m3u8-downloader }
-  # dailymotion-downloader: SERP Video Downloader (1,000+ sites), then M3U8 Stream Downloader for
-  # Dailymotion's HLS streams.
+  # dailymotion-downloader: M3U8 Stream Downloader saves Dailymotion's HLS streams.
   - action: listing-alternatives-set
     id: lst_d9e04a8dcf78e84867ea926e
     slug: dailymotion-downloader
     reason: '#539: hand-picked alternatives (batch A)'
     expected: []
     alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
       - { id: lst_cef8fce97410ddc48129f680, slug: m3u8-downloader }
-  # facebook-video-downloader: SERP Video Downloader saves video from 1,000+ sites in one extension.
-  - action: listing-alternatives-set
-    id: lst_a18091d61a39a387973490b9
-    slug: facebook-video-downloader
-    reason: '#539: hand-picked alternatives (batch A)'
-    expected: []
-    alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
   # gohighlevel-downloader: HighLevel portal training: ClientClub Video Downloader works on
-  # HighLevel-powered portals, then SERP Video Downloader and the Loom, Vimeo, Wistia and YouTube
-  # downloaders for embedded lessons.
+  # HighLevel-powered portals, then the Loom, Vimeo, Wistia and YouTube downloaders for embedded
+  # lessons.
   - action: listing-alternatives-set
     id: lst_64c5f9c72f119b66d7aa77da
     slug: gohighlevel-downloader
@@ -108,195 +101,83 @@ operations:
     expected: []
     alternatives:
       - { id: lst_4b0f5192501e08f933de92c2, slug: clientclub-downloader }
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
       - { id: lst_bfa3d572078554563e4b9d6c, slug: loom-video-downloader }
       - { id: lst_57e20ae1ccd797430b80911e, slug: vimeo-video-downloader }
       - { id: lst_5fd233158f7997c59a6dac65, slug: wistia-video-downloader }
       - { id: lst_5c78bbdb78f3fa13970399c1, slug: youtube-downloader }
-  # gokollab-downloader: GoKollab workshop replays: SERP Video Downloader (1,000+ sites), the Loom,
-  # Vimeo, YouTube and Wistia downloaders for embedded lessons, then M3U8 Stream Downloader for HLS
-  # streams.
+  # gokollab-downloader: GoKollab workshop replays: the Loom, Vimeo, YouTube and Wistia downloaders
+  # for embedded lessons, then M3U8 Stream Downloader for HLS streams.
   - action: listing-alternatives-set
     id: lst_8aca25e8fccf588bdcd53b1d
     slug: gokollab-downloader
     reason: '#539: hand-picked alternatives (batch A)'
     expected: []
     alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
       - { id: lst_bfa3d572078554563e4b9d6c, slug: loom-video-downloader }
       - { id: lst_57e20ae1ccd797430b80911e, slug: vimeo-video-downloader }
       - { id: lst_5c78bbdb78f3fa13970399c1, slug: youtube-downloader }
       - { id: lst_5fd233158f7997c59a6dac65, slug: wistia-video-downloader }
       - { id: lst_cef8fce97410ddc48129f680, slug: m3u8-downloader }
-  # hulu-downloader: SERP Video Downloader also saves streaming video in the browser.
-  - action: listing-alternatives-set
-    id: lst_7916d089511792dc58592e2e
-    slug: hulu-downloader
-    reason: '#539: hand-picked alternatives (batch A)'
-    expected: []
-    alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
-  # instagram-downloader: SERP Video Downloader saves video from 1,000+ sites in one extension.
-  - action: listing-alternatives-set
-    id: lst_093c329a3bf0eef710824272
-    slug: instagram-downloader
-    reason: '#539: hand-picked alternatives (batch A)'
-    expected: []
-    alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
-  # internet-archive-downloader: SERP Video Downloader saves Archive.org's video and audio (only
-  # this listing batch-saves its books and whole collections).
-  - action: listing-alternatives-set
-    id: lst_0064fcc841ff036c5a8a278b
-    slug: internet-archive-downloader
-    reason: '#539: hand-picked alternatives (batch A)'
-    expected: []
-    alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
-  # justforfans-downloader: SERP Video Downloader (1,000+ sites), then M3U8 Stream Downloader for
-  # JustForFans' HLS streams.
+  # justforfans-downloader: M3U8 Stream Downloader saves JustForFans' HLS streams.
   - action: listing-alternatives-set
     id: lst_3966e02ea1a078b6a092fbfd
     slug: justforfans-downloader
     reason: '#539: hand-picked alternatives (batch A)'
     expected: []
     alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
       - { id: lst_cef8fce97410ddc48129f680, slug: m3u8-downloader }
-  # kajabi-video-downloader: Kajabi lessons: SERP Video Downloader (1,000+ sites), then the Loom,
-  # Vimeo, YouTube and Wistia downloaders for the hosts Kajabi lessons embed.
+  # kajabi-video-downloader: Kajabi lessons: the Loom, Vimeo, YouTube and Wistia downloaders for the
+  # hosts Kajabi lessons embed.
   - action: listing-alternatives-set
     id: lst_74e0e74369d59ac99e0e8ab7
     slug: kajabi-video-downloader
     reason: '#539: hand-picked alternatives (batch A)'
     expected: []
     alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
       - { id: lst_bfa3d572078554563e4b9d6c, slug: loom-video-downloader }
       - { id: lst_57e20ae1ccd797430b80911e, slug: vimeo-video-downloader }
       - { id: lst_5c78bbdb78f3fa13970399c1, slug: youtube-downloader }
       - { id: lst_5fd233158f7997c59a6dac65, slug: wistia-video-downloader }
-  # linkedin-downloader: SERP Video Downloader saves video from 1,000+ sites in one extension.
-  - action: listing-alternatives-set
-    id: lst_ffeec6e5afe7fd8dbcecce98
-    slug: linkedin-downloader
-    reason: '#539: hand-picked alternatives (batch A)'
-    expected: []
-    alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
-  # loom-video-downloader: SERP Video Downloader (1,000+ sites), then M3U8 Stream Downloader for
-  # Loom's HLS streams.
+  # loom-video-downloader: M3U8 Stream Downloader saves Loom's HLS streams.
   - action: listing-alternatives-set
     id: lst_bfa3d572078554563e4b9d6c
     slug: loom-video-downloader
     reason: '#539: hand-picked alternatives (batch A)'
     expected: []
     alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
       - { id: lst_cef8fce97410ddc48129f680, slug: m3u8-downloader }
-  # m3u8-downloader: SERP Video Downloader also handles HLS and DASH streams.
-  - action: listing-alternatives-set
-    id: lst_cef8fce97410ddc48129f680
-    slug: m3u8-downloader
-    reason: '#539: hand-picked alternatives (batch A)'
-    expected: []
-    alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
-  # mindvalley-downloader: Mindvalley lessons: SERP Video Downloader (1,000+ sites), then the Vimeo,
-  # YouTube, Loom, Wistia and SproutVideo downloaders for the lessons embedded from those hosts.
+  # mindvalley-downloader: Mindvalley lessons: the Vimeo, YouTube, Loom, Wistia and SproutVideo
+  # downloaders for the lessons embedded from those hosts.
   - action: listing-alternatives-set
     id: lst_3229dac60e335ad34f250181
     slug: mindvalley-downloader
     reason: '#539: hand-picked alternatives (batch A)'
     expected: []
     alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
       - { id: lst_57e20ae1ccd797430b80911e, slug: vimeo-video-downloader }
       - { id: lst_5c78bbdb78f3fa13970399c1, slug: youtube-downloader }
       - { id: lst_bfa3d572078554563e4b9d6c, slug: loom-video-downloader }
       - { id: lst_5fd233158f7997c59a6dac65, slug: wistia-video-downloader }
       - { id: lst_8220983e1c99a496fc5b4fd3, slug: sprout-video-downloader }
-  # moodle-downloader: Moodle lectures: SERP Video Downloader (1,000+ sites), then the YouTube and
-  # Vimeo downloaders for embedded lectures.
+  # moodle-downloader: Moodle lectures: the YouTube and Vimeo downloaders for embedded lectures.
   - action: listing-alternatives-set
     id: lst_dd5782afd06d1c32fbfac989
     slug: moodle-downloader
     reason: '#539: hand-picked alternatives (batch A)'
     expected: []
     alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
       - { id: lst_5c78bbdb78f3fa13970399c1, slug: youtube-downloader }
       - { id: lst_57e20ae1ccd797430b80911e, slug: vimeo-video-downloader }
-  # netflix-downloader: SERP Video Downloader also saves streaming video in the browser.
-  - action: listing-alternatives-set
-    id: lst_890185225bb932ac835ecc31
-    slug: netflix-downloader
-    reason: '#539: hand-picked alternatives (batch A)'
-    expected: []
-    alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
-  # nicovideo-downloader: SERP Video Downloader saves video from 1,000+ sites in one extension.
-  - action: listing-alternatives-set
-    id: lst_e28edab5e2315d59ed1cda83
-    slug: nicovideo-downloader
-    reason: '#539: hand-picked alternatives (batch A)'
-    expected: []
-    alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
-  # onlyfans-bulk-downloader: its link now leads to OnlyFans Downloader, which saves the same
-  # subscribed media, then SERP Video Downloader (1,000+ sites).
-  - action: listing-alternatives-set
-    id: lst_0d34a5b3397b463214cf708e
-    slug: onlyfans-bulk-downloader
-    reason: '#539: hand-picked alternatives (batch A)'
-    expected: []
-    alternatives:
-      - { id: lst_4251455a4d740603c89dd58a, slug: onlyfans-downloader }
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
-  # onlyfans-downloader: SERP Video Downloader (1,000+ sites); OnlyFans Bulk Downloader is left out
-  # because its link now leads to this listing.
-  - action: listing-alternatives-set
-    id: lst_4251455a4d740603c89dd58a
-    slug: onlyfans-downloader
-    reason: '#539: hand-picked alternatives (batch A)'
-    expected: []
-    alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
-  # patreon-downloader: SERP Video Downloader saves Patreon posts' video, audio and images.
-  - action: listing-alternatives-set
-    id: lst_1fd5fd08aa68460a8accf27a
-    slug: patreon-downloader
-    reason: '#539: hand-picked alternatives (batch A)'
-    expected: []
-    alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
-  # pexels-video-downloader: SERP Video Downloader saves video from 1,000+ sites in one extension.
-  - action: listing-alternatives-set
-    id: lst_306bb8afe41d79e1f5de3836
-    slug: pexels-video-downloader
-    reason: '#539: hand-picked alternatives (batch A)'
-    expected: []
-    alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
-  # podia-downloader: Podia lessons: SERP Video Downloader (1,000+ sites), then the Wistia and Vimeo
-  # downloaders for the hosts Podia creators use.
+  # podia-downloader: Podia lessons: the Wistia and Vimeo downloaders for the hosts Podia creators
+  # use.
   - action: listing-alternatives-set
     id: lst_36cab7ecb5f76ab812932b37
     slug: podia-downloader
     reason: '#539: hand-picked alternatives (batch A)'
     expected: []
     alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
       - { id: lst_5fd233158f7997c59a6dac65, slug: wistia-video-downloader }
       - { id: lst_57e20ae1ccd797430b80911e, slug: vimeo-video-downloader }
-  # reddit-downloader: SERP Video Downloader saves video from 1,000+ sites in one extension.
-  - action: listing-alternatives-set
-    id: lst_31ccb57efcd0e48b95a659b2
-    slug: reddit-downloader
-    reason: '#539: hand-picked alternatives (batch A)'
-    expected: []
-    alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
   # serp-notes: the listing is Notes, a browser-sidebar notes app with an AI assistant: Notes for
   # ChatGPT (Zoho Notebook's web clipper with AI) and Glasp (highlights and notes in a browser
   # sidebar) first, then AI note-taking apps.
@@ -321,163 +202,82 @@ operations:
     expected: []
     alternatives:
       - { id: lst_cef8fce97410ddc48129f680, slug: m3u8-downloader }
-  # skillshare-downloader: SERP Video Downloader saves video from 1,000+ sites in one extension.
-  - action: listing-alternatives-set
-    id: lst_48e170d8e92f5471119caba7
-    slug: skillshare-downloader
-    reason: '#539: hand-picked alternatives (batch A)'
-    expected: []
-    alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
-  # skool-video-downloader: Skool lessons: SERP Video Downloader (1,000+ sites), the Loom, Vimeo,
-  # YouTube and Wistia downloaders for embedded lessons, then M3U8 Stream Downloader for Skool's
-  # native HLS video.
+  # skool-video-downloader: Skool lessons: the Loom, Vimeo, YouTube and Wistia downloaders for
+  # embedded lessons, then M3U8 Stream Downloader for Skool's native HLS video.
   - action: listing-alternatives-set
     id: lst_7df4054ba79c031fe5c35a43
     slug: skool-video-downloader
     reason: '#539: hand-picked alternatives (batch A)'
     expected: []
     alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
       - { id: lst_bfa3d572078554563e4b9d6c, slug: loom-video-downloader }
       - { id: lst_57e20ae1ccd797430b80911e, slug: vimeo-video-downloader }
       - { id: lst_5c78bbdb78f3fa13970399c1, slug: youtube-downloader }
       - { id: lst_5fd233158f7997c59a6dac65, slug: wistia-video-downloader }
       - { id: lst_cef8fce97410ddc48129f680, slug: m3u8-downloader }
-  # snapchat-video-downloader: SERP Video Downloader saves video from 1,000+ sites in one extension.
-  - action: listing-alternatives-set
-    id: lst_96dddd16b0b5c776aa9585dd
-    slug: snapchat-video-downloader
-    reason: '#539: hand-picked alternatives (batch A)'
-    expected: []
-    alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
-  # soundgasm-downloader: SERP Video Downloader also saves audio-only streams.
-  - action: listing-alternatives-set
-    id: lst_be200da7aa284c43afa03b02
-    slug: soundgasm-downloader
-    reason: '#539: hand-picked alternatives (batch A)'
-    expected: []
-    alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
-  # sprout-video-downloader: SERP Video Downloader (1,000+ sites), then M3U8 Stream Downloader for
-  # SproutVideo's HLS streams.
+  # sprout-video-downloader: M3U8 Stream Downloader saves SproutVideo's HLS streams.
   - action: listing-alternatives-set
     id: lst_8220983e1c99a496fc5b4fd3
     slug: sprout-video-downloader
     reason: '#539: hand-picked alternatives (batch A)'
     expected: []
     alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
       - { id: lst_cef8fce97410ddc48129f680, slug: m3u8-downloader }
-  # teachable-video-downloader: Teachable lessons: SERP Video Downloader (1,000+ sites), then Wistia
-  # Video Downloader for Wistia-hosted lessons.
+  # teachable-video-downloader: Teachable lessons: Wistia Video Downloader for Wistia-hosted
+  # lessons.
   - action: listing-alternatives-set
     id: lst_6b11053b27225043df32ffbf
     slug: teachable-video-downloader
     reason: '#539: hand-picked alternatives (batch A)'
     expected: []
     alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
       - { id: lst_5fd233158f7997c59a6dac65, slug: wistia-video-downloader }
-  # tellatv-downloader: SERP Video Downloader (1,000+ sites), then M3U8 Stream Downloader for
-  # Tella's HLS streams.
+  # tellatv-downloader: M3U8 Stream Downloader saves Tella's HLS streams.
   - action: listing-alternatives-set
     id: lst_2eb70f2c088c9106dd5452bc
     slug: tellatv-downloader
     reason: '#539: hand-picked alternatives (batch A)'
     expected: []
     alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
       - { id: lst_cef8fce97410ddc48129f680, slug: m3u8-downloader }
-  # terabox-downloader: SERP Video Downloader also saves from file-hosting sites.
-  - action: listing-alternatives-set
-    id: lst_e77b0ef6719c2e91713fe56c
-    slug: terabox-downloader
-    reason: '#539: hand-picked alternatives (batch A)'
-    expected: []
-    alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
-  # thinkific-downloader: Thinkific lessons: SERP Video Downloader (1,000+ sites), then the Wistia
-  # and Vimeo downloaders for embedded lessons.
+  # thinkific-downloader: Thinkific lessons: the Wistia and Vimeo downloaders for embedded lessons.
   - action: listing-alternatives-set
     id: lst_c7a578768511cf9c68baca0a
     slug: thinkific-downloader
     reason: '#539: hand-picked alternatives (batch A)'
     expected: []
     alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
       - { id: lst_5fd233158f7997c59a6dac65, slug: wistia-video-downloader }
       - { id: lst_57e20ae1ccd797430b80911e, slug: vimeo-video-downloader }
-  # tiktok-downloader: SERP Video Downloader saves video from 1,000+ sites in one extension.
-  - action: listing-alternatives-set
-    id: lst_939891a6494949693bb712ff
-    slug: tiktok-downloader
-    reason: '#539: hand-picked alternatives (batch A)'
-    expected: []
-    alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
-  # twitch-video-downloader: SERP Video Downloader (1,000+ sites), then M3U8 Stream Downloader for
-  # Twitch's HLS VODs.
+  # twitch-video-downloader: M3U8 Stream Downloader saves Twitch's HLS VODs.
   - action: listing-alternatives-set
     id: lst_a97de07030551e1fdfc4b467
     slug: twitch-video-downloader
     reason: '#539: hand-picked alternatives (batch A)'
     expected: []
     alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
       - { id: lst_cef8fce97410ddc48129f680, slug: m3u8-downloader }
-  # twitter-x-downloader: SERP Video Downloader saves video from 1,000+ sites in one extension.
-  - action: listing-alternatives-set
-    id: lst_34b9d549c34b75076ae98e93
-    slug: twitter-x-downloader
-    reason: '#539: hand-picked alternatives (batch A)'
-    expected: []
-    alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
-  # udemy-downloader: SERP Video Downloader saves video from 1,000+ sites in one extension.
-  - action: listing-alternatives-set
-    id: lst_7ef2560bf800c58122f12fa0
-    slug: udemy-downloader
-    reason: '#539: hand-picked alternatives (batch A)'
-    expected: []
-    alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
-  # vimeo-video-downloader: SERP Video Downloader (1,000+ sites), then M3U8 Stream Downloader for
-  # Vimeo's HLS streams.
+  # vimeo-video-downloader: M3U8 Stream Downloader saves Vimeo's HLS streams.
   - action: listing-alternatives-set
     id: lst_57e20ae1ccd797430b80911e
     slug: vimeo-video-downloader
     reason: '#539: hand-picked alternatives (batch A)'
     expected: []
     alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
       - { id: lst_cef8fce97410ddc48129f680, slug: m3u8-downloader }
-  # whop-video-downloader: SERP Video Downloader (1,000+ sites), then M3U8 Stream Downloader for the
-  # HLS streams of Whop's Mux player.
+  # whop-video-downloader: M3U8 Stream Downloader saves the HLS streams of Whop's Mux player.
   - action: listing-alternatives-set
     id: lst_834a96e6f8c01222d90d0390
     slug: whop-video-downloader
     reason: '#539: hand-picked alternatives (batch A)'
     expected: []
     alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
       - { id: lst_cef8fce97410ddc48129f680, slug: m3u8-downloader }
-  # wistia-video-downloader: SERP Video Downloader (1,000+ sites), then M3U8 Stream Downloader for
-  # Wistia's HLS streams.
+  # wistia-video-downloader: M3U8 Stream Downloader saves Wistia's HLS streams.
   - action: listing-alternatives-set
     id: lst_5fd233158f7997c59a6dac65
     slug: wistia-video-downloader
     reason: '#539: hand-picked alternatives (batch A)'
     expected: []
     alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
       - { id: lst_cef8fce97410ddc48129f680, slug: m3u8-downloader }
-  # youtube-downloader: SERP Video Downloader saves video from 1,000+ sites in one extension.
-  - action: listing-alternatives-set
-    id: lst_5c78bbdb78f3fa13970399c1
-    slug: youtube-downloader
-    reason: '#539: hand-picked alternatives (batch A)'
-    expected: []
-    alternatives:
-      - { id: lst_92706ab1980a42e7172f7642, slug: serp-video-downloader }
