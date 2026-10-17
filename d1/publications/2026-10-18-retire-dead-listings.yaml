@@ -1,0 +1,461 @@
+# serpcompany/best.serp.co#546: retire or re-describe listings whose product is gone or has pivoted,
+# found by #539's alternatives batches (#542, #544, #545, #547, #548) and checked again here. The
+# owner approved it on 2026-10-18 ("okay do it"). Each listing's own site was read on 2026-10-18,
+# in a browser for the ones that render in JavaScript; the comment above each operation says what
+# it showed.
+# - Gone (20) and unrelated (7): listing-unpublish. Gone means dead, parked, shut down,
+#   absorbed into another company with no listing to send it to, or only a waitlist for something
+#   never launched; unrelated means the site now sells something else. The page answers 410 Gone
+#   with #517's removed-listing page, and leaves the sitemap, search, RSS and category pages.
+#   The row stays: Republish in /admin brings it back. A hygiene removal, so not `unowned`: the
+#   listing comes down even if someone owns or claimed it, as the dead-domain and #340 removals do.
+# - Successor (2): unpublished here, then 2026-10-18-retire-dead-listings-follow-up.yaml sends each
+#   slug to its successor's live page with a permanent redirect (308). A manifest names a listing
+#   once, so the redirects need their own manifest, published after this one.
+# - Rename (4): listing-details-set, for a product that was renamed or acquired but is the same
+#   kind and whose long description still describes it (#340 decision 3). The name and short
+#   description change; the website only for Datasette, whose link opened a defunct plugin.
+# - Re-describe (4): listing-details-set for a listing kept live (#551 review): the same company and
+#   kind of product, whose name or one-line description is out of date. Munch and GRID are renamed
+#   too; Typpo and Cybertiks keep their names. The long description is left as it is.
+# Not here, and listed in the PR for the next round: listings still picked as an alternative in an
+# open alternatives manifest (#544, #545, #547, #548), whose publication a retirement would refuse;
+# the fan-site downloaders the owner keeps, apart from OnlyFans Bulk Downloader, whose own page is
+# gone (Successor, below); and apps.serp.co tools. Checked and kept live: Emberly and AI Tutor (#551
+# review) and Soon Pulse (rechecked in a browser) still sell what their listings describe.
+# Ids are the v1 import's, the same on staging and production. Each slug is in production's
+# sitemap-products.xml, and its production page showed the website and category below (2026-10-18).
+# Row-level: a listing whose slug, website, categories, name or description changed, that is no
+# longer live, or whose own submission is in review refuses the whole batch, with nothing written.
+# Apply staging first, then production after promotion.
+version: 1
+id: 2026-10-18-retire-dead-listings
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  # Gone: dead, parked, shut down, absorbed, or a waitlist for something never launched.
+  # Banana: its own post "Sunsetting Serverless GPUs" (2024-02-01) says the platform shut down on
+  #   2024-03-31. The homepage still loads, with nothing behind it.
+  - action: listing-unpublish
+    id: lst_0d20ea83fa90e11524d79382
+    slug: banana.dev
+    categories:
+      - cloud-hosting
+    reason: "#546 gone (checked 2026-10-18): Banana shut its serverless GPU platform down on 2024-03-31, as its own sunset post says"
+    expected:
+      website: https://serp.ly/banana
+  # Cloudalize: cloudalize.com redirects to radianarc.com, GPU infrastructure for telecom operators,
+  #   cloud gaming and governments. The GPU virtual workstations the listing and its long
+  #   description cover are no longer offered, and Radian Arc has no listing.
+  - action: listing-unpublish
+    id: lst_a8744924e0ba8798f7d44805
+    slug: cloudalize.com
+    categories:
+      - cloud-hosting
+    reason: "#546 gone (checked 2026-10-18): cloudalize.com redirects to Radian Arc, GPU infrastructure for telecoms; the virtual workstations the listing covers are gone"
+    expected:
+      website: https://serp.ly/cloudalize.com
+  # Codeamigo: the homepage says its maker no longer maintains Codeamigo and has moved on to
+  #   Porkybank, a budgeting app. Its two courses are "Coming Soon" behind a waitlist.
+  - action: listing-unpublish
+    id: lst_794b9cdf5dd72d63445a9f85
+    slug: codeamigo.dev
+    categories:
+      - education
+    reason: "#546 gone (checked 2026-10-18): the homepage says Codeamigo is no longer maintained; its courses are \"Coming Soon\" behind a waitlist"
+    expected:
+      website: https://serp.ly/codeamigo
+  # Dolly by Databricks: the link opens Databricks' 2023 "Hello Dolly" blog post. Dolly was a 2023
+  #   open-source research model; its repository (databrickslabs/dolly) was last pushed on
+  #   2023-06-30, and no Databricks product page offers it.
+  - action: listing-unpublish
+    id: lst_ce29004a1428656ea8280b02
+    slug: databricks.com
+    categories:
+      - data-analytics
+    reason: "#546 gone (checked 2026-10-18): Dolly was a 2023 research model: the link opens a 2023 blog post, and its repository was last pushed in June 2023"
+    expected:
+      website: https://serp.ly/dolly-by-databricks
+  # Channel: the link (serp.ly/channel) ends on usechannel.com, which answers 404
+  #   (DEPLOYMENT_NOT_FOUND). fluenthq.com itself is now Fluent, automated client reporting for
+  #   marketing agencies, not the business-intelligence tool the listing describes.
+  - action: listing-unpublish
+    id: lst_85303e25c2513ed363f92037
+    slug: fluenthq.com
+    categories:
+      - data-analytics
+    reason: "#546 gone (checked 2026-10-18): the link ends on usechannel.com, which answers 404; fluenthq.com is now client reporting for marketing agencies"
+    expected:
+      website: https://serp.ly/channel
+  # Gemoo: gemoo.com shows only a "We'll Be Back Soon!" scheduled-maintenance page, and the Wayback
+  #   Machine has the same page in every snapshot from 2026-01-21 to 2026-07-12.
+  - action: listing-unpublish
+    id: lst_a48d9cacab7344a36b0d4286
+    slug: gemoo.com
+    categories:
+      - video
+    reason: "#546 gone (checked 2026-10-18): only a scheduled-maintenance page, the same in every Wayback Machine snapshot since 2026-01-21"
+    expected:
+      website: https://serp.ly/gemoo
+  # GPUX.AI: the homepage loads, but its app (app.gpux.ai) and API (i.gpux.ai) answer Cloudflare
+  #   522. Its newest post is from July 2023, and its footer says 2021-2022.
+  - action: listing-unpublish
+    id: lst_564c3b5203b3edeb6c578751
+    slug: gpux.ai
+    categories:
+      - cloud-hosting
+    reason: "#546 gone (checked 2026-10-18): its app and API answer Cloudflare 522, and its newest post is from July 2023"
+    expected:
+      website: https://serp.ly/gpux-ai
+  # Gretel: gretel.ai redirects to an NVIDIA use-case page for NeMo synthetic-data tools (NVIDIA
+  #   acquired Gretel). Gretel's platform isn't offered on its own any more, and no listing is
+  #   NVIDIA NeMo.
+  - action: listing-unpublish
+    id: lst_83b4bf0866bef7be04bc11c1
+    slug: gretel.ai
+    categories:
+      - data-analytics
+    reason: "#546 gone (checked 2026-10-18): gretel.ai redirects to an NVIDIA use-case page (NVIDIA acquired Gretel); Gretel's platform isn't offered on its own"
+    expected:
+      website: https://serp.ly/gretel
+  # Job Hunt Mode: only a waitlist ("Join the Waitlist"; "We are building the next version of Job
+  #   Hunt Mode").
+  - action: listing-unpublish
+    id: lst_a6fd78fc8a5f80942351f3bb
+    slug: jobhuntmode.com
+    categories:
+      - careers
+    reason: "#546 gone (checked 2026-10-18): the site is only a waitlist for the next version of Job Hunt Mode"
+    expected:
+      website: https://serp.ly/job-hunt-mode-5-02
+  # June AI: the link (june.so/ai/) answers 404; a browser then shows the old June AI page. The
+  #   homepage's "A new chapter for June" (2025-08-08) says goodbye to the June product as the team
+  #   joins Amplitude, which has no listing.
+  - action: listing-unpublish
+    id: lst_11d4c43c9a3c5e23aba80a5b
+    slug: june.so
+    categories:
+      - data-analytics
+    reason: "#546 gone (checked 2026-10-18): June said goodbye to its product on 2025-08-08 when the team joined Amplitude; the link answers 404"
+    expected:
+      website: https://serp.ly/june-ai
+  # Whiteboard: the link ends on whiteboard.college, which times out, and mywhiteboard.ai answers
+  #   402 "Deployment Paused".
+  - action: listing-unpublish
+    id: lst_2a69d1e1560bdfaf693ed9aa
+    slug: mywhiteboard.ai
+    categories:
+      - education
+    reason: "#546 gone (checked 2026-10-18): the link ends on whiteboard.college, which times out, and mywhiteboard.ai answers 402 Deployment Paused"
+    expected:
+      website: https://serp.ly/whiteboard
+  # OtterTune: the homepage reads "OtterTune is Dead (2020-2024)".
+  - action: listing-unpublish
+    id: lst_cdaba0091ffa614678215954
+    slug: ottertune.com
+    categories:
+      - data-analytics
+    reason: "#546 gone (checked 2026-10-18): the homepage says OtterTune is dead (2020-2024)"
+    expected:
+      website: https://serp.ly/ottertune
+  # EZQL (Outerbase): the homepage says Outerbase joined Cloudflare and points to its GitHub
+  #   repository; its hosted app (app.outerbase.com) no longer resolves. EZQL was its AI query
+  #   feature.
+  - action: listing-unpublish
+    id: lst_57acf849cf47d5661d1b0b1c
+    slug: outerbase.com
+    categories:
+      - data-analytics
+    reason: "#546 gone (checked 2026-10-18): Outerbase joined Cloudflare: its hosted app no longer resolves, and the site points to its code on GitHub"
+    expected:
+      website: https://serp.ly/ezql
+  # Prepsup: a "Launching soon" page with a waitlist for an exam-prep tool that has not launched.
+  - action: listing-unpublish
+    id: lst_4bcaa9ded358b81a92fc437e
+    slug: prepsup.com
+    categories:
+      - education
+    reason: "#546 gone (checked 2026-10-18): a \"launching soon\" waitlist page; the product has not launched"
+    expected:
+      website: https://prepsup.com
+  # ProfBot: a waitlist (its form offers the semesters Spring 2023 to Winter 2024) and a beta demo
+  #   with fixed quiz questions; it never launched.
+  - action: listing-unpublish
+    id: lst_d9077ba9c1023684bf420e12
+    slug: profbot.ai
+    categories:
+      - education
+    reason: "#546 gone (checked 2026-10-18): only a waitlist for 2023-24 semesters and a beta demo; it never launched"
+    expected:
+      website: https://serp.ly/profbot
+  # Rows AI: Rows' post of 2026-02-22 says Superhuman acquired Rows and Rows.com would wind down on
+  #   2026-05-31; its pages now send users to Superhuman Docs. No listing is Superhuman Docs
+  #   (superhuman.com's listing is the mail app).
+  - action: listing-unpublish
+    id: lst_10ba1e2ad5fc4afb23b4520d
+    slug: rows.com
+    categories:
+      - data-analytics
+    reason: "#546 gone (checked 2026-10-18): Superhuman acquired Rows, which wound down on 2026-05-31; its pages point to Superhuman Docs, which has no listing"
+    expected:
+      website: https://serp.ly/rows-ai
+  # Skills AI Chat: a parked domain. A browser gets a parking page with only the domain name and a
+  #   "most relevant links" blurb; plain HTTP answers 410, and HTTPS can reset the connection. Its
+  #   last archived page (March 2026) was a "We're getting things ready" loader.
+  - action: listing-unpublish
+    id: lst_18223f73932b929a357f21f9
+    slug: skills.ai
+    categories:
+      - data-analytics
+    reason: "#546 gone (checked 2026-10-18): a parked domain: a browser gets a parking page with only the domain name, and plain HTTP answers 410"
+    expected:
+      website: https://serp.ly/skills-ai-chat
+  # Supercreator: "Supercreator has been sunset" and "The product is no longer active."
+  - action: listing-unpublish
+    id: lst_c85a20b58352264c237738ba
+    slug: supercreator.ai
+    categories:
+      - video
+    reason: "#546 gone (checked 2026-10-18): the site says Supercreator has been sunset and the product is no longer active"
+    expected:
+      website: https://serp.ly/supercreator
+  # Vidnami: vidnamipro.com is an information page about Vidnami whose trial and discount links go
+  #   to vidnami.com, which no longer resolves.
+  - action: listing-unpublish
+    id: lst_3d377aa6fbd300fc60d5da14
+    slug: vidnamipro.com
+    categories:
+      - video
+    reason: "#546 gone (checked 2026-10-18): an information page about Vidnami whose links go to vidnami.com, which no longer resolves"
+    expected:
+      website: https://serp.ly/vidnami
+  # ZapHire: the Wayback Machine shows a "Join the waitlist" page in April 2025 and near-empty pages
+  #   from May 2025, with nothing readable since; the site now answers every visitor with a
+  #   Cloudflare block.
+  - action: listing-unpublish
+    id: lst_f034a3a472139f1743d759d1
+    slug: zap-hire.com
+    categories:
+      - careers
+    reason: "#546 gone (checked 2026-10-18): a waitlist in April 2025, nothing readable in the archive since May 2025, and the site now blocks every visitor"
+    expected:
+      website: https://serp.ly/zaphire
+  # Unrelated: the site now sells something unrelated to what the listing describes.
+  # Delv AI: now a waitlist for a message-writing tool ("Write what you meant"), not the research
+  #   and data-analysis platform the listing describes.
+  - action: listing-unpublish
+    id: lst_af142c8869d1335c25947f8f
+    slug: delv.ai
+    categories:
+      - education
+    reason: "#546 unrelated (checked 2026-10-18): now a waitlist for a message-writing tool, not the research and data-analysis platform the listing describes"
+    expected:
+      website: https://serp.ly/delv-ai
+  # Eilla AI: now an AI-native M&A advisory service for small and medium businesses, not the
+  #   private-market intelligence platform the listing describes.
+  - action: listing-unpublish
+    id: lst_2116dffbbc00fc2e6a77f37d
+    slug: eilla.ai
+    categories:
+      - education
+    reason: "#546 unrelated (checked 2026-10-18): now an M&A advisory service for small businesses, not the market intelligence platform the listing describes"
+    expected:
+      website: https://serp.ly/eilla-ai
+  # ChatGPT in Google Sheets: the link ends on Two Minute Reports' ChatGPT page, marketing-data
+  #   reporting for agencies. gox.ai now sells only Two Minute Reports, not ChatGPT in Google
+  #   Sheets.
+  - action: listing-unpublish
+    id: lst_1af291bc5a42d7d46e6e7927
+    slug: gox.ai
+    categories:
+      - data-analytics
+    reason: "#546 unrelated (checked 2026-10-18): the link ends on Two Minute Reports, marketing reporting for agencies, not ChatGPT in Google Sheets"
+    expected:
+      website: https://serp.ly/chatgpt-in-google-sheets
+  # Gpt Vetting: the link's pages (/gpt-vetting, /ai-interviewer, /zara) redirect to micro1's home
+  #   page, now a data lab for training frontier models. It has no recruiting product.
+  - action: listing-unpublish
+    id: lst_47e0992afe739e11155043a5
+    slug: micro1.ai
+    categories:
+      - careers
+    reason: "#546 unrelated (checked 2026-10-18): the link redirects to micro1's home page, now a data lab for training AI models, with no recruiting product"
+    expected:
+      website: https://serp.ly/gpt-vetting
+  # OnLoop: now "OnLoop: Boutique AI Transformation Agency", consulting, not the team-development
+  #   software the listing describes.
+  - action: listing-unpublish
+    id: lst_95d000a50a2ef413bae99335
+    slug: onloop.com
+    categories:
+      - careers
+    reason: "#546 unrelated (checked 2026-10-18): now an AI consulting agency, not the team-development software the listing describes"
+    expected:
+      website: https://onloop.com
+  # Oxolo: now voice-based documentation for construction sites, not the AI video creation the
+  #   listing describes.
+  - action: listing-unpublish
+    id: lst_a2be5f24755d39dd221e7c39
+    slug: oxolo.com
+    categories:
+      - video
+    reason: "#546 unrelated (checked 2026-10-18): now voice-based construction documentation, not the AI video creation the listing describes"
+    expected:
+      website: https://serp.ly/oxolo
+  # Talkberry - mock interview: /mock-interview redirects to the homepage, a generic AI
+  #   language-tutoring page that links out to unrelated AI tools (AI Lawyer, AI Psychologist), not
+  #   English job-interview practice.
+  - action: listing-unpublish
+    id: lst_97d1003e062d381aefb28f6f
+    slug: talkberry.ai
+    categories:
+      - education
+    reason: "#546 unrelated (checked 2026-10-18): now a generic AI language-tutoring page; the mock job interview product is gone"
+    expected:
+      website: https://serp.ly/talkberry-mock-interview
+  # Successor: unpublished here; -follow-up sends each slug to its successor (308).
+  # Takomo: takomo.ai redirects to verda.com, DataCrunch's new name. Verda sells the serverless GPU
+  #   containers Takomo's listing describes, so Takomo's slug goes to DataCrunch's listing (renamed
+  #   Verda below).
+  - action: listing-unpublish
+    id: lst_e46c716e49f17b17301f2fab
+    slug: takomo.ai
+    categories:
+      - cloud-hosting
+    reason: "#546 successor (checked 2026-10-18): takomo.ai redirects to verda.com, the renamed DataCrunch; its slug redirects to datacrunch.io next"
+    expected:
+      website: https://serp.ly/takomo
+  # OnlyFans Bulk Downloader: the owner's 2026-10-09 kept list (d1/hygiene/2026-10-09-adult-
+  #   decisions.yaml, `kept`) keeps the fan-site downloaders, this one included. Its own page is
+  #   gone (apps.serp.co/onlyfans-bulk-downloader answers 404) and serp.ly/onlyfans-bulk-downloader
+  #   already forwards to OnlyFans Downloader, a kept, live listing that covers bulk downloads, so
+  #   its slug redirects there and the fan-site downloader stays reachable.
+  - action: listing-unpublish
+    id: lst_0d34a5b3397b463214cf708e
+    slug: onlyfans-bulk-downloader
+    categories:
+      - video-downloaders
+    reason: "#546 successor (checked 2026-10-18): its own page is gone (apps.serp.co 404) and its link opens OnlyFans Downloader, the kept live listing; its slug redirects there next"
+    expected:
+      website: https://serp.ly/onlyfans-bulk-downloader
+  # Rename: the same kind of product under a new name; the long description still fits.
+  # DataCrunch: datacrunch.io redirects to verda.com, the same GPU cloud renamed (GPU instances and
+  #   clusters, serverless GPU containers, storage). Its long description still describes it.
+  - action: listing-details-set
+    id: lst_20b9297ba604b6d4b976027b
+    slug: datacrunch.io
+    reason: "#546 rename (checked 2026-10-18): DataCrunch is now Verda: datacrunch.io redirects to verda.com, which sells the same GPU cloud"
+    expected:
+      name: "DataCrunch"
+      description: "DataCrunch's Serverless GPU Solutions Transform AI Deployment"
+      website: https://serp.ly/datacrunch.io
+    details:
+      name: "Verda"
+      description: "A European AI cloud: GPU instances and clusters, serverless GPU containers for inference, and storage. Formerly DataCrunch."
+  # Catalyst Technology Group: catalysttg.com redirects to acrisurecyber.com. Acrisure Cyber
+  #   Services sells the same managed IT, cybersecurity and cloud services, and its long description
+  #   still describes them.
+  - action: listing-details-set
+    id: lst_d9803beb4a1b70fa3aa423ea
+    slug: catalysttg.com
+    reason: "#546 rename (checked 2026-10-18): catalysttg.com redirects to Acrisure Cyber Services, which sells the same managed IT services"
+    expected:
+      name: "Catalyst Technology Group"
+      description: "Catalyst Technology Group: Expert IT Solutions for SMB Growth"
+      website: https://serp.ly/catalysttg.com
+    details:
+      name: "Acrisure Cyber Services"
+      description: "Managed IT, cybersecurity, cloud and business continuity services for businesses. Formerly Catalyst Technology Group."
+  # VerbiAI: verbiai.com redirects to pluginuseful.com, and Plug In Useful's Shopify app Plug In AI
+  #   links to verbiai.com's FAQ and docs.verbiai.com: the same AI SEO copy for Shopify, renamed.
+  #   Its long description still describes it.
+  - action: listing-details-set
+    id: lst_1d4a1388ac30ec5159ba62b1
+    slug: verbiai.com
+    reason: "#546 rename (checked 2026-10-18): VerbiAI is now Plug In AI: verbiai.com redirects to Plug In Useful, whose Shopify app links to VerbiAI docs"
+    expected:
+      name: "VerbiAI"
+      description: "VerbiAI's AI Transforms Shopify Stores with Optimized Content"
+      website: https://serp.ly/verbiai
+    details:
+      name: "Plug In AI"
+      description: "AI-written, SEO-optimised product and collection copy, meta tags and image alt text for Shopify stores, in bulk. Formerly VerbiAI."
+  # Datasette ChatGPT plugin: OpenAI closed ChatGPT plugins in 2024, so the plugin the name and link
+  #   point to no longer works. The slug and the long description cover Datasette itself, which is
+  #   live, so the listing becomes Datasette and links to datasette.io.
+  - action: listing-details-set
+    id: lst_61ec380de1e7194c1d8634ca
+    slug: datasette.io
+    reason: "#546 rename (checked 2026-10-18): OpenAI closed ChatGPT plugins in 2024; the slug and long description cover Datasette itself"
+    expected:
+      name: "Datasette ChatGPT plugin"
+      description: "Datasette Revolutionizes Data Exploration with Dynamic Plugins"
+      website: https://serp.ly/datasette-chatgpt-plugin
+    details:
+      name: "Datasette"
+      description: "An open-source tool for exploring and publishing data: load it, explore and query it, and publish it as an interactive website and API."
+      website: "https://datasette.io/"
+  # Re-describe: the same company and kind of product, kept live, whose name or one-line
+  #   description is out of date (#551 review). The long description is left as it is.
+  # Munch: getmunch.com redirects to Munch Studio (munchstudio.com), the same company (its
+  #   testimonials and "Partner with Munch" link still say Munch): a self-serve AI social media
+  #   tool whose every plan includes video repurposing (500 to 7,500 minutes a month), the AI
+  #   clips cut from long videos that the long description covers.
+  - action: listing-details-set
+    id: lst_f17b749bb6cfd0600e7cf245
+    slug: getmunch.com
+    reason: "#546 re-describe (checked 2026-10-18): Munch is now Munch Studio, an AI social media tool whose every plan still includes video repurposing"
+    expected:
+      name: "Munch"
+      description: "Munch Company's AI Transforms Videos into Platform-Ready Clips While Maintaining Creative Control"
+      website: https://serp.ly/munch
+    details:
+      name: "Munch Studio"
+      description: "AI that runs a business's social media: it repurposes long videos into short clips, creates posts and videos, and plans and publishes them. Formerly Munch."
+  # Typpo: typpo.app is still Typpo by BeatPitch Inc. (Santa Monica): pick a template, type or say
+  #   a line, and it renders a captioned video with each word synced to your voice (iPhone app and
+  #   Figma plugin). The long description covers that mechanism and maker; only the microlearning
+  #   angle of its one-line description is out of date.
+  - action: listing-details-set
+    id: lst_333a5e345c3fdeeb0a9a6b3f
+    slug: typpo.app
+    reason: "#546 re-describe (checked 2026-10-18): the same Typpo, now a captioned-video maker; its one-line description's microlearning angle is out of date"
+    expected:
+      name: "Typpo"
+      description: "Typpo's Dual-Channel Approach Revolutionizes Microlearning through Auditory and Visual Content"
+      website: https://serp.ly/typpo
+    details:
+      description: "Type or say a line, and Typpo turns it into a designed, captioned video, each word synced to your voice. An iPhone app, with a Figma plugin for templates."
+  # GRID 2.0: grid.is sells GRID's spreadsheet engine (@grid-is/spreadsheet-engine on npm),
+  #   compatible with Excel and Google Sheets, with agent tools, a spreadsheet viewer and editor,
+  #   and an Excel add-in. The long description centres on that engine; the end-user document app
+  #   it also covers is gone, so the name drops "2.0".
+  - action: listing-details-set
+    id: lst_df371000ae44999c8743be53
+    slug: grid.is
+    reason: "#546 re-describe (checked 2026-10-18): GRID still sells its spreadsheet engine, now for developers and AI agents; the end-user app is gone"
+    expected:
+      name: "GRID 2.0"
+      description: "GRID 2.0 Transforms Spreadsheets with AI-Powered Calculation and Dynamic Data Visualization"
+      website: https://serp.ly/grid-2-0
+    details:
+      name: "GRID"
+      description: "An Excel-compatible spreadsheet engine for developers and AI agents, from npm, with agent tools, a spreadsheet viewer and editor, and an Excel add-in."
+  # Cybertiks: cybertiks.com (English at /en/) sells an Earth-observation platform that combines
+  #   satellite, ocean, atmospheric and field data, with an agent that cites where each number came
+  #   from, set up per customer and not tied to one sector; sargassum monitoring is its first live
+  #   use. The long description's company overview (Mexico City, 2020, remote sensing and AI) still
+  #   fits; its soil-analysis and smart-city products are no longer advertised (in the PR for the
+  #   owner).
+  - action: listing-details-set
+    id: lst_f0b6bd0d1647f02e690f43eb
+    slug: cybertiks.com
+    reason: "#546 re-describe (checked 2026-10-18): Cybertiks still sells remote sensing and AI analytics, now an Earth-observation platform, not soil analysis"
+    expected:
+      name: "Cybertiks"
+      description: "Cybertiks Transforms Digital Transformation with AI-Powered Soil Analysis and Smart City Platforms"
+      website: https://serp.ly/cybertiks
+    details:
+      description: "An Earth-observation platform combining satellite, ocean, atmospheric and field data, with an AI agent citing its sources. First use: sargassum monitoring."
