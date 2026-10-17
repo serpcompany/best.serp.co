@@ -4,6 +4,11 @@ import { resolveFooterBadgeConfigs } from '../apps/web/src/components/layout/foo
 
 describe('resolveDrBadgeConfig', () => {
   it('returns the DR badge config for active directory domains', () => {
+    expect(resolveDrBadgeConfig('best.serp.co')).toEqual({
+      alt: 'Verified DR 78 for best.serp.co',
+      href: 'https://dr.serp.co/sites/best.serp.co',
+      src: 'https://dr.serp.co/badge/best.serp.co?style=serp-dr-v3'
+    })
     expect(resolveDrBadgeConfig('serp.co')).toEqual({
       alt: 'Verified DR 78 for serp.co',
       href: 'https://dr.serp.co/sites/serp.co',

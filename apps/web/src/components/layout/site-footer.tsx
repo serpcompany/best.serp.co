@@ -87,6 +87,9 @@ export function SiteFooter() {
                     height="50"
                     loading="lazy"
                     decoding="async"
+                    // Hold the 200x50 box once the image loads, too: Tailwind's base `height:
+                    // auto` would resize it to the badge's own aspect ratio and shift the row.
+                    className="h-[50px]"
                   />
                 </a>
               </li>

@@ -5,6 +5,7 @@ export type DrBadgeConfig = {
 }
 
 const drScoresByDomain = {
+  'best.serp.co': 78,
   'browserextensions.io': 39,
   'pornvideodownloaders.com': 16,
   'serp.ai': 69,
