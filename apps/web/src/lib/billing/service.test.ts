@@ -11,6 +11,7 @@ import { createAdminReadOperations, selectAdminListingPlans } from '@/db/admin-q
 import { createBadgeProgramOperations } from '@/db/badge-program'
 import { createBillingOperations } from '@/db/billing'
 import { createDatabase } from '@/db/client'
+import { createEmailDeliveryLedger } from '@/db/email-deliveries'
 import { executePlans } from '@/db/plan-runner'
 import { prepareCatalogPublication } from '@/db/plan-support'
 import { buildRejectSubmissionPlans, DISPUTE_DECIDES_REFUND_NOTE } from '@/db/submission-plans'
@@ -25,6 +26,10 @@ import { planLabel } from '../admin/listing-labels'
 import { listingDetailView } from '../admin/listing-view'
 import { submissionView } from '../admin/review-view'
 import { checkBadgeAtRefund } from '../badge-program/refund'
+import { resolveEmailPolicy } from '../email/config'
+import { appEmailTemplates } from '../email/registry'
+import { createCapturingEmailSender } from '../email/senders'
+import { createEmailService } from '../email/service'
 import { features, type SiteFeatures } from '../features'
 import { CONFIRM_AGAIN_HASH, SHORTEST_CHECKOUT_MS } from './checkout-window'
 import type { GuardrailResult } from './guardrails'
@@ -3119,16 +3124,21 @@ describe('webhook follow-ups (#481)', () => {
 })
 
 describe('dispute and refund follow-ups (#483, #484)', () => {
-  /** /admin's Reject as `other`, with the billing module's refund hook as the runtime wires it. */
-  function rejectAsOther(f: Fixture, submissionId = 's1') {
+  /**
+   * /admin's Reject as `other`, with the billing module's refund hook as the runtime wires it,
+   * and the decision's `notify` (the fixture's, or an email service on the ledger, #499).
+   */
+  function rejectAsOther(f: Fixture, submissionId = 's1', notify?: AdminContext['notify']) {
     return rejectSubmission(
       {
         ...adminContext(f),
         // The refund's emails go through the decision's `notify`, which answers them (#490).
-        notify: (async (template, request) => {
-          await f.deps.notify(template, request)
-          return 'sent'
-        }) as AdminContext['notify'],
+        notify:
+          notify ??
+          ((async (template, request) => {
+            await f.deps.notify(template, request)
+            return 'sent'
+          }) as AdminContext['notify']),
         refunds: {
           refundRejectedSubmission: ({ notify, ...input }) =>
             refundRejectedSubmission(
@@ -3250,6 +3260,59 @@ describe('dispute and refund follow-ups (#483, #484)', () => {
       refund_note: DISPUTE_DECIDES_REFUND_NOTE,
       status: 'paid'
     })
+  })
+
+  it('tells the owner of a held payment refunded in the dashboard and then rejected, once, and refunds nothing (#499)', async () => {
+    const f = fixture({
+      guardrails: { code: 'fetch_timeout', ok: false, problem: 'the connection timed out' }
+    })
+    f.submission('s1', 'draft', null)
+    await webhook(f, paidEvent(f, await checkout(f, 's1')))
+    const payment = f.row<{ id: string }>('SELECT provider_payment_id AS id FROM orders').id
+    await webhook(f, paymentEvent('payment_refunded', payment))
+    expect(
+      f.row(
+        `SELECT status, refunded_at IS NOT NULL AS refunded FROM listing_submissions WHERE id='s1'`
+      )
+    ).toEqual({ refunded: 1, status: 'verified' })
+    // The decision's emails go through the email service as production wires it, on the ledger.
+    const sender = createCapturingEmailSender()
+    const service = createEmailService({
+      ledger: createEmailDeliveryLedger({ client: f.client }),
+      log: () => undefined,
+      policy: resolveEmailPolicy({ D1_RUNTIME_ENV: 'production', SITE_ENVIRONMENT: 'production' }),
+      sender,
+      templates: appEmailTemplates,
+      waitUntil: () => undefined
+    })
+    const notify: AdminContext['notify'] = (template, request) => service.deliver(template, request)
+    const answer = {
+      email: { outcome: 'sent', to: 'maya@example.com' },
+      ok: true,
+      refundPending: false,
+      refunded: true
+    }
+    // The first rejection finds the refund recorded: the real hook refunds nothing and sends
+    // "rejected and refunded". Its retry refunds nothing, and the ledger answers it went out.
+    await expect(rejectAsOther(f, 's1', notify)).resolves.toEqual({ ...answer, replayed: false })
+    await expect(rejectAsOther(f, 's1', notify)).resolves.toEqual({ ...answer, replayed: true })
+    expect(f.refundSeen.count).toBe(0)
+    expect(f.refunds).toEqual([])
+    expect(f.row('SELECT status, refunded_by FROM orders')).toEqual({
+      refunded_by: 'provider',
+      status: 'refunded'
+    })
+    expect(sender.sent.map(message => message.to)).toEqual(['maya@example.com'])
+    expect(f.rows('SELECT template_id, event_key, status, attempts FROM email_deliveries')).toEqual(
+      [
+        {
+          attempts: 1,
+          event_key: 'submission-rejected:s1',
+          status: 'sent',
+          template_id: 'submission-rejected-refunded'
+        }
+      ]
+    )
   })
 
   it('records a refund reported before its payment, on the order it names, so nothing applies it (#484)', async () => {

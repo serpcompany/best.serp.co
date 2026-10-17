@@ -110,7 +110,10 @@ export type DecisionEmail =
  * (`after_rejection`), and send `submission-rejected-refunded` through `notify`. When it
  * throws, the rejection stands and the refund stays pending. It answers `disputed` when the
  * payment's dispute is open or lost (#483): nothing is refunded, the order records that the
- * dispute decides the money, and the refund is no longer pending.
+ * dispute decides the money, and the refund is no longer pending. It runs after the refund is
+ * recorded too, to resend a failed email (#499): it then refunds nothing and sends the same
+ * email under the same event key, which the ledger sends once; a throw then leaves the refund
+ * recorded, and the decision answers the email `not_sent`.
  */
 export interface AdminRefunds {
   refundRejectedSubmission(input: {
@@ -400,9 +403,10 @@ async function emailChangesRequested(
 }
 
 /**
- * What follows a rejection that holds. A paid submission rejected as `other` is refund-pending
- * until its refund is recorded, so the refund hook (#68) runs again, and the refund sends
- * "rejected and refunded". Any other rejection gets its rejection email.
+ * What follows a rejection that holds. A paid submission rejected as `other` runs the refund
+ * hook (#68) each time: while the refund is pending it refunds and sends "rejected and
+ * refunded"; once the refund is recorded it refunds nothing, and the ledger sends that email
+ * only if it didn't go out (#499). Any other rejection gets its rejection email.
  */
 async function afterRejection(
   context: AdminContext,
@@ -412,8 +416,8 @@ async function afterRejection(
   const none = { email: null, refundPending: false, refunded: false }
   if (review?.status !== 'rejected') return none
   if (review.rejectionCategory === 'other' && review.paidAt !== null) {
-    if (review.refundedAt !== null) return { ...none, refunded: true }
-    if (!context.refunds) return { ...none, refundPending: true }
+    const recorded = review.refundedAt !== null
+    if (!context.refunds) return { ...none, refundPending: !recorded, refunded: recorded }
     // The refund sends the submitter's rejection email under the rejection's event key.
     const rejectionKey = context.eventKey('submission-rejected', submissionId)
     let email: DecisionEmail | null = review.submitter ? null : NO_ACCOUNT
@@ -429,11 +433,23 @@ async function afterRejection(
         submissionId
       })
       // Disputed (#483): nothing refunded, and nothing pending; the dispute decides the money.
-      return { email, refundPending: false, refunded: refund === 'refunded' }
+      return { email, refundPending: false, refunded: recorded || refund === 'refunded' }
     } catch (error) {
-      log(context, 'refund_rejected_submission', submissionId, 'refund_pending')
-      console.error(JSON.stringify({ event: 'admin_refund_failed', ...errorFields(error) }))
-      return { ...none, refundPending: true }
+      if (!recorded) {
+        log(context, 'refund_rejected_submission', submissionId, 'refund_pending')
+        console.error(JSON.stringify({ event: 'admin_refund_failed', ...errorFields(error) }))
+        return { ...none, refundPending: true }
+      }
+      // The refund stays recorded: only the retry of its email failed, so the toast says the
+      // email wasn't sent (unless the hook got as far as sending it), and the admin retries.
+      log(context, 'refund_rejected_submission', submissionId, 'email_not_sent')
+      console.error(
+        JSON.stringify({ event: 'admin_rejection_email_failed', ...errorFields(error) })
+      )
+      const unsent: DecisionEmail = review.submitter
+        ? { outcome: 'not_sent', to: review.submitter.email }
+        : NO_ACCOUNT
+      return { ...none, email: email ?? unsent, refunded: true }
     }
   }
   if (!review.rejectionReason) return none
