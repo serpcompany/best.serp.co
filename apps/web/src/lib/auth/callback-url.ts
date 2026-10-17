@@ -40,6 +40,11 @@ export function safeCallbackPath(
   return new URL(result, origin).origin === new URL(origin).origin ? result : DEFAULT_CALLBACK_PATH
 }
 
+/** The sign-in page, which sends the visitor on to `returnPath` (checked there by `safeCallbackPath`). */
+export function signInPath(returnPath: string): string {
+  return `/login/?callbackUrl=${encodeURIComponent(returnPath)}`
+}
+
 /** How the signed-in screen names the destination. */
 export interface CallbackDestination {
   /** The continue button: "Continue to Submit". */

@@ -17,8 +17,10 @@
  * 6. Outside public production, `/robots.txt` disallows every crawler; a Worker that serves as
  *    staging also lets its auditor in, with best.serp.co's rules (#359).
  * 7. `/admin` and `/api/admin`: Cloudflare Access (production) and a session cookie, else
- *    503, 403, or 401 (`lib/auth/admin-gate.ts`); pages and handlers then require an admin. On
- *    staging, `/api/admin/*` also takes the admin key from a request that passed step 2 (#408).
+ *    503, 403, or 401, or for an `/admin` page without the cookie sign-in and back (#488,
+ *    `lib/auth/admin-gate.ts`); pages and handlers then require an admin, and an admin page's
+ *    request carries its own path for `requireAdmin()`'s sign-in. On staging, `/api/admin/*`
+ *    also takes the admin key from a request that passed step 2 (#408).
  * 8. The local dev endpoints (`/api/dev/*`, `/api/auth/dev/*`) answer 404 unless the Worker was
  *    reached on a local host (#164). This uses the Worker's own URL: inside OpenNext a client's
  *    `X-Forwarded-Host` becomes `Host`, so a check there alone could be talked past.
@@ -33,7 +35,7 @@
  * before the cache, so nothing stored is ever served to a request without it, and a 401 is
  * never stored.
  */
-import { type AdminGateEnv, adminGate } from '../auth/admin-gate'
+import { type AdminGateEnv, adminGate, withAdminPagePath } from '../auth/admin-gate'
 import type { VerifyAccessOptions } from '../auth/cloudflare-access'
 import { isLocalRequestHost } from '../environment/local-host'
 import {
@@ -94,7 +96,7 @@ export async function handleWorkerRequest(
       passedStagingGate: access.gate === 'passed'
     })) ??
     devEndpointGate(admitted) ??
-    (await pipeline.serve(admitted))
+    (await pipeline.serve(withAdminPagePath(admitted)))
   return headers(response, access.gate === 'passed')
 }
 

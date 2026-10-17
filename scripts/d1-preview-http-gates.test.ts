@@ -17,6 +17,7 @@ import {
   xRobotsTagBlocksIndexing
 } from './crawl-policy.ts'
 import {
+  ADMIN_PAGE_SIGN_IN,
   adminLockStatusesFromConfig,
   allowedAdminLockStatuses,
   canonicalHostRedirectConfigured,
@@ -226,11 +227,16 @@ const canonicalRedirects: Record<string, string> = {
 const adminLockGatePaths = ['/admin/', '/api/admin']
 
 function adminLockResponse(url: URL): Response {
-  // Staging has no Access lock (401 without a session); production answers 503 until its
-  // Access vars are set.
-  return url.hostname.startsWith('best-serp-co-staging.')
-    ? new Response('Unauthorized\n', { status: 401 })
-    : new Response('Access not configured\n', { status: 503 })
+  // Staging has no Access lock: without a session, `/admin/` goes to sign-in (#488) and
+  // `/api/admin` answers 401. Production answers 503 until its Access vars are set.
+  if (!url.hostname.startsWith('best-serp-co-staging.'))
+    return new Response('Access not configured\n', { status: 503 })
+  return url.pathname === '/admin/'
+    ? new Response(null, {
+        headers: { location: ADMIN_PAGE_SIGN_IN.location },
+        status: ADMIN_PAGE_SIGN_IN.status
+      })
+    : new Response('Unauthorized\n', { status: 401 })
 }
 
 /** The sign-in request the auth gate sends on purpose with an empty email. */
@@ -2113,7 +2119,7 @@ describe('admin lock gate', () => {
     const staging = stagingPlatformOrigin
     stubCrawlPolicy(adminAnswer(404))
     await expect(gates('staging', staging)).rejects.toThrow(
-      'staging admin route /admin/ returned 404, not 401'
+      'staging admin route /admin/ returned 404, not 303'
     )
     // With staging Access switched on but unconfigured, 401 is wrong and 503 is right.
     stubCrawlPolicy(adminAnswer(401))
@@ -2126,6 +2132,37 @@ describe('admin lock gate', () => {
     await expect(
       gates('staging', staging, undefined, { wranglerConfigPath: accessConfiguredPath })
     ).resolves.toBeUndefined()
+  })
+
+  it('expects sign-in from the /admin/ page and 401 from /api/admin on staging (#488)', async () => {
+    const staging = stagingPlatformOrigin
+    const page = (response: Response, location: string | null) =>
+      new Response(null, {
+        headers: { ...Object.fromEntries(response.headers), ...(location ? { location } : {}) },
+        status: location ? 303 : 401
+      })
+    // The successful stub answers the sign-in redirect and the 401.
+    stubCrawlPolicy((_url, response) => response)
+    await expect(gates('staging', staging)).resolves.toBeUndefined()
+    // The bare 401 the page answered before #488.
+    stubCrawlPolicy((url, response) =>
+      url.pathname === '/admin/' ? page(response, null) : response
+    )
+    await expect(gates('staging', staging)).rejects.toThrow(
+      'staging admin route /admin/ returned 401, not 303'
+    )
+    stubCrawlPolicy((url, response) =>
+      url.pathname === '/admin/' ? page(response, '/login/') : response
+    )
+    await expect(gates('staging', staging)).rejects.toThrow(
+      `staging admin route /admin/ redirected to /login/, not ${ADMIN_PAGE_SIGN_IN.location}`
+    )
+    stubCrawlPolicy((url, response) =>
+      url.pathname === '/api/admin' ? page(response, ADMIN_PAGE_SIGN_IN.location) : response
+    )
+    await expect(gates('staging', staging)).rejects.toThrow(
+      'staging admin route /api/admin returned 303, not 401'
+    )
   })
 })
 

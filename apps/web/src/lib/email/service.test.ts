@@ -323,6 +323,42 @@ describe('email delivery', () => {
     expect(rows()).toHaveLength(0)
   })
 
+  it('resolves a delivery with what it did, still through waitUntil (#490)', async () => {
+    let failCompletion = false
+    const { pending, sender, service } = harness(staging, {
+      ledger: real => ({
+        claim: claim => real.claim(claim),
+        complete: async completion => {
+          if (failCompletion) throw new Error('D1 unavailable')
+          return real.complete(completion)
+        }
+      })
+    })
+    const deliver = (eventKey: string, to = 'owner@serp.co') =>
+      service.deliver('test-fixture', { eventKey, input, to })
+
+    const sent = deliver('fixture:outcome')
+    expect(pending).toHaveLength(1)
+    await expect(sent).resolves.toBe('sent')
+    // Already sent: a replay is answered from the ledger.
+    await expect(deliver('fixture:outcome')).resolves.toBe('sent')
+    sender.failNext(Object.assign(new Error('Rate limited'), { code: 'RATE_LIMITED' }))
+    await expect(deliver('fixture:refused')).resolves.toBe('failed')
+    // Off staging's allowlist: never attempted.
+    await expect(deliver('fixture:skipped', 'someone@example.com')).resolves.toBe('not_sent')
+    await expect(deliver('person@example.com')).resolves.toBe('not_sent')
+    // Sent, but its outcome never recorded: pending from then on.
+    failCompletion = true
+    await expect(deliver('fixture:unrecorded')).resolves.toBe('sent')
+    await expect(deliver('fixture:unrecorded')).resolves.toBe('pending')
+    expect(sender.sent).toHaveLength(2)
+
+    const disabled = createDisabledEmailService<typeof fixtureTemplates>('off', () => undefined)
+    await expect(
+      disabled.deliver('test-fixture', { eventKey: 'fixture:off', input, to: 'owner@serp.co' })
+    ).resolves.toBe('not_sent')
+  })
+
   it('logs when waitUntil is unavailable instead of throwing', () => {
     const { logs, service } = harness(production, {
       waitUntil: () => {

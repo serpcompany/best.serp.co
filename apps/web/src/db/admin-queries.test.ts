@@ -1,5 +1,6 @@
+import type { SQLInputValue } from 'node:sqlite'
 import { describe, expect, it } from 'vitest'
-import { createAdminReadOperations, toInstant } from './admin-queries'
+import { createAdminReadOperations, selectSubmissionReviewPlans, toInstant } from './admin-queries'
 import { createDatabase } from './client'
 import { insertPublishedListing, SqliteD1 } from './test-support'
 
@@ -190,6 +191,81 @@ describe('admin review queue reads', () => {
     expect(await reads.getSubmissionReview('sub_keyb')).toMatchObject({
       listing: { id: 'lst_keyb', verifiedOwner: true }
     })
+  })
+
+  it("reads a submission's decision emails from the ledger, the newest 20 first (#490)", async () => {
+    const row = (template: string, key: string, at: string, status = 'sent') =>
+      `('${template}','${key}','log','${status}','${at}')`
+    const rounds = Array.from({ length: 20 }, (_, index) =>
+      row(
+        'changes-requested',
+        `submission-changes-requested:sub_quill:${index + 1}`,
+        `2026-10-07 00:00:${String(10 + index)}`
+      )
+    )
+    const reads = fixture(`INSERT INTO email_deliveries
+      (template_id, event_key, provider, status, updated_at) VALUES
+      ${[
+        row('listing-approved', 'submission-approved:sub_quill', '2026-10-09 00:00:00'),
+        row(
+          'submission-rejected-refunded',
+          'submission-rejected:sub_quill',
+          '2026-10-09 00:00:00',
+          'failed'
+        ),
+        ...rounds,
+        row(
+          'changes-requested',
+          'submission-changes-requested:sub_quill2:1',
+          '2026-10-10 00:00:00'
+        ),
+        row('changes-requested', 'submission-changes-requested:sub_quill;', '2026-10-10 00:00:00'),
+        row('submission-paid', 'submission-paid:sub_quill', '2026-10-10 00:00:00'),
+        row('listing-approved', 'submission-approved:sub_old', '2026-10-10 00:00:00')
+      ].join(',')};`)
+    const emails = (await reads.getSubmissionReview('sub_quill'))?.emails
+    expect(emails?.slice(0, 3)).toEqual([
+      {
+        eventKey: 'submission-rejected:sub_quill',
+        kind: 'rejected_refunded',
+        status: 'failed',
+        updatedAt: '2026-10-09T00:00:00.000Z'
+      },
+      {
+        eventKey: 'submission-approved:sub_quill',
+        kind: 'approved',
+        status: 'sent',
+        updatedAt: '2026-10-09T00:00:00.000Z'
+      },
+      {
+        eventKey: 'submission-changes-requested:sub_quill:20',
+        kind: 'changes_requested',
+        status: 'sent',
+        updatedAt: '2026-10-07T00:00:29.000Z'
+      }
+    ])
+    expect(emails?.map(email => email.eventKey)).toEqual([
+      'submission-rejected:sub_quill',
+      'submission-approved:sub_quill',
+      ...Array.from(
+        { length: 18 },
+        (_, index) => `submission-changes-requested:sub_quill:${20 - index}`
+      )
+    ])
+  })
+
+  it("seeks the ledger's primary key for a submission's decision emails (#490 review)", () => {
+    const plan = selectSubmissionReviewPlans('sub_quill').at(-1)
+    if (!plan) throw new Error('missing decision email plan')
+    const steps = new SqliteD1().database
+      .prepare(`EXPLAIN QUERY PLAN ${plan.sql}`)
+      .all(...(plan.params as SQLInputValue[]))
+      .map(step => String(step.detail))
+    expect(steps.filter(step => step.startsWith('SEARCH'))).toEqual([
+      'SEARCH email_deliveries USING INDEX sqlite_autoindex_email_deliveries_1 (template_id=? AND event_key=?)',
+      'SEARCH email_deliveries USING INDEX sqlite_autoindex_email_deliveries_1 (template_id=? AND event_key>? AND event_key<?)'
+    ])
+    expect(steps.join('\n')).not.toMatch(/SCAN|TEMP B-TREE/)
   })
 
   it('reads a revision with the listing it edits and flags a stale base', async () => {

@@ -23,7 +23,7 @@ Worker handler outside Next.js.
 
 | File | Owns |
 |---|---|
-| `server.ts` | `enqueueEmail(templateId, { eventKey, to, input })` for route handlers and actions (`server-only`) |
+| `server.ts` | `enqueueEmail(templateId, { eventKey, to, input })` for route handlers and actions, and `deliverEmail` (`server-only`) |
 | `runtime.ts` | `createWorkerEmailService({ env, context, templates })` from Worker bindings; `isEmailDeliveryConfigured(env)` |
 | `service.ts` | Validation, environment policy, rendering, the ledger claim, one send, logs; `emailEventKey` |
 | `config.ts` | Environment policy, senders, link origins, the staging allowlist, useSend settings |
@@ -104,7 +104,9 @@ await enqueueEmail('<template id>', {
 ```
 
 `enqueueEmail` schedules delivery with the request's `ctx.waitUntil` and returns; it never
-throws and never fails the request. A cron or other Worker handler calls
+throws and never fails the request. `deliverEmail` does the same and resolves once delivery
+finishes with what it did (`sent`, `failed`, `pending` or `not_sent`), for a caller that reports
+it: the admin decisions (#490). A cron or other Worker handler calls
 `createWorkerEmailService` with its own `env` and `ExecutionContext`.
 
 The event key names one occurrence of an event (`submission-created:<submission id>`,

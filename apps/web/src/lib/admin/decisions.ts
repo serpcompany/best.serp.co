@@ -12,6 +12,7 @@
  * changes the catalog. Emails go through the injected `notify` whenever the decision holds,
  * a replay included: the email ledger keys each one by its event, so a retried decision never
  * sends twice, and an email whose first send failed goes out when the decision is retried.
+ * A submission decision answers what its email to the submitter did (`DecisionEmail`, #490).
  * A decision that lost only the race for the global publication version is run once more on
  * fresh state (`retryPublicationRace`).
  *
@@ -73,16 +74,28 @@ import { hasFileExtension } from '@/lib/file-extensions'
 import { isReservedListingSlug } from '@/lib/site/site-routes'
 import { errorFields } from '@/lib/telemetry/error-fields'
 import type { AppEmailTemplates } from '../email/registry'
-import type { EmailRequest } from '../email/service'
+import type { EmailDeliveryOutcome, EmailRequest } from '../email/service'
 import type { TemplateInput } from '../email/templates'
 import { retiredCategoryReason } from './listing-labels'
 import { describeMediaFailure } from './logo-note'
 
-/** Sends one of the site's emails after the response (`enqueueEmail` in production). */
+/**
+ * Sends one of the site's emails and resolves with what its delivery did (`deliverEmail` in
+ * production), at most once per template and event key.
+ */
 export type AdminNotify = <K extends keyof AppEmailTemplates & string>(
   templateId: K,
   request: EmailRequest<TemplateInput<AppEmailTemplates[K]>>
-) => Promise<void>
+) => Promise<EmailDeliveryOutcome>
+
+/**
+ * What a submission decision's email to the submitter did (#490), for the admin's toast: its
+ * delivery outcome and address, or why there is none (no account on file; a paid approval,
+ * whose email waits for #70).
+ */
+export type DecisionEmail =
+  | { outcome: EmailDeliveryOutcome; to: string }
+  | { outcome: 'no_account' | 'paid' }
 
 /**
  * Refunds a paid submission's payment through the payment provider (#68's billing module,
@@ -94,14 +107,16 @@ export type AdminNotify = <K extends keyof AppEmailTemplates & string>(
  * `refundRejectedSubmission` may run more than once for a submission: after the rejection,
  * on every replay of it, and from #68's sweep. It must be idempotent (a provider idempotency
  * key such as `refund:<submissionId>`), record the refund with `buildRefundSubmissionPlans`
- * (`after_rejection`), and send `submission-rejected-refunded`. When it throws, the
- * rejection stands and the refund stays pending. It answers `disputed` when the payment's
- * dispute is open or lost (#483): nothing is refunded, the order records that the dispute
- * decides the money, and the refund is no longer pending.
+ * (`after_rejection`), and send `submission-rejected-refunded` through `notify`. When it
+ * throws, the rejection stands and the refund stays pending. It answers `disputed` when the
+ * payment's dispute is open or lost (#483): nothing is refunded, the order records that the
+ * dispute decides the money, and the refund is no longer pending.
  */
 export interface AdminRefunds {
   refundRejectedSubmission(input: {
     actor: string
+    /** Sends the refund's emails, so the decision can answer the submitter's (#490). */
+    notify: AdminNotify
     submissionId: string
   }): Promise<'disputed' | 'refunded'>
 }
@@ -342,30 +357,46 @@ function storedReview(context: AdminContext, submissionId: string) {
 }
 
 // Decision emails are built from the stored state each time the decision holds, so a replay
-// sends the same email under the same event key (the ledger sends it at most once).
+// sends the same email under the same event key (the ledger sends it at most once). Each
+// answers what it did (`DecisionEmail`), or null when the decision sends none.
+
+const NO_ACCOUNT: DecisionEmail = { outcome: 'no_account' }
 
 /** "Approved", for a free listing; a paid one was told it went live when it was paid. */
-async function emailApproval(context: AdminContext, submissionId: string): Promise<void> {
+async function emailApproval(
+  context: AdminContext,
+  submissionId: string
+): Promise<DecisionEmail | null> {
   const review = await storedReview(context, submissionId)
+  if (review?.status !== 'approved') return null
   // The paid approval email waits for its template (#70).
-  if (review?.status !== 'approved' || review.plan !== 'free' || !review.submitter) return
-  await context.notify('listing-approved', {
+  if (review.plan !== 'free') return { outcome: 'paid' }
+  if (!review.submitter) return NO_ACCOUNT
+  const to = review.submitter.email
+  const outcome = await context.notify('listing-approved', {
     eventKey: context.eventKey('submission-approved', submissionId),
     input: { listingName: review.name, listingSlug: review.slug, website: review.website },
-    to: review.submitter.email
+    to
   })
+  return { outcome, to }
 }
 
 /** "Changes requested", once per request: a resubmitted submission can be sent back again. */
-async function emailChangesRequested(context: AdminContext, submissionId: string): Promise<void> {
+async function emailChangesRequested(
+  context: AdminContext,
+  submissionId: string
+): Promise<DecisionEmail | null> {
   const review = await storedReview(context, submissionId)
-  if (review?.status !== 'changes_requested' || !review.submitter || !review.reviewerNote) return
+  if (review?.status !== 'changes_requested' || !review.reviewerNote) return null
+  if (!review.submitter) return NO_ACCOUNT
+  const to = review.submitter.email
   const occurrence = review.events.filter(event => event.eventType === 'changes_requested').length
-  await context.notify('changes-requested', {
+  const outcome = await context.notify('changes-requested', {
     eventKey: context.eventKey('submission-changes-requested', submissionId, String(occurrence)),
     input: { note: review.reviewerNote, submissionId, submissionName: review.name },
-    to: review.submitter.email
+    to
   })
+  return { outcome, to }
 }
 
 /**
@@ -376,48 +407,57 @@ async function emailChangesRequested(context: AdminContext, submissionId: string
 async function afterRejection(
   context: AdminContext,
   submissionId: string
-): Promise<{ refundPending: boolean; refunded: boolean }> {
+): Promise<RejectionResult> {
   const review = await storedReview(context, submissionId)
-  const none = { refundPending: false, refunded: false }
+  const none = { email: null, refundPending: false, refunded: false }
   if (review?.status !== 'rejected') return none
   if (review.rejectionCategory === 'other' && review.paidAt !== null) {
-    if (review.refundedAt !== null) return { refundPending: false, refunded: true }
-    if (!context.refunds) return { refundPending: true, refunded: false }
+    if (review.refundedAt !== null) return { ...none, refunded: true }
+    if (!context.refunds) return { ...none, refundPending: true }
+    // The refund sends the submitter's rejection email under the rejection's event key.
+    const rejectionKey = context.eventKey('submission-rejected', submissionId)
+    let email: DecisionEmail | null = review.submitter ? null : NO_ACCOUNT
+    const notify: AdminNotify = async (templateId, request) => {
+      const outcome = await context.notify(templateId, request)
+      if (request.eventKey === rejectionKey) email = { outcome, to: request.to }
+      return outcome
+    }
     try {
       const refund = await context.refunds.refundRejectedSubmission({
         actor: context.actor,
+        notify,
         submissionId
       })
       // Disputed (#483): nothing refunded, and nothing pending; the dispute decides the money.
-      return { refundPending: false, refunded: refund === 'refunded' }
+      return { email, refundPending: false, refunded: refund === 'refunded' }
     } catch (error) {
       log(context, 'refund_rejected_submission', submissionId, 'refund_pending')
       console.error(JSON.stringify({ event: 'admin_refund_failed', ...errorFields(error) }))
-      return { refundPending: true, refunded: false }
+      return { ...none, refundPending: true }
     }
   }
-  if (!review.submitter || !review.rejectionReason) return none
-  const request = {
-    eventKey: context.eventKey('submission-rejected', submissionId),
-    to: review.submitter.email
-  }
-  if (review.rejectionCategory === 'prohibited') {
-    await context.notify('submission-rejected-prohibited', {
-      ...request,
-      input: {
-        reason: review.rejectionReason,
-        submissionId,
-        submissionName: review.name,
-        website: review.website
-      }
-    })
-  } else {
-    await context.notify('submission-rejected', {
-      ...request,
-      input: { reason: review.rejectionReason, submissionId, submissionName: review.name }
-    })
-  }
-  return none
+  if (!review.rejectionReason) return none
+  if (!review.submitter) return { ...none, email: NO_ACCOUNT }
+  const to = review.submitter.email
+  const eventKey = context.eventKey('submission-rejected', submissionId)
+  const outcome =
+    review.rejectionCategory === 'prohibited'
+      ? await context.notify('submission-rejected-prohibited', {
+          eventKey,
+          input: {
+            reason: review.rejectionReason,
+            submissionId,
+            submissionName: review.name,
+            website: review.website
+          },
+          to
+        })
+      : await context.notify('submission-rejected', {
+          eventKey,
+          input: { reason: review.rejectionReason, submissionId, submissionName: review.name },
+          to
+        })
+  return { ...none, email: { outcome, to } }
 }
 
 /** The edits a reviewer may make before approving (screen 11, "Edit before approving"). */
@@ -467,10 +507,12 @@ const PAYMENT_NOT_KEPT: Record<PaymentLoss, DecisionFailure> = {
   )
 }
 
+type ApprovalResult = { email: DecisionEmail | null; listingSlug: string }
+
 export function approveSubmission(
   context: AdminContext,
   input: Parameters<typeof approveSubmissionOnce>[1]
-): Promise<Decision<{ listingSlug: string }>> {
+): Promise<Decision<ApprovalResult>> {
   return retryPublicationRace(() => approveSubmissionOnce(context, input))
 }
 
@@ -486,15 +528,15 @@ async function approveSubmissionOnce(
     linkRel?: ListingLinkRel
     submissionId: string
   }
-): Promise<Decision<{ listingSlug: string }>> {
+): Promise<Decision<ApprovalResult>> {
   const expectedImageKey = input.expectedImageKey ?? null
   const expectedLogoKey = input.expectedLogoKey ?? null
   const snapshot = await submissionSnapshot(context, input.submissionId)
   if (!snapshot) return notFound('submission')
   const result = { listingSlug: snapshot.slug }
   if (snapshot.status === 'approved') {
-    await emailApproval(context, input.submissionId)
-    return { ok: true, replayed: true, ...result }
+    const email = await emailApproval(context, input.submissionId)
+    return { ok: true, replayed: true, ...result, email }
   }
   if (snapshot.status !== 'verified' && snapshot.status !== 'paid_pending_review') {
     return failure(409, 'not_in_review', 'Only a submission in the review queue can be approved.')
@@ -655,22 +697,25 @@ async function approveSubmissionOnce(
     submissionRead(context, snapshot)
   )
   log(context, 'approve_submission', input.submissionId, decision.ok ? 'approved' : decision.error)
-  if (decision.ok && !decision.replayed) context.media?.settle?.(approvedListingId)
-  if (decision.ok) await emailApproval(context, input.submissionId)
-  return decision
+  if (!decision.ok) return decision
+  if (!decision.replayed) context.media?.settle?.(approvedListingId)
+  return { ...decision, email: await emailApproval(context, input.submissionId) }
 }
 
 export async function requestSubmissionChanges(
   context: AdminContext,
   input: { note: string; submissionId: string }
-): Promise<Decision> {
+): Promise<Decision<{ email: DecisionEmail | null }>> {
   const note = input.note.trim()
   if (!note) return failure(422, 'note_required', 'Write a note for the submitter.')
   const snapshot = await submissionSnapshot(context, input.submissionId)
   if (!snapshot) return notFound('submission')
   if (snapshot.status === 'changes_requested') {
-    await emailChangesRequested(context, input.submissionId)
-    return { ok: true, replayed: true }
+    return {
+      email: await emailChangesRequested(context, input.submissionId),
+      ok: true,
+      replayed: true
+    }
   }
   if (!(submissionTransitions.requestChanges.from as readonly string[]).includes(snapshot.status)) {
     return failure(409, 'not_in_review', 'Only a submission in the review queue can be sent back.')
@@ -688,11 +733,11 @@ export async function requestSubmissionChanges(
     {}
   )
   log(context, 'request_changes', input.submissionId, decision.ok ? 'sent' : decision.error)
-  if (decision.ok) await emailChangesRequested(context, input.submissionId)
-  return decision
+  if (!decision.ok) return decision
+  return { ...decision, email: await emailChangesRequested(context, input.submissionId) }
 }
 
-type RejectionResult = { refundPending: boolean; refunded: boolean }
+type RejectionResult = { email: DecisionEmail | null; refundPending: boolean; refunded: boolean }
 
 export function rejectSubmission(
   context: AdminContext,
@@ -753,7 +798,7 @@ async function rejectSubmissionOnce(
       submissionId: input.submissionId
     }),
     async () => (await submissionSnapshot(context, input.submissionId))?.status === 'rejected',
-    { refundPending: false, refunded: false },
+    { email: null, refundPending: false, refunded: false },
     submissionRead(context, snapshot)
   )
   log(

@@ -61,6 +61,7 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { paidPlanKept } from '@/db/payment-kept'
+import type { DecisionEmail } from '@/lib/admin/decisions'
 import {
   ageWords,
   formatDateTime,
@@ -70,7 +71,7 @@ import {
   listingPath
 } from '@/lib/admin/format'
 import type { LinkRel } from '@/lib/admin/listing-view'
-import { type ReviewView, withCreatedTag } from '@/lib/admin/review-view'
+import { decisionEmailNote, type ReviewView, withCreatedTag } from '@/lib/admin/review-view'
 import { SUBMISSION_TAG_LIMIT } from '@/lib/submissions/contract'
 import { cn } from '@/lib/utils'
 import { adminRequest } from './api'
@@ -79,12 +80,14 @@ import { LogoPreview } from './logo-preview'
 import { RecordHeader } from './record-header'
 import { PlanBadge, StatusBadge, type StatusKind } from './status-badge'
 import { CategoryForm, TagForm } from './taxonomy-forms'
+import { Timeline } from './timeline'
 
 /**
  * The review page of one submission or owner revision (#64 screen 11): the page head with the
  * decisions, the listing preview (or the inline edit before approving), and the side cards.
  * Decisions call `/api/admin/{submissions|revisions}/<id>/<action>`; each compares and swaps on
- * the content version shown here, so a stale page gets a 409 and a prompt to reload.
+ * the content version shown here, so a stale page gets a 409 and a prompt to reload. A
+ * submission decision's toast also says what its email to the submitter did (#490).
  */
 
 interface Category {
@@ -228,7 +231,10 @@ export function ReviewDetail({
   async function send(action: string, body: unknown, done: string): Promise<void> {
     setBusy(true)
     setError(null)
-    const result = await adminRequest(`${basePath}/${action}`, body)
+    const result = await adminRequest<{ email?: DecisionEmail | null; refundPending?: boolean }>(
+      `${basePath}/${action}`,
+      body
+    )
     setBusy(false)
     if (!result.ok) {
       setError(result.message)
@@ -241,7 +247,11 @@ export function ReviewDetail({
       // The rejection stands; the refund (#68) is retried by rejecting again or by its sweep.
       toast.warning('Rejected, but the refund didn’t go through yet. Reject again to retry it.')
     } else {
-      toast.success(result.replayed ? 'Already done. Nothing changed.' : done)
+      const title = result.replayed ? 'Already done. Nothing changed.' : done
+      const email = decisionEmailNote(result.email)
+      const options = email ? { description: email.text } : undefined
+      if (email?.warn) toast.warning(title, options)
+      else toast.success(title, options)
     }
     router.refresh()
   }
@@ -657,6 +667,16 @@ export function ReviewDetail({
                 </p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+      ) : null}
+      {view.emails.length > 0 ? (
+        <Card className="gap-4">
+          <CardHeader>
+            <CardTitle>Emails</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Timeline items={view.emails} />
           </CardContent>
         </Card>
       ) : null}

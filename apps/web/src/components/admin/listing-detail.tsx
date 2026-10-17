@@ -63,6 +63,7 @@ import { Kv } from './kv'
 import { LogoPreview } from './logo-preview'
 import { RecordHeader } from './record-header'
 import { StatusBadge, type StatusKind } from './status-badge'
+import { Timeline } from './timeline'
 
 /**
  * One listing (#64 screen 12): details, tags (#341), outbound link, owner, badge checks, and
@@ -96,34 +97,6 @@ function ownerNote(verifiedVia: string): string {
   if (verifiedVia === 'paid_claim') return 'Paid claim: ownership doesn’t depend on a badge.'
   if (verifiedVia === 'submission') return 'They submitted this listing.'
   return 'An admin made them the owner.'
-}
-
-function Timeline({ items }: { items: ListingDetailView['activity'] }) {
-  if (items.length === 0) return <p className="text-sm text-muted-foreground">No activity yet.</p>
-  return (
-    <ol className="space-y-4">
-      {items.map(item => (
-        <li key={item.key} className="flex gap-3">
-          <span
-            className={cn(
-              'mt-1.5 size-2 shrink-0 rounded-full',
-              item.tone === 'ok'
-                ? 'bg-success'
-                : item.tone === 'warn'
-                  ? 'bg-warning'
-                  : item.tone === 'err'
-                    ? 'bg-destructive'
-                    : 'bg-muted-foreground/40'
-            )}
-          />
-          <div className="text-sm">
-            <p className="font-medium">{item.title}</p>
-            <p className="text-xs text-muted-foreground">{item.detail}</p>
-          </div>
-        </li>
-      ))}
-    </ol>
-  )
 }
 
 export function ListingDetail({
