@@ -193,23 +193,29 @@ describe('the Other categorization manifests (#333)', () => {
     }
   })
 
-  it('moves no listing that any committed manifest unpublishes (#332: its expected [other])', () => {
+  it('moves no listing that a committed manifest unpublishes from Other (#332: its expected [other])', () => {
     // Committed manifests only: d1-remote-publisher.test.ts writes temporary ones there.
     const committedFiles = execFileSync('git', ['ls-files', 'd1/publications'], {
       encoding: 'utf8'
     })
       .split('\n')
       .filter(path => /\.ya?ml$/u.test(path))
-    const unpublished = new Map<string, string>()
+    const unpublished = new Map<string, { path: string; categories: string[] }>()
     for (const path of committedFiles)
       for (const operation of parseManifest(readFileSync(resolve(path), 'utf8')).operations)
-        if (operation.action === 'listing-unpublish') unpublished.set(operation.id, path)
+        if (operation.action === 'listing-unpublish')
+          unpublished.set(operation.id, { path, categories: operation.categories })
     expect(unpublished.size).toBeGreaterThan(0)
+    // A later retirement (#546) expects the categories the listing has after these moves, never
+    // Other; one that still expects Other would be refused once the listing moves.
     for (const name of committedOtherCategoryManifests())
       for (const operation of parseManifest(readFileSync(resolve('d1/publications', name), 'utf8'))
         .operations)
         if (operation.action === 'listing-categories-set')
-          expect(unpublished.get(operation.id), `${name}: ${operation.slug}`).toBeUndefined()
+          expect(
+            unpublished.get(operation.id)?.categories ?? [],
+            `${name}: ${operation.slug} (${unpublished.get(operation.id)?.path})`
+          ).not.toContain('other')
   })
 
   it('keeps the committed manifests identical to what the committed proposal generates', () => {
