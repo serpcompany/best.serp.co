@@ -1100,11 +1100,17 @@ const SITE_REFUND: ReturnedRefund = { outside: false, refundId: null }
 /**
  * What the provider records of an order's payment now (#486): whether its refunds that haven't
  * failed send all of it back (`returned`), and the one that sends the money back (the site's own,
- * by the order it names, else the newest), or the provider's error when it couldn't say. The
- * error is null when retrying wouldn't help: nothing to ask about, or a key refused the read.
+ * by the order it names, else the newest), and the newest that failed or was canceled (`failed`,
+ * the refund a flag records, #503), or the provider's error when it couldn't say. The error is
+ * null when retrying wouldn't help: nothing to ask about, or a key refused the read.
  */
 type RefundsAtProvider =
-  | { checked: true; refund: ProviderRefund | null; returned: boolean }
+  | {
+      checked: true
+      failed: ProviderRefund | null
+      refund: ProviderRefund | null
+      returned: boolean
+    }
   | { checked: false; error: unknown }
 
 async function refundsAtProvider(
@@ -1130,6 +1136,8 @@ async function refundsAtProvider(
   )
   return {
     checked: true,
+    failed:
+      refunds.find(refund => refund.status === 'failed' || refund.status === 'canceled') ?? null,
     refund: sending.find(refund => refund.orderId === order.id) ?? sending[0] ?? null,
     returned: sending.reduce((sum, refund) => sum + refund.amountCents, 0) >= charged
   }
@@ -2002,7 +2010,8 @@ async function finishRefundAtProvider(
  * events arrive in. Its refunds that haven't failed send it all back: a flag clears (a later
  * refund, in the provider's dashboard say, sent the money back, #485) and records that refund.
  * They don't: the refund that sent it back has failed since, so the order is flagged as its
- * `refund.failed` would (a retried report landing after its failure never clears it). When the
+ * `refund.failed` would, recording the same refund (a retried report landing after its failure
+ * never clears it, and the admin is emailed once for that failure, #503). When the
  * provider can't say for now (down, a timeout, a rate limit, a 5xx, a partial list), nothing is
  * recorded: a flag stays, and the error answers the delivery 500, so the provider's retry decides
  * with its record (#513). When its key is refused the read (401, 403), or there is nothing to ask
@@ -2028,7 +2037,9 @@ async function settleRefundFlag(
     } else if (atProvider.returned && flagged) {
       if (await clearRefundFailed(deps, order, atProvider.refund?.id ?? null)) return
     } else {
-      if (!atProvider.returned && !flagged) await flagRefundFailedNow(deps, order, null)
+      if (!atProvider.returned && !flagged) {
+        await flagRefundFailedNow(deps, order, null, atProvider.failed?.id ?? null)
+      }
       return
     }
   }
@@ -2123,7 +2134,9 @@ async function alertPartialRefund(
  * refunds decides (#486), whatever order their events arrive in: when its refunds that haven't
  * failed still send all of it back (a later refund did, its report delivered first), nothing is
  * flagged, and a flag set while the provider couldn't say is cleared. Otherwise the money never
- * went back (`flagRefundFailedNow`). When the provider can't say, the report decides as before:
+ * went back (`flagRefundFailedNow`), and a `refunded` order records the newest refund the
+ * provider's record says failed, whichever report flags it (#503), so a late report of an older
+ * refund can't overwrite it. When the provider can't say, the report decides as before:
  * a failure of a refund other than the one the order records (`provider_refund_id`: an earlier
  * one, reported after a newer one succeeded, #485) flags nothing; the error then answers the
  * delivery 500, so the provider's retry checks again. A clear the order changed under while the
@@ -2152,7 +2165,7 @@ async function flagRefundFailed(
       deps,
       current,
       atProvider.checked ? null : refundId,
-      refundId
+      atProvider.checked ? (atProvider.failed?.id ?? refundId) : refundId
     )
     if (!atProvider.checked && atProvider.error) throw atProvider.error
     return outcome
@@ -2171,8 +2184,9 @@ async function flagRefundFailed(
  * recorded meanwhile, so the dispute's own takedown reads the flag. `unlessSupersededBy`: when the
  * provider couldn't say (#486), a failure of a refund other than the one the order records flags
  * nothing; one with no recorded refund (blanked when a refund outside the site cleared the flag)
- * always flags. `failedRefundId`: the refund the report says failed, which a `refunded` order then
- * records as its refund, so the admin's email names that refund (`alertKey`, #503). Three lost
+ * always flags. `failedRefundId`: the refund that failed (the newest failed one in the provider's
+ * record, else the one the report names), which a `refunded` order then records as its refund, so
+ * the admin's email names that refund however its reports arrive (`alertKey`, #503). Three lost
  * writes throw, so the provider's retry runs it again.
  */
 async function flagRefundFailedNow(
@@ -2253,7 +2267,7 @@ async function alertAdmin(
 
 /**
  * An admin alert's event key: the order and the kind, and for a failed refund the refund the
- * flagged order records (`provider_refund_id`, #503). That is the refund that failed: its report
+ * flagged order records (`provider_refund_id`, #503). That is the refund that failed: the flag
  * records it (`flagRefundFailedNow`), and a clear records the refund that sent the money back, so
  * that refund's own failure emails the admin again, while a retried report of the same failure
  * doesn't. A `refunding` order records none until its refund finishes (which clears the flag), so

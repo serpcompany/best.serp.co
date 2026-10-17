@@ -471,15 +471,16 @@ export function buildRecordProviderRefundPlans(input: {
  * takedown of its listing, and a flag without one asserts no such dispute was recorded meanwhile,
  * so a dispute and a failed refund that race always meet (one of them takes the listing down).
  * Either refuses the batch once the order moved on. A `refunded` order records the refund that
- * failed (`refundId`, when the report names it) as its refund, so the admin's email for it is keyed
- * on that refund however its events arrive (#503); without one it keeps the refund it records.
+ * failed (`refundId`: the provider's record's newest failed one, else the one the report names) as
+ * its refund, so the admin's email for it is keyed on that refund however its events arrive
+ * (#503); without one it keeps the refund it records.
  */
 export function buildFlagRefundFailedPlans(input: {
   disputed?: boolean
   now: string
   orderId: string
   refunded?: boolean
-  /** The refund that failed, as its report names it (a `refunded` order only). */
+  /** The refund that failed, by the provider's record or its report (a `refunded` order only). */
   refundId?: string | null
 }): StatementPlan[] {
   if (input.disputed || input.refunded) {

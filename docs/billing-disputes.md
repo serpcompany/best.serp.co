@@ -81,10 +81,12 @@ refund sent the money back, and its report came first) and a `charge.refunded` c
 recording the refund that sent it back (`provider_refund_id`), so that refund's own failure flags
 the order again and a later dispute takes the listing down. When none does, a `refund.failed` flags
 the order, and so does a `charge.refunded` of a `refunded` order: a retried report that lands after
-its refund failed never clears it. A `refunded` order's flag records the refund that failed (the
-`refund.failed`'s, as `provider_refund_id`), and the admin's email is keyed on it, hashed (an email
-key can't hold Stripe's capitals): the dashboard refund that cleared a flag and then failed too
-emails the admin again, and a retried report of the same failure doesn't. A `refunding` order
+its refund failed never clears it. A `refunded` order's flag records the refund that failed (as
+`provider_refund_id`: the newest failed one in Stripe's record, or the `refund.failed`'s when Stripe
+can't say), and the admin's email is keyed on it, hashed (an email key can't hold Stripe's
+capitals): the dashboard refund that cleared a flag and then failed too emails the admin again,
+and a retried report of the same failure doesn't, whichever of its `charge.refunded` and
+`refund.failed` lands first. A `refunding` order
 records no refund until its refund finishes, so its failure is keyed on the order. The sweep sends
 a failed refund's email again only while the order is still flagged. A clear is compared and
 swapped on the order as read before Stripe was asked (its `updated_at`), so a refund's failure
@@ -92,10 +94,11 @@ recorded during that call makes the event read both again; when the order keeps 
 stays and the delivery answers 500 (#498's review). If Stripe can't say for now (unreachable, a
 timeout, 429, a 5xx, or more refunds than the ten pages of 100 the site reads, never read as a short
 total), the delivery answers 500, so Stripe delivers it again and its record then decides. Until
-then a `charge.refunded` records nothing, so a flag stays (#513), and a `refund.failed` decides as
-before: it flags the order unless it is for a refund other than the one the order records
-(`provider_refund_id`: an earlier one, reported after the site's retry succeeded). If Stripe refuses
-the read (401 or 403), the event decides as before and is answered, as
+then a `charge.refunded` leaves a flag as it is (#513; a dashboard refund of a `paid` order is
+still recorded first, then answered 500), and a `refund.failed` decides as before: it flags the
+order unless it is for a refund other than the one the order records (`provider_refund_id`: an
+earlier one, reported after the site's retry succeeded). If Stripe refuses the read (401 or 403),
+the event decides as before and is answered, as
 [Configuration](./billing.md#configuration-owner) describes: a `refund.failed` as above, and a
 `charge.refunded` clears the flag unless it is the site's own refund's (its `refund:<order>` key:
 the refund that failed, delivered late).

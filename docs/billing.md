@@ -222,9 +222,10 @@ when Stripe can't say ([Refunds](./billing-disputes.md#refunds)) and answers 2xx
 permission never answers every refund event 500 until Stripe stops retrying. Any other failure of
 that read (unreachable, a timeout, 429, a 5xx, or more refunds than it reads, `refunds_incomplete`)
 logs the same event with `retry: true` and answers 500, so Stripe delivers it again; a
-`charge.refunded` records nothing first: it neither finishes a claimed refund (#504) nor clears a
-`refund_failed` flag (#513). The sweep skips flagged orders, so while that read keeps failing an
-admin's "Refund…" settles a flagged `refunding` order, and a flagged `refunded` one stays flagged.
+`charge.refunded` neither finishes a claimed refund (#504) nor clears a `refund_failed` flag (#513)
+first (a dashboard refund of a `paid` order is still recorded, then answered 500). The sweep
+skips flagged orders, so while that read keeps failing an admin's "Refund…" settles a flagged
+`refunding` order, and a flagged `refunded` one stays flagged.
 After the next refund on staging, look for `billing_refunds_unchecked` in its logs before promoting.
 Webhook endpoints (trailing slash included; Stripe does not follow redirects):
 
