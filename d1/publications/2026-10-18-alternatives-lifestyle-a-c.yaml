@@ -1,0 +1,145 @@
+# serpcompany/best.serp.co#539 (batch F): hand-picked alternatives for the 17 live listings whose
+# primary category is Health & Lifestyle and whose slug starts with a to c (bargpt.app to
+# copilot2trip.com; none starts with a), the first part of Health & Lifestyle in #539's size order;
+# a later batch takes d to z. The picks lead each page's Alternatives section; the page tops it up
+# to six from similar listings.
+# Picked on 2026-10-18 from staging's live listings (read-only), each also live on production
+# (https://best.serp.co/sitemap-products.xml, read that day), by what each listing and its
+# candidates say they do: a pick does the same job for the same kind of user, best first, and a
+# listing gets fewer than six, or none, when nothing else fits. That day each listing's site and
+# each pick's site was read to confirm it still offers the product its listing describes; BarGPT,
+# which blocks scripts, was read in a browser.
+# Every listing and pick is a v1 import listing, with the same id and slug on staging and
+# production. The reason for each listing is the comment above its operation.
+# Six listings have no operation. Five because nothing in the catalog substitutes for them on
+# 2026-10-18: BarGPT (AI cocktail recipes), Be My Eyes (live visual help for blind and low-vision
+# people from volunteers and AI), Boredhumans (a collection of free AI toys and entertainment
+# tools), CareFlick (an AI companion that keeps older people company) and ChessGPT.ai (playing chess
+# against ChatGPT). One because its site doesn't offer the listed product on 2026-10-18, so it is a
+# retirement candidate and no listing picks it: Cheerleaderai (cheerleaderai.com, the connection
+# fails). Their pages keep the similar-listings fallback.
+# Each listing-alternatives-set compares and swaps the listing's slug and current picks (none yet),
+# refuses a pick that isn't live with that id and slug, keeps the listing's checksum, and logs an
+# `edited` event. Row-level, so the batch is refused with nothing written if any listing changed.
+# Needs migration 0018_listing_alternatives (#534, release 9). Publish on staging first, then on
+# production after the promotion that carries it.
+version: 1
+id: 2026-10-18-alternatives-lifestyle-a-c
+concurrency: rows
+provenance:
+  actor: devinschumacher
+  workflow: github/publish-d1
+operations:
+  # bizzabo.com: event management platforms for company events and conferences.
+  - action: listing-alternatives-set
+    id: lst_6007f742b59eb8e8b8b2a66f
+    slug: bizzabo.com
+    reason: '#539: hand-picked alternatives (batch F)'
+    expected: []
+    alternatives:
+      - { id: lst_868eee08306656558ff218a2, slug: boompop.com }
+      - { id: lst_03c5c245805a41c5e6ad28a4, slug: gatherly.io }
+  # boompop.com: event management platforms for company events.
+  - action: listing-alternatives-set
+    id: lst_868eee08306656558ff218a2
+    slug: boompop.com
+    reason: '#539: hand-picked alternatives (batch F)'
+    expected: []
+    alternatives:
+      - { id: lst_6007f742b59eb8e8b8b2a66f, slug: bizzabo.com }
+  # buoyhealth.com: AI symptom checkers.
+  - action: listing-alternatives-set
+    id: lst_5d9964eee033c567494379df
+    slug: buoyhealth.com
+    reason: '#539: hand-picked alternatives (batch F)'
+    expected: []
+    alternatives:
+      - { id: lst_9eb69c91201a22a7239de775, slug: ubiehealth.com }
+      - { id: lst_03f90b7d527851ade6880f2a, slug: symptomchecker.io }
+  # burnbacon.com: AI fitness and nutrition coaching.
+  - action: listing-alternatives-set
+    id: lst_7e98432eaf369bbe2e07c163
+    slug: burnbacon.com
+    reason: '#539: hand-picked alternatives (batch F)'
+    expected: []
+    alternatives:
+      - { id: lst_45cd9f6e2d4e9be94a628c5f, slug: strongrfastr.com }
+      - { id: lst_26cc57d84f3784e8cf17286b, slug: dr-muscle.com }
+      - { id: lst_d836059a52c3010671356eb3, slug: welling.ai }
+      - { id: lst_14bb8a79bbaca662bc7364f8, slug: fitbod.me }
+      - { id: lst_54bb53ed43490319ad545a05, slug: gymbuddy.ai }
+      - { id: lst_632d27a715cc6607caaf10a3, slug: lifesum.com }
+  # casadesante.com: AI meal planners that fit a diet.
+  - action: listing-alternatives-set
+    id: lst_43035a5ac8087341f79feeb0
+    slug: casadesante.com
+    reason: '#539: hand-picked alternatives (batch F)'
+    expected: []
+    alternatives:
+      - { id: lst_35e8652793035bd6a8e0ab59, slug: mealgenie.ai }
+      - { id: lst_48413524f219b723c707b224, slug: mealmind.io }
+      - { id: lst_11dca9e79faee2d2c7b0f67e, slug: prospre.io }
+      - { id: lst_45cd9f6e2d4e9be94a628c5f, slug: strongrfastr.com }
+      - { id: lst_54d4e8537ad651fd8e8fe1ae, slug: mealpractice.com }
+      - { id: lst_02764b81a4579c713ec42dd8, slug: dishgen.com }
+  # charisma.ai: conversational AI characters for interactive stories and training scenarios.
+  - action: listing-alternatives-set
+    id: lst_3d5f84097ffc3bf6d3fc6600
+    slug: charisma.ai
+    reason: '#539: hand-picked alternatives (batch F)'
+    expected: []
+    alternatives:
+      - { id: lst_b8c35630648444f297255106, slug: convai.com }
+  # chefgpt.xyz: AI recipe generators from the ingredients you have.
+  - action: listing-alternatives-set
+    id: lst_fa92720f8ceb06bd69ce6eac
+    slug: chefgpt.xyz
+    reason: '#539: hand-picked alternatives (batch F)'
+    expected: []
+    alternatives:
+      - { id: lst_c5d360500e966d245acfdebd, slug: what-the-chef.com }
+      - { id: lst_78efca4ab27660c359e33ce4, slug: scrappychef.ai }
+      - { id: lst_02764b81a4579c713ec42dd8, slug: dishgen.com }
+      - { id: lst_ddab070eba92ebf32b67edbd, slug: cookaifood.com }
+      - { id: lst_0c67097a483a157faf374524, slug: mealsai.com }
+  # cladwell.com: apps that plan outfits from the clothes you own.
+  - action: listing-alternatives-set
+    id: lst_2ce3994ce22355d9d8c66b91
+    slug: cladwell.com
+    reason: '#539: hand-picked alternatives (batch F)'
+    expected: []
+    alternatives:
+      - { id: lst_4e48c6e7253a3beb4c178492, slug: dressrious.com }
+  # convai.com: conversational AI characters for games, virtual worlds and training (Inworld now sells realtime voice and LLM infrastructure, including live dialogue for game characters).
+  - action: listing-alternatives-set
+    id: lst_b8c35630648444f297255106
+    slug: convai.com
+    reason: '#539: hand-picked alternatives (batch F)'
+    expected: []
+    alternatives:
+      - { id: lst_f4f8d704eb1b2220cd20bc03, slug: inworld.ai }
+      - { id: lst_3d5f84097ffc3bf6d3fc6600, slug: charisma.ai }
+  # cookaifood.com: AI recipe generators.
+  - action: listing-alternatives-set
+    id: lst_ddab070eba92ebf32b67edbd
+    slug: cookaifood.com
+    reason: '#539: hand-picked alternatives (batch F)'
+    expected: []
+    alternatives:
+      - { id: lst_fa92720f8ceb06bd69ce6eac, slug: chefgpt.xyz }
+      - { id: lst_02764b81a4579c713ec42dd8, slug: dishgen.com }
+      - { id: lst_0c67097a483a157faf374524, slug: mealsai.com }
+      - { id: lst_c5d360500e966d245acfdebd, slug: what-the-chef.com }
+      - { id: lst_78efca4ab27660c359e33ce4, slug: scrappychef.ai }
+  # copilot2trip.com: AI travel planners that build itineraries.
+  - action: listing-alternatives-set
+    id: lst_16307c329eee19586e5b2c0e
+    slug: copilot2trip.com
+    reason: '#539: hand-picked alternatives (batch F)'
+    expected: []
+    alternatives:
+      - { id: lst_e48c7df481c37405e7f05554, slug: mindtrip.ai }
+      - { id: lst_7a4b25f8935ab2b6acd7036a, slug: tripplanner.ai }
+      - { id: lst_1e0941a261d67f48c38fdec2, slug: nowy.io }
+      - { id: lst_b5995f85a96384b731b9d043, slug: usevacay.com }
+      - { id: lst_c6f976a06f20b03afae07efd, slug: plantripai.com }
