@@ -1597,7 +1597,15 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
     // A later refund that succeeded clears a refunded order's flag and its recorded refund, so
     // that refund's own failure flags it again (#485 rounds 2 and 3).
     await db.prepare(`UPDATE orders SET provider_refund_id='re_1' WHERE id='ord-dispute'`).run()
-    await run(B.buildClearRefundFailedPlans({ now: NOW, orderId: 'ord-dispute' }))
+    const readAt = String((await order('ord-dispute'))?.updated_at)
+    // Compared and swapped on `updated_at` as read before the provider was asked (#498's
+    // review): a refund's failure recorded meanwhile bumps it, and the clear is refused.
+    await expect(
+      run(B.buildClearRefundFailedPlans({ now: NOW, orderId: 'ord-dispute', updatedAt: 'before' }))
+    ).rejects.toThrow()
+    await run(
+      B.buildClearRefundFailedPlans({ now: NOW, orderId: 'ord-dispute', updatedAt: readAt })
+    )
     expect(await order('ord-dispute')).toMatchObject({
       attention: null,
       provider_refund_id: null,
@@ -1606,7 +1614,12 @@ describe('#62 plans on Wrangler-local D1 (workerd)', () => {
     // When the provider says which refund sent the money back, the clear records it (#486).
     await db.prepare(`UPDATE orders SET attention='refund_failed' WHERE id='ord-dispute'`).run()
     await run(
-      B.buildClearRefundFailedPlans({ now: NOW, orderId: 'ord-dispute', refundId: 're_dash' })
+      B.buildClearRefundFailedPlans({
+        now: NOW,
+        orderId: 'ord-dispute',
+        refundId: 're_dash',
+        updatedAt: String((await order('ord-dispute'))?.updated_at)
+      })
     )
     expect(await order('ord-dispute')).toMatchObject({
       attention: null,

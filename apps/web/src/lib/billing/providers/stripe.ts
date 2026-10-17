@@ -355,7 +355,10 @@ export function createStripeProvider(config: StripeConfig): BillingProvider {
     },
 
     async paymentRefunds(paymentId) {
-      if (!/^pi_[A-Za-z0-9_]+$/u.test(paymentId)) return []
+      // Never sent to Stripe, and an error: "no refunds" would read as nothing sent back.
+      if (!/^pi_[A-Za-z0-9_]+$/u.test(paymentId)) {
+        throw new BillingProviderError('Not a PaymentIntent id.', 'invalid_payment', 400)
+      }
       // The Refunds read that the Refunds write a restricted key needs already includes (#486).
       // Every page, older ones after `starting_after`: the service totals them all, so a payment
       // with more refunds than a page holds is never read as partly refunded.

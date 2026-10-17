@@ -48,6 +48,7 @@ import { type GuardrailResult, guardrailProblem } from './guardrails'
 import {
   type BillingEvent,
   type BillingProvider,
+  BillingProviderError,
   BillingWebhookError,
   type CheckoutState,
   type PaymentChange,
@@ -85,6 +86,12 @@ const FAILED_RECONCILE_MS = 3 * 24 * 60 * 60 * 1000
 const SWEEP_PROVIDER_CALLS = 20
 /** How often a write that lost the catalog publication race tries again. */
 const PUBLICATION_ATTEMPTS = 3
+/**
+ * How many times a refund event decides an order's `refund_failed` flag on the provider's record
+ * before its delivery answers 500 (#498's review): a clear refused because the order changed
+ * while the provider was asked reads both again once.
+ */
+const REFUND_FLAG_DECISIONS = 2
 /**
  * The sweep sends a payment's emails again for this long after it was applied or changed
  * outside the site (#481), well inside the email provider's idempotency window, and from
@@ -1093,7 +1100,8 @@ const SITE_REFUND: ReturnedRefund = { outside: false, refundId: null }
 /**
  * What the provider records of an order's payment now (#486): whether its refunds that haven't
  * failed send all of it back (`returned`), and the one that sends the money back (the site's own,
- * by the order it names, else the newest), or the provider's error when it couldn't say.
+ * by the order it names, else the newest), or the provider's error when it couldn't say. The
+ * error is null when retrying wouldn't help: nothing to ask about, or a key refused the read.
  */
 type RefundsAtProvider =
   | { checked: true; refund: ProviderRefund | null; returned: boolean }
@@ -1109,8 +1117,13 @@ async function refundsAtProvider(
   try {
     refunds = await deps.provider.paymentRefunds(order.providerPaymentId)
   } catch (error) {
-    logError('billing_refunds_unchecked', error, { order: order.id })
-    return { checked: false, error }
+    // A key refused the read (401, 403) won't be let in on a retry: the event decides as before
+    // and is answered, rather than every refund event answering 500 until Stripe gives up (#498's
+    // review). Anything else (Stripe down, rate-limited, a partial list) is retried.
+    const refused =
+      error instanceof BillingProviderError && (error.status === 401 || error.status === 403)
+    logError('billing_refunds_unchecked', error, { order: order.id, retry: !refused })
+    return { checked: false, error: refused ? null : error }
   }
   const sending = refunds.filter(
     refund => refund.status === 'pending' || refund.status === 'succeeded'
@@ -1133,7 +1146,14 @@ async function returnedRefund(
   order: OrderRecord,
   otherwise: ReturnedRefund
 ): Promise<ReturnedRefund> {
-  const atProvider = await refundsAtProvider(deps, order)
+  return refundOf(await refundsAtProvider(deps, order), order, otherwise)
+}
+
+function refundOf(
+  atProvider: RefundsAtProvider,
+  order: OrderRecord,
+  otherwise: ReturnedRefund
+): ReturnedRefund {
   if (!atProvider.checked || !atProvider.refund) return otherwise
   return { outside: atProvider.refund.orderId !== order.id, refundId: atProvider.refund.id }
 }
@@ -1946,14 +1966,24 @@ function siteRefundRunning(deps: BillingDependencies, order: OrderRecord): boole
  * is refunded already). The provider's record of the payment's refunds says which refund it was;
  * when it can't, the report's request key does: the site's own (`siteRefund`) is a call whose
  * answer never came back (a timeout after the provider refunded), recorded as the site's refund
- * with no "refunded outside the site" alert (#484).
+ * with no "refunded outside the site" alert (#484). When the provider's record says its refunds
+ * that haven't failed don't send the payment back (the reported refund failed since: a retried
+ * report, delivered after its failure, #498's review), nothing went back: the order stays
+ * `refunding`, flagged `refund_failed` (the sweep stops retrying it, and never tells the owner it
+ * was refunded).
  */
 async function finishRefundAtProvider(
   deps: BillingDependencies,
   order: OrderRecord,
   siteRefund: boolean
 ): Promise<string> {
-  const refund = await returnedRefund(deps, order, { outside: !siteRefund, refundId: null })
+  const atProvider = await refundsAtProvider(deps, order)
+  if (atProvider.checked && !atProvider.returned) {
+    logWarning('billing_refund_not_returned', { order: order.id })
+    if (order.attention === 'refund_failed') return 'refund_failed'
+    return flagRefundFailedNow(deps, order, null)
+  }
+  const refund = refundOf(atProvider, order, { outside: !siteRefund, refundId: null })
   await recordClaimedRefund(deps, order.id, refund, false)
   if (!refund.outside) return 'refunded'
   log('billing_order_refunded_at_provider', { claimed: order.refundReason, order: order.id })
@@ -1970,39 +2000,58 @@ async function finishRefundAtProvider(
  * `refund.failed` would (a retried report landing after its failure never clears it). When the
  * provider can't say, the report decides as before: any but the site's own refund's (its
  * request key, the refund that failed, delivered late) clears the flag; the error then answers the
- * delivery 500, so the provider's retry checks again.
+ * delivery 500, so the provider's retry checks again. A clear the order changed under while the
+ * provider was asked (`clearRefundFailed`) reads both again; when that keeps losing, the flag
+ * stays and the delivery answers 500.
  */
 async function settleRefundFlag(
   deps: BillingDependencies,
   orderId: string,
   requestKey: string | null
 ): Promise<void> {
-  const order = await deps.operations.order(orderId)
-  if (order?.status !== 'refunded') return
-  const flagged = order.attention === 'refund_failed'
-  const atProvider = await refundsAtProvider(deps, order)
-  if (atProvider.checked) {
-    if (atProvider.returned && flagged) {
-      await clearRefundFailed(deps, order, atProvider.refund?.id ?? null)
-    } else if (!atProvider.returned && !flagged) {
-      await flagRefundFailedNow(deps, order, null)
+  for (let decision = 0; decision < REFUND_FLAG_DECISIONS; decision += 1) {
+    const order = await deps.operations.order(orderId)
+    if (order?.status !== 'refunded') return
+    const flagged = order.attention === 'refund_failed'
+    const atProvider = await refundsAtProvider(deps, order)
+    if (!atProvider.checked) {
+      const clears = flagged && requestKey !== `refund:${order.id}`
+      const settled = !clears || (await clearRefundFailed(deps, order, null))
+      if (atProvider.error) throw atProvider.error
+      if (settled) return
+    } else if (atProvider.returned && flagged) {
+      if (await clearRefundFailed(deps, order, atProvider.refund?.id ?? null)) return
+    } else {
+      if (!atProvider.returned && !flagged) await flagRefundFailedNow(deps, order, null)
+      return
     }
-    return
   }
-  if (flagged && requestKey !== `refund:${order.id}`) await clearRefundFailed(deps, order, null)
-  if (atProvider.error) throw atProvider.error
+  throw new CodedError(
+    'billing_payment_change_not_recorded',
+    `The refund_failed flag of order ${orderId} could not be settled yet.`
+  )
 }
 
-/** Clears a `refunded` order's flag: the money went back, by `refundId` when known (#485, #486). */
+/**
+ * Clears a `refunded` order's flag: the money went back, by `refundId` when known (#485, #486).
+ * False when the order changed since it was read (its `updated_at`), while the provider was asked:
+ * a refund's failure recorded meanwhile, say (#498's review), so the caller reads and decides again.
+ */
 async function clearRefundFailed(
   deps: BillingDependencies,
   order: OrderRecord,
   refundId: string | null
-): Promise<void> {
-  await deps.operations.apply(
-    buildClearRefundFailedPlans({ now: nowIso(deps), orderId: order.id, refundId })
+): Promise<boolean> {
+  const cleared = await deps.operations.apply(
+    buildClearRefundFailedPlans({
+      now: nowIso(deps),
+      orderId: order.id,
+      refundId,
+      updatedAt: order.updatedAt
+    })
   )
-  log('billing_refund_failed_cleared', { order: order.id })
+  if (cleared) log('billing_refund_failed_cleared', { order: order.id })
+  return cleared
 }
 
 /**
@@ -2071,7 +2120,8 @@ async function alertPartialRefund(
  * went back (`flagRefundFailedNow`). When the provider can't say, the report decides as before:
  * a failure of a refund other than the one the order records (`provider_refund_id`: an earlier
  * one, reported after a newer one succeeded, #485) flags nothing; the error then answers the
- * delivery 500, so the provider's retry checks again.
+ * delivery 500, so the provider's retry checks again. A clear the order changed under while the
+ * provider was asked reads both again, as `settleRefundFlag`'s does.
  */
 async function flagRefundFailed(
   deps: BillingDependencies,
@@ -2079,17 +2129,27 @@ async function flagRefundFailed(
   /** The refund that failed (`PaymentChange.refundId`), when the provider reports it. */
   refundId: string | null
 ): Promise<string> {
-  const atProvider = await refundsAtProvider(deps, order)
-  if (atProvider.checked && atProvider.returned) {
-    if (order.status === 'refunded' && order.attention === 'refund_failed') {
-      await clearRefundFailed(deps, order, atProvider.refund?.id ?? null)
+  let current: OrderRecord | null = order
+  for (let decision = 0; decision < REFUND_FLAG_DECISIONS; decision += 1) {
+    if (decision > 0) current = await deps.operations.order(order.id)
+    if (!current) return 'unknown_order'
+    const atProvider = await refundsAtProvider(deps, current)
+    if (atProvider.checked && atProvider.returned) {
+      const flagged = current.status === 'refunded' && current.attention === 'refund_failed'
+      if (flagged && !(await clearRefundFailed(deps, current, atProvider.refund?.id ?? null))) {
+        continue
+      }
+      log('billing_refund_failed_superseded', { order: current.id })
+      return 'refund_failed_superseded'
     }
-    log('billing_refund_failed_superseded', { order: order.id })
-    return 'refund_failed_superseded'
+    const outcome = await flagRefundFailedNow(deps, current, atProvider.checked ? null : refundId)
+    if (!atProvider.checked && atProvider.error) throw atProvider.error
+    return outcome
   }
-  const outcome = await flagRefundFailedNow(deps, order, atProvider.checked ? null : refundId)
-  if (!atProvider.checked && atProvider.error) throw atProvider.error
-  return outcome
+  throw new CodedError(
+    'billing_payment_change_not_recorded',
+    `The failed refund of order ${order.id} could not be recorded yet.`
+  )
 }
 
 /**

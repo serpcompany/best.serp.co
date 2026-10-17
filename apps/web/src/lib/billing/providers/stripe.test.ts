@@ -317,8 +317,11 @@ describe('Stripe provider', () => {
     })
     // Stripe down: the provider's error, so the webhook answers 500 and is delivered again.
     await expect(stripe.paymentRefunds('pi_1')).rejects.toBeInstanceOf(BillingProviderError)
-    // Anything but a PaymentIntent id is never sent.
-    await expect(stripe.paymentRefunds('cs_test_1')).resolves.toEqual([])
+    // Anything but a PaymentIntent id is never sent, and is an error, never "no refunds".
+    await expect(stripe.paymentRefunds('cs_test_1')).rejects.toMatchObject({
+      code: 'invalid_payment',
+      name: 'BillingProviderError'
+    })
     expect(calls).toHaveLength(2)
   })
 
